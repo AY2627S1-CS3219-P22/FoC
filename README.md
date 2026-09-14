@@ -14,11 +14,11 @@ withdrawn, or exchanged for money, and only circulate within the platform.
 
 | Name | Role |
 | ----- | ----- |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
+| Eunice | Order Service |
+| Jade | User Service |
+| Karthika | Credit Service |
+| Maliha | UI |
+|Sanya | Supplier Service |
 
 ---
 
