@@ -1,0 +1,30 @@
+{
+  "name": "Supplier-Service",
+  "version": "1.0.0",
+  "description": "Supplier Service for Supplier Listings and Search",
+  "main": "NA",
+  "author": "@sunpterodactyl",
+  "scripts": {
+    "test": "vitest run",
+    "test:db": "vitest run tests/db",
+    "dev": "nodemon src/index.ts"
+  },
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.2",
+    "@types/pg": "^8.23.1",
+    "dotenv": "^18.0.3",
+    "joi": "^18.2.9",
+    "nodemon": "^3.1.14",
+    "pg": "^8.23.0",
+    "supabase": "^2.117.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^7.0.2",
+    "vitest": "4"
+  }
+}
