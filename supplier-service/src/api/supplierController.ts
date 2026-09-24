@@ -2,6 +2,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import {getSupplierByIdService, updateSupplierByIdService, deleteSupplierByIdService, getAllSuppliersService}  from '@database/SupplierRepository';
+import { randomUUID } from 'crypto';
 
 const handleResponse = (res: Response, status: number, data: any, message: string) => {
     res.status(status).json({
@@ -12,6 +13,8 @@ const handleResponse = (res: Response, status: number, data: any, message: strin
 
 export default handleResponse;
 
+//TODO: Implement Idempotency Key
+const idempotencyKey = randomUUID; //to prevent the same duplicate supplier creation/edit request
 
 export const getAllSuppliers = async(req:Request, res:Response, next:NextFunction) => {
     try {
@@ -33,7 +36,6 @@ export const getSupplierById = async(req:Request, res:Response, next:NextFunctio
  };
 
 
-//TODO: How will the API handle the deletion of a supplier when a user has an ongoing request?
 export const deleteSupplierById = async(req:Request, res:Response, next:NextFunction) => {
     try {
         const deletedSupplier = await deleteSupplierByIdService(Int8Array.from(req.params.id));
@@ -46,5 +48,5 @@ export const deleteSupplierById = async(req:Request, res:Response, next:NextFunc
  export const createSupplier = async() => {0;}
 
  export const updateSupplierById = async() => {0;}
-//TODO: How will the API handle field validation for a newly creater or updated supplier
+
 //TODO: How will the API handle writes that fail + repeated request the admin user makes

@@ -14,7 +14,8 @@
     "forceConsistentCasingInFileNames": true, 
     "paths": {
       "@/*": ["./src/*"], "@database/*": ["./src/database/*"], 
-      "@data/*": ["./src/data/*"], "@api/*": ["./src/api/*"]
+      "@data/*": ["./src/data/*"], "@api/*": ["./src/api/*"],
+      "@middleware/*": ["./src/middleware/*"]
      },
     }
 

@@ -1,5 +1,9 @@
+//This is where the express server lives
+
 import dotenv from 'dotenv';
 import express from "express";
+import supplierRouter from "@api/router";
+import errorHandler from "@middleware/errorHandler";
 
 dotenv.config();
 
@@ -10,8 +14,23 @@ const port = process.env.PORT || 3001;
 app.use(express.json());
 
 //Routes
+app.get('/', (_req, res) => {
+    res.status(200).json({
+        service: 'Supplier Service',
+        status: 'ok',
+        routes: {
+            list: 'GET /supplier',
+            getById: 'GET /supplier/:id',
+            create: 'POST /supplier',
+            update: 'PUT /supplier/:id',
+            remove: 'DELETE /supplier/:id',
+        },
+    });
+});
+app.use(supplierRouter);
 
 //Error handling middleware
+app.use(errorHandler);
 
 //Server running
 app.listen(port, () => {

@@ -7,7 +7,7 @@
   "scripts": {
     "test": "vitest run",
     "test:db": "vitest run tests/db",
-    "dev": "nodemon src/index.ts"
+    "dev": "tsx watch src/index.ts"
   },
   "type": "module",
   "license": "MIT",
@@ -26,6 +26,7 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "4"
+    "vitest": "4",
+    "zod": "^4.6.5"
   }
 }
