@@ -22,10 +22,12 @@ export class Supplier {
     }
 
     //less strict equality check for suppliers, only checks if the supplierId is the same
-    public equals(other: Supplier) {
-        return this.supplierId === other.supplierId;
+    public hasDuplicateName(other: Supplier) {
+        return this.name === other.name;
+        //Checks if a supplier has a duplicate name with another supplier
     }
 
+    /*
     //strict equality check for duplicates
     public isDuplicateOf(other: Supplier): boolean {
         return (
@@ -34,6 +36,7 @@ export class Supplier {
         this.buildingName.trim().toLowerCase() === other.buildingName.trim().toLowerCase()
         );
     }
+    */ 
 
 }
 

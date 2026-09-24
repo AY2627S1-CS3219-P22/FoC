@@ -13,7 +13,8 @@
     "experimentalDecorators": true, 
     "forceConsistentCasingInFileNames": true, 
     "paths": {
-      "@/*": ["./src/*"], "@models/*": ["src/data/*"]
+      "@/*": ["./src/*"], "@database/*": ["./src/database/*"], 
+      "@data/*": ["./src/data/*"], "@api/*": ["./src/api/*"]
      },
     }
 
