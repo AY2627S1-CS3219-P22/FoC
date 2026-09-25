@@ -1,4 +1,4 @@
-//This is where the express server lives
+//This is where the express server lives for local testing
 
 import dotenv from 'dotenv';
 import express from "express";
@@ -13,22 +13,9 @@ const port = process.env.PORT || 3001;
 //Middleware
 app.use(express.json());
 
-//Routes
-app.get('/', (_req, res) => {
-    res.status(200).json({
-        service: 'Supplier Service',
-        status: 'ok',
-        routes: {
-            list: 'GET /supplier',
-            getById: 'GET /supplier/:id',
-            create: 'POST /supplier',
-            update: 'PUT /supplier/:id',
-            remove: 'DELETE /supplier/:id',
-        },
-    });
-});
-app.use(supplierRouter);
+const router = supplierRouter
 
+app.use(router);
 //Error handling middleware
 app.use(errorHandler);
 
