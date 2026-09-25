@@ -8,7 +8,7 @@ const supplierRouter = express.Router();
 
 supplierRouter.post('/supplier',validateRequest(createSupplierSchema, ValidationSource.BODY), createSupplier);
 supplierRouter.get('/supplier/:id', getSupplierById);
-supplierRouter.put('/supplier/:id', validateRequest(updateSupplierSchema, ValidationSource.BODY),updateSupplierById);
+supplierRouter.put('/supplier/:id', validateRequest(updateSupplierSchema, ValidationSource.BODY),updateSupplierById); //idempotent
 supplierRouter.delete('/supplier/:id',deleteSupplierById);
 supplierRouter.get('/supplier', getAllSuppliers);
 

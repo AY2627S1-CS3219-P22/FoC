@@ -4,6 +4,7 @@ This file will
 - Export the database connection pool for use in other files
 */
 
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -29,4 +30,5 @@ pool.on('error', (err: Error) => {
   console.error('Unexpected error on PostgresSQL client', err);
 });
 
+export const db = drizzle({ client: pool });
 export default pool;
