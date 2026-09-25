@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package user;
+
+// Internal-only RPC surface for other FoC services.
+// Exposes just the *public* profile (F2.6) — never auth fields.
+service UserService {
+  // Fetch a user's public profile by ID.
+  rpc GetPublicProfile(GetPublicProfileRequest) returns (PublicProfile);
+}
+
+message GetPublicProfileRequest {
+  string user_id = 1;
+}
+
+message PublicProfile {
+  string user_id = 1;
+  string username = 2;
+  string first_name = 3;
+  string last_name = 4;
+}
