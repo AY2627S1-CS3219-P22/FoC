@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "es2018",
+    "lib": ["es2018"],
+    "strict": true,
+    "sourceMap": false, 
+    "module": "commonjs",
+    "skipLibCheck": true,
+    "noImplicitAny": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true, 
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true, 
+    "forceConsistentCasingInFileNames": true, 
+    "paths": {
+      "@/*": ["./src/*"], "@database/*": ["./src/database/*"], 
+      "@data/*": ["./src/data/*"], "@api/*": ["./src/api/*"],
+      "@middleware/*": ["./src/middleware/*"]
+     },
+    }
+
+}

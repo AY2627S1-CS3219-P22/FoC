@@ -1,0 +1,33 @@
+{
+  "name": "Supplier-Service",
+  "version": "1.0.0",
+  "description": "Supplier Service for Supplier Listings and Search",
+  "main": "NA",
+  "author": "@sunpterodactyl",
+  "scripts": {
+    "test": "vitest run tests/api",
+    "dev": "tsx watch src/index.ts"
+  },
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.1",
+    "drizzle-orm": "^0.45.3",
+    "drizzle-zod": "^0.8.3",
+    "express": "^5.2.1",
+    "vite": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.2",
+    "@types/pg": "^8.23.1",
+    "dotenv": "^18.0.3",
+    "nodemon": "^3.1.14",
+    "pg": "^8.23.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "4",
+    "zod": "^4.6.5"
+  }
+}
