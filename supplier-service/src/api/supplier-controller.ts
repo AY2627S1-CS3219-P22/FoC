@@ -1,7 +1,7 @@
 //Standardize the controller responses for the UI
 
 import { Request, Response, NextFunction } from 'express';
-import {getSupplierByIdService, updateSupplierByIdService, deleteSupplierByIdService, getAllSuppliersService, createSupplierService}  from '@database/SupplierRepository';
+import {getSupplierByIdService, updateSupplierByIdService, deleteSupplierByIdService, getAllSuppliersService, createSupplierService}  from '@/database/supplier-repository';
 import { randomUUID } from 'crypto';
 
 const handleResponse = (res: Response, status: number, data: any, message: string) => {
@@ -65,5 +65,10 @@ export const updateSupplierById = async(req:Request, res:Response, next:NextFunc
         next(err);
     }
 }
+
+//Supports supplier search for building, location description, and name
+export const searchSuppliers = async(req:Request, res:Response, next:NextFunction) => {0;} 
+
+
 
 //TODO: How will the API handle writes that fail + repeated request the admin user makes

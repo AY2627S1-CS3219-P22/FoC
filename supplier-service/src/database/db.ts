@@ -10,7 +10,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 //environment variables for database connection
-//TODO: set these variables in the .env file
 
 const maxConnections = process.env.MAX_CONNECTIONS || 11;
 const connectionString = process.env.DATABASE_URL;

@@ -1,6 +1,6 @@
 import {ZodType, ZodError} from "zod";
 import {Request, Response, NextFunction} from "express";
-import {errorHandler} from "@middleware/errorHandler";
+import {errorHandler} from "@/middleware/error-handler";
 
 export enum ValidationSource {
     BODY = "body",
