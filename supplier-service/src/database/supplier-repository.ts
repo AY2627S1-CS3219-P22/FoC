@@ -5,9 +5,9 @@ TODO: Supplier_Database name should be interpolated as db_name
 AI Declaration: Migration to drizzle for createSupplierService and updateSupplierService used
 
 */ 
-import pool, { db } from '@database/db';
-import { CreateSupplierSchema, UpdateSupplierType, supplier } from '@data/schema';
-import { getTableColumns, isNull, eq, and} from 'drizzle-orm';
+import pool, { db } from '@database/db'; //drizzle-orm
+import { CreateSupplierSchema, SupplierCategory, UpdateSupplierType, supplier } from '@data/schema';
+import { getTableColumns, isNull, eq, and, sql} from 'drizzle-orm';
 import dotenv from 'dotenv'; 
 
 dotenv.config()
@@ -46,8 +46,7 @@ export async function deleteSupplierByIdService(id: number) {
     return result.rows[0];
 }
 
-//allow loading 30 suppliers per UI page
-//optimization - just in case
+//Might need to think about loading optimizations
 export async function getAllSuppliersService() {
     const suppliers = await db
       .select(publicSupplierColumns)
@@ -57,3 +56,20 @@ export async function getAllSuppliersService() {
     return suppliers;
   }
 
+export async function searchSuppliersService(text: string) {
+    const resultList = await db
+        .select(publicSupplierColumns)
+        .from(sql `public.search_suppliers(${text}) AS ${supplier}` )
+        .where(isNull(supplier.deletedAt));
+
+    return resultList; //should result a list of matching results inclusive of Building, Name, and Location description DB inputs
+}
+
+export async function filterSuppliersByCategoryService(supplier_type: SupplierCategory ) {
+    const resultList = await db
+        .select(publicSupplierColumns)
+        .from(sql `public.filter_suppliers_by_category(${supplier_type}) AS ${supplier}` )
+        .where(isNull(supplier.deletedAt));
+
+    return resultList; //list of matching results with category supplier_type
+}

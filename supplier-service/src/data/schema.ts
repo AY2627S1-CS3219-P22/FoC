@@ -53,4 +53,5 @@ export const updateSupplierSchema = createUpdateSchema(supplier)
 export type Supplier = typeof supplier.$inferSelect;
 export type CreateSupplierSchema = z.infer<typeof createSupplierSchema>;
 export type UpdateSupplierType = z.infer<typeof updateSupplierSchema>;
+export type SupplierCategory = z.infer<typeof SUPPLIER_CATEGORY>;
 

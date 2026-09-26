@@ -13,8 +13,7 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
         });
     }
 
-    console.log(err.stack);
-    res.status(500).send('Something broke!');
+    res.status(500).send(`Something broke! ${err.stack}`); //TODO: specific error handling messages
 }
 
 export default errorHandler;

@@ -1,7 +1,7 @@
 //Standardize the controller responses for the UI
 
 import { Request, Response, NextFunction } from 'express';
-import {getSupplierByIdService, updateSupplierByIdService, deleteSupplierByIdService, getAllSuppliersService, createSupplierService}  from '@/database/supplier-repository';
+import {getSupplierByIdService, updateSupplierByIdService, deleteSupplierByIdService, getAllSuppliersService, createSupplierService, searchSuppliersService, filterSuppliersByCategoryService}  from '@/database/supplier-repository';
 import { randomUUID } from 'crypto';
 
 const handleResponse = (res: Response, status: number, data: any, message: string) => {
@@ -67,8 +67,25 @@ export const updateSupplierById = async(req:Request, res:Response, next:NextFunc
 }
 
 //Supports supplier search for building, location description, and name
-export const searchSuppliers = async(req:Request, res:Response, next:NextFunction) => {0;} 
+export const searchSuppliers = async(req:Request, res:Response, next:NextFunction) => {
+   try {
+       const supplierList = await searchSuppliersService(req.body);
+       handleResponse(res, 200, supplierList, `Supplier list for ${req.body} search input returned`)
+   } catch(err) {
+    next(err);
+   }
+} 
 
+//Supports supplier filtering by category
+export const filterSuppliersByCategory = async(req:Request, res:Response, next:NextFunction) => {
+    try {
+        const supplierList = await searchSuppliersService(req.body);
+        handleResponse(res, 200, supplierList, `Supplier list for ${req.body} search input returned`)
+    } catch(err) {
+     next(err);
+    }
+} 
 
-
-//TODO: How will the API handle writes that fail + repeated request the admin user makes
+//TODO: How will the API handle writes that fail
+// TODO: Handle repeated request the admin user makes --idempotency 
+// TODO: error responses
