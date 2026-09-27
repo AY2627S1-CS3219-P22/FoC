@@ -1,10 +1,14 @@
 //Standardize the controller responses for the UI
 
 import { Request, Response, NextFunction } from 'express';
-import {getSupplierByIdService, updateSupplierByIdService, deleteSupplierByIdService, getAllSuppliersService, createSupplierService}  from '@database/SupplierRepository';
-import { randomUUID } from 'crypto';
+import {getSupplierByIdService, 
+    updateSupplierByIdService, deleteSupplierByIdService, 
+    getAllSuppliersService, 
+    createSupplierService, 
+    searchSuppliersService, 
+    filterSuppliersByCategoryService}  from '@/database/supplier-repository';
+import { SUPPLIER_CATEGORY, updateRequestSchema } from '@/data/schema';
 
-/** Sends an HTTP response with the given status and a JSON `data` and `message` body. */
 const handleResponse = (res: Response, status: number, data: any, message: string) => {
     res.status(status).json({
         data,
@@ -14,10 +18,6 @@ const handleResponse = (res: Response, status: number, data: any, message: strin
 
 export default handleResponse;
 
-//TODO: Implement Idempotency Key
-const idempotencyKey = randomUUID; //to prevent the same duplicate supplier creation/edit request
-
-/** Responds with the default supplier query result and status 200, forwarding errors to `next`. */
 export const getAllSuppliers = async(req:Request, res:Response, next:NextFunction) => {
     try {
         const suppliers = await getAllSuppliersService();
@@ -28,10 +28,6 @@ export const getAllSuppliers = async(req:Request, res:Response, next:NextFunctio
  };
 
 
-/**
- * Converts the path ID to a number and responds with the matching supplier and status 200.
- * A missing row still produces a 200 response; errors go to `next`.
- */
 export const getSupplierById = async(req:Request, res:Response, next:NextFunction) => {
     try {
         const supplierId = await getSupplierByIdService(Number(req.params.id));
@@ -43,10 +39,6 @@ export const getSupplierById = async(req:Request, res:Response, next:NextFunctio
  };
 
 
-/**
- * Converts the path ID to a number and responds with status 200 after a delete attempt.
- * A missing row still produces a 200 response; errors go to `next`.
- */
 export const deleteSupplierById = async(req:Request, res:Response, next:NextFunction) => {
     try {
         const deletedSupplier = await deleteSupplierByIdService(Number(req.params.id));
@@ -57,31 +49,49 @@ export const deleteSupplierById = async(req:Request, res:Response, next:NextFunc
     }
  };
 
-/**
- * Creates a supplier from the request body and responds with the created row and status 200.
- * Errors go to `next`.
- */
  export const createSupplier = async(req:Request, res:Response, next:NextFunction) => {
     try {
         const newSupplier = await createSupplierService(req.body);
         const newSupplierName = req.body.name;
-        handleResponse(res, 200, newSupplier, `Supplier ${newSupplier} created`);
+        handleResponse(res, 201, newSupplier, `Successful. New supplier created`);
     } catch(err) {
         next(err);
     }
 }
 
-/**
- * Converts the path ID to a number, applies the request body, and responds with status 200.
- * A missing row still produces a 200 response; errors go to `next`.
- */
 export const updateSupplierById = async(req:Request, res:Response, next:NextFunction) => {
     try {
-        const updatedSupplier = await updateSupplierByIdService(Number(req.params.id), req.body);
+        const { expectedUpdatedAt, ...updateData } = updateRequestSchema.parse(req.body);
+
+        const updatedSupplier = await updateSupplierByIdService(Number(req.params.id), updateData, expectedUpdatedAt);
+
         handleResponse(res, 200, updatedSupplier, `Supplier ${req.params.id} was updated`);
     } catch(err) {
         next(err);
     }
 }
 
-//TODO: How will the API handle writes that fail + repeated request the admin user makes
+//Supports supplier search for building, location description, and name
+export const searchSuppliers = async(req:Request, res:Response, next:NextFunction) => {
+   try {
+       const searchText = String(req.query.q ?? ''); //replaced body with .query.q and also included nullish operator ??
+       const supplierList = await searchSuppliersService(searchText);
+       handleResponse(res, 200, supplierList, `Supplier list for ${searchText} search input returned`)
+   } catch(err) {
+    next(err);
+   }
+} 
+
+//Supports supplier filtering by category
+export const filterSuppliersByCategory = async(req:Request, res:Response, next:NextFunction) => {
+    try {
+        const category = SUPPLIER_CATEGORY.parse(req.query.type); //replaced body with query here
+        const supplierList = await filterSuppliersByCategoryService(category);
+        handleResponse(res, 200, supplierList, `Supplier list for ${category} category returned`)
+    } catch(err) {
+     next(err);
+    }
+} 
+
+// Idempotency: later, middleware on POST /supplier and PUT /supplier/:id
+// reads Idempotency-Key and replays the first response for the same key.

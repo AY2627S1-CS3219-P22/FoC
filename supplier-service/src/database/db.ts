@@ -10,12 +10,12 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 //environment variables for database connection
-//TODO: set these variables in the .env file
 
 const maxConnections = process.env.MAX_CONNECTIONS || 11;
 const connectionString = process.env.DATABASE_URL;
 //11 is the maximum number of connections to the database (default postgres is 10)
 
+//TODO: Update to make more production ready
 const pool = new Pool({
    connectionString: connectionString,
    password: process.env.DATABASE_PASSWORD,

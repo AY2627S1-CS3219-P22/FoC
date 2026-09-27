@@ -9,6 +9,7 @@ out/
 .env.*.local
 *.pem
 *.key
+env/
 
 # OS
 .DS_Store
@@ -16,3 +17,6 @@ Thumbs.db
 
 #node_modules
 node_modules/
+
+#supabase secrets --from supplier service
+supabase/.temp/start-secrets/supabase_edge_runtime_FoC/env/
