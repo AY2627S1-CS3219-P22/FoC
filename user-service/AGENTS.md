@@ -12,7 +12,7 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 ## Stack (do not substitute without team agreement)
 - Node.js + TypeScript, Express (REST), `@grpc/grpc-js` + `@grpc/proto-loader` (RPC)
 - Prisma + PostgreSQL
-- zod (validation), bcrypt (password hashing), dotenv (config)
+- zod (validation), bcryptjs (password hashing), dotenv (config)
 - Dev runner: `tsx`. Formatting: prettier (no ESLint).
 
 ## Rules
@@ -22,7 +22,7 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 - **Schema changes go through `prisma migrate dev`, never `db push`.**
 - **No cross-service database access.** This service owns its own DB/schema; talk
   to other services over gRPC/REST only.
-- **Passwords are hashed (bcrypt), never encrypted/decrypted.**
+- **Passwords are hashed (bcryptjs), never encrypted/decrypted.**
 - **`/health` must ping the database**, not just return 200.
 - Validate all input with zod (password rules: min 8 chars, ≥1 special, ≥1
   uppercase, ≥1 numeric — F1.1.2).

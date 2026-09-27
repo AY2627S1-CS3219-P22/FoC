@@ -1,6 +1,6 @@
 import { env } from './env';
 import { prisma } from './db';
-import { createApp } from './rest/app';
+import { createApp } from './api/app';
 import { startGrpcServer } from './grpc/server';
 
 // Boots both servers: Express (REST) and gRPC (internal RPC).

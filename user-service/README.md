@@ -155,6 +155,29 @@ Copy `.env.example` → `.env`. `.env` is gitignored — never commit real secre
 | `PORT`         | REST (Express) port              | `3001`              |
 | `GRPC_PORT`    | gRPC port (internal profile RPC) | `50052`             |
 
+## Architecture
+
+The HTTP API is layered so each file has one job. A request flows through the
+layers top to bottom:
+
+```text
+Request → routes → middleware → controller → service → Prisma → Postgres
+          (which    (validate    (HTTP glue:  (business  (data
+           handler)   input,       call         logic)     access)
+                      400 if bad)  service,
+                                   shape reply)
+```
+
+- **routes** — map a URL to a handler. No logic.
+- **middleware** — runs before the controller (e.g. validate the body against a
+  DTO schema; reject with `400` if invalid).
+- **dto** — zod schemas defining valid API input/output shapes (kept separate
+  from the Prisma DB model, so internal fields like `passwordHash` never leak).
+- **controller** — thin HTTP layer: read the validated request, call a service,
+  translate the result into a response + status code.
+- **service** — the business logic (uniqueness checks, hashing, create). It has
+  no knowledge of HTTP, so it can be reused (e.g. by the gRPC handler later).
+
 ## Project layout
 
 ```text
@@ -167,8 +190,14 @@ user-service/
 │   ├── index.ts           # boots REST + gRPC
 │   ├── env.ts             # zod-validated config
 │   ├── db.ts              # Prisma client + DB ping
-│   ├── rest/app.ts        # Express app + /health
-│   └── grpc/server.ts     # gRPC server
+│   ├── api/               # HTTP (REST) transport
+│   │   ├── app.ts         #   Express app + /health, mounts routers
+│   │   ├── routes/        #   path → handler wiring
+│   │   ├── controllers/   #   HTTP glue (read request, call service, send response)
+│   │   ├── services/      #   business logic (uniqueness, hashing, DB via Prisma)
+│   │   ├── middleware/    #   cross-cutting (e.g. zod validation)
+│   │   └── dto/           #   zod schemas: API input/output shapes
+│   └── grpc/server.ts     # gRPC transport
 ├── compose.yaml           # this service's Postgres (+ service)
 └── Dockerfile
 ```
