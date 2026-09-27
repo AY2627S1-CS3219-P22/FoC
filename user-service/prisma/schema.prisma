@@ -1,0 +1,31 @@
+// Prisma schema for the User Service.
+// Schema changes go through `prisma migrate dev`, never `db push`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// RBAC: an account can hold multiple roles at once, so roles are an enum array
+// (Roles[]), never a single field.
+enum Roles {
+  USER
+  ADMINISTRATOR
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  firstName    String
+  lastName     String
+  email        String   @unique
+  passwordHash String   // bcrypt hash
+  roles        Roles[]  @default([USER])
+  isDeleted    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
