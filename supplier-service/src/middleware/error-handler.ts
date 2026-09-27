@@ -27,6 +27,9 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
             // e.g. concurrent write/edit conflict
             return res.status(409).json({ message: err.message || 'Conflict: resource was modified concurrently' });
 
+        case ErrorCode.NOT_FOUND:
+            return res.status(404).json({ message: err.message || 'Object not found' });
+
         case ErrorCode.RATE_LIMITED:
             return res.status(429).json({ message: err.message || 'Too many requests' });
 

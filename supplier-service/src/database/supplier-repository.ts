@@ -9,15 +9,25 @@ import pool, { db } from '@database/db'; //drizzle-orm
 import { CreateSupplierSchema, SupplierCategory, UpdateSupplierType, supplier } from '@data/schema';
 import { getTableColumns, isNull, eq, and, sql} from 'drizzle-orm';
 import dotenv from 'dotenv'; 
+import { ConflictError, NotFoundError } from '@/middleware/errors';
 
 dotenv.config()
 
-const db_name = process.env.DATABASE_NAME
 const { deletedAt, ...publicSupplierColumns } = getTableColumns(supplier);
 
+//drizzle wraps driver errors, so the postgres code sits on err.cause
+const isDuplicateName = (err: any) => err?.code === '23505' || err?.cause?.code === '23505';
+
 export async function createSupplierService(newSupplier: CreateSupplierSchema)  {
-    const [created] = await db.insert(supplier).values(newSupplier).returning();
+    try{
+        const [created] = await db.insert(supplier).values(newSupplier).returning(publicSupplierColumns);
     return created;
+    } catch(err) {
+        if (isDuplicateName(err)) {
+            throw new ConflictError(`Supplier "${newSupplier.name}" already exists`);
+        }
+        throw err;
+    }
 }
 
 export async function getSupplierByIdService(id: number)  {
@@ -28,15 +38,41 @@ export async function getSupplierByIdService(id: number)  {
 
   return row;
 }
-export async function updateSupplierByIdService(id: number, updates: UpdateSupplierType)  {
-    const [updated] = await db
-        .update(supplier)
-        .set({
-            ...updates,
-            updatedAt: new Date(),
-        })
-        .where(eq(supplier.supplierId, id))
-        .returning();
+export async function updateSupplierByIdService(id: number, updates: UpdateSupplierType, expectedUpdatedAt: Date)  {
+
+    let updated;
+
+    try {
+        [updated] = await db
+            .update(supplier)
+            .set({
+                ...updates,
+                updatedAt: new Date(),
+            })
+            .where(and(eq(supplier.supplierId, id), eq(supplier.updatedAt, expectedUpdatedAt), isNull(supplier.deletedAt)))
+            .returning(publicSupplierColumns);
+    } catch(err) {
+        if (isDuplicateName(err)) {
+            throw new ConflictError(`Supplier "${updates.name}" already exists`);
+        }
+        throw err;
+    }
+
+    //AI declaration: Completely suggested by claude. Remove if redundant....
+    //TODO: check if redundant in tests
+    //no row matched: the supplier is either gone or was updated by someone else first
+    if (!updated) {
+        const [existing] = await db
+            .select({ id: supplier.supplierId })
+            .from(supplier)
+            .where(and(eq(supplier.supplierId, id), isNull(supplier.deletedAt)));
+
+        if (!existing) {
+            throw new NotFoundError(`Supplier ${id} not found`);
+        }
+        throw new ConflictError('Supplier was modified concurrently');
+    }
+
     return updated;
 }
 
@@ -44,9 +80,13 @@ export async function updateSupplierByIdService(id: number, updates: UpdateSuppl
 //edited to return the deleted supplier for better response messages
 export async function deleteSupplierByIdService(id: number) {
     const result = await pool.query(
-        'UPDATE "Supplier_Database" SET deleted_at = NOW() WHERE id = $1 RETURNING id',
+        'UPDATE "Supplier_Database" SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING id',
         [id],
     );
+
+    if (!result.rows[0]) {
+       throw new NotFoundError(`Supplier ${id} not found`);
+    }
     return result.rows[0];
 }
 

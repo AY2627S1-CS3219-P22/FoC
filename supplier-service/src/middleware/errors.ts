@@ -5,6 +5,7 @@ export enum ErrorCode {
   CONFLICT = 'CONFLICT',
   RATE_LIMITED = 'RATE_LIMITED',
   INTERNAL = 'INTERNAL',
+  NOT_FOUND = `NOT_FOUND`,
 }
 
 export class AppError extends Error {
@@ -41,5 +42,11 @@ export class ConflictError extends AppError {
 export class RateLimitError extends AppError {
   constructor(message = 'Too many requests') {
       super(ErrorCode.RATE_LIMITED, 429, message);
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(message = 'Object not found') {
+      super(ErrorCode.NOT_FOUND, 404, message);
   }
 }

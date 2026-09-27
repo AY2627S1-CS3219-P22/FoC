@@ -1,6 +1,5 @@
 import {ZodType} from "zod";
 import {Request, Response, NextFunction} from "express";
-import {errorHandler} from '@middleware/error-handler'
 
 export enum ValidationSource {
     BODY = "body",
@@ -13,9 +12,11 @@ export const validateRequest = (schema:ZodType, source: ValidationSource) => {
     return (req:Request, res: Response, next: NextFunction) => {
         const result = schema.safeParse(req[source]);
         if (!result.success) {
-            return errorHandler(result.error, req, res.status(400), next);
+            return next(result.error);
         }
-        req[source] = result.data;
-+       next();//call next function
+        if (source === ValidationSource.BODY) {
+            req.body = result.data;
+        }
+        next();
     }
 }

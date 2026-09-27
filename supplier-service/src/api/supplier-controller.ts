@@ -1,7 +1,13 @@
 //Standardize the controller responses for the UI
 
 import { Request, Response, NextFunction } from 'express';
-import {getSupplierByIdService, updateSupplierByIdService, deleteSupplierByIdService, getAllSuppliersService, createSupplierService, searchSuppliersService, filterSuppliersByCategoryService}  from '@/database/supplier-repository';
+import {getSupplierByIdService, 
+    updateSupplierByIdService, deleteSupplierByIdService, 
+    getAllSuppliersService, 
+    createSupplierService, 
+    searchSuppliersService, 
+    filterSuppliersByCategoryService}  from '@/database/supplier-repository';
+import { SUPPLIER_CATEGORY, updateRequestSchema } from '@/data/schema';
 
 const handleResponse = (res: Response, status: number, data: any, message: string) => {
     res.status(status).json({
@@ -47,7 +53,7 @@ export const deleteSupplierById = async(req:Request, res:Response, next:NextFunc
     try {
         const newSupplier = await createSupplierService(req.body);
         const newSupplierName = req.body.name;
-        handleResponse(res, 200, newSupplier, `Supplier ${newSupplier} created`);
+        handleResponse(res, 201, newSupplier, `Supplier ${newSupplier} created`);
     } catch(err) {
         next(err);
     }
@@ -55,7 +61,10 @@ export const deleteSupplierById = async(req:Request, res:Response, next:NextFunc
 
 export const updateSupplierById = async(req:Request, res:Response, next:NextFunction) => {
     try {
-        const updatedSupplier = await updateSupplierByIdService(Number(req.params.id), req.body);
+        const { expectedUpdatedAt, ...updateData } = updateRequestSchema.parse(req.body);
+
+        const updatedSupplier = await updateSupplierByIdService(Number(req.params.id), updateData, expectedUpdatedAt);
+
         handleResponse(res, 200, updatedSupplier, `Supplier ${req.params.id} was updated`);
     } catch(err) {
         next(err);
@@ -65,8 +74,9 @@ export const updateSupplierById = async(req:Request, res:Response, next:NextFunc
 //Supports supplier search for building, location description, and name
 export const searchSuppliers = async(req:Request, res:Response, next:NextFunction) => {
    try {
-       const supplierList = await searchSuppliersService(req.body);
-       handleResponse(res, 200, supplierList, `Supplier list for ${req.body} search input returned`)
+       const searchText = String(req.query.q ?? ''); //replaced body with .query.q and also included nullish operator ??
+       const supplierList = await searchSuppliersService(searchText);
+       handleResponse(res, 200, supplierList, `Supplier list for ${searchText} search input returned`)
    } catch(err) {
     next(err);
    }
@@ -75,8 +85,9 @@ export const searchSuppliers = async(req:Request, res:Response, next:NextFunctio
 //Supports supplier filtering by category
 export const filterSuppliersByCategory = async(req:Request, res:Response, next:NextFunction) => {
     try {
-        const supplierList = await searchSuppliersService(req.body);
-        handleResponse(res, 200, supplierList, `Supplier list for ${req.body} search input returned`)
+        const category = SUPPLIER_CATEGORY.parse(req.query.type); //replaced body with query here
+        const supplierList = await filterSuppliersByCategoryService(category);
+        handleResponse(res, 200, supplierList, `Supplier list for ${category} category returned`)
     } catch(err) {
      next(err);
     }
