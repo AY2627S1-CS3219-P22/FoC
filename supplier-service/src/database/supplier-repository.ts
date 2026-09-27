@@ -3,8 +3,8 @@ Has information about the supplier database and its operations
 TODO: Supplier_Database name should be interpolated as db_name
 
 AI Declaration: Migration to drizzle for createSupplierService and updateSupplierService used
-
 */ 
+
 import pool, { db } from '@database/db'; //drizzle-orm
 import { CreateSupplierSchema, SupplierCategory, UpdateSupplierType, supplier } from '@data/schema';
 import { getTableColumns, isNull, eq, and, sql} from 'drizzle-orm';
@@ -41,8 +41,12 @@ export async function updateSupplierByIdService(id: number, updates: UpdateSuppl
 }
 
 //support soft delete
+//edited to return the deleted supplier for better response messages
 export async function deleteSupplierByIdService(id: number) {
-    const result = await pool.query('UPDATE "Supplier_Database" SET deleted_at = NOW() WHERE id = $1', [id]); //prevent SQL injection issues
+    const result = await pool.query(
+        'UPDATE "Supplier_Database" SET deleted_at = NOW() WHERE id = $1 RETURNING id',
+        [id],
+    );
     return result.rows[0];
 }
 

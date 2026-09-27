@@ -17,6 +17,7 @@ app.use(express.json());
 const router = supplierRouter
 
 app.use(router);
+
 //Error handling middleware
 app.use(errorHandler);
 

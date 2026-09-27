@@ -2,7 +2,6 @@
 
 import { Request, Response, NextFunction } from 'express';
 import {getSupplierByIdService, updateSupplierByIdService, deleteSupplierByIdService, getAllSuppliersService, createSupplierService, searchSuppliersService, filterSuppliersByCategoryService}  from '@/database/supplier-repository';
-import { randomUUID } from 'crypto';
 
 const handleResponse = (res: Response, status: number, data: any, message: string) => {
     res.status(status).json({
@@ -12,9 +11,6 @@ const handleResponse = (res: Response, status: number, data: any, message: strin
 };
 
 export default handleResponse;
-
-//TODO: Implement Idempotency Key
-const idempotencyKey = randomUUID; //to prevent the same duplicate supplier creation/edit request
 
 export const getAllSuppliers = async(req:Request, res:Response, next:NextFunction) => {
     try {
@@ -86,6 +82,5 @@ export const filterSuppliersByCategory = async(req:Request, res:Response, next:N
     }
 } 
 
-//TODO: How will the API handle writes that fail
-// TODO: Handle repeated request the admin user makes --idempotency 
-// TODO: error responses
+// Idempotency: later, middleware on POST /supplier and PUT /supplier/:id
+// reads Idempotency-Key and replays the first response for the same key.
