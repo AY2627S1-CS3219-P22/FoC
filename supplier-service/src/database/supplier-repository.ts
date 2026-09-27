@@ -100,20 +100,18 @@ export async function getAllSuppliersService() {
     return suppliers;
   }
 
-export async function searchSuppliersService(text: string) {
-    const resultList = await db
-        .select(publicSupplierColumns)
-        .from(sql `public.search_suppliers(${text}) AS ${supplier}` )
-        .where(isNull(supplier.deletedAt));
 
-    return resultList; //should result a list of matching results inclusive of Building, Name, and Location description DB inputs
+//replace drizzle with SQL queries due to some weird issues...apparently drizzle-orm does not expose functions stored in db
+//functions stored in db are public.search_suppliers public.filter_suppliers_by_category a.k.a ts vectors
+
+export async function searchSuppliersService(text: string) {
+    const resultList = await pool.query('SELECT * FROM public.search_suppliers($1)', [text]);
+
+    return resultList.rows; //should result a list of matching results inclusive of Building, Name, and Location description DB inputs
 }
 
 export async function filterSuppliersByCategoryService(supplier_type: SupplierCategory ) {
-    const resultList = await db
-        .select(publicSupplierColumns)
-        .from(sql `public.filter_suppliers_by_category(${supplier_type}) AS ${supplier}` )
-        .where(isNull(supplier.deletedAt));
+    const resultList = await pool.query('SELECT * FROM public.filter_suppliers_by_category($1)', [supplier_type]);
 
-    return resultList; //list of matching results with category supplier_type
+    return resultList.rows; //list of matching results with category supplier_type
 }

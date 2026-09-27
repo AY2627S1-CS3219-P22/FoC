@@ -44,3 +44,5 @@ services:
 
 volumes:
   db-data:
+# docker compose down -d --build
+#in order to stop container

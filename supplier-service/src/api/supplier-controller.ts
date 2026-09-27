@@ -53,7 +53,7 @@ export const deleteSupplierById = async(req:Request, res:Response, next:NextFunc
     try {
         const newSupplier = await createSupplierService(req.body);
         const newSupplierName = req.body.name;
-        handleResponse(res, 201, newSupplier, `Supplier ${newSupplier} created`);
+        handleResponse(res, 201, newSupplier, `Successful. New supplier created`);
     } catch(err) {
         next(err);
     }

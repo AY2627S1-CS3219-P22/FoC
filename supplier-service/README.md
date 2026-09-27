@@ -57,22 +57,7 @@ docker compose down      # keep the data
 docker compose down -v   # also delete the data
 ```
 
-## Running without Docker
-
-The service reads `DATABASE_URL`, falling back to
-`postgresql://postgres:postgres@127.0.0.1:54322/postgres`, which is the port the
-Supabase CLI uses. So the CLI stack works too:
-
-```bash
-npx supabase start     # Postgres on 54322, Studio on 54323
-npx supabase db reset  # apply migrations + seed
-yarn dev               # tsx watch on port 3001
-```
-
-The compose database deliberately uses **54332** so it can run alongside
-`npx supabase start` on 54322.
-
-# Docker CI, Supabase Tests
+# TODO: Docker CI, Supabase Tests
 
 `vitest` covers the controller and router with the repository mocked, so tests do
 not need a database:
@@ -81,9 +66,15 @@ not need a database:
 yarn test
 ```
 
+Test plan
+* Include error response tests
+* Vitest mocks for each API endpoint
+* Concurrency test
+*Scalability testing with autocannon package
+
 # Implementation Details
 
-Tech Stack = Express.js, Node, Supabase, Drizzle, JWT
+Tech Stack = Express.js, Node, Supabase, Drizzle, JWT(in-progress)
 
 ## Database Connection
 
@@ -107,10 +98,23 @@ TODO: Set up docker secrets for seamless deployment across different devices
 `PUT` uses optimistic concurrency. Read the supplier first and send back the
 `updatedAt` you received:
 
+For your own reference you can run the docker and then try out these commands from the terminal
+
 ```bash
 curl -X PUT localhost:3001/supplier/1 \
   -H 'Content-Type: application/json' \
   -d '{"name":"New Name","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'
+
+curl -X POST localhost:3001/supplier -H 'Content-Type: application/json' \
+  -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'
+
+curl localhost:3001/suppliers
+curl "localhost:3001/suppliers/search?q=coffee"
+curl "localhost:3001/suppliers/search?q=print"
+curl "localhost:3001/suppliers/category?type=printing"
+curl localhost:3001/supplier/1
+
+curl -X DELETE localhost:3001/supplier/1
 ```
 
 If someone else updated the row in between, the response is `409` and nothing is
@@ -123,4 +127,4 @@ All failures return JSON `{ "message": ... }`. Validation failures also include
 `401` unauthorized, `404` not found, `409` conflict, `429` rate limited, and
 `500` for anything unexpected (details are logged server-side only).
 
-** Very nicely written by Claude
+** Very nicely written by Claude. edited by @sunpterodactyl
