@@ -6,7 +6,6 @@ import type { LoginInput } from '../dto/loginDto';
 
 const SALT_ROUNDS = 10;
 
-// Fields safe to expose to clients — deliberately excludes passwordHash.
 const publicUserSelect = {
   id: true,
   username: true,
@@ -17,13 +16,8 @@ const publicUserSelect = {
   createdAt: true,
 } satisfies Prisma.UserSelect;
 
-// Registers a user (F1). Input is already validated by the DTO, so this only
-// does business logic: reject a duplicate email/username, hash the password,
-// and create the record. Returns a discriminated result the controller maps to
-// a status code (201 on success, 409 on conflict).
 export async function register(input: RegisterInput) {
-  // Friendly pre-check for a clear message. The DB also enforces uniqueness via
-  // @unique, which is the real guard against race conditions.
+  // Check duplicate email or username
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: input.email }, { username: input.username }] },
     select: { email: true, username: true },
@@ -56,20 +50,13 @@ export async function register(input: RegisterInput) {
         : String(target ?? '').includes('email');
       return { ok: false as const, field: hitEmail ? ('email' as const) : ('username' as const) };
     }
-    throw err; // anything else is a genuine error — let it propagate
+    throw err;
   }
 }
 
-// Verifies login credentials (F2.1). Returns a discriminated result the
-// controller maps to a response: sign a JWT on success, 401 on failure. The
-// failure case is deliberately generic — it does not distinguish "unknown email"
-// from "wrong password" — to satisfy F2.1.1 without leaking which field was
-// wrong (also avoids user enumeration).
 export async function login(input: LoginInput) {
   const user = await prisma.user.findUnique({
     where: { email: input.email },
-    // passwordHash + roles are needed here but stay inside the service; only the
-    // id and roles leave, folded into the signed token.
     select: { id: true, passwordHash: true, roles: true },
   });
 
@@ -80,14 +67,10 @@ export async function login(input: LoginInput) {
   return { ok: true as const, userId: user.id, roles: user.roles };
 }
 
-// Fetches a single user's public profile by id (F2.3). Returns null if the id
-// doesn't exist. Uses publicUserSelect, so passwordHash is never returned.
 export async function getProfileById(id: string) {
   return prisma.user.findUnique({ where: { id }, select: publicUserSelect });
 }
 
-// Lists all users' public profiles. Guarded as an ADMINISTRATOR-only capability
-// at the route layer — used to demonstrate RBAC enforcement.
 export async function listProfiles() {
   return prisma.user.findMany({ select: publicUserSelect });
 }
