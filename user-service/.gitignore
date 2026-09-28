@@ -12,7 +12,7 @@ src/generated/
 .env.local
 .env.*.local
 
-# JWT signing keys (RS256) — never commit; regenerate locally (see DECISIONS.md D8)
+# JWT signing keys (RS256) — never commit; regenerate locally
 keys/
 
 # Logs

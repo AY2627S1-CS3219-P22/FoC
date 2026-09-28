@@ -6,18 +6,19 @@ import { registerSchema } from '../dto/registerDto';
 import { loginSchema } from '../dto/loginDto';
 import * as userController from '../controllers/userController';
 
-// Routes for the /users resource (mounted at /users in app.ts).
 export const userRouter = Router();
 
-// POST /users/register — validate the body, then hand off to the controller.
+// POST /users/register
 userRouter.post('/register', validate(registerSchema), userController.register);
 
-// POST /users/login — validate credentials shape, then verify + issue a JWT (F2.1).
+// POST /users/login
 userRouter.post('/login', validate(loginSchema), userController.login);
 
-// GET /users/me — any authenticated user can read their own profile (F2.3).
-// Demonstrates authentication: no/invalid token → 401.
+// GET /users/me
 userRouter.get('/me', authenticate, userController.getMe);
 
-// GET /users — ADMINISTRATOR-only. Demonstrates RBAC: a normal USER → 403.
+// GET /users
 userRouter.get('/', authenticate, requireRole('ADMINISTRATOR'), userController.listUsers);
+
+// GET /users/:id — admin views a specific user (RBAC: normal USER -> 403)
+userRouter.get('/:id', authenticate, requireRole('ADMINISTRATOR'), userController.getUserById);
