@@ -4,12 +4,12 @@ CREATE EXTENSION "http" SCHEMA "public";
 
 CREATE TABLE "public"."Supplier_Database" (
   "Name"                 text                     NOT NULL,
-  "Type"                 text,                    NOT NULL,
-  "Building"             text,                    NOT NULL,
+  "Type"                 text                     NOT NULL,
+  "Building"             text                     NOT NULL,
   "Floor"                bigint                   DEFAULT '1'::bigint,
   "Location Description" text                     DEFAULT ''::text,
-  "Latitude"             numeric(9,6),            NOT NULL,
-  "Longitude"            numeric(9,6),            NOT NULL,
+  "Latitude"             numeric(9,6)             NOT NULL,
+  "Longitude"            numeric(9,6)             NOT NULL,
   "StartingTime"         text                     DEFAULT 'NA'::text,
   "ClosingTime"          text                     DEFAULT 'NA'::text,
   "ImageURL"             text,

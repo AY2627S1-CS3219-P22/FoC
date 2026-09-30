@@ -12,10 +12,12 @@ docker compose up -d --build
 
 This starts two containers:
 
-| Service | What it is | Where |
-| --- | --- | --- |
-| `db` | Supabase Postgres 17, seeded | `127.0.0.1:54332` |
-| `app` | Express supplier service | `http://localhost:3001` |
+
+| Service | What it is                              | Where                   |
+| ------- | --------------------------------------- | ----------------------- |
+| `db`    | Supabase Postgres 17, seeded at default | `127.0.0.1:54332`       |
+| `app`   | Express supplier service default at     | `http://localhost:3001` |
+
 
 On its **first** start the `db` container applies everything in
 `supabase/migrations/` in timestamp order and then loads
@@ -27,6 +29,8 @@ Check it is up:
 ```bash
 curl localhost:3001/suppliers
 ```
+
+
 
 ### Reseeding
 
@@ -44,11 +48,15 @@ After changing anything in `src/`, rebuild the app image:
 docker compose up -d --build app
 ```
 
+
+
 ### Inspecting the database
 
 ```bash
 docker compose exec db psql -U postgres -d postgres -c 'select id, "Name" from public."Supplier_Database";'
 ```
+
+
 
 ### Stopping
 
@@ -57,20 +65,37 @@ docker compose down      # keep the data
 docker compose down -v   # also delete the data
 ```
 
-# TODO: Docker CI, Supabase Tests
 
-`vitest` covers the controller and router with the repository mocked, so tests do
-not need a database:
+
+# Testing
+
+Tests do not use the Compose stack above. `yarn test` starts its own throwaway
+Supabase Postgres through Testcontainers, applies the same migrations and
+`supabase/schemas/seed.sql` that `compose.yaml` mounts, and stops the container
+when the run finishes. You do not run `docker compose` for this.
+
+Docker Desktop has to be running, because Testcontainers talks to the Docker
+daemon. From `supplier-service/`:
 
 ```bash
+yarn install
 yarn test
 ```
 
-Test plan
-* Include error response tests
-* Vitest mocks for each API endpoint
-* Concurrency test
-*Scalability testing with autocannon package
+`yarn test` runs `tests/api`. The first run pulls
+`public.ecr.aws/supabase/postgres:17.6.1.167`, which can take a couple of
+minutes; later runs reuse the image. The container gets a random host port, so
+it never collides with the Compose database on `54332`.
+
+The scalability run is separate, because it measures throughput rather than
+correctness and takes about ten seconds:
+
+```bash
+yarn test:perf
+```
+
+That starts the Express app on a free port and drives `GET /suppliers` and
+`GET /suppliers/search` with autocannon against the same Testcontainers database.
 
 # Implementation Details
 
@@ -85,40 +110,47 @@ TODO: Set up docker secrets for seamless deployment across different devices
 
 ## CRUD Database Operations
 
-| Method | Route | Notes |
-| --- | --- | --- |
-| GET | `/suppliers` | active suppliers only |
-| GET | `/suppliers/search?q=coffee` | full-text search over name, building, description |
-| GET | `/suppliers/category?type=food` | filter by category |
-| GET | `/supplier/:id` | 404 if missing or soft-deleted |
-| POST | `/supplier` | 201 on success, 409 if the name is already taken |
-| PUT | `/supplier/:id` | requires `expectedUpdatedAt`, 409 if changed meanwhile |
-| DELETE | `/supplier/:id` | soft delete, 404 if already deleted |
+
+| Method | Route                           | Notes                                                  |
+| ------ | ------------------------------- | ------------------------------------------------------ |
+| GET    | `/suppliers`                    | active suppliers only                                  |
+| GET    | `/suppliers/search?q=coffee`    | full-text search over name, building, description      |
+| GET    | `/suppliers/category?type=food` | filter by category                                     |
+| GET    | `/supplier/:id`                 | 404 if missing or soft-deleted                         |
+| POST   | `/supplier`                     | 201 on success, 409 if the name is already taken       |
+| PUT    | `/supplier/:id`                 | requires `expectedUpdatedAt`, 409 if changed meanwhile or 404 if supplier is deleted/doesnt exist |
+| DELETE | `/supplier/:id`                 | soft delete, 404 if already deleted                    |
+
 
 `PUT` uses optimistic concurrency. Read the supplier first and send back the
-`updatedAt` you received:
+`updatedAt` you received. The seed sets that to `2026-01-01T00:00:00.000Z`; any
+other value is a `409` and nothing is written.
 
-For your own reference you can run the docker and then try out these commands from the terminal
+To start run `ddocker compose up -d --build` and the app should run on port `3001`.
+You can view the app container and local CLI ONLY supabase container as well. All seed data (3) are specified in 
+`supplier-service/supabase/schemas/seed.sql`
 
-```bash
-curl -X PUT localhost:3001/supplier/1 \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"New Name","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'
 
-curl -X POST localhost:3001/supplier -H 'Content-Type: application/json' \
-  -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'
+| API endpoint                            | Sample curl command                                                                                                                                                                                                        |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /suppliers`                        | `curl localhost:3001/suppliers`                                                                                                                                                                                            |
+| `GET /suppliers/search?q=coffee`        | `curl "localhost:3001/suppliers/search?q=coffee"`                                                                                                                                                                          |
+| `GET /suppliers/category?type=printing` | `curl "localhost:3001/suppliers/category?type=printing"`                                                                                                                                                                   |
+| `GET /supplier/:id`                     | `curl localhost:3001/supplier/1`                                                                                                                                                                                           |
+| `POST /supplier`                        | `curl -X POST localhost:3001/supplier -H 'Content-Type: application/json' -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'` |
+| `PUT /supplier/:id`                     | `curl -X PUT localhost:3001/supplier/1 -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'`                                                                    |
+| `DELETE /supplier/:id`                  | `curl -X DELETE localhost:3001/supplier/1`                                                                                                                                                                                 |
 
-curl localhost:3001/suppliers
-curl "localhost:3001/suppliers/search?q=coffee"
-curl "localhost:3001/suppliers/search?q=print"
-curl "localhost:3001/suppliers/category?type=printing"
-curl localhost:3001/supplier/1
 
-curl -X DELETE localhost:3001/supplier/1
-```
+If someone else updated the row in between, the response is `409` and nothing is written. This is done by updated_at versioning. If the expectedUpdatedAt doesn't match the current e.g. after an update occurs, the response 409 is shown
 
-If someone else updated the row in between, the response is `409` and nothing is
-written.
+e.g. run `curl -X PUT localhost:3001/supplier/1 -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}`
+twice and the second command will fail
+
+expected: `409 Conflict Error`
+
+To prevent duplicate suppliers  run  `curl -X POST localhost:3001/supplier -H 'Content-Type: application/json' -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'` twice and the command on the second try will fail 
+
 
 ### Error responses
 

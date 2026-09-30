@@ -9,6 +9,7 @@ services:
     image: public.ecr.aws/supabase/postgres:17.6.1.167
     environment:
       POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       # 54322 belongs to `npx supabase start`, so this stack uses 54332.
       - "54332:5432"
@@ -44,5 +45,5 @@ services:
 
 volumes:
   db-data:
-# docker compose down -d --build
+# docker compose down -v
 #in order to stop container

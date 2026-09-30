@@ -89,6 +89,10 @@ export const supplierIdParamSchema = z.object({
     id: z.coerce.number().int().positive(),
   });
 
+export const supplierCategoryQuerySchema = z.object({
+type: SUPPLIER_CATEGORY,
+});
+
 export type Supplier = typeof supplier.$inferSelect;
 export type CreateSupplierSchema = z.infer<typeof createSupplierSchema>;
 export type UpdateSupplierType = z.infer<typeof updateSupplierSchema>;

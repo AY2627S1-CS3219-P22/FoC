@@ -81,7 +81,7 @@ export async function updateSupplierByIdService(id: number, updates: UpdateSuppl
 
     //no row matched
     // causes: supplier deletion (not found err), stale data: updated by someone else, id does not exist(not found err)
-    if (!updated) {
+    if (updated.length == 0 || !updated) {
         const [existing] = await db
             .select({ id: supplier.supplierId })
             .from(supplier)
@@ -93,7 +93,7 @@ export async function updateSupplierByIdService(id: number, updates: UpdateSuppl
         throw new ConflictError('Conflict: Supplier was modified concurrently');
     }
 
-    return updated;
+    return updated[0];
 }
 
 //support soft delete
