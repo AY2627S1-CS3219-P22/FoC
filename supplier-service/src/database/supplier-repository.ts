@@ -8,10 +8,8 @@ AI Declaration: Migration to drizzle for createSupplierService and updateSupplie
 import pool, { db } from '@database/db'; //drizzle-orm
 import { CreateSupplierSchema, SupplierCategory, UpdateSupplierType, supplier } from '@data/schema';
 import { getTableColumns, isNull, eq, and, sql} from 'drizzle-orm';
-import dotenv from 'dotenv'; 
 import { ConflictError, NotFoundError } from '@/middleware/errors';
 
-dotenv.config()
 
 const { deletedAt, ...publicSupplierColumns } = getTableColumns(supplier);
 
@@ -40,10 +38,26 @@ export async function getSupplierByIdService(id: number)  {
 }
 export async function updateSupplierByIdService(id: number, updates: UpdateSupplierType, expectedUpdatedAt: Date)  {
 
-    let updated;
+    /*
+    Parameters: 
+        - supplier id: bigint or number referencing supplier
+        - updates: drizzle-zod schema of "Supplier" class wrapped to ensure user cannot access fields e.g. deleted_at or updated_at
+        - expectedUpdatedAt: read current updated_at of the supplier. implements supplier_versioning
+
+    DB query
+        - Checks whether supplier_id exists, if supplier version is the same as expected version, and supplier is not deleted
+        - Sets supplier fields. Sets updatedAt to current date
+
+    Response/Error Handling Cases
+        - Supplier Id does not exist or Supplier is deleted
+        - Current supplier updated at version does not match request body
+        - Supplier name is duplicated 
+    */
+
+    let updated; //declare variable in function scope
 
     try {
-        [updated] = await db
+        updated = await db
             .update(supplier)
             .set({
                 ...updates,
@@ -58,9 +72,8 @@ export async function updateSupplierByIdService(id: number, updates: UpdateSuppl
         throw err;
     }
 
-    //AI declaration: Completely suggested by claude. Remove if redundant....
-    //TODO: check if redundant in tests
-    //no row matched: the supplier is either gone or was updated by someone else first
+    //no row matched
+    // causes: supplier deletion, stale data: updated by someone else, id does not exist
     if (!updated) {
         const [existing] = await db
             .select({ id: supplier.supplierId })
@@ -79,9 +92,8 @@ export async function updateSupplierByIdService(id: number, updates: UpdateSuppl
 //support soft delete
 //edited to return the deleted supplier for better response messages
 export async function deleteSupplierByIdService(id: number) {
-    const result = await pool.query(
-        'UPDATE "Supplier_Database" SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING id',
-        [id],
+    const result = await db.execute(
+        sql`UPDATE "Supplier_Database" SET deleted_at = NOW() WHERE id = ${id} AND deleted_at IS NULL RETURNING id`
     );
 
     if (!result.rows[0]) {
@@ -91,6 +103,7 @@ export async function deleteSupplierByIdService(id: number) {
 }
 
 //Might need to think about loading optimizations
+//TODO: Order supplier loading based on location
 export async function getAllSuppliersService() {
     const suppliers = await db
       .select(publicSupplierColumns)
@@ -105,13 +118,13 @@ export async function getAllSuppliersService() {
 //functions stored in db are public.search_suppliers public.filter_suppliers_by_category a.k.a ts vectors
 
 export async function searchSuppliersService(text: string) {
-    const resultList = await pool.query('SELECT * FROM public.search_suppliers($1)', [text]);
+    const resultList = await db.execute(`SELECT * FROM public.search_suppliers(${text})`);
 
     return resultList.rows; //should result a list of matching results inclusive of Building, Name, and Location description DB inputs
 }
 
 export async function filterSuppliersByCategoryService(supplier_type: SupplierCategory ) {
-    const resultList = await pool.query('SELECT * FROM public.filter_suppliers_by_category($1)', [supplier_type]);
+    const resultList = await db.execute(`SELECT * FROM public.filter_suppliers_by_category(${supplier_type})`);
 
     return resultList.rows; //list of matching results with category supplier_type
 }

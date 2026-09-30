@@ -15,12 +15,21 @@ const maxConnections = process.env.MAX_CONNECTIONS || 11;
 const connectionString = process.env.DATABASE_URL;
 //11 is the maximum number of connections to the database (default postgres is 10)
 
-//TODO: Update to make more production ready
+//added in discrete credentials due to issue raised on shared .env in this folder
+//production database credentials might win over test credentials and lead to accidental data destruction
+
+const discreteCredentials = connectionString
+   ? {}
+   : {
+      password: process.env.DATABASE_PASSWORD,
+      user: process.env.DATABASE_USER,
+      host: process.env.DATABASE_HOST,
+   };
+
+
 const pool = new Pool({
    connectionString: connectionString,
-   password: process.env.DATABASE_PASSWORD,
-   user: process.env.DATABASE_USER,
-   host: process.env.DATABASE_HOST,
+   ...discreteCredentials,
    max: Number(maxConnections),
    idleTimeoutMillis: 30000,
    connectionTimeoutMillis: 2000,
