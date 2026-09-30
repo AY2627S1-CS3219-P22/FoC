@@ -21,9 +21,8 @@ Admin user tests
 - Test: Supplier creation | Expected 201
 
 The admin account is a token signed with the throwaway key pair from
-tests/setup-env.ts, standing in for one the user service would issue. The
-authentication cases are it.todo until the router calls authenticate and that
-middleware reads its key from the environment.
+tests/setup-env.ts, standing in for one the user service would issue. A valid
+signature is enough: this service does not check roles.
 */
 
 import request from 'supertest';

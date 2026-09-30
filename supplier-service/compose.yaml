@@ -39,6 +39,9 @@ services:
       NODE_ENV: production
       PORT: "3001"
       DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
+      USER_SERVICE_PUBLIC_KEY_PATH: /app/keys/public.pem #REMOVE AFTER D2!!!!!!
+    volumes:
+      - ./keys/public.pem:/app/keys/public.pem:ro
     depends_on:
       db:
         condition: service_healthy

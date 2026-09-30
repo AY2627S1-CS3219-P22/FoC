@@ -7,31 +7,25 @@ ALERT: AI assisted programming
 
 import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import type { Role } from '@middleware/jwt-validation';
 
 type TokenOptions = {
   id?: string;
-  roles?: Role[];
   //seconds; negative values produce an already-expired token
   expiresIn?: number;
 };
 
 export function signTestToken({
   id = 'test-user',
-  roles = ['ADMIN'],
   expiresIn = 300,
 }: TokenOptions = {}): string {
-  return jwt.sign({ roles }, process.env.TEST_JWT_PRIVATE_KEY as string, {
+  return jwt.sign({}, process.env.TEST_JWT_PRIVATE_KEY as string, {
     algorithm: 'RS256',
     subject: id,
     expiresIn,
   });
 }
 
-//most tests only care that the caller is an authenticated admin
 export const adminBearer = () => `Bearer ${signTestToken()}`;
-
-export const userBearer = () => `Bearer ${signTestToken({ id: 'plain-user', roles: ['USER'] })}`;
 
 /*
 Correctly formed and signed, but by a key this service has no reason to trust.
@@ -44,7 +38,7 @@ export function foreignBearer(): string {
     publicKeyEncoding: { type: 'spki', format: 'pem' },
   });
 
-  const token = jwt.sign({ roles: ['ADMIN'] }, privateKey, {
+  const token = jwt.sign({}, privateKey, {
     algorithm: 'RS256',
     subject: 'impostor',
     expiresIn: 300,

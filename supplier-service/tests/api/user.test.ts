@@ -25,7 +25,7 @@ filterSuppliersByCategory runs SUPPLIER_CATEGORY.parse on the query, so a
 category outside the enum is a malformed request rather than a missing
 resource. A valid category that nobody is in is a 200 with an empty list.
 
-The write section is it.todo until the router calls authenticate and requireRole.
+Write routes require a token; those cases live in admin.test.ts.
 */
 
 import request from 'supertest';
@@ -132,14 +132,3 @@ describe('GET /suppliers/category as an anonymous user', () => {
   });
 });
 
-/*
-An authenticated but non-admin caller is the case requireRole('ADMIN') exists
-for: the token verifies, so this is a permission failure rather than a failure
-to identify the caller. Todos until that middleware is on the write routes.
-*/
-describe('write routes reject a non-admin user', () => {
-  it.todo('rejects POST');
-  it.todo('rejects PUT');
-  it.todo('rejects DELETE');
-  it.todo('leaves the data untouched after a rejected write');
-});

@@ -110,46 +110,70 @@ TODO: Set up docker secrets for seamless deployment across different devices
 
 ## CRUD Database Operations
 
-
-| Method | Route                           | Notes                                                  |
-| ------ | ------------------------------- | ------------------------------------------------------ |
-| GET    | `/suppliers`                    | active suppliers only                                  |
-| GET    | `/suppliers/search?q=coffee`    | full-text search over name, building, description      |
-| GET    | `/suppliers/category?type=food` | filter by category                                     |
-| GET    | `/supplier/:id`                 | 404 if missing or soft-deleted                         |
-| POST   | `/supplier`                     | 201 on success, 409 if the name is already taken       |
-| PUT    | `/supplier/:id`                 | requires `expectedUpdatedAt`, 409 if changed meanwhile or 404 if supplier is deleted/doesnt exist |
-| DELETE | `/supplier/:id`                 | soft delete, 404 if already deleted                    |
-
+| Method | Route                           | Notes |
+| ------ | ------------------------------- | ----- |
+| GET    | `/suppliers`                    | public; active suppliers only |
+| GET    | `/suppliers/search?q=coffee`    | public; full-text search over name, building, description |
+| GET    | `/suppliers/category?type=food` | public; filter by category |
+| GET    | `/supplier/:id`                 | public; 404 if missing or soft-deleted |
+| POST   | `/supplier`                     | Bearer JWT required; 201 on success, 409 if the name is already taken |
+| PUT    | `/supplier/:id`                 | Bearer JWT required; send `expectedUpdatedAt`; 409 if the row changed, 404 if missing or deleted |
+| DELETE | `/supplier/:id`                 | Bearer JWT required; soft delete, 404 if already deleted |
 
 `PUT` uses optimistic concurrency. Read the supplier first and send back the
 `updatedAt` you received. The seed sets that to `2026-01-01T00:00:00.000Z`; any
 other value is a `409` and nothing is written.
 
-To start run `ddocker compose up -d --build` and the app should run on port `3001`.
-You can view the app container and local CLI ONLY supabase container as well. All seed data (3) are specified in 
-`supplier-service/supabase/schemas/seed.sql`
+To start run `docker compose up -d --build` and the app should run on port `3001`.
+All seed data (3) are specified in `supplier-service/supabase/schemas/seed.sql`.
 
+Write routes need an RS256 Bearer token signed with `keys/private.pem`. From
+`supplier-service/` (after `yarn install`):
 
-| API endpoint                            | Sample curl command                                                                                                                                                                                                        |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /suppliers`                        | `curl localhost:3001/suppliers`                                                                                                                                                                                            |
-| `GET /suppliers/search?q=coffee`        | `curl "localhost:3001/suppliers/search?q=coffee"`                                                                                                                                                                          |
-| `GET /suppliers/category?type=printing` | `curl "localhost:3001/suppliers/category?type=printing"`                                                                                                                                                                   |
-| `GET /supplier/:id`                     | `curl localhost:3001/supplier/1`                                                                                                                                                                                           |
-| `POST /supplier`                        | `curl -X POST localhost:3001/supplier -H 'Content-Type: application/json' -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'` |
-| `PUT /supplier/:id`                     | `curl -X PUT localhost:3001/supplier/1 -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'`                                                                    |
-| `DELETE /supplier/:id`                  | `curl -X DELETE localhost:3001/supplier/1`                                                                                                                                                                                 |
+```bash
+TOKEN=$(node --input-type=module -e "
+import jwt from 'jsonwebtoken';
+import fs from 'node:fs';
+const token = jwt.sign({}, fs.readFileSync('./keys/private.pem', 'utf8'), {
+  algorithm: 'RS256',
+  subject: 'demo-admin',
+  expiresIn: '15m',
+});
+process.stdout.write(token);
+")
+```
 
+| API endpoint | Sample curl command |
+| ------------ | ------------------- |
+| `GET /suppliers` | `curl localhost:3001/suppliers` |
+| `GET /suppliers/search?q=coffee` | `curl "localhost:3001/suppliers/search?q=coffee"` |
+| `GET /suppliers/category?type=printing` | `curl "localhost:3001/suppliers/category?type=printing"` |
+| `GET /supplier/:id` | `curl localhost:3001/supplier/1` |
+| `POST /supplier` | `curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'` |
+| `PUT /supplier/:id` | `curl -X PUT localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'` |
+| `DELETE /supplier/:id` | `curl -X DELETE localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN"` |
 
-If someone else updated the row in between, the response is `409` and nothing is written. This is done by updated_at versioning. If the expectedUpdatedAt doesn't match the current e.g. after an update occurs, the response 409 is shown
+If someone else updated the row in between, the response is `409` and nothing is written. This is done by `updated_at` versioning. If `expectedUpdatedAt` doesn't match the current row, the response is 409.
 
-e.g. run `curl -X PUT localhost:3001/supplier/1 -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}`
-twice and the second command will fail
+e.g. run the `PUT` sample above twice; the second command will fail with `409 Conflict`.
 
-expected: `409 Conflict Error`
+To prevent duplicate suppliers, run the `POST` sample twice; the second try will fail with `409`.
 
-To prevent duplicate suppliers  run  `curl -X POST localhost:3001/supplier -H 'Content-Type: application/json' -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'` twice and the command on the second try will fail 
+A typical caller with no token is just curl without `-H Authorization`. Reads still work. Writes stop at `authenticate` with 401:
+
+```bash
+curl -X POST localhost:3001/supplier \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'
+
+curl -X PUT localhost:3001/supplier/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'
+
+curl -X DELETE localhost:3001/supplier/1
+```
+
+Expected: GETs `200`, POST/PUT/DELETE `401 Unauthorized`. 
 
 
 ### Error responses
