@@ -85,6 +85,9 @@ export const updateRequestSchema = updateSupplierSchema.extend({
     expectedUpdatedAt: z.coerce.date(),
 });
 
+export const supplierIdParamSchema = z.object({
+    id: z.coerce.number().int().positive(),
+  });
 
 export type Supplier = typeof supplier.$inferSelect;
 export type CreateSupplierSchema = z.infer<typeof createSupplierSchema>;

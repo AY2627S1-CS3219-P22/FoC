@@ -5,10 +5,10 @@ TODO: Supplier_Database name should be interpolated as db_name
 AI Declaration: Migration to drizzle for createSupplierService and updateSupplierService used
 */ 
 
-import pool, { db } from '@database/db'; //drizzle-orm
+import { db } from '@database/db'; //drizzle-orm
 import { CreateSupplierSchema, SupplierCategory, UpdateSupplierType, supplier } from '@data/schema';
 import { getTableColumns, isNull, eq, and, sql} from 'drizzle-orm';
-import { ConflictError, NotFoundError } from '@/middleware/errors';
+import { ConflictError, NotFoundError,  } from '@/middleware/errors';
 
 
 const { deletedAt, ...publicSupplierColumns } = getTableColumns(supplier);
@@ -29,13 +29,20 @@ export async function createSupplierService(newSupplier: CreateSupplierSchema)  
 }
 
 export async function getSupplierByIdService(id: number)  {
+
   const [row] = await db
   .select(publicSupplierColumns)
   .from(supplier)
   .where(and(eq(supplier.supplierId, id), isNull(supplier.deletedAt)));
 
+  if(!row) {
+    //case 1: No Suppliers Listed in DB 
+    //case 2: Cannot connect to DB
+    throw new NotFoundError(`Error 404: Supplier ${id} Not Found`);
+  }
   return row;
 }
+
 export async function updateSupplierByIdService(id: number, updates: UpdateSupplierType, expectedUpdatedAt: Date)  {
 
     /*
@@ -49,9 +56,9 @@ export async function updateSupplierByIdService(id: number, updates: UpdateSuppl
         - Sets supplier fields. Sets updatedAt to current date
 
     Response/Error Handling Cases
-        - Supplier Id does not exist or Supplier is deleted
-        - Current supplier updated at version does not match request body
-        - Supplier name is duplicated 
+        - Supplier Id does not exist or Supplier is deleted [Error 400]
+        - Current supplier updated at version does not match request body [Error 409]
+        - Supplier name is duplicated [Error 409]
     */
 
     let updated; //declare variable in function scope
@@ -73,7 +80,7 @@ export async function updateSupplierByIdService(id: number, updates: UpdateSuppl
     }
 
     //no row matched
-    // causes: supplier deletion, stale data: updated by someone else, id does not exist
+    // causes: supplier deletion (not found err), stale data: updated by someone else, id does not exist(not found err)
     if (!updated) {
         const [existing] = await db
             .select({ id: supplier.supplierId })
@@ -81,9 +88,9 @@ export async function updateSupplierByIdService(id: number, updates: UpdateSuppl
             .where(and(eq(supplier.supplierId, id), isNull(supplier.deletedAt)));
 
         if (!existing) {
-            throw new NotFoundError(`Supplier ${id} not found`);
+            throw new NotFoundError(`Supplier ${id} not found. Supplier is either deleted or does not exist.`);
         }
-        throw new ConflictError('Supplier was modified concurrently');
+        throw new ConflictError('Conflict: Supplier was modified concurrently');
     }
 
     return updated;
@@ -109,7 +116,6 @@ export async function getAllSuppliersService() {
       .select(publicSupplierColumns)
       .from(supplier)
       .where(isNull(supplier.deletedAt));
-
     return suppliers;
   }
 
@@ -118,13 +124,15 @@ export async function getAllSuppliersService() {
 //functions stored in db are public.search_suppliers public.filter_suppliers_by_category a.k.a ts vectors
 
 export async function searchSuppliersService(text: string) {
-    const resultList = await db.execute(`SELECT * FROM public.search_suppliers(${text})`);
+    const resultList = await db.execute(sql `SELECT * FROM public.search_suppliers(${text})`);
 
     return resultList.rows; //should result a list of matching results inclusive of Building, Name, and Location description DB inputs
 }
 
 export async function filterSuppliersByCategoryService(supplier_type: SupplierCategory ) {
-    const resultList = await db.execute(`SELECT * FROM public.filter_suppliers_by_category(${supplier_type})`);
+    const resultList = await db.execute(sql `SELECT * FROM public.filter_suppliers_by_category(${supplier_type})`);
 
     return resultList.rows; //list of matching results with category supplier_type
 }
+
+//TODO: Add create new supplier category
