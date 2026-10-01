@@ -56,9 +56,9 @@ export const listUsers: RequestHandler = async (_req, res) => {
   res.status(200).json({ users });
 };
 
-// GET /users/:id — view a specific user's profile (ADMINISTRATOR only)
+// GET /users/:id
 export const getUserById: RequestHandler = async (req, res) => {
-  const id = String(req.params.id); // single route param is always a string at runtime
+  const id = String(req.params.id);
   const user = await userService.getProfileById(id);
   if (!user) {
     res.status(404).json({ error: 'Not Found', message: 'User not found.' });
