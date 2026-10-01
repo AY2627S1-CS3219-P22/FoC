@@ -14,7 +14,7 @@ export function createApp(): Express {
     });
   });
 
-  // Feature routes.
+  // Feature routes
   app.use('/users', userRouter);
 
   return app;

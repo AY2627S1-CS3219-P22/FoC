@@ -2,10 +2,10 @@ import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../db';
 import type { RegisterInput } from '../dto/registerDto';
+import type { LoginInput } from '../dto/loginDto';
 
 const SALT_ROUNDS = 10;
 
-// Fields safe to expose to clients — deliberately excludes passwordHash.
 const publicUserSelect = {
   id: true,
   username: true,
@@ -16,13 +16,8 @@ const publicUserSelect = {
   createdAt: true,
 } satisfies Prisma.UserSelect;
 
-// Registers a user (F1). Input is already validated by the DTO, so this only
-// does business logic: reject a duplicate email/username, hash the password,
-// and create the record. Returns a discriminated result the controller maps to
-// a status code (201 on success, 409 on conflict).
 export async function register(input: RegisterInput) {
-  // Friendly pre-check for a clear message. The DB also enforces uniqueness via
-  // @unique, which is the real guard against race conditions.
+  // Check duplicate email or username
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: input.email }, { username: input.username }] },
     select: { email: true, username: true },
@@ -55,6 +50,27 @@ export async function register(input: RegisterInput) {
         : String(target ?? '').includes('email');
       return { ok: false as const, field: hitEmail ? ('email' as const) : ('username' as const) };
     }
-    throw err; // anything else is a genuine error — let it propagate
+    throw err;
   }
+}
+
+export async function login(input: LoginInput) {
+  const user = await prisma.user.findUnique({
+    where: { email: input.email },
+    select: { id: true, passwordHash: true, roles: true },
+  });
+
+  if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) {
+    return { ok: false as const };
+  }
+
+  return { ok: true as const, userId: user.id, roles: user.roles };
+}
+
+export async function getProfileById(id: string) {
+  return prisma.user.findUnique({ where: { id }, select: publicUserSelect });
+}
+
+export async function listProfiles() {
+  return prisma.user.findMany({ select: publicUserSelect });
 }
