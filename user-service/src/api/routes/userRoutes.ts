@@ -1,10 +1,24 @@
 import { Router } from 'express';
 import { validate } from '../middleware/validate';
+import { authenticate } from '../middleware/authenticate';
+import { requireRole } from '../middleware/requireRole';
 import { registerSchema } from '../dto/registerDto';
+import { loginSchema } from '../dto/loginDto';
 import * as userController from '../controllers/userController';
 
-// Routes for the /users resource (mounted at /users in app.ts).
 export const userRouter = Router();
 
-// POST /users/register — validate the body, then hand off to the controller.
+// POST /users/register
 userRouter.post('/register', validate(registerSchema), userController.register);
+
+// POST /users/login
+userRouter.post('/login', validate(loginSchema), userController.login);
+
+// GET /users/me
+userRouter.get('/me', authenticate, userController.getMe);
+
+// GET /users
+userRouter.get('/', authenticate, requireRole('ADMINISTRATOR'), userController.listUsers);
+
+// GET /users/:id
+userRouter.get('/:id', authenticate, requireRole('ADMINISTRATOR'), userController.getUserById);
