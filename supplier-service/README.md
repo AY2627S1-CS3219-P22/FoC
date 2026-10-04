@@ -110,15 +110,17 @@ TODO: Set up docker secrets for seamless deployment across different devices
 
 ## CRUD Database Operations
 
-| Method | Route                           | Notes |
-| ------ | ------------------------------- | ----- |
-| GET    | `/suppliers`                    | public; active suppliers only |
-| GET    | `/suppliers/search?q=coffee`    | public; full-text search over name, building, description |
-| GET    | `/suppliers/category?type=food` | public; filter by category |
-| GET    | `/supplier/:id`                 | public; 404 if missing or soft-deleted |
-| POST   | `/supplier`                     | Bearer JWT required; 201 on success, 409 if the name is already taken |
+
+| Method | Route                           | Notes                                                                                            |
+| ------ | ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| GET    | `/suppliers`                    | public; active suppliers only                                                                    |
+| GET    | `/suppliers/search?q=coffee`    | public; full-text search over name, building, description                                        |
+| GET    | `/suppliers/category?type=food` | public; filter by category                                                                       |
+| GET    | `/supplier/:id`                 | public; 404 if missing or soft-deleted                                                           |
+| POST   | `/supplier`                     | Bearer JWT required; 201 on success, 409 if the name is already taken                            |
 | PUT    | `/supplier/:id`                 | Bearer JWT required; send `expectedUpdatedAt`; 409 if the row changed, 404 if missing or deleted |
-| DELETE | `/supplier/:id`                 | Bearer JWT required; soft delete, 404 if already deleted |
+| DELETE | `/supplier/:id`                 | Bearer JWT required; soft delete, 404 if already deleted                                         |
+
 
 `PUT` uses optimistic concurrency. Read the supplier first and send back the
 `updatedAt` you received. The seed sets that to `2026-01-01T00:00:00.000Z`; any
@@ -143,15 +145,17 @@ process.stdout.write(token);
 ")
 ```
 
-| API endpoint | Sample curl command |
-| ------------ | ------------------- |
-| `GET /suppliers` | `curl localhost:3001/suppliers` |
-| `GET /suppliers/search?q=coffee` | `curl "localhost:3001/suppliers/search?q=coffee"` |
-| `GET /suppliers/category?type=printing` | `curl "localhost:3001/suppliers/category?type=printing"` |
-| `GET /supplier/:id` | `curl localhost:3001/supplier/1` |
-| `POST /supplier` | `curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'` |
-| `PUT /supplier/:id` | `curl -X PUT localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'` |
-| `DELETE /supplier/:id` | `curl -X DELETE localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN"` |
+
+| API endpoint                            | Sample curl command                                                                                                                                                                                                                                          |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /suppliers`                        | `curl localhost:3001/suppliers`                                                                                                                                                                                                                              |
+| `GET /suppliers/search?q=coffee`        | `curl "localhost:3001/suppliers/search?q=coffee"`                                                                                                                                                                                                            |
+| `GET /suppliers/category?type=printing` | `curl "localhost:3001/suppliers/category?type=printing"`                                                                                                                                                                                                     |
+| `GET /supplier/:id`                     | `curl localhost:3001/supplier/1`                                                                                                                                                                                                                             |
+| `POST /supplier`                        | `curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'` |
+| `PUT /supplier/:id`                     | `curl -X PUT localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'`                                                                    |
+| `DELETE /supplier/:id`                  | `curl -X DELETE localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN"`                                                                                                                                                                                 |
+
 
 If someone else updated the row in between, the response is `409` and nothing is written. This is done by `updated_at` versioning. If `expectedUpdatedAt` doesn't match the current row, the response is 409.
 
@@ -174,7 +178,6 @@ curl -X DELETE localhost:3001/supplier/1
 ```
 
 Expected: GETs `200`, POST/PUT/DELETE `401 Unauthorized`. 
-
 
 ### Error responses
 

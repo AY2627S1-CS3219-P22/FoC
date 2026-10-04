@@ -93,7 +93,11 @@ export const supplierCategoryQuerySchema = z.object({
 type: SUPPLIER_CATEGORY,
 });
 
+//return values 
 export type Supplier = typeof supplier.$inferSelect;
+export type PublicSupplier = Omit<Supplier, 'deletedAt'> //standardize supplier return type
+
+//for CRUD input validation
 export type CreateSupplierSchema = z.infer<typeof createSupplierSchema>;
 export type UpdateSupplierType = z.infer<typeof updateSupplierSchema>;
 export type SupplierCategory = z.infer<typeof SUPPLIER_CATEGORY>;
