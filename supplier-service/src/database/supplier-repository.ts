@@ -6,8 +6,8 @@ AI Declaration: Migration to drizzle for createSupplierService and updateSupplie
 */ 
 
 import { db } from '@database/db'; //drizzle-orm
-import { CreateSupplierSchema, SupplierCategory, UpdateSupplierType, supplier } from '@data/schema';
-import { getTableColumns, isNull, eq, and, sql} from 'drizzle-orm';
+import { CreateSupplierSchema, PublicSupplier, SupplierCategory, UpdateSupplierType, supplier } from '@data/schema';
+import { getTableColumns, isNull, eq, and, sql, desc} from 'drizzle-orm';
 import { ConflictError, NotFoundError,  } from '@/middleware/errors';
 
 
@@ -16,7 +16,7 @@ const { deletedAt, ...publicSupplierColumns } = getTableColumns(supplier);
 //drizzle wraps driver errors, so the postgres code sits on err.cause
 const isDuplicateName = (err: any) => err?.code === '23505' || err?.cause?.code === '23505';
 
-export async function createSupplierService(newSupplier: CreateSupplierSchema)  {
+export async function createSupplierService(newSupplier: CreateSupplierSchema): Promise<PublicSupplier>  {
     try{
         const [created] = await db.insert(supplier).values(newSupplier).returning(publicSupplierColumns);
     return created;
@@ -28,7 +28,7 @@ export async function createSupplierService(newSupplier: CreateSupplierSchema)  
     }
 }
 
-export async function getSupplierByIdService(id: number)  {
+export async function getSupplierByIdService(id: number): Promise<PublicSupplier>  {
 
   const [row] = await db
   .select(publicSupplierColumns)
@@ -43,7 +43,7 @@ export async function getSupplierByIdService(id: number)  {
   return row;
 }
 
-export async function updateSupplierByIdService(id: number, updates: UpdateSupplierType, expectedUpdatedAt: Date)  {
+export async function updateSupplierByIdService(id: number, updates: UpdateSupplierType, expectedUpdatedAt: Date): Promise<PublicSupplier>  {
 
     /*
     Parameters: 
@@ -98,15 +98,14 @@ export async function updateSupplierByIdService(id: number, updates: UpdateSuppl
 
 //support soft delete
 //edited to return the deleted supplier for better response messages
-export async function deleteSupplierByIdService(id: number) {
-    const result = await db.execute(
-        sql`UPDATE "Supplier_Database" SET deleted_at = NOW() WHERE id = ${id} AND deleted_at IS NULL RETURNING id`
-    );
-
-    if (!result.rows[0]) {
-       throw new NotFoundError(`Supplier ${id} not found`);
-    }
-    return result.rows[0];
+export async function deleteSupplierByIdService(id: number): Promise<PublicSupplier> {
+    const [deleted] = await db
+    .update(supplier)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(supplier.supplierId, id), isNull(supplier.deletedAt)))
+    .returning(publicSupplierColumns);
+  if (!deleted) throw new NotFoundError(`Supplier ${id} not found`);
+  return deleted;
 }
 
 //Might need to think about loading optimizations
@@ -120,19 +119,22 @@ export async function getAllSuppliersService() {
   }
 
 
-//replace drizzle with SQL queries due to some weird issues...apparently drizzle-orm does not expose functions stored in db
-//functions stored in db are public.search_suppliers public.filter_suppliers_by_category a.k.a ts vectors
+//use drizzle-orm to standardize response to PublicSupplier type for UI integration
+export async function searchSuppliersService(text: string): Promise<PublicSupplier[]> {
+    const query = sql`websearch_to_tsquery('english', ${text})`;
+    return db
+      .select({ ...publicSupplierColumns, rank: sql<number>`ts_rank(fts, ${query})` })
+      .from(supplier)
+      .where(and(isNull(supplier.deletedAt), sql`fts @@ ${query}`))
+      .orderBy(desc(sql`ts_rank(fts, ${query})`));
+  }
+  
+  export async function filterSuppliersByCategoryService(
+    supplierType: SupplierCategory,
+  ): Promise<PublicSupplier[]> {
+    return db
+      .select(publicSupplierColumns)
+      .from(supplier)
+      .where(and(isNull(supplier.deletedAt), eq(supplier.type, supplierType)));
+  }
 
-export async function searchSuppliersService(text: string) {
-    const resultList = await db.execute(sql `SELECT * FROM public.search_suppliers(${text})`);
-
-    return resultList.rows; //should result a list of matching results inclusive of Building, Name, and Location description DB inputs
-}
-
-export async function filterSuppliersByCategoryService(supplier_type: SupplierCategory ) {
-    const resultList = await db.execute(sql `SELECT * FROM public.filter_suppliers_by_category(${supplier_type})`);
-
-    return resultList.rows; //list of matching results with category supplier_type
-}
-
-//TODO: Add create new supplier category
