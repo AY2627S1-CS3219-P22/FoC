@@ -1,5 +1,6 @@
 import express, { type Express } from 'express';
 import { pingDatabase } from '../db';
+import { userRouter } from './routes/userRoutes';
 
 export function createApp(): Express {
   const app = express();
@@ -12,6 +13,9 @@ export function createApp(): Express {
       db: dbUp ? 'up' : 'down',
     });
   });
+
+  // Feature routes.
+  app.use('/users', userRouter);
 
   return app;
 }
