@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package credit;
+
+service CreditService {
+  rpc GetBalance(GetBalanceRequest) returns (Balance);
+  // Mutations must be atomic and idempotent by order_id when implemented.
+  // Repeating an identical operation returns the existing reservation;
+  // conflicting amounts/users or invalid transitions fail with FAILED_PRECONDITION.
+  rpc ReserveCredits(ReserveCreditsRequest) returns (Reservation);
+  rpc ReleaseCredits(ReleaseCreditsRequest) returns (Reservation);
+  rpc SettleCredits(SettleCreditsRequest) returns (Reservation);
+}
+
+message GetBalanceRequest {
+  string user_id = 1;
+}
+
+message Balance {
+  string user_id = 1;
+  int32 available_credits = 2;
+  int32 reserved_credits = 3;
+}
+
+message ReserveCreditsRequest {
+  string order_id = 1;
+  string requester_id = 2;
+  // Positive whole credits. Insufficient available balance: FAILED_PRECONDITION.
+  int32 amount = 3;
+}
+
+message ReleaseCreditsRequest {
+  string order_id = 1;
+}
+
+message SettleCreditsRequest {
+  string order_id = 1;
+  string courier_id = 2;
+}
+
+enum ReservationStatus {
+  RESERVATION_STATUS_UNSPECIFIED = 0;
+  RESERVED = 1;
+  RELEASED = 2;
+  SETTLED = 3;
+}
+
+message Reservation {
+  string order_id = 1;
+  string requester_id = 2;
+  int32 amount = 3;
+  ReservationStatus status = 4;
+  // Empty until settlement.
+  string courier_id = 5;
+}
