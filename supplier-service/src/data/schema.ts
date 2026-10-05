@@ -45,8 +45,6 @@ export const supplier = pgTable('Supplier_Database', {
     floor: integer("Floor").notNull(),
     longitude: numeric("Longitude").notNull(),
     latitude: numeric("Latitude").notNull(),
-    startingTime:varchar("StartingTime").default("NA"),
-    closingTime: varchar("ClosingTime").default("NA"),
     imageURL: varchar("ImageURL").default("NA"),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
@@ -68,9 +66,6 @@ export const createSupplierSchema = createInsertSchema(supplier).omit ({
                                     createdAt: true, 
                                     updatedAt: true,
                                     deletedAt: true,
-                                }).extend({
-                                    startingTime: z.string().default("NA").optional(),
-                                    closingTime: z.string().default("NA").optional(),
                                 });
 
 export const updateSupplierSchema = createUpdateSchema(supplier)
