@@ -1,6 +1,19 @@
 {
-  "name": "foc",
-  "version": "1.0.0",
+  "name": "foc-services",
+  "version": "0.1.0",
   "private": true,
-  "license": "MIT"
+  "workspaces": [
+    "shared/grpc",
+    "order-service/grpc",
+    "credit-service/grpc",
+    "supplier-service/grpc"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @foc/grpc && npm run build --workspace @foc/order-grpc --workspace @foc/credit-grpc --workspace @foc/supplier-grpc",
+    "test": "npm run test --workspace @foc/grpc",
+    "grpc:generate": "npm run generate --workspace @foc/grpc"
+  },
+  "engines": {
+    "node": ">=20"
+  }
 }
