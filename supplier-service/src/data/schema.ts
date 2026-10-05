@@ -9,6 +9,7 @@ import { bigint, integer, numeric, pgTable, timestamp, varchar, uniqueIndex} fro
 import { createInsertSchema, createUpdateSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import {sql} from 'drizzle-orm'
+import {createOpeningHoursSchema} from '@data/opening-hours-schema';
 
 export const SUPPLIER_CATEGORY = z.enum(['food/coffee', 'printing', 'food', 'shopping', 'other']);
 
@@ -66,7 +67,13 @@ export const createSupplierSchema = createInsertSchema(supplier).omit ({
                                     createdAt: true, 
                                     updatedAt: true,
                                     deletedAt: true,
-                                });
+                                }).extend
+                                ({openingHours: 
+                                    z.array(createOpeningHoursSchema).length(7, 'Opening hours must span 7 days of the week')
+                                }).refine(
+                                    (s) => new Set(s.openingHours.map((h) => h.dayOfWeek)).size == 7, //validate!
+                                    {message: 'Opening hours must contain hours for each day of the week exactly once', path: ['openingHours']},
+                                );
 
 export const updateSupplierSchema = createUpdateSchema(supplier)
                                     .omit({
@@ -74,7 +81,7 @@ export const updateSupplierSchema = createUpdateSchema(supplier)
                                     createdAt: true, 
                                     updatedAt: true,
                                     deletedAt: true,
-                                    }).partial();
+                                    });
 
 export const updateRequestSchema = updateSupplierSchema.extend({
     expectedUpdatedAt: z.coerce.date(),
