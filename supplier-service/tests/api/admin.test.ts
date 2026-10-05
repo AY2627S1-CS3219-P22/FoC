@@ -40,6 +40,13 @@ const validSupplier = {
   floor: 1,
   latitude: '1.304400',
   longitude: '103.772600',
+  //createSupplierSchema mandates a full week, so authorization tests still need one
+  openingHours: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+    dayOfWeek,
+    opensAt: '09:00:00',
+    closesAt: '17:00:00',
+    isClosed: false,
+  })),
 };
 
 beforeAll(async () => {
