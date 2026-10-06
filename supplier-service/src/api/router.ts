@@ -1,5 +1,6 @@
 import express from 'express';
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { getAllSuppliers, getSupplierById, deleteSupplierById, createSupplier, updateSupplierById, searchSuppliers, filterSuppliersByCategory, updateSupplierHours, getNearbySuppliers} from '@/api/supplier-controller';
 import {validateRequest, ValidationSource} from '@/middleware/zod-validation';
 import {createSupplierSchema, updateRequestSchema, supplierIdParamSchema, supplierCategoryQuerySchema, supplierRadiusQuerySchema} from "@data/schema";
@@ -7,8 +8,11 @@ import {openingHoursParamSchema, updateOpeningHoursBodySchema} from "@data/openi
 import { authenticate, requireRole, ADMIN } from '@/middleware/jwt-validation';
 =======
 import { getAllSuppliers, getSupplierById, deleteSupplierById, createSupplier, updateSupplierById, searchSuppliers, filterSuppliersByCategory, updateSupplierHours} from '@/api/supplier-controller';
+=======
+import { getAllSuppliers, getSupplierById, deleteSupplierById, createSupplier, updateSupplierById, searchSuppliers, filterSuppliersByCategory, updateSupplierHours, getNearbySuppliers} from '@/api/supplier-controller';
+>>>>>>> a76812b (Add in the location post gis functionality)
 import {validateRequest, ValidationSource} from '@/middleware/zod-validation';
-import {createSupplierSchema, updateRequestSchema, supplierIdParamSchema, supplierCategoryQuerySchema} from "@data/schema";
+import {createSupplierSchema, updateRequestSchema, supplierIdParamSchema, supplierCategoryQuerySchema, supplierRadiusQuerySchema} from "@data/schema";
 import {openingHoursParamSchema, updateOpeningHoursBodySchema} from "@data/opening-hours-schema";
 import { authenticate } from '@/middleware/jwt-validation';
 >>>>>>> 8e75931 (Update supplier hours schema, controller, repository and tests)
@@ -43,9 +47,12 @@ supplierRouter.get('/suppliers/search-radius', validateRequest(supplierRadiusQue
 // get all open suppliers 
 //supplierRouter.get('/supplier/:id/opening-hours')
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 //get all supppliers closest to me 
 //supplierRouter.get('/suppliers/search-radius', getNearbySuppliers);
 >>>>>>> 8e75931 (Update supplier hours schema, controller, repository and tests)
+=======
+>>>>>>> a76812b (Add in the location post gis functionality)
 export default supplierRouter;
