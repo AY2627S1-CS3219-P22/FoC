@@ -2,11 +2,14 @@ import { useState } from "react"
 import type { Page } from "../App"
 
 interface Props {
-  onLogin: () => void
+  onLogin: (email: string, password: string, remember: boolean) => Promise<void>
+  message?: string
   onNavigate: (page: Page) => void
 }
 
-export default function LoginPage({ onLogin, onNavigate }: Props) {
+export default function LoginPage({ onLogin, onNavigate, message }: Props) {
+  const [error, setError] = useState("")
+  const [busy, setBusy] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [remember, setRemember] = useState(false)
@@ -66,14 +69,16 @@ export default function LoginPage({ onLogin, onNavigate }: Props) {
             <h2 className="text-xl font-semibold text-[#162A46] mb-1">Welcome back</h2>
             <p className="text-sm text-[#3F6B5A] mb-7">Sign in to your student account</p>
 
+            {message && <p role="status" className="mb-4 text-sm text-[#3F6B5A]">{message}</p>}
+            {error && <p role="alert" className="mb-4 text-sm text-red-600">{error}</p>}
             <form
-              onSubmit={(e) => { e.preventDefault(); onLogin() }}
+              onSubmit={async (e) => { e.preventDefault(); setBusy(true); setError(''); try { await onLogin(email, password, remember) } catch (err) { setError((err as Error).message) } finally { setBusy(false) } }}
               className="space-y-4"
             >
               <div>
                 <label className="block text-xs font-medium text-[#1B2522] mb-1.5">University email</label>
                 <input
-                  type="email"
+                  required type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="yourname@u.nus.edu"
@@ -83,12 +88,12 @@ export default function LoginPage({ onLogin, onNavigate }: Props) {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-medium text-[#1B2522]">Password</label>
-                  <button type="button" className="text-xs text-[#3F6B5A] hover:text-[#1A4A36] transition-colors">
+                  <button disabled title="Password recovery is not implemented by the User Service" type="button" className="text-xs text-[#3F6B5A] hover:text-[#1A4A36] transition-colors">
                     Forgot password?
                   </button>
                 </div>
                 <input
-                  type="password"
+                  required type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -105,10 +110,10 @@ export default function LoginPage({ onLogin, onNavigate }: Props) {
                 <span className="text-xs text-[#1B2522]">Remember me</span>
               </label>
               <button
-                type="submit"
+                disabled={busy} type="submit"
                 className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] active:scale-[.99] transition-all"
               >
-                Log in
+                {busy ? "Signing in…" : "Log in"}
               </button>
             </form>
 

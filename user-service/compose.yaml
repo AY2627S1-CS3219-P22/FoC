@@ -31,6 +31,11 @@ services:
       DATABASE_URL: 'postgresql://user_service:user_service@postgres:5432/user_service?schema=public'
       PORT: '3001'
       GRPC_PORT: '50051'
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+      JWT_EXPIRES_IN: 15m
+    volumes:
+      - ./keys:/app/keys:ro
     ports:
       - '3001:3001'
       - '50051:50051'

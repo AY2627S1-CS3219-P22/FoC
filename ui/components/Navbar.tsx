@@ -66,6 +66,7 @@ function NavIcon({ icon }: { icon: NavItem["icon"] }) {
 }
 
 export default function Navbar({ user, currentPage, onNavigate }: NavbarProps) {
+  const visibleItems: NavItem[] = [...navItems, { label: 'Suppliers', mobileLabel: 'Suppliers', page: 'suppliers', icon: 'orders' }, ...(user.roles.includes('ADMINISTRATOR') ? [{ label: 'Admin', mobileLabel: 'Admin', page: 'admin' as const, icon: 'activity' as const }] : [])]
   const initials = user.name.split(" ").map((n) => n[0]).join("").slice(0, 2)
   const activePage =
     currentPage === "create-success"
@@ -91,8 +92,8 @@ export default function Navbar({ user, currentPage, onNavigate }: NavbarProps) {
         </button>
 
         {/* Center nav */}
-        <nav className="hidden md:flex items-center gap-0.5">
-          {navItems.map(({ label, page }) => (
+        <nav className="hidden md:flex items-center gap-0.5 flex-wrap">
+          {visibleItems.map(({ label, page }) => (
             <button
               key={page}
               onClick={() => onNavigate(page)}
@@ -116,6 +117,11 @@ export default function Navbar({ user, currentPage, onNavigate }: NavbarProps) {
             <span>{user.credits}</span>
             <span className="hidden min-[380px]:inline">Credits</span>
           </div>
+          {user.roles.includes("ADMINISTRATOR") && (
+            <span className="rounded-full border border-[#162A46]/15 bg-[#162A46]/5 px-2 py-1 text-[10px] font-semibold text-[#162A46] sm:text-xs">
+              Administrator
+            </span>
+          )}
           <button
             onClick={() => onNavigate("profile")}
             className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#162A46] text-xs font-semibold text-white transition-opacity hover:opacity-90"
@@ -129,14 +135,14 @@ export default function Navbar({ user, currentPage, onNavigate }: NavbarProps) {
       {/* Mobile bottom nav */}
       <nav
         aria-label="Primary navigation"
-        className="fixed inset-x-0 bottom-0 z-50 flex border-t border-[#E4E8E6] bg-white/95 pl-[max(0.5rem,env(safe-area-inset-left,0px))] pr-[max(0.5rem,env(safe-area-inset-right,0px))] pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-6px_24px_rgba(22,42,70,0.08)] backdrop-blur-md md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 flex overflow-x-auto border-t border-[#E4E8E6] bg-white/95 pl-[max(0.5rem,env(safe-area-inset-left,0px))] pr-[max(0.5rem,env(safe-area-inset-right,0px))] pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-6px_24px_rgba(22,42,70,0.08)] backdrop-blur-md md:hidden"
       >
-        {navItems.map(({ mobileLabel, page, icon }) => (
+        {visibleItems.map(({ mobileLabel, page, icon }) => (
           <button
             key={page}
             onClick={() => onNavigate(page)}
             aria-current={activePage === page ? "page" : undefined}
-            className={`relative flex min-h-16 flex-1 flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-medium transition-colors ${
+            className={`relative flex min-h-16 min-w-14 flex-1 flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-medium transition-colors ${
               activePage === page
                 ? "text-[#1A4A36]"
                 : "text-[#3F6B5A] hover:text-[#1A4A36]"

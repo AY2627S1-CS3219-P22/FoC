@@ -1,4 +1,7 @@
-import { useState } from "react"
+import { clearToken, getToken, saveToken } from './api/client'
+import { getMe, login, register, type Profile, type Registration } from './api/users'
+import SuppliersPage from './pages/SuppliersPage'
+import { useEffect, useState } from "react"
 import Navbar from "./components/Navbar"
 import LoginPage from "./pages/LoginPage"
 import SignupPage from "./pages/SignupPage"
@@ -22,6 +25,7 @@ export type Page =
   | "errand-complete"
   | "profile"
   | "admin"
+  | "suppliers"
 
 export interface Order {
   id: string
@@ -40,6 +44,7 @@ export interface Order {
 }
 
 export interface User {
+  roles: string[]
   id: string
   name: string
   email: string
@@ -50,15 +55,14 @@ export interface User {
   creditsEarned: number
 }
 
-const CURRENT_USER: User = {
-  id: "u1",
-  name: "Jordan Tan",
-  email: "jordan.tan@u.nus.edu",
-  credits: 12,
-  memberSince: "September 2026",
-  requestsCreated: 2,
-  errandsCompleted: 2,
-  creditsEarned: 9,
+const EMPTY_USER: User = {
+  id: '', name: '', email: '', roles: [], credits: 0, memberSince: '',
+  requestsCreated: 0, errandsCompleted: 0, creditsEarned: 0,
+}
+function toUser(profile: Profile): User {
+  // Prototype balance until the Credit Service provides persisted balances.
+  return { ...EMPTY_USER, credits: 10, id: profile.id, name: `${profile.firstName} ${profile.lastName}`, email: profile.email,
+    roles: profile.roles, memberSince: new Date(profile.createdAt).toLocaleDateString('en-SG', { month: 'long', year: 'numeric' }) }
 }
 
 const SEED_ORDERS: Order[] = [
@@ -198,7 +202,7 @@ function SuccessScreen({
 export default function App() {
   const [page, setPage]           = useState<Page>("login")
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [user, setUser]           = useState<User>(CURRENT_USER)
+  const [user, setUser]           = useState<User>(EMPTY_USER)
   const [orders, setOrders]       = useState<Order[]>(SEED_ORDERS)
   const [selectedOrderId, setSelectedOrderId] = useState<string>("o1")
   const [acceptedOrderId, setAcceptedOrderId] = useState<string | null>(null)
@@ -212,14 +216,33 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "instant" })
   }
 
-  const handleLogin = () => {
-    setIsLoggedIn(true)
-    navigate("orders")
+  const [restoring, setRestoring] = useState(!!getToken())
+  const [sessionError, setSessionError] = useState('')
+  useEffect(() => {
+    let active = true
+    const expired = () => { setIsLoggedIn(false); setUser(EMPTY_USER); setPage('login'); setSessionError('Your session expired. Please sign in again.') }
+    window.addEventListener('foc:unauthorized', expired)
+    if (getToken()) getMe().then(({ user: profile }) => {
+      if (active) { setUser(toUser(profile)); setIsLoggedIn(true); setPage('orders') }
+    }).catch((err: Error) => { if (active) setSessionError(err.message) })
+      .finally(() => { if (active) setRestoring(false) })
+    return () => { active = false; window.removeEventListener('foc:unauthorized', expired) }
+  }, [])
+  const handleLogin = async (email: string, password: string, remember = false) => {
+    const { token } = await login(email, password)
+    saveToken(token, remember)
+    try {
+      const { user: profile } = await getMe()
+      setUser(toUser(profile)); setIsLoggedIn(true); setSessionError(''); navigate('orders')
+    } catch (error) { clearToken(); throw error }
   }
-
+  const handleRegister = async (input: Registration) => {
+    await register(input)
+    setSessionError('Account created. Sign in with your email and password.')
+    navigate('login')
+  }
   const handleLogout = () => {
-    setIsLoggedIn(false)
-    navigate("login")
+    clearToken(); setUser(EMPTY_USER); setIsLoggedIn(false); setSessionError(''); navigate('login')
   }
 
   const handleAcceptOrder = (orderId: string) => {
@@ -252,14 +275,16 @@ export default function App() {
       ? (orders.find((o) => o.id === acceptedOrderId)?.credits ?? 4)
       : 4
 
+  if (restoring) return <p role="status" className="p-8">Restoring your session…</p>
+
   // Unauthenticated
   if (!isLoggedIn) {
-    if (page === "signup") return <SignupPage onLogin={handleLogin} onNavigate={navigate} />
-    return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
+    if (page === "signup") return <SignupPage onRegister={handleRegister} onNavigate={navigate} />
+    return <LoginPage message={sessionError} onLogin={handleLogin} onNavigate={navigate} />
   }
 
   // Admin is a full-screen layout without the main Navbar
-  if (page === "admin") {
+  if (page === "admin" && user.roles.includes("ADMINISTRATOR")) {
     return (
       <AdminPage
         orders={orders}
@@ -278,6 +303,8 @@ export default function App() {
       <Navbar user={user} currentPage={page} onNavigate={navigate} onLogout={handleLogout} />
 
       <main className="min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+        <p className="mx-auto max-w-6xl px-4 pt-3 text-xs text-[#3F6B5A]">Users and suppliers are live. Orders and credits are a prototype; the credit service is not connected.</p>
+        {page === 'suppliers' && <SuppliersPage />}
         {page === "orders" && (
           <OrdersPage orders={orders} onNavigate={navigate} onSelectOrder={(id) => navigate("order-details", id)} />
         )}

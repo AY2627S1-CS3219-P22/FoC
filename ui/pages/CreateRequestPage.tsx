@@ -1,4 +1,5 @@
-import { SUPPLIERS } from "../data/suppliers"
+import { categoryLabel, categories } from "../api/suppliers"
+import { useSuppliers } from "../hooks/useSuppliers"
 import { useEffect, useState } from "react"
 import type { User, Order, Page } from "../App"
 
@@ -70,10 +71,8 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
   }
   const [supplierSearch, setSupplierSearch] = useState("")
   const [supplierType, setSupplierType] = useState("All")
-  const visibleSuppliers = SUPPLIERS.filter((supplier) =>
-    (supplierType === "All" || supplier.type === supplierType) &&
-    `${supplier.name} ${supplier.location}`.toLowerCase().includes(supplierSearch.trim().toLowerCase())
-  )
+  const { suppliers, loading, error, reload } = useSuppliers(supplierSearch, supplierType)
+  const visibleSuppliers = suppliers.map(s => ({ id: String(s.supplierId), name: s.name, location: s.buildingName, type: s.type, hours: `${s.startingTime || 'NA'} – ${s.closingTime || 'NA'}` }))
   const [form, setForm] = useState({
     pickupLocation: "",
     supplier: "",
@@ -154,15 +153,15 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
             />
           </div>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Supplier category">
-            {["All", "F&B", "Convenience", "Services", "Retail"].map((type) => (
+            {["All", ...categories].map((type) => (
               <button
-                key={type}
+                key={categoryLabel(type)}
                 type="button"
                 aria-pressed={supplierType === type}
                 onClick={() => setSupplierType(type)}
                 className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${supplierType === type ? "border-[#1A4A36] bg-[#1A4A36] text-white" : "border-[#E4E8E6] bg-white text-[#3F6B5A] hover:border-[#3F6B5A]"}`}
               >
-                {type}
+                {categoryLabel(type)}
               </button>
             ))}
           </div>
@@ -172,6 +171,8 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
               <p className="mt-1 text-xs text-[#3F6B5A]">Pickup location: {form.pickupLocation}</p>
             </div>
           )}
+          {loading && <p role="status">Loading suppliers…</p>}
+          {error && <p role="alert" className="text-sm text-red-600">{error} <button onClick={reload}>Retry</button></p>}
           <fieldset className="min-w-0">
             <legend className="mb-3 text-xs font-medium text-[#3F6B5A]">Choose a supplier · {visibleSuppliers.length} found</legend>
             <div className="grid max-h-80 grid-cols-1 gap-3 overflow-y-auto px-1 py-2 [scrollbar-gutter:stable]">
@@ -190,13 +191,13 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-[#162A46]">{supplier.name}</span>
-                      <span className="mt-1 block text-xs text-[#3F6B5A]">{supplier.location} · {supplier.type}</span>
+                      <span className="mt-1 block text-xs text-[#3F6B5A]">{supplier.location} · {categoryLabel(supplier.type)}</span>
                       {supplier.hours && <span className="mt-1 block text-xs text-[#3F6B5A]">{supplier.hours}</span>}
                     </span>
                   </label>
                 )
               })}
-              {visibleSuppliers.length === 0 && (
+              {!loading && !error && visibleSuppliers.length === 0 && (
                 <div className="rounded-xl border border-[#E4E8E6] bg-white p-6 text-center">
                   <p className="text-sm font-medium text-[#162A46]">No suppliers found</p>
                   <p className="mt-1 text-xs text-[#3F6B5A]">Try another name, location, or category.</p>

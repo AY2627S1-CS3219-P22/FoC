@@ -1,32 +1,34 @@
-import { SUPPLIERS } from "../data/suppliers"
+import SupplierImage from "../components/SupplierImage"
+import { categoryLabel, categories, getSupplier, type Supplier } from "../api/suppliers"
+import { useSuppliers } from "../hooks/useSuppliers"
 import React, { useState } from "react"
 
 const TYPE_COLORS: Record<string, string> = {
-  "F&B":          "bg-orange-50 text-orange-600",
-  "Convenience":  "bg-blue-50 text-blue-600",
-  "Services":     "bg-purple-50 text-purple-600",
-  "Retail":       "bg-amber-50 text-amber-600",
+  "food":          "bg-orange-50 text-orange-600",
+  "food/coffee":  "bg-blue-50 text-blue-600",
+  "printing":     "bg-purple-50 text-purple-600",
+  "shopping":       "bg-amber-50 text-amber-600",
 }
 
 const TYPE_ICONS: Record<string, React.ReactElement> = {
-  "F&B": (
+  "food": (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
       <circle cx="12" cy="12" r="9" />
     </svg>
   ),
-  "Convenience": (
+  "food/coffee": (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 9m13-9l2 9M9 21h6" />
     </svg>
   ),
-  "Services": (
+  "printing": (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
   ),
-  "Retail": (
+  "shopping": (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
     </svg>
@@ -35,18 +37,16 @@ const TYPE_ICONS: Record<string, React.ReactElement> = {
 
 
 
-const ALL_TYPES = ["All", "F&B", "Convenience", "Services", "Retail"]
+const ALL_TYPES = ["All", ...categories]
 
 export default function SuppliersPage() {
   const [filter, setFilter] = useState("All")
   const [search, setSearch] = useState("")
 
-  const visible = SUPPLIERS.filter((s) => {
-    const matchType   = filter === "All" || s.type === filter
-    const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
-                        s.location.toLowerCase().includes(search.toLowerCase())
-    return matchType && matchSearch
-  })
+  const { suppliers, loading, error, reload } = useSuppliers(search, filter)
+  const [detail, setDetail] = useState<Supplier | null>(null)
+  const [detailError, setDetailError] = useState('')
+  const visible = suppliers.map(s => ({ imageURL: s.imageURL, id: s.supplierId, name: s.name, location: s.buildingName, type: s.type, hours: `${s.startingTime || 'NA'} – ${s.closingTime || 'NA'}` }))
 
   return (
     <div className="mx-auto w-full max-w-4xl px-3 py-5 sm:px-6 sm:py-8 lg:px-8">
@@ -71,7 +71,7 @@ export default function SuppliersPage() {
         <div className="flex gap-2 flex-wrap">
           {ALL_TYPES.map((t) => (
             <button
-              key={t}
+              key={categoryLabel(t)}
               onClick={() => setFilter(t)}
               className={`px-3 py-2 text-xs font-medium rounded-lg border transition-colors ${
                 filter === t
@@ -79,16 +79,19 @@ export default function SuppliersPage() {
                   : "bg-white text-[#3F6B5A] border-[#E4E8E6] hover:border-[#3F6B5A]"
               }`}
             >
-              {t}
+              {categoryLabel(t)}
             </button>
           ))}
         </div>
       </div>
 
+      {loading && <p role="status">Loading suppliers…</p>}
+      {(error || detailError) && <p role="alert" className="text-red-600">{error || detailError} <button onClick={reload}>Retry</button></p>}
+      {detail && <div role="dialog" aria-modal="true" aria-label="Supplier details" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"><div className="max-h-[90dvh] w-full max-w-md overflow-auto rounded-xl bg-white p-6"><SupplierImage imageURL={detail.imageURL} name={detail.name} /><h2 className="font-semibold">{detail.name}</h2><p>{detail.buildingName} · Floor {detail.floor}</p><p>{detail.locationDescription}</p><p>{categoryLabel(detail.type)} · {detail.startingTime} – {detail.closingTime}</p><p>{detail.latitude}, {detail.longitude}</p><button className="mt-4 underline" onClick={() => setDetail(null)}>Close</button></div></div>}
       {/* Count */}
       <p className="text-xs text-[#9CA3AF] mb-4">{visible.length} supplier{visible.length !== 1 ? "s" : ""}</p>
 
-      {visible.length === 0 ? (
+      {!loading && !error && visible.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-12 h-12 bg-[#E8F1ED] rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-5 h-5 text-[#3F6B5A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -107,12 +110,13 @@ export default function SuppliersPage() {
                 key={s.id}
                 className="bg-white border border-[#E4E8E6] rounded-xl p-5 hover:border-[#3F6B5A] hover:shadow-sm transition-all"
               >
+                <SupplierImage imageURL={s.imageURL} name={s.name} />
                 <div className="flex items-start gap-3 mb-3">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
-                    {TYPE_ICONS[s.type]}
+                    {TYPE_ICONS[s.type] || TYPE_ICONS["shopping"]}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#162A46] truncate">{s.name}</p>
+                    <button className="text-left text-sm font-semibold text-[#162A46]" onClick={() => { setDetailError(''); getSupplier(s.id).then(setDetail).catch((err: Error) => setDetailError(err.message)) }}>{s.name}</button>
                     <div className="flex items-center gap-1 mt-0.5">
                       <svg className="w-3 h-3 text-[#9CA3AF] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -124,7 +128,7 @@ export default function SuppliersPage() {
 
                 <div className="flex items-center justify-between">
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${iconBg}`}>
-                    {s.type}
+                    {categoryLabel(s.type)}
                   </span>
                   <div className="flex items-center gap-1">
                     <svg className="w-3 h-3 text-[#9CA3AF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

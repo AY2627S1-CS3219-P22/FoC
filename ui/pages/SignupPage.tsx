@@ -1,20 +1,25 @@
+import type { Registration } from "../api/users"
 import { useState } from "react"
 import type { Page } from "../App"
 
 interface Props {
-  onLogin: () => void
+  onRegister: (input: Registration) => Promise<void>
   onNavigate: (page: Page) => void
 }
 
-export default function SignupPage({ onLogin, onNavigate }: Props) {
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" })
+export default function SignupPage({ onRegister, onNavigate }: Props) {
+  const [error, setError] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [form, setForm] = useState({ firstName: "", lastName: "", username: "", email: "", password: "", confirm: "" })
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }))
 
   const inputCls =
     "w-full px-3.5 py-2.5 border border-[#E4E8E6] rounded-lg text-sm text-[#1B2522] placeholder-[#9CA3AF] bg-white focus:outline-none focus:border-[#1A4A36] focus:ring-1 focus:ring-[#1A4A36] transition-colors"
 
   const fields: { key: keyof typeof form; label: string; type: string; placeholder: string }[] = [
-    { key: "name",     label: "Full name",         type: "text",     placeholder: "Jordan Tan" },
+    { key: "firstName", label: "First name", type: "text", placeholder: "Jordan" },
+    { key: "lastName", label: "Last name", type: "text", placeholder: "Tan" },
+    { key: "username", label: "Username", type: "text", placeholder: "jordan.tan" },
     { key: "email",    label: "University email",   type: "email",    placeholder: "yourname@u.nus.edu" },
     { key: "password", label: "Password",           type: "password", placeholder: "••••••••" },
     { key: "confirm",  label: "Confirm password",   type: "password", placeholder: "••••••••" },
@@ -41,16 +46,17 @@ export default function SignupPage({ onLogin, onNavigate }: Props) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p className="text-xs text-[#1A4A36] font-medium leading-relaxed">
-              {"You'll receive 10 starter credits when you create your account."}
+              {"Use your NUS email. Password: at least 8 characters, including an uppercase letter, number and special character."}
             </p>
           </div>
 
-          <form onSubmit={(e) => { e.preventDefault(); onLogin() }} className="space-y-4">
+          {error && <p role="alert" className="mb-3 text-sm text-red-600">{error}</p>}
+          <form onSubmit={async (e) => { e.preventDefault(); if (form.password !== form.confirm) { setError('Passwords do not match.'); return } setError(''); setBusy(true); try { const { confirm: _confirm, ...input } = form; await onRegister(input) } catch (err) { setError((err as Error).message) } finally { setBusy(false) } }} className="space-y-4">
             {fields.map(({ key, label, type, placeholder }) => (
               <div key={key}>
                 <label className="block text-xs font-medium text-[#1B2522] mb-1.5">{label}</label>
                 <input
-                  type={type}
+                  required minLength={type === "password" ? 8 : undefined} type={type}
                   value={form[key]}
                   onChange={(e) => set(key, e.target.value)}
                   placeholder={placeholder}
@@ -59,10 +65,10 @@ export default function SignupPage({ onLogin, onNavigate }: Props) {
               </div>
             ))}
             <button
-              type="submit"
+              disabled={busy} type="submit"
               className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] active:scale-[.99] transition-all"
             >
-              Create account
+              {busy ? "Creating account…" : "Create account"}
             </button>
           </form>
 

@@ -1,33 +1,16 @@
-import { useState } from "react"
+import SupplierManager from "../components/SupplierManager"
+import { listUsers, type Profile } from "../api/users"
+import { useEffect, useState } from "react"
 import type { Order, User, Page } from "../App"
 import StatusBadge from "../components/StatusBadge"
 
 type Section = "overview" | "orders" | "users" | "suppliers" | "logs"
-
-const MOCK_USERS = [
-  { id: "u1", name: "Jordan Tan",  email: "jordan.tan@u.nus.edu",  credits: 24, requests: 8,  deliveries: 12, status: "active" },
-  { id: "u2", name: "Aisha Lim",   email: "aisha.lim@u.nus.edu",   credits: 18, requests: 3,  deliveries: 5,  status: "active" },
-  { id: "u3", name: "Marcus Goh",  email: "marcus.goh@u.nus.edu",  credits: 31, requests: 11, deliveries: 8,  status: "active" },
-  { id: "u4", name: "Priya Nair",  email: "priya.nair@u.nus.edu",  credits: 7,  requests: 6,  deliveries: 2,  status: "active" },
-  { id: "u5", name: "Ryan Chen",   email: "ryan.chen@u.nus.edu",   credits: 42, requests: 2,  deliveries: 20, status: "active" },
-  { id: "u6", name: "Wei Lin",     email: "wei.lin@u.nus.edu",     credits: 15, requests: 4,  deliveries: 4,  status: "suspended" },
-]
-
-const MOCK_SUPPLIERS = [
-  { id: "s1", name: "CoffeeBean",       location: "COM3",           type: "F&B" },
-  { id: "s2", name: "Cheers",           location: "UTown",           type: "Convenience" },
-  { id: "s3", name: "Science Canteen",  location: "Science Faculty", type: "F&B" },
-  { id: "s4", name: "Print Lab",        location: "Engineering",     type: "Services" },
-  { id: "s5", name: "YST Canteen",      location: "YST",             type: "F&B" },
-  { id: "s6", name: "CLB Bookshop",     location: "Central Library", type: "Retail" },
-]
 
 const MOCK_LOGS = [
   { id: 1, action: "Order accepted",   detail: "#o1 accepted by Jordan Tan",             time: "2:51 PM",  type: "order" },
   { id: 2, action: "New request",      detail: "#o6 created by Priya Nair",              time: "1:00 PM",  type: "order" },
   { id: 3, action: "Order completed",  detail: "#o5 completed — +4 credits to Sofia Park",time: "5:45 PM", type: "credit" },
   { id: 4, action: "User registered",  detail: "wei.lin@u.nus.edu joined CampusDash",        time: "Sep 9",    type: "user" },
-  { id: 5, action: "Supplier added",   detail: "CLB Bookshop added by admin",             time: "Sep 8",    type: "supplier" },
   { id: 6, action: "Order expired",    detail: "#o2 expired — no courier found",          time: "Sep 8",    type: "order" },
 ]
 
@@ -48,15 +31,20 @@ interface Props {
 export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: Props) {
   const [section, setSection]           = useState<Section>("overview")
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  const [showAddSupplier, setShowAddSupplier] = useState(false)
-  const [suppliers, setSuppliers]       = useState(MOCK_SUPPLIERS)
-  const [newSupplier, setNewSupplier]   = useState({ name: "", location: "", type: "" })
+  const [users, setUsers] = useState<Profile[]>([])
+  const [usersError, setUsersError] = useState('')
+  const [usersLoading, setUsersLoading] = useState(true)
+  useEffect(() => {
+    let active = true
+    listUsers().then(result => { if (active) setUsers(result.users) }).catch((err: Error) => { if (active) setUsersError(err.message) }).finally(() => { if (active) setUsersLoading(false) })
+    return () => { active = false }
+  }, [])
 
   const stats = [
     { label: "Active Orders",    value: orders.filter((o) => ["accepted", "picked-up"].includes(o.status)).length },
     { label: "Open Requests",    value: orders.filter((o) => o.status === "open").length },
     { label: "Completed Orders", value: orders.filter((o) => o.status === "completed").length },
-    { label: "Registered Users", value: MOCK_USERS.length },
+    { label: "Registered Users", value: users.length },
   ]
 
   const NAV: { key: Section; label: string }[] = [
@@ -129,7 +117,13 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
             <span className="text-sm font-semibold text-[#162A46] capitalize">{section.replace("-", " ")}</span>
           </div>
           <div className="flex items-center gap-2.5">
-            <span className="text-xs text-[#3F6B5A] hidden sm:block">Admin: {user.name}</span>
+            <span className="text-xs text-[#3F6B5A] hidden sm:block">{user.name}</span>
+          {user.roles.includes("ADMINISTRATOR") && (
+            <span className="rounded-full border border-[#162A46]/15 bg-[#162A46]/5 px-2 py-1 text-[10px] font-semibold text-[#162A46] sm:text-xs">
+              Administrator
+            </span>
+          )}
+
             <div className="w-7 h-7 rounded-full bg-[#162A46] text-white text-[10px] font-semibold flex items-center justify-center">
               {user.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
             </div>
@@ -137,6 +131,10 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
         </div>
 
         <div className="p-6 flex-1">
+          <p className="mb-4 text-xs text-[#3F6B5A]">Orders, credits and activity logs are prototype data. Users and suppliers use live services.</p>
+          <div className="mb-4 flex flex-wrap gap-3 md:hidden"><button onClick={() => onNavigate('orders')}>Back to App</button>{NAV.map(item => <button key={item.key} onClick={() => setSection(item.key)}>{item.label}</button>)}</div>
+          {usersLoading && <p role="status">Loading users…</p>}
+          {usersError && <p role="alert" className="text-red-600">{usersError}</p>}
 
           {/* ── OVERVIEW ── */}
           {section === "overview" && (
@@ -314,32 +312,32 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
                     </tr>
                   </thead>
                   <tbody>
-                    {MOCK_USERS.map((u, i) => (
+                    {users.map((u, i) => (
                       <tr
                         key={u.id}
-                        className={`hover:bg-[#F7F9F8] cursor-pointer transition-colors ${i < MOCK_USERS.length - 1 ? "border-b border-[#E4E8E6]" : ""}`}
+                        className={`hover:bg-[#F7F9F8] cursor-pointer transition-colors ${i < users.length - 1 ? "border-b border-[#E4E8E6]" : ""}`}
                       >
                         <td className={tdCls}>
                           <div className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded-full bg-[#162A46] text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
-                              {u.name.charAt(0)}
+                              {u.firstName.charAt(0)}
                             </div>
-                            <span className="font-medium text-[#1B2522]">{u.name}</span>
+                            <span className="font-medium text-[#1B2522]">{u.firstName} {u.lastName}</span>
                           </div>
                         </td>
                         <td className={`${tdCls} text-[#3F6B5A]`}>{u.email}</td>
-                        <td className={`${tdCls} font-semibold text-[#162A46]`}>{u.credits}</td>
-                        <td className={tdCls}>{u.requests}</td>
-                        <td className={tdCls}>{u.deliveries}</td>
+                        <td className={`${tdCls} font-semibold text-[#162A46]`}>—</td>
+                        <td className={tdCls}>—</td>
+                        <td className={tdCls}>—</td>
                         <td className={tdCls}>
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
-                              u.status === "active"
+                              true
                                 ? "bg-[#E8F1ED] text-[#1A4A36]"
                                 : "bg-red-50 text-red-600"
                             }`}
                           >
-                            {u.status}
+                            {u.roles.join(", ")}
                           </span>
                         </td>
                       </tr>
@@ -350,106 +348,7 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
             </div>
           )}
 
-          {/* ── SUPPLIERS ── */}
-          {section === "suppliers" && (
-            <div>
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-sm font-semibold text-[#162A46]">Supplier Management</h2>
-                <button
-                  onClick={() => setShowAddSupplier(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-[#1A4A36] text-white text-xs font-medium rounded-lg hover:bg-[#163D2C] transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Supplier
-                </button>
-              </div>
-              <div className="bg-white border border-[#E4E8E6] rounded-xl overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr>
-                      {["Name", "Location", "Type", "Actions"].map((h) => (
-                        <th key={h} className={thCls}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {suppliers.map((s, i) => (
-                      <tr key={s.id} className={`hover:bg-[#F7F9F8] transition-colors ${i < suppliers.length - 1 ? "border-b border-[#E4E8E6]" : ""}`}>
-                        <td className={`${tdCls} font-medium`}>{s.name}</td>
-                        <td className={`${tdCls} text-[#3F6B5A]`}>{s.location}</td>
-                        <td className={tdCls}>
-                          <span className="bg-[#F7F9F8] border border-[#E4E8E6] px-2 py-0.5 rounded text-[10px] text-[#3F6B5A] font-medium">
-                            {s.type}
-                          </span>
-                        </td>
-                        <td className={tdCls}>
-                          <div className="flex gap-4">
-                            <button className="text-[#3F6B5A] hover:text-[#1A4A36] transition-colors text-xs font-medium">
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => setSuppliers((prev) => prev.filter((x) => x.id !== s.id))}
-                              className="text-red-400 hover:text-red-600 transition-colors text-xs font-medium"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Add supplier modal */}
-              {showAddSupplier && (
-                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-                    <h3 className="text-base font-semibold text-[#162A46] mb-5">Add Supplier</h3>
-                    <div className="space-y-4 mb-5">
-                      {[
-                        { k: "name",     label: "Name",     ph: "e.g. CoffeeBean" },
-                        { k: "location", label: "Location", ph: "e.g. COM3" },
-                        { k: "type",     label: "Type",     ph: "e.g. F&B" },
-                      ].map(({ k, label, ph }) => (
-                        <div key={k}>
-                          <label className="block text-xs font-medium text-[#1B2522] mb-1.5">{label}</label>
-                          <input
-                            placeholder={ph}
-                            value={newSupplier[k as keyof typeof newSupplier]}
-                            onChange={(e) => setNewSupplier((p) => ({ ...p, [k]: e.target.value }))}
-                            className="w-full px-3.5 py-2.5 border border-[#E4E8E6] rounded-lg text-sm text-[#1B2522] bg-white focus:outline-none focus:border-[#1A4A36] focus:ring-1 focus:ring-[#1A4A36] transition-colors"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => { setShowAddSupplier(false); setNewSupplier({ name: "", location: "", type: "" }) }}
-                        className="flex-1 py-2.5 border border-[#E4E8E6] text-[#1B2522] text-sm font-medium rounded-lg hover:bg-[#F7F9F8] transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (newSupplier.name && newSupplier.location) {
-                            setSuppliers((p) => [...p, { id: `s${Date.now()}`, ...newSupplier }])
-                            setShowAddSupplier(false)
-                            setNewSupplier({ name: "", location: "", type: "" })
-                          }
-                        }}
-                        className="flex-1 py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] transition-colors"
-                      >
-                        Add Supplier
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          {section === "suppliers" && <SupplierManager admin />}
 
           {/* ── ACTIVITY LOGS ── */}
           {section === "logs" && (
