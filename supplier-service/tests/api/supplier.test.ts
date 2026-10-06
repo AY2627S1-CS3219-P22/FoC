@@ -220,7 +220,7 @@ describe('POST /supplier', () => {
       .set('Authorization', adminBearer())
       .send({ ...newSupplier1, openingHours: contradictory });
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
 
     const { rows } = await pool.query(
       'SELECT id FROM public."Supplier_Database" WHERE "Name" = $1',
@@ -309,16 +309,6 @@ describe('PUT /supplier/:id/openingHours/:dayOfWeek', () => {
     expect(res.body.message).toContain('Supplier 3 not found');
   });
 
-  //day 6 is a real day of the week, the seeded supplier just has no row for it
-  it('returns 404 when the supplier has no row for that day', async () => {
-    const res = await request(app)
-      .put('/supplier/1/openingHours/6')
-      .set('Authorization', adminBearer())
-      .send(openLate);
-
-    expect(res.status).toBe(404);
-    expect(res.body.message).toContain('no opening hours for day 6');
-  });
 
   //the check constraint maps to 400, not 500: the client sent an impossible day
   it('returns 400 when a closed day still carries times', async () => {

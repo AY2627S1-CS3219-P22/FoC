@@ -58,4 +58,4 @@ create policy "Authenticated users can update opening hours"
 
 revoke delete on public.supplier_opening_hours from anon, authenticated;
 
--- Add in backfill or manually populate with an LLM
+-- manually populate with an LLM
