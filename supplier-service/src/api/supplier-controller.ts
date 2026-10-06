@@ -7,8 +7,9 @@ import {getSupplierByIdService,
     createSupplierService, 
     searchSuppliersService, 
     filterSuppliersByCategoryService,
-    updateSupplierHoursByIdService}  from '@/database/supplier-repository';
-import { SUPPLIER_CATEGORY, updateRequestSchema } from '@/data/schema';
+    updateSupplierHoursByIdService,
+    getNearbySuppliersService}  from '@/database/supplier-repository';
+import { SUPPLIER_CATEGORY, supplierRadiusQuerySchema, updateRequestSchema } from '@/data/schema';
 
 const handleResponse = (res: Response, status: number, data: any, message: string) => {
     res.status(status).json({
@@ -115,5 +116,14 @@ export const updateSupplierHours = async(req:Request, res:Response, next:NextFun
     }
 }
 
+export const getNearbySuppliers = async(req:Request, res:Response, next:NextFunction) => {
+    try {
+        const { latitude, longitude, radius } = supplierRadiusQuerySchema.parse(req.query);
+        const nearbySuppliers = await getNearbySuppliersService(latitude, longitude, radius);
+        handleResponse(res, 200, nearbySuppliers, `Nearby suppliers within ${radius} meters fetched successfully`);
+    } catch (err) {
+        next(err);
+    }
+}
 // Idempotency: later, middleware on POST /supplier and PUT /supplier/:id
 // reads Idempotency-Key and replays the first response for the same key.

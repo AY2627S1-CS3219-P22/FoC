@@ -561,3 +561,40 @@ describe('GET /suppliers/category', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('GET /suppliers/search-radius', () => {
+  //seed: Coffee Roaster at (1.294167, 103.773611), Print Shop ~240m away, Bookstore is soft-deleted
+  it('returns active suppliers within the radius, nearest first', async () => {
+    const res = await request(app).get('/suppliers/search-radius').query({
+      latitude: 1.294167,
+      longitude: 103.773611,
+      radius: 500,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((s: { name: string }) => s.name)).toEqual([
+      'The Coffee Roaster',
+      'Central Print Shop',
+    ]);
+    expect(res.body.data[0]).not.toHaveProperty('location');
+    expect(res.body.data[0]).toHaveProperty('openingHours');
+  });
+
+  it('does not match /suppliers/search, and excludes suppliers outside the radius', async () => {
+    const res = await request(app).get('/suppliers/search-radius').query({
+      latitude: 1.294167,
+      longitude: 103.773611,
+      radius: 50,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].name).toBe('The Coffee Roaster');
+  });
+
+  it('rejects a request with no coordinates', async () => {
+    const res = await request(app).get('/suppliers/search-radius');
+
+    expect(res.status).toBe(400);
+  });
+});
