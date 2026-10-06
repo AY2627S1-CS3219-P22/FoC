@@ -9,7 +9,7 @@ import { bigint, integer, numeric, pgTable, timestamp, varchar, uniqueIndex} fro
 import { createInsertSchema, createUpdateSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import {sql} from 'drizzle-orm'
-import {createOpeningHoursSchema} from '@data/opening-hours-schema';
+import {createOpeningHoursSchema, PublicOpeningHours} from '@data/opening-hours-schema';
 
 export const SUPPLIER_CATEGORY = z.enum(['food/coffee', 'printing', 'food', 'shopping', 'other']);
 
@@ -95,9 +95,15 @@ export const supplierCategoryQuerySchema = z.object({
 type: SUPPLIER_CATEGORY,
 });
 
+
+
 //return values 
-export type Supplier = typeof supplier.$inferSelect;
-export type PublicSupplier = Omit<Supplier, 'deletedAt'> //standardize supplier return type
+export type SupplierAndDate = typeof supplier.$inferSelect; //this helps with returning all days of the week
+export type PublicSupplier = Omit<SupplierAndDate, 'deletedAt'> //standardize supplier return type
+
+export type SupplierWithHours = PublicSupplier &{openingHours: PublicOpeningHours[]}; //full list
+
+export type SearchSupplier = PublicSupplier & {openingHours: PublicOpeningHours | null};
 
 //for CRUD input validation
 export type CreateSupplierSchema = z.infer<typeof createSupplierSchema>;

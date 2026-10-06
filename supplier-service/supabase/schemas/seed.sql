@@ -69,6 +69,6 @@ insert into public.supplier_opening_hours
   (supplier_id, day_of_week, opens_at, closes_at, is_closed)
 select s.id, d, '09:00', '17:00', false
 from public."Supplier_Database" s
-cross join generate_series(1, 5) as d
+cross join generate_series(1, 6) as d
 where s.deleted_at is null
 on conflict (supplier_id, day_of_week) do nothing;

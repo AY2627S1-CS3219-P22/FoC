@@ -6,7 +6,7 @@ AI Declaration: Migration to drizzle for createSupplierService and updateSupplie
 */ 
 
 import { db } from '@database/db'; //drizzle-orm
-import { CreateSupplierSchema, PublicSupplier, SupplierCategory, UpdateSupplierType, supplier } from '@data/schema';
+import { CreateSupplierSchema, PublicSupplier, SearchSupplier, SupplierCategory, SupplierWithHours, UpdateSupplierType, supplier } from '@data/schema';
 import { UpdateOpeningHours, supplierOpeningHours} from '@data/opening-hours-schema';
 import { getTableColumns, isNull, eq, and, sql, desc} from 'drizzle-orm';
 import { BadRequestError, ConflictError, NotFoundError,  } from '@/middleware/errors';
@@ -41,16 +41,29 @@ export async function createSupplierService(input: CreateSupplierSchema): Promis
         if (isDuplicateName(err)) {
             throw new ConflictError(`Supplier "${newSupplier.name}" already exists`);
         }
+        //the hours rows carry the same check constraint the nested PUT reports as 400,
+        //so a disagreeing day must not surface here as an unhandled 500
+        if (isCheckViolation(err)) {
+            throw new BadRequestError(
+                'Opening hours must either be closed with no times, or open with both opens_at and closes_at',
+            );
+        }
         throw err;
     }
 }
 
-export async function getSupplierByIdService(id: number): Promise<PublicSupplier>  {
+export async function getSupplierByIdService(id: number): Promise<SupplierWithHours>  {
 
-  const [row] = await db
-  .select(publicSupplierColumns)
-  .from(supplier)
-  .where(and(eq(supplier.supplierId, id), isNull(supplier.deletedAt)));
+  const row = await db.query.supplier.findFirst({
+    columns: {deletedAt: false},
+    where: and(eq(supplier.supplierId, id), isNull(supplier.deletedAt)),
+    with: {
+        openingHours: {
+            columns: { dayOfWeek: true, opensAt: true, closesAt: true, isClosed: true},
+            orderBy: (h, { asc }) => [asc(h.dayOfWeek)]
+        }}
+  })
+  
 
   if(!row) {
     //case error: No Suppliers Listed in DB 
@@ -188,7 +201,8 @@ export async function deleteSupplierByIdService(id: number): Promise<PublicSuppl
 
 //Might need to think about loading optimizations
 //TODO: Order supplier loading based on location
-export async function getAllSuppliersService() {
+export async function getAllSuppliersService(): Promise<PublicSupplier[]>{
+    
     const suppliers = await db
       .select(publicSupplierColumns)
       .from(supplier)
@@ -209,7 +223,7 @@ export async function searchSuppliersService(text: string): Promise<PublicSuppli
   
   export async function filterSuppliersByCategoryService(
     supplierType: SupplierCategory,
-  ): Promise<PublicSupplier[]> {
+  ): Promise<PublicSupplier[]>{
     return db
       .select(publicSupplierColumns)
       .from(supplier)
