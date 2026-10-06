@@ -20,5 +20,5 @@ userRouter.get('/me', authenticate, userController.getMe);
 // GET /users
 userRouter.get('/', authenticate, requireRole('ADMINISTRATOR'), userController.listUsers);
 
-// GET /users/:id — admin views a specific user (RBAC: normal USER -> 403)
+// GET /users/:id
 userRouter.get('/:id', authenticate, requireRole('ADMINISTRATOR'), userController.getUserById);
