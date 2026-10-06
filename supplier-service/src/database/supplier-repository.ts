@@ -231,6 +231,20 @@ export async function searchSuppliersService(text: string): Promise<PublicSuppli
   }
 
 
-export async function getNearbySuppliersService() {
-    return 0; //STUB
+export async function getNearbySuppliersService(latitude: number, longitude: number, radius: number): Promise<SupplierWithHours[]> {
+    
+    const suppliersNearby = await db.query.supplier.findMany({
+        columns: {deletedAt: false},
+        where: and(
+            isNull(supplier.deletedAt),
+            sql`ST_DWithin(location, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326), ${radius})`
+        ),
+        with: {
+            openingHours: {
+                columns: { dayOfWeek: true, opensAt: true, closesAt: true, isClosed: true},
+                orderBy: (h, { asc }) => [asc(h.dayOfWeek)]
+            }
+        }
+    })
+    return suppliersNearby;
 }

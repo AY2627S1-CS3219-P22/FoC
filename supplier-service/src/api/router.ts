@@ -1,7 +1,7 @@
 import express from 'express';
-import { getAllSuppliers, getSupplierById, deleteSupplierById, createSupplier, updateSupplierById, searchSuppliers, filterSuppliersByCategory, updateSupplierHours} from '@/api/supplier-controller';
+import { getAllSuppliers, getSupplierById, deleteSupplierById, createSupplier, updateSupplierById, searchSuppliers, filterSuppliersByCategory, updateSupplierHours, getNearbySuppliers} from '@/api/supplier-controller';
 import {validateRequest, ValidationSource} from '@/middleware/zod-validation';
-import {createSupplierSchema, updateRequestSchema, supplierIdParamSchema, supplierCategoryQuerySchema} from "@data/schema";
+import {createSupplierSchema, updateRequestSchema, supplierIdParamSchema, supplierCategoryQuerySchema, supplierRadiusQuerySchema} from "@data/schema";
 import {openingHoursParamSchema, updateOpeningHoursBodySchema} from "@data/opening-hours-schema";
 import { authenticate } from '@/middleware/jwt-validation';
   
@@ -23,10 +23,9 @@ supplierRouter.put('/supplier/:id/openingHours/:dayOfWeek', authenticate, valida
 supplierRouter.get('/suppliers', getAllSuppliers);
 supplierRouter.get('/suppliers/search', searchSuppliers); 
 supplierRouter.get('/suppliers/category', validateRequest(supplierCategoryQuerySchema, ValidationSource.QUERY), filterSuppliersByCategory);
+//get all suppliers closest to me; query: {latitude, longitude, radius in metres}
+supplierRouter.get('/suppliers/search-radius', validateRequest(supplierRadiusQuerySchema, ValidationSource.QUERY), getNearbySuppliers);
 
 // get all open suppliers 
 //supplierRouter.get('/supplier/:id/opening-hours')
-
-//get all supppliers closest to me 
-//supplierRouter.get('/suppliers/search-radius', getNearbySuppliers);
 export default supplierRouter;
