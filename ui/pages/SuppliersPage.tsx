@@ -1,3 +1,4 @@
+import { supplierHoursLabel } from '../api/suppliers'
 import SupplierImage from "../components/SupplierImage"
 import { categoryLabel, categories, getSupplier, type Supplier } from "../api/suppliers"
 import { useSuppliers } from "../hooks/useSuppliers"
@@ -46,7 +47,7 @@ export default function SuppliersPage() {
   const { suppliers, loading, error, reload } = useSuppliers(search, filter)
   const [detail, setDetail] = useState<Supplier | null>(null)
   const [detailError, setDetailError] = useState('')
-  const visible = suppliers.map(s => ({ imageURL: s.imageURL, id: s.supplierId, name: s.name, location: s.buildingName, type: s.type, hours: `${s.startingTime || 'NA'} – ${s.closingTime || 'NA'}` }))
+  const visible = suppliers.map(s => ({ imageURL: s.imageURL, id: s.supplierId, name: s.name, location: s.buildingName, type: s.type, hours: supplierHoursLabel(s) }))
 
   return (
     <div className="mx-auto w-full max-w-4xl px-3 py-5 sm:px-6 sm:py-8 lg:px-8">
@@ -87,7 +88,7 @@ export default function SuppliersPage() {
 
       {loading && <p role="status">Loading suppliers…</p>}
       {(error || detailError) && <p role="alert" className="text-red-600">{error || detailError} <button onClick={reload}>Retry</button></p>}
-      {detail && <div role="dialog" aria-modal="true" aria-label="Supplier details" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"><div className="max-h-[90dvh] w-full max-w-md overflow-auto rounded-xl bg-white p-6"><SupplierImage imageURL={detail.imageURL} name={detail.name} /><h2 className="font-semibold">{detail.name}</h2><p>{detail.buildingName} · Floor {detail.floor}</p><p>{detail.locationDescription}</p><p>{categoryLabel(detail.type)} · {detail.startingTime} – {detail.closingTime}</p><p>{detail.latitude}, {detail.longitude}</p><button className="mt-4 underline" onClick={() => setDetail(null)}>Close</button></div></div>}
+      {detail && <div role="dialog" aria-modal="true" aria-label="Supplier details" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"><div className="max-h-[90dvh] w-full max-w-md overflow-auto rounded-xl bg-white p-6"><SupplierImage imageURL={detail.imageURL} name={detail.name} /><h2 className="font-semibold">{detail.name}</h2><p>{detail.buildingName} · Floor {detail.floor}</p><p>{detail.locationDescription}</p><p>{categoryLabel(detail.type)} · {supplierHoursLabel(detail)}</p><p>{detail.latitude}, {detail.longitude}</p><button className="mt-4 underline" onClick={() => setDetail(null)}>Close</button></div></div>}
       {/* Count */}
       <p className="text-xs text-[#9CA3AF] mb-4">{visible.length} supplier{visible.length !== 1 ? "s" : ""}</p>
 

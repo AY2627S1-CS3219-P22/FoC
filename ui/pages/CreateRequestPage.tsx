@@ -1,3 +1,4 @@
+import { supplierHoursLabel } from '../api/suppliers'
 import { categoryLabel, categories } from "../api/suppliers"
 import { useSuppliers } from "../hooks/useSuppliers"
 import { useEffect, useState } from "react"
@@ -72,7 +73,7 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
   const [supplierSearch, setSupplierSearch] = useState("")
   const [supplierType, setSupplierType] = useState("All")
   const { suppliers, loading, error, reload } = useSuppliers(supplierSearch, supplierType)
-  const visibleSuppliers = suppliers.map(s => ({ id: String(s.supplierId), name: s.name, location: s.buildingName, type: s.type, hours: `${s.startingTime || 'NA'} – ${s.closingTime || 'NA'}` }))
+  const visibleSuppliers = suppliers.map(s => ({ id: String(s.supplierId), name: s.name, location: s.buildingName, type: s.type, hours: supplierHoursLabel(s) }))
   const [form, setForm] = useState({
     pickupLocation: "",
     supplier: "",

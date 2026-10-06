@@ -158,3 +158,7 @@ verification, and its supplier was deleted through the UI.
 Checks passed: 51 database API tests, 16 authorization tests, 8 frontend tests,
 frontend production build, and frontend/Supplier TypeScript checks. The existing
 14 backend TODO tests remain unimplemented.
+
+## Replacing the Supplier Service
+
+See [Supplier Service handoff](../docs/supplier-service-handoff.md) for the teammate's weekly-hours API, configuration switch, port/JWT requirements, database migration concerns, and contracts that still need confirmation from her PR. Keep `VITE_SUPPLIER_HOURS_MODE=legacy` until that service is installed; then use `weekly` and restart Vite.

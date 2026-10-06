@@ -1,6 +1,7 @@
+import SupplierOpeningHours, { HoursFields } from './SupplierOpeningHours'
 import SupplierImage from "./SupplierImage"
 import { useState } from 'react'
-import { categoryLabel, categories, deleteSupplier, getSupplier, saveSupplier, type Supplier, type SupplierInput } from '../api/suppliers'
+import { blankOpeningHours, weeklyHoursEnabled, categoryLabel, categories, deleteSupplier, getSupplier, saveSupplier, type Supplier, type SupplierInput } from '../api/suppliers'
 import { useSuppliers } from '../hooks/useSuppliers'
 const inputClass = 'w-full rounded-lg border border-[#E4E8E6] bg-white px-3 py-2 text-sm focus:outline-none focus:border-[#1A4A36]'
 const blank: SupplierInput = { name: '', type: 'food', buildingName: '', locationDescription: '', floor: 1, latitude: '', longitude: '', startingTime: 'NA', closingTime: 'NA', imageURL: 'NA' }
@@ -41,10 +42,11 @@ export default function SupplierManager({ admin = false }: { admin?: boolean }) 
     ['startingTime', 'Opening time (e.g. 0900hrs)', 'text'], ['closingTime', 'Closing time (e.g. 1800hrs)', 'text'],
     ['imageURL', 'Image URL (or NA)', 'text'],
   ] as const
+  const visibleFields = fields.filter(([key]) => !weeklyHoursEnabled || (key !== 'startingTime' && key !== 'closingTime'))
   return <section className="text-[#1B2522]">
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-sm font-semibold text-[#162A46]">{admin ? 'Supplier Management' : 'Campus Suppliers'}</h2>
-      {admin && <button disabled={busy} onClick={() => { setSelected(undefined); setForm({ ...blank }); setActionError(''); setMode('create') }} className="rounded-lg bg-[#1A4A36] px-3 py-2 text-xs font-medium text-white">+ Add Supplier</button>}
+      {admin && <button disabled={busy} onClick={() => { setSelected(undefined); setForm({ ...blank, openingHours: blankOpeningHours() }); setActionError(''); setMode('create') }} className="rounded-lg bg-[#1A4A36] px-3 py-2 text-xs font-medium text-white">+ Add Supplier</button>}
     </div>
     <div className="mb-4 grid gap-3 sm:grid-cols-2">
       <label className="text-xs">Search suppliers<input className={inputClass} value={query} onChange={e => setQuery(e.target.value)} placeholder="Name, building or location" /></label>
@@ -64,14 +66,16 @@ export default function SupplierManager({ admin = false }: { admin?: boolean }) 
       <div role="dialog" aria-modal="true" aria-labelledby="supplier-dialog-title" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
         <h3 id="supplier-dialog-title" className="mb-4 font-semibold text-[#162A46]">{mode === 'create' ? 'Add Supplier' : mode === 'edit' ? 'Edit Supplier' : mode === 'delete' ? 'Delete Supplier' : selected?.name}</h3>
         {actionError && <p role="alert" className="mb-3 text-sm text-red-600">{actionError}{mode === 'edit' && selected && <button disabled={busy} onClick={() => void open(selected.supplierId, 'edit')} className="ml-2 underline">Reload latest record</button>}</p>}
-        {mode === 'view' ? <><SupplierImage imageURL={selected?.imageURL} name={selected?.name || 'Supplier'} /><dl className="space-y-3 text-sm">{[['Category', selected ? categoryLabel(selected.type) : '—'], ...fields.map(([key, label]) => [label, form[key]])].map(([label, value]) => <div key={String(label)}><dt className="text-xs text-[#3F6B5A]">{label}</dt><dd className="break-words">{value || '—'}</dd></div>)}</dl><button className="mt-5 underline" onClick={() => setMode(null)}>Close</button></> :
+        {mode === 'view' ? <><SupplierImage imageURL={selected?.imageURL} name={selected?.name || 'Supplier'} /><dl className="space-y-3 text-sm">{[['Category', selected ? categoryLabel(selected.type) : '—'], ...visibleFields.map(([key, label]) => [label, form[key]])].map(([label, value]) => <div key={String(label)}><dt className="text-xs text-[#3F6B5A]">{label}</dt><dd className="break-words">{value || '—'}</dd></div>)}</dl><button className="mt-5 underline" onClick={() => setMode(null)}>Close</button></> :
           <form onSubmit={e => { e.preventDefault(); void submit() }}>
             {mode === 'delete' ? <p className="mb-5 text-sm">Delete {selected?.name} from the active supplier list?</p> : <div className="grid gap-4 sm:grid-cols-2">
-              {fields.map(([key, label, type]) => <label key={key} className="text-xs">{label}<input autoFocus={key === 'name'} className={inputClass} type={type} step={key === 'floor' ? '1' : 'any'} required={['name', 'buildingName', 'locationDescription', 'floor', 'latitude', 'longitude'].includes(key)} value={form[key] ?? ''} onChange={e => setForm(old => ({ ...old, [key]: key === 'floor' ? Number(e.target.value) : e.target.value }))} /></label>)}
+              {visibleFields.map(([key, label, type]) => <label key={key} className="text-xs">{label}<input autoFocus={key === 'name'} className={inputClass} type={type} step={key === 'floor' ? '1' : 'any'} required={['name', 'buildingName', 'locationDescription', 'floor', 'latitude', 'longitude'].includes(key)} value={form[key] ?? ''} onChange={e => setForm(old => ({ ...old, [key]: key === 'floor' ? Number(e.target.value) : e.target.value }))} /></label>)}
               <label className="text-xs">Category<select className={inputClass} value={form.type} onChange={e => setForm(old => ({ ...old, type: e.target.value }))}>{!categories.some(c => c === form.type) && <option value={form.type}>{categoryLabel(form.type)}</option>}{categories.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}</select></label>
             </div>}
+            {weeklyHoursEnabled && mode === 'create' && <fieldset disabled={busy} className="mt-4"><legend className="font-medium">Weekly opening hours</legend>{(form.openingHours || []).map(day => <HoursFields key={day.dayOfWeek} day={day} onChange={value => setForm(old => ({ ...old, openingHours: old.openingHours?.map(item => item.dayOfWeek === value.dayOfWeek ? value : item) }))} />)}</fieldset>}
             <div className="mt-5 flex gap-3"><button type="button" disabled={busy} onClick={() => setMode(null)} className="flex-1 rounded-lg border py-2 text-sm">Cancel</button><button disabled={busy} className="flex-1 rounded-lg bg-[#1A4A36] py-2 text-sm text-white disabled:opacity-50">{busy ? 'Saving…' : mode === 'delete' ? 'Delete' : 'Save'}</button></div>
           </form>}
+        {weeklyHoursEnabled && mode === 'edit' && selected && <SupplierOpeningHours key={selected.supplierId} supplierId={selected.supplierId} />}
       </div>
     </div>}
   </section>

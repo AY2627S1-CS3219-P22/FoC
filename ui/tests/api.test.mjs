@@ -11,6 +11,10 @@ for (const name of ['client', 'users', 'suppliers']) {
   const source = readFileSync(new URL(`../api/${name}.ts`, import.meta.url), 'utf8').replaceAll('import.meta.env', '({})').replaceAll("'./client'", "'./client.mjs'")
   writeFileSync(join(dir, `${name}.mjs`), ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText)
 }
+const weeklySource = readFileSync(new URL('../api/suppliers.ts', import.meta.url), 'utf8')
+  .replaceAll('import.meta.env', '({ VITE_SUPPLIER_HOURS_MODE: "weekly" })').replaceAll("'./client'", "'./client.mjs'")
+writeFileSync(join(dir, 'suppliers-weekly.mjs'), ts.transpileModule(weeklySource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText)
+const weekly = await import(pathToFileURL(join(dir, 'suppliers-weekly.mjs')))
 after(() => rmSync(dir, { recursive: true, force: true }))
 const storage = () => { const data = new Map(); return { getItem: k => data.get(k) ?? null, setItem: (k, v) => data.set(k, v), removeItem: k => data.delete(k) } }
 globalThis.sessionStorage = storage(); globalThis.localStorage = storage(); globalThis.window = new EventTarget()
@@ -65,4 +69,38 @@ test('unauthorized responses clear expired sessions; forbidden responses retain 
 test('validation errors include field details', async () => {
   status = 400; body = { error: 'Validation failed', details: { email: ['Email must be an NUS address'] } }
   await assert.rejects(users.register({}), /email: Email must be an NUS address/)
+})
+
+test('weekly creation sends exactly seven days without obsolete hours; edits keep concurrency separate', async () => {
+  client.saveToken('admin-token'); body = { data: row }
+  const { supplierId, createdAt, updatedAt, ...input } = row
+  const openingHours = weekly.blankOpeningHours()
+  openingHours[1] = { dayOfWeek: 1, isClosed: false, opensAt: '09:00:00', closesAt: '17:00:00' }
+  await weekly.saveSupplier({ ...input, openingHours })
+  const created = JSON.parse(calls[0].options.body)
+  assert.deepEqual(created.openingHours, openingHours)
+  assert.equal('startingTime' in created, false); assert.equal('closingTime' in created, false)
+  await weekly.saveSupplier({ ...input, openingHours }, row)
+  const updated = JSON.parse(calls[1].options.body)
+  assert.equal(updated.expectedUpdatedAt, updatedAt); assert.equal('openingHours' in updated, false)
+  await weekly.saveOpeningHours(1, openingHours[1])
+  assert.equal(calls[2].url, '/api/suppliers/supplier/1/openingHours/1')
+  assert.equal(calls[2].options.method, 'PUT')
+  assert.equal(calls[2].options.headers.get('Authorization'), 'Bearer admin-token')
+  assert.deepEqual(JSON.parse(calls[2].options.body), { isClosed: false, opensAt: '09:00:00', closesAt: '17:00:00' })
+})
+test('weekly requests reject incomplete, duplicate or inconsistent days before sending', async () => {
+  await assert.rejects(weekly.saveSupplier({}), /seven days/)
+  const days = weekly.blankOpeningHours()
+  assert.throws(() => weekly.validateOpeningHours([...days.slice(1), days[1]]), /seven days/)
+  await assert.rejects(weekly.saveOpeningHours(1, { ...days[0], dayOfWeek: 7 }), /Invalid day/)
+  await assert.rejects(weekly.saveOpeningHours(1, { ...days[0], opensAt: '09:00:00' }), /Each day/)
+  await assert.rejects(weekly.saveOpeningHours(1, { ...days[0], isClosed: false, opensAt: '25:00:00', closesAt: '17:00:00' }), /Each day/)
+  assert.equal(calls.length, 0)
+})
+test('nested update failures surface without retrying; weekly display does not imply legacy hours are current', async () => {
+  status = 404; body = { message: 'Supplier not found' }
+  await assert.rejects(weekly.saveOpeningHours(1, weekly.blankOpeningHours()[0]), err => err.status === 404)
+  assert.equal(calls.length, 1)
+  assert.equal(weekly.supplierHoursLabel(row), 'See supplier for opening hours')
 })
