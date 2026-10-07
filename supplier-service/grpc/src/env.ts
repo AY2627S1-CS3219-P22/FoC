@@ -1,5 +1,12 @@
-import 'dotenv/config';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { config } from 'dotenv';
 import { z } from 'zod';
+
+const grpcDir = path.dirname(fileURLToPath(import.meta.url));
+//REST .env holds DATABASE_URL; grpc/.env (cwd) can override ports
+config({ path: path.resolve(grpcDir, '../../.env.example') });
+config();
 
 const schema = z.object({
   GRPC_HOST: z.string().min(1).default('0.0.0.0'),

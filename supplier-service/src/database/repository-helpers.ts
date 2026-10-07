@@ -3,6 +3,7 @@ import { getSupplierByIdService } from './supplier-repository';
 
 //make sure to declare this is a boolean
 
+//NOT A REST endpoint yet. Just placed here
 export async function isSupplierOpenService(id: number, at = new Date()): Promise<boolean> {
     const supplierRow = await getSupplierByIdService(id); // 404 if missing/deleted
     //already handles a 404 error and return never processes

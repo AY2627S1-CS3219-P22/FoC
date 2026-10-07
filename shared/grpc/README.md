@@ -9,7 +9,7 @@ Existing REST handlers, repositories, databases, auth, and startup files are unc
 | User     | 50052             | `GetPublicProfile`                                                | `user-service/proto/user.proto` (existing) |
 | Order    | 50051             | `GetOrder`                                                        | `shared/grpc/proto/order.proto`            |
 | Credit   | 50053             | `GetBalance`, `ReserveCredits`, `ReleaseCredits`, `SettleCredits` | `shared/grpc/proto/credit.proto`           |
-| Supplier | 50054             | `GetSupplier`                                                     | `shared/grpc/proto/supplier.proto`         |
+| Supplier | 50054             | `GetSupplier`, `IsOpen`                                           | `shared/grpc/proto/supplier.proto`         |
 
 The order and credit contracts are initial integration proposals because the
 fetched branches have no implementations for those services. Credit mutation

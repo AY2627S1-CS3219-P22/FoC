@@ -1,24 +1,38 @@
 {
   "name": "@foc/supplier-grpc",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "type": "commonjs",
+  "description": "Supplier Service for Supplier Listings and Search",
+  "author": "@sunpterodactyl, @",
+  "license": "MIT",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "predev": "npm run build --workspace @foc/grpc",
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "start": "tsx src/index.ts"
   },
   "dependencies": {
     "@foc/grpc": "0.1.0",
     "@grpc/grpc-js": "^1.14.5",
+    "@supabase/supabase-js": "^2.117.1",
+    "@testcontainers/postgresql": "^12.2.0",
     "dotenv": "^18.0.3",
+    "drizzle-orm": "^0.45.3",
+    "drizzle-zod": "^0.8.3",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.0",
+    "vite": "^6.0.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "tsx": "^4.20.0",
-    "typescript": "^6.0.0"
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.6.2",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
   }
 }
