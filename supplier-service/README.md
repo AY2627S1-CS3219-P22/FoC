@@ -160,7 +160,89 @@ process.stdout.write(token);
 | `PUT /supplier/:id/openingHours/:dayOfWeek` | `curl -X PUT localhost:3001/supplier/1/openingHours/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"opensAt":"08:30:00","closesAt":"18:00:00","isClosed":false}'` |
 
 
+## gRPC sample commands
 
+co-written with grok and edited by @sunpterodactyl
+
+Compose only starts Postgres and the Express app. gRPC is a second process on
+port `50054`, used by order-service. It loads `DATABASE_URL` from this folder's
+`.env.example` (the same database REST uses). Run these from the **repo root**, not
+`supplier-service/`.
+
+```bash
+cd /path/to/FoC
+npm install
+npm run build --workspace @foc/grpc
+npm run dev --workspace @foc/supplier-grpc
+```
+
+You should see `supplier-service gRPC listening on 0.0.0.0:50054`. Leave that
+terminal open. In another terminal, also from the repo root:
+
+```bash
+# IsOpen: seed supplier 1, hours in Asia/Singapore. Prints { isOpen: true|false }
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try {
+  console.log(await supplier.isOpen({ supplierId: '1' }));
+} finally {
+  supplier.close();
+}
+"
+```
+
+`supplierId` is a `uint64`, so it is a **string** on the wire (`'1'`, not `1`).
+
+```bash
+# GetSupplier is still a stub: expect gRPC UNIMPLEMENTED, not a supplier payload
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try {
+  await supplier.getSupplier({ supplierId: '1' });
+} catch (e) {
+  console.log(e.code, e.details);
+} finally {
+  supplier.close();
+}
+"
+```
+
+Failure cases for `IsOpen`:
+
+```bash
+# INVALID_ARGUMENT: supplier_id must be a positive integer
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try { await supplier.isOpen({ supplierId: '0' }); }
+catch (e) { console.log(e.code, e.details); }
+finally { supplier.close(); }
+"
+
+# NOT_FOUND: supplier 3 is soft-deleted in the seed
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try { await supplier.isOpen({ supplierId: '3' }); }
+catch (e) { console.log(e.code, e.details); }
+finally { supplier.close(); }
+"
+```
+
+The shared transport tests (client wrapper only, no database) are:
+
+```bash
+npm test --workspace @foc/grpc
+```
+
+Order-service already has a peer client at `SUPPLIER_GRPC_ADDR` (default
+`localhost:50054`). After this process is up:
+
+```ts
+const { isOpen } = await clients.supplier.isOpen({ supplierId: String(id) });
+```
 
 ## Creating a supplier
 
