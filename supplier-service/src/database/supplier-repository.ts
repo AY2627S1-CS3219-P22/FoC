@@ -10,6 +10,7 @@ import { CreateSupplierSchema, PublicSupplier, SearchSupplier, SupplierCategory,
 import { UpdateOpeningHours, supplierOpeningHours} from '@data/opening-hours-schema';
 import { getTableColumns, isNull, eq, and, sql, desc} from 'drizzle-orm';
 import { BadRequestError, ConflictError, NotFoundError,  } from '@/middleware/errors';
+import { isOpenStatus } from './repository-helpers';
 
 
 const { deletedAt, ...publicSupplierColumns } = getTableColumns(supplier);
@@ -18,7 +19,7 @@ const { deletedAt, ...publicSupplierColumns } = getTableColumns(supplier);
 const isDuplicateName = (err: any) => err?.code === '23505' || err?.cause?.code === '23505';
 const isCheckViolation = (err: any) => err?.code === '23514' || err?.cause?.code === '23514';
 
-export async function createSupplierService(input: CreateSupplierSchema): Promise<PublicSupplier>  {
+export async function createSupplierService(input: CreateSupplierSchema): Promise<SupplierWithHours>  {
     const { openingHours, ...newSupplier } = input;
     
     try{
@@ -29,13 +30,14 @@ export async function createSupplierService(input: CreateSupplierSchema): Promis
                                         .values(newSupplier)
                                         .returning(publicSupplierColumns);
 
-            await tx.insert(supplierOpeningHours)
-                    .values(openingHours.map((h) => ({...h, supplierId: insertedSupplier.supplierId})));
+            const hours = await tx.insert(supplierOpeningHours)
+                    .values(openingHours.map((h) => ({...h, supplierId: insertedSupplier.supplierId})))
+                    .returning();
             //maps each opening hours input from 0 to 6 to an entry in second table e.g. {openingHours: {0: [closingTime: DateTime(type), openingTime: DateTime(type) ... 6:}}
             //mandate all 7 days to be stated on creation, no NA
             //also preserves duplicate error being the only 23505 error
 
-            return insertedSupplier
+            return {...insertedSupplier, openingHours: hours}
         });
     } catch(err) {
         if (isDuplicateName(err)) {
@@ -72,7 +74,7 @@ export async function getSupplierByIdService(id: number): Promise<SupplierWithHo
   return row;
 }
 
-export async function updateSupplierByIdService(id: number, updates: UpdateSupplierType, expectedUpdatedAt: Date): Promise<PublicSupplier>  {
+export async function updateSupplierByIdService(id: number, updates: UpdateSupplierType, expectedUpdatedAt: Date): Promise<UpdateSupplierType>  {
 
     /*
     Parameters: 
