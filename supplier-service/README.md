@@ -1,23 +1,24 @@
 # Local setup quickstart
 
-Requires Docker Desktop. Nothing else needs to be installed: the database and the
-service both run in containers. 
+Requires Docker Desktop. Nothing else needs to be installed: the database, the
+Express app, and the gRPC server all run in containers.
 
-PLEASE NOTE: This is only for local setup. Check that you do not have the production .env file!!!!
+This stack is local only. `compose.yaml` does **not** load `.env`. It hardcodes
+`DATABASE_URL` to the compose `db` service. Do not point a production `.env` at
+this folder while you work here.
 
 ```bash
 cd supplier-service
 docker compose up -d --build
 ```
 
-This starts two containers:
-
+This starts three containers:
 
 | Service | What it is                              | Where                   |
 | ------- | --------------------------------------- | ----------------------- |
 | `db`    | Supabase Postgres 17, seeded at default | `127.0.0.1:54332`       |
-| `app`   | Express supplier service default at     | `http://localhost:3001` |
-
+| `app`   | Express supplier service                | `http://localhost:3001` |
+| `grpc`  | supplier gRPC (`IsOpen` for order)      | `localhost:50054`       |
 
 On its **first** start the `db` container applies everything in
 `supabase/migrations/` in timestamp order and then loads
@@ -42,10 +43,12 @@ docker compose down -v
 docker compose up -d --build
 ```
 
-After changing anything in `src/`, rebuild the app image:
+After changing anything in `src/`, rebuild the app image. After changing
+`grpc/` or `shared/grpc`, rebuild the gRPC image:
 
 ```bash
 docker compose up -d --build app
+docker compose up -d --build grpc
 ```
 
 
@@ -103,8 +106,16 @@ Tech Stack = Express.js, Node, Supabase, Drizzle, JWT(in-progress)
 
 ## Database Connection
 
-`src/database/db.ts` builds a single `pg` pool from `DATABASE_URL`. For the
-production database, set that variable; for local work the default above applies.
+`src/database/db.ts` builds a single `pg` pool from `DATABASE_URL`. Compose sets
+that to `postgresql://postgres:postgres@db:5432/postgres` (container DNS). A
+process on the host that talks to the same database must use port **54332**:
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres
+```
+
+Do not use a production pooler URL for local compose, `yarn test`, or host
+`npm run dev`.
 
 TODO: Set up docker secrets for seamless deployment across different devices
 
@@ -164,20 +175,26 @@ process.stdout.write(token);
 
 co-written with grok and edited by @sunpterodactyl
 
-Compose only starts Postgres and the Express app. gRPC is a second process on
-port `50054`, used by order-service. It loads `DATABASE_URL` from this folder's
-`.env.example` (the same database REST uses). Run these from the **repo root**, not
-`supplier-service/`.
+`docker compose up` starts gRPC on port `50054` against the compose database.
+The client one-liners below still run from the **repo root**, because they import
+`@foc/grpc`.
 
 ```bash
 cd /path/to/FoC
 npm install
 npm run build --workspace @foc/grpc
-npm run dev --workspace @foc/supplier-grpc
 ```
 
-You should see `supplier-service gRPC listening on 0.0.0.0:50054`. Leave that
-terminal open. In another terminal, also from the repo root:
+If you run the server on the host instead of the compose `grpc` service, point
+it at the published Postgres port (not a production URL):
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres \
+  npm run dev --workspace @foc/supplier-grpc
+```
+
+That prints `supplier-service gRPC listening on 0.0.0.0:50054`. Client samples,
+from the repo root:
 
 ```bash
 # IsOpen: seed supplier 1, hours in Asia/Singapore. Prints { isOpen: true|false }
