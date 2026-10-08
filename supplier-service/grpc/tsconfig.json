@@ -1,14 +1,21 @@
 {
+  "extends": "../tsconfig.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "node16",
-    "moduleResolution": "node16",
-    "lib": ["ES2022"],
     "outDir": "dist",
-    "rootDir": "src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true
+    "rootDir": "..",
+    "types": ["node"],
+    "paths": {
+      "@/*": ["../src/*"],
+      "@database/*": ["../src/database/*"],
+      "@data/*": ["../src/data/*"],
+      "@api/*": ["../src/api/*"],
+      "@middleware/*": ["../src/middleware/*"]
+    }
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "../src/database/**/*.ts",
+    "../src/data/**/*.ts",
+    "../src/middleware/errors.ts"
+  ]
 }

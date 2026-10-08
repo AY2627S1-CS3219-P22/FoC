@@ -1,23 +1,24 @@
 # Local setup quickstart
 
-Requires Docker Desktop. Nothing else needs to be installed: the database and the
-service both run in containers. 
+Requires Docker Desktop. Nothing else needs to be installed: the database, the
+Express app, and the gRPC server all run in containers.
 
-PLEASE NOTE: This is only for local setup. Check that you do not have the production .env file!!!!
+This stack is local only. `compose.yaml` does **not** load `.env`. It hardcodes
+`DATABASE_URL` to the compose `db` service. Do not point a production `.env` at
+this folder while you work here.
 
 ```bash
 cd supplier-service
 docker compose up -d --build
 ```
 
-This starts two containers:
-
+This starts three containers:
 
 | Service | What it is                              | Where                   |
 | ------- | --------------------------------------- | ----------------------- |
 | `db`    | Supabase Postgres 17, seeded at default | `127.0.0.1:54332`       |
-| `app`   | Express supplier service default at     | `http://localhost:3001` |
-
+| `app`   | Express supplier service                | `http://localhost:3001` |
+| `grpc`  | supplier gRPC (`IsOpen` for order)      | `localhost:50054`       |
 
 On its **first** start the `db` container applies everything in
 `supabase/migrations/` in timestamp order and then loads
@@ -42,10 +43,12 @@ docker compose down -v
 docker compose up -d --build
 ```
 
-After changing anything in `src/`, rebuild the app image:
+After changing anything in `src/`, rebuild the app image. After changing
+`grpc/` or `shared/grpc`, rebuild the gRPC image:
 
 ```bash
 docker compose up -d --build app
+docker compose up -d --build grpc
 ```
 
 
@@ -103,24 +106,35 @@ Tech Stack = Express.js, Node, Supabase, Drizzle, JWT(in-progress)
 
 ## Database Connection
 
-`src/database/db.ts` builds a single `pg` pool from `DATABASE_URL`. For the
-production database, set that variable; for local work the default above applies.
+`src/database/db.ts` builds a single `pg` pool from `DATABASE_URL`. Compose sets
+that to `postgresql://postgres:postgres@db:5432/postgres` (container DNS). A
+process on the host that talks to the same database must use port **54332**:
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres
+```
+
+Do not use a production pooler URL for local compose, `yarn test`, or host
+`npm run dev`.
 
 TODO: Set up docker secrets for seamless deployment across different devices
 
 ## CRUD Database Operations
 
-| Method | Route                           | Notes |
-| ------ | ------------------------------- | ----- |
-| GET    | `/suppliers`                    | public; active suppliers only |
-| GET    | `/suppliers/search?q=coffee`    | public; full-text search over name, building, description |
-| GET    | `/suppliers/category?type=food` | public; filter by category |
-| GET    | `/supplier/:id`                 | public; 404 if missing or soft-deleted |
-| POST   | `/supplier`                     | Bearer JWT required; 201 on success, 409 if the name is already taken |
-| PUT    | `/supplier/:id`                 | Bearer JWT required; send `expectedUpdatedAt`; 409 if the row changed, 404 if missing or deleted |
-| DELETE | `/supplier/:id`                 | Bearer JWT required; soft delete, 404 if already deleted |
 
-`PUT` uses optimistic concurrency. Read the supplier first and send back the
+| Method | Route                                   | Notes                                                                                            |
+| ------ | --------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| GET    | `/suppliers`                            | public; active suppliers only                                                                    |
+| GET    | `/suppliers/search?q=coffee`            | public; full-text search over name, building, description                                        |
+| GET    | `/suppliers/category?type=food`         | public; filter by category                                                                       |
+| GET    | `/supplier/:id`                         | public; 404 if missing or soft-deleted                                                           |
+| POST   | `/supplier`                             | Bearer JWT required; 201 on success, 409 if the name is already taken                            |
+| PUT    | `/supplier/:id`                         | Bearer JWT required; send `expectedUpdatedAt`; 409 if the row changed, 404 if missing or deleted |
+| DELETE | `/supplier/:id`                         | Bearer JWT required; soft delete, 404 if already deleted                                         |
+| PUT    | `/supplier/:id/openingHours/:dayOfWeek` | Bearer JWT required; replaces one day of opening hours                                           |
+
+
+`PUT /supplier/:id` uses optimistic concurrency. Read the supplier first and send back the
 `updatedAt` you received. The seed sets that to `2026-01-01T00:00:00.000Z`; any
 other value is a `409` and nothing is written.
 
@@ -143,25 +157,255 @@ process.stdout.write(token);
 ")
 ```
 
-| API endpoint | Sample curl command |
-| ------------ | ------------------- |
-| `GET /suppliers` | `curl localhost:3001/suppliers` |
-| `GET /suppliers/search?q=coffee` | `curl "localhost:3001/suppliers/search?q=coffee"` |
-| `GET /suppliers/category?type=printing` | `curl "localhost:3001/suppliers/category?type=printing"` |
-| `GET /supplier/:id` | `curl localhost:3001/supplier/1` |
-| `POST /supplier` | `curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'` |
-| `PUT /supplier/:id` | `curl -X PUT localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'` |
-| `DELETE /supplier/:id` | `curl -X DELETE localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN"` |
+
+| API endpoint                                | Sample curl command                                                                                                                                                                             |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /suppliers`                            | `curl localhost:3001/suppliers`                                                                                                                                                                 |
+| `GET /suppliers/search?q=coffee`            | `curl "localhost:3001/suppliers/search?q=coffee"`                                                                                                                                               |
+| `GET /suppliers/search-radius`              | `curl "localhost:3001/suppliers/search-radius?latitude=1.294167&longitude=103.773611&radius=500"`                                                                                                |
+| `GET /suppliers/category?type=printing`     | `curl "localhost:3001/suppliers/category?type=printing"`                                                                                                                                        |
+| `GET /supplier/:id`                         | `curl localhost:3001/supplier/1`                                                                                                                                                                |
+| `POST /supplier`                            | see the multi-line sample below; the body needs all seven days of `openingHours`                                                                                                                |
+| `PUT /supplier/:id`                         | `curl -X PUT localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'`       |
+| `DELETE /supplier/:id`                      | `curl -X DELETE localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN"`                                                                                                                    |
+| `PUT /supplier/:id/openingHours/:dayOfWeek` | `curl -X PUT localhost:3001/supplier/1/openingHours/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"opensAt":"08:30:00","closesAt":"18:00:00","isClosed":false}'` |
+
+
+## gRPC sample commands
+
+co-written with grok and edited by @sunpterodactyl
+
+`docker compose up` starts gRPC on port `50054` against the compose database.
+The client one-liners below still run from the **repo root**, because they import
+`@foc/grpc`.
+
+```bash
+cd /path/to/FoC
+npm install
+npm run build --workspace @foc/grpc
+```
+
+If you run the server on the host instead of the compose `grpc` service, point
+it at the published Postgres port (not a production URL):
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres \
+  npm run dev --workspace @foc/supplier-grpc
+```
+
+That prints `supplier-service gRPC listening on 0.0.0.0:50054`. Client samples,
+from the repo root:
+
+```bash
+# IsOpen: seed supplier 1, hours in Asia/Singapore. Prints { isOpen: true|false }
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try {
+  console.log(await supplier.isOpen({ supplierId: '1' }));
+} finally {
+  supplier.close();
+}
+"
+```
+
+`supplierId` is a `uint64`, so it is a **string** on the wire (`'1'`, not `1`).
+
+```bash
+# GetSupplier is still a stub: expect gRPC UNIMPLEMENTED, not a supplier payload
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try {
+  await supplier.getSupplier({ supplierId: '1' });
+} catch (e) {
+  console.log(e.code, e.details);
+} finally {
+  supplier.close();
+}
+"
+```
+
+Failure cases for `IsOpen`:
+
+```bash
+# INVALID_ARGUMENT: supplier_id must be a positive integer
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try { await supplier.isOpen({ supplierId: '0' }); }
+catch (e) { console.log(e.code, e.details); }
+finally { supplier.close(); }
+"
+
+# NOT_FOUND: supplier 3 is soft-deleted in the seed
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try { await supplier.isOpen({ supplierId: '3' }); }
+catch (e) { console.log(e.code, e.details); }
+finally { supplier.close(); }
+"
+```
+
+The shared transport tests (client wrapper only, no database) are:
+
+```bash
+npm test --workspace @foc/grpc
+```
+
+Order-service already has a peer client at `SUPPLIER_GRPC_ADDR` (default
+`localhost:50054`). After this process is up:
+
+```ts
+const { isOpen } = await clients.supplier.isOpen({ supplierId: String(id) });
+```
+
+## Creating a supplier
+
+`POST /supplier` is atomic: the supplier row and its seven opening-hours rows are
+written in one transaction. `createSupplierSchema` rejects the request with `400`
+unless `openingHours` has exactly seven entries with `dayOfWeek` 0 through 6, each
+appearing once.
+
+```bash
+curl -X POST localhost:3001/supplier \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "My Cafe",
+    "type": "food",
+    "buildingName": "COM1",
+    "locationDescription": "L1",
+    "floor": 1,
+    "latitude": "1.290000",
+    "longitude": "103.770000",
+    "openingHours": [
+      { "dayOfWeek": 0, "isClosed": true,  "opensAt": null,      "closesAt": null },
+      { "dayOfWeek": 1, "isClosed": false, "opensAt": "09:00:00", "closesAt": "17:00:00" },
+      { "dayOfWeek": 2, "isClosed": false, "opensAt": "09:00:00", "closesAt": "17:00:00" },
+      { "dayOfWeek": 3, "isClosed": false, "opensAt": "09:00:00", "closesAt": "17:00:00" },
+      { "dayOfWeek": 4, "isClosed": false, "opensAt": "09:00:00", "closesAt": "17:00:00" },
+      { "dayOfWeek": 5, "isClosed": false, "opensAt": "09:00:00", "closesAt": "17:00:00" },
+      { "dayOfWeek": 6, "isClosed": true,  "opensAt": null,      "closesAt": null }
+    ]
+  }'
+```
+
+
+
+### Failure cases worth trying
+
+All four return `400` and write nothing. The first three are caught by
+`createSupplierSchema` before any query runs:
+
+```bash
+# 400: only six days, "Opening hours must span 7 days of the week"
+curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"Six Day Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000","openingHours":[{"dayOfWeek":0,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":1,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":2,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":3,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":4,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":5,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"}]}'
+
+# 400: seven entries but day 1 appears twice and day 2 is missing
+curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"Dup Day Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000","openingHours":[{"dayOfWeek":0,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":1,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":1,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":3,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":4,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":5,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":6,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"}]}'
+
+# 400: dayOfWeek 7. The refine() only counts seven distinct days, so the range is
+# restated on createOpeningHoursSchema; the error names openingHours.2.dayOfWeek
+curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"Day Seven Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000","openingHours":[{"dayOfWeek":0,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":1,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":7,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":3,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":4,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":5,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":6,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"}]}'
+```
+
+The fourth is the one zod cannot catch, because it does not cross-check the three
+fields against each other. The table's agreement constraint rejects it and
+`createSupplierService` maps the violation to `400`, matching what the nested
+`PUT` reports for the same mistake:
+
+```bash
+curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"Disagree Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000","openingHours":[{"dayOfWeek":0,"isClosed":true,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":1,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":2,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":3,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":4,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":5,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":6,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"}]}'
+```
+
+Running the valid sample above a second time is a `409`: the name is taken and
+`unique_active_supplier_name` rejects the insert.
+
+## Updating opening hours
+
+Hours live in `public.supplier_opening_hours`, one row per supplier per day, so
+they are edited through a nested route instead of resending the whole supplier.
+`dayOfWeek` is in the path and follows Postgres' convention: **0 is Sunday**
+through 6 for Saturday.
+
+A day is replaced, not patched. `opensAt`, `closesAt` and `isClosed` are all
+required because the table's check constraint needs them to agree: either
+`isClosed` is true and both times are `null`, or `isClosed` is false and both
+times are set. Times are `HH:MM:SS` without a timezone.
+
+```bash
+# Monday 08:30 to 18:00
+curl -X PUT localhost:3001/supplier/1/openingHours/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"opensAt":"08:30:00","closesAt":"18:00:00","isClosed":false}'
+
+# closed on Sunday
+curl -X PUT localhost:3001/supplier/1/openingHours/0 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"opensAt":null,"closesAt":null,"isClosed":true}'
+```
+
+There is no `expectedUpdatedAt` here: a day is small enough that last write wins
+is acceptable, and `updated_at` is maintained by the
+`supplier_opening_hours_set_updated_at` trigger rather than the application.
+
+Failure cases worth trying:
+
+```bash
+# 400: isClosed disagrees with the times
+curl -X PUT localhost:3001/supplier/1/openingHours/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"opensAt":"09:00:00","closesAt":"17:00:00","isClosed":true}'
+
+# 400: dayOfWeek outside 0-6
+curl -X PUT localhost:3001/supplier/1/openingHours/9 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"opensAt":"09:00:00","closesAt":"17:00:00","isClosed":false}'
+
+# 404: supplier 3 is soft deleted in the seed
+curl -X PUT localhost:3001/supplier/3/openingHours/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"opensAt":"09:00:00","closesAt":"17:00:00","isClosed":false}'
+
+# 401: no token
+curl -X PUT localhost:3001/supplier/1/openingHours/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"opensAt":"09:00:00","closesAt":"17:00:00","isClosed":false}'
+```
+
+Inspect the result straight from the database:
+
+```bash
+docker compose exec db psql -U postgres -d postgres \
+  -c 'select day_of_week, opens_at, closes_at, is_closed from public.supplier_opening_hours where supplier_id = 1 order by day_of_week;'
+```
+
+
+
+## Conflicts on the supplier row 
 
 If someone else updated the row in between, the response is `409` and nothing is written. This is done by `updated_at` versioning. If `expectedUpdatedAt` doesn't match the current row, the response is 409.
 
-e.g. run the `PUT` sample above twice; the second command will fail with `409 Conflict`.
+e.g. run the `PUT /supplier/1` sample from the table twice; the second command will fail with `409 Conflict`.
 
 To prevent duplicate suppliers, run the `POST` sample twice; the second try will fail with `409`.
 
 A typical caller with no token is just curl without `-H Authorization`. Reads still work. Writes stop at `authenticate` with 401:
 
 ```bash
+# authenticate runs before validateRequest, so this 401s on the token alone and
+# the body is deliberately short: no openingHours needed to see the rejection
 curl -X POST localhost:3001/supplier \
   -H 'Content-Type: application/json' \
   -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'
@@ -174,7 +418,6 @@ curl -X DELETE localhost:3001/supplier/1
 ```
 
 Expected: GETs `200`, POST/PUT/DELETE `401 Unauthorized`. 
-
 
 ### Error responses
 

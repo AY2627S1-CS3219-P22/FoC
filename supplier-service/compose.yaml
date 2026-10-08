@@ -1,5 +1,11 @@
-# Local Supabase Postgres + the supplier service.
+# Local Supabase Postgres + Express + gRPC.
 #   docker compose up -d --build
+#
+# Do not use a production .env with this stack. DATABASE_URL is hardcoded to the
+# compose `db` service below; there is no env_file on purpose.
+# Host processes (yarn test, npm run dev) are separate and must not reuse that
+# production URL either.
+#
 # The db container applies supabase/migrations then supabase/schemas/seed.sql on
 # first start only, so use `docker compose down -v` to reseed from scratch.
 name: supplier-service
@@ -22,7 +28,9 @@ services:
       - ./supabase/migrations/20260925102800_add_search_functions.sql:/docker-entrypoint-initdb.d/z03_search_functions.sql:ro
       - ./supabase/migrations/20260927173000_create_unique_index.sql:/docker-entrypoint-initdb.d/z04_unique_index.sql:ro
       - ./supabase/migrations/20260927190000_updated_at_ms_precision.sql:/docker-entrypoint-initdb.d/z05_updated_at_precision.sql:ro
-      - ./supabase/schemas/seed.sql:/docker-entrypoint-initdb.d/z06_seed.sql:ro
+      - ./supabase/migrations/20261004172304_create_supplier_opening_hours.sql:/docker-entrypoint-initdb.d/z06_opening_hours.sql:ro
+      - ./supabase/schemas/seed.sql:/docker-entrypoint-initdb.d/z07_seed.sql:ro
+      - ./supabase/migrations/20261006102848_location_search.sql:/docker-entrypoint-initdb.d/z08_location_search.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
@@ -39,14 +47,27 @@ services:
       NODE_ENV: production
       PORT: "3001"
       DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
-      USER_SERVICE_PUBLIC_KEY_PATH: /app/keys/public.pem #REMOVE AFTER D2!!!!!!
+      USER_SERVICE_PUBLIC_KEY_PATH: /app/keys/public.pem
     volumes:
       - ./keys/public.pem:/app/keys/public.pem:ro
     depends_on:
       db:
         condition: service_healthy
 
+  grpc:
+    build:
+      context: ..
+      dockerfile: supplier-service/Dockerfile.grpc
+    ports:
+      - "50054:50054"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
+      GRPC_HOST: 0.0.0.0
+      GRPC_PORT: "50054"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   db-data:
-# docker compose down -v
-#in order to stop container

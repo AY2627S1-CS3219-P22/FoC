@@ -1,0 +1,33 @@
+FROM node:22-alpine
+WORKDIR /repo
+
+# Workspace lockfile lives at the FoC root; other grpc package.json files are
+# required so `npm ci` can resolve the workspaces list.
+COPY package.json package-lock.json ./
+COPY shared/grpc ./shared/grpc
+COPY user-service/proto ./user-service/proto
+COPY order-service/grpc/package.json ./order-service/grpc/
+COPY credit-service/grpc/package.json ./credit-service/grpc/
+COPY supplier-service/package.json supplier-service/yarn.lock ./supplier-service/
+COPY supplier-service/tsconfig.json ./supplier-service/
+COPY supplier-service/src ./supplier-service/src
+COPY supplier-service/grpc/package.json ./supplier-service/grpc/
+COPY supplier-service/grpc/tsconfig.json ./supplier-service/grpc/
+COPY supplier-service/grpc/src ./supplier-service/grpc/src
+
+# REST src resolves drizzle-orm / pg / vitest from supplier-service/node_modules.
+# Install Yarn deps before NODE_ENV=production so parent devDependencies stay.
+RUN corepack enable \
+ && yarn --cwd supplier-service install --frozen-lockfile
+
+# tsx is a grpc devDependency; install it even when NODE_ENV=production later.
+RUN npm ci --include=dev \
+ && npm run build --workspace @foc/grpc
+
+WORKDIR /repo/supplier-service/grpc
+ENV NODE_ENV=production
+ENV GRPC_HOST=0.0.0.0
+ENV GRPC_PORT=50054
+EXPOSE 50054
+
+CMD ["npx", "tsx", "src/index.ts"]
