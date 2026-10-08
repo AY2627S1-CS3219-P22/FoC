@@ -19,6 +19,8 @@ import type { ReleaseCreditsRequest } from './generated/credit/ReleaseCreditsReq
 import type { SettleCreditsRequest } from './generated/credit/SettleCreditsRequest';
 import type { GetSupplierRequest } from './generated/supplier/GetSupplierRequest';
 import type { Supplier__Output as Supplier } from './generated/supplier/Supplier';
+import type { IsOpenRequest } from './generated/supplier/IsOpenRequest';
+import type { IsOpenResponse__Output as IsOpenResponse } from './generated/supplier/IsOpenResponse';
 
 export interface ClientConfig {
   timeoutMs?: number;
@@ -162,6 +164,16 @@ export function createSupplierClient(target: string, config: ClientConfig = {}) 
     getSupplier(request: GetSupplierRequest, options: RpcOptions = {}): Promise<Supplier> {
       return unary((callback) =>
         client.getSupplier(
+          request,
+          options.metadata ?? new Metadata(),
+          callOptions(timeoutMs, options),
+          callback,
+        ),
+      );
+    },
+    isOpen(request: IsOpenRequest, options: RpcOptions = {}): Promise<IsOpenResponse> {
+      return unary((callback) =>
+        client.isOpen(
           request,
           options.metadata ?? new Metadata(),
           callOptions(timeoutMs, options),

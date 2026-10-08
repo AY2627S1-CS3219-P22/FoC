@@ -9,6 +9,10 @@ import { Pool } from 'pg';
 import dotenv from 'dotenv';
 dotenv.config();
 
+import * as supplierSchema from '@data/schema';
+import * as hoursSchema from '@data/opening-hours-schema';
+import * as dataRelations from '@data/relations';
+
 //environment variables for database connection
 
 const maxConnections = process.env.MAX_CONNECTIONS || 11;
@@ -39,5 +43,8 @@ pool.on('error', (err: Error) => {
   console.error('Unexpected error on PostgresSQL client', err);
 });
 
-export const db = drizzle({ client: pool });
+export const db = drizzle({ 
+                     client: pool, 
+                     schema: { ...supplierSchema, ...hoursSchema, ...dataRelations },
+                  });
 export default pool;
