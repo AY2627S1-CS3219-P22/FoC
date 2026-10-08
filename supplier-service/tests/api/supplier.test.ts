@@ -15,6 +15,18 @@ import pool from '@database/db';
 import { resetDatabase } from '../helpers/reset-database';
 import { adminBearer } from '../helpers/auth-token';
 
+/*
+createSupplierSchema mandates all 7 days, so every create payload carries a full week.
+time columns round-trip as HH:MM:SS, so the fixtures use that form to compare literally.
+*/
+const fullWeek = () =>
+  [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+    dayOfWeek,
+    opensAt: '09:00:00',
+    closesAt: '17:00:00',
+    isClosed: false,
+  }));
+
 const newSupplier1 = {
   name: '[Test Supplier] Noodle Bar',
   type: 'food',
@@ -24,6 +36,7 @@ const newSupplier1 = {
   //numeric columns round-trip as strings through pg
   latitude: '1.294900',
   longitude: '103.774500',
+  openingHours: fullWeek(),
 };
 
 beforeAll(async () => {
@@ -150,6 +163,213 @@ describe('POST /supplier', () => {
       .send({ ...newSupplier1, name: 'Campus Bookstore' });
 
     expect(res.status).toBe(201);
+  });
+
+  //the response only carries the supplier, so the hours are checked in the table
+  it('writes one opening hours row per day', async () => {
+    const res = await request(app)
+      .post('/supplier')
+      .set('Authorization', adminBearer())
+      .send(newSupplier1);
+
+    const { rows } = await pool.query(
+      'SELECT day_of_week, opens_at, closes_at, is_closed FROM public.supplier_opening_hours WHERE supplier_id = $1 ORDER BY day_of_week',
+      [res.body.data.supplierId],
+    );
+
+    expect(rows).toHaveLength(7);
+    expect(rows.map((r: any) => r.day_of_week)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(rows[0]).toMatchObject({ opens_at: '09:00:00', closes_at: '17:00:00', is_closed: false });
+  });
+
+  //length(7) on the array: a partial week is rejected before any SQL runs
+  it('rejects a payload that does not cover all 7 days', async () => {
+    const res = await request(app)
+      .post('/supplier')
+      .set('Authorization', adminBearer())
+      .send({ ...newSupplier1, openingHours: fullWeek().slice(0, 6) });
+
+    expect(res.status).toBe(400);
+  });
+
+  /*
+  Seven entries that are not seven distinct days would hit the (supplier_id, day_of_week)
+  unique constraint, which raises the same 23505 as a duplicate name. The refine on
+  createSupplierSchema catches it first so the 409 path stays unambiguous.
+  */
+  it('rejects a week that repeats a day', async () => {
+    const repeated = fullWeek();
+    repeated[6] = { ...repeated[6], dayOfWeek: 0 };
+
+    const res = await request(app)
+      .post('/supplier')
+      .set('Authorization', adminBearer())
+      .send({ ...newSupplier1, openingHours: repeated });
+
+    expect(res.status).toBe(400);
+  });
+
+  //both inserts share one transaction, so a day the table rejects must undo the supplier too
+  it('rolls back the supplier when a day violates the check constraint', async () => {
+    const contradictory = fullWeek();
+    //is_closed with times set is exactly what the table forbids
+    contradictory[3] = { ...contradictory[3], isClosed: true };
+
+    const res = await request(app)
+      .post('/supplier')
+      .set('Authorization', adminBearer())
+      .send({ ...newSupplier1, openingHours: contradictory });
+
+    expect(res.status).toBe(400);
+
+    const { rows } = await pool.query(
+      'SELECT id FROM public."Supplier_Database" WHERE "Name" = $1',
+      [newSupplier1.name],
+    );
+    expect(rows).toHaveLength(0);
+  });
+});
+
+/*
+seed.sql gives suppliers 1 and 2 days 1-5 only, so day 0 and day 6 exist as valid
+days of the week with no row behind them. Supplier 3 is soft deleted.
+*/
+describe('PUT /supplier/:id/openingHours/:dayOfWeek', () => {
+  const openLate = { opensAt: '10:00:00', closesAt: '22:00:00', isClosed: false };
+
+  it('replaces the hours for one day', async () => {
+    const res = await request(app)
+      .put('/supplier/1/openingHours/1')
+      .set('Authorization', adminBearer())
+      .send(openLate);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ supplierId: 1, dayOfWeek: 1, ...openLate });
+    expect(res.body.message).toContain('Monday');
+  });
+
+  it('leaves the other days alone', async () => {
+    await request(app).put('/supplier/1/openingHours/1').set('Authorization', adminBearer()).send(openLate);
+
+    const { rows } = await pool.query(
+      'SELECT opens_at FROM public.supplier_opening_hours WHERE supplier_id = 1 AND day_of_week = 2',
+    );
+    expect(rows[0].opens_at).toBe('09:00:00');
+  });
+
+  //a day with no times is how the table stores "closed", so both must be null
+  it('closes a day when the times are null', async () => {
+    const res = await request(app)
+      .put('/supplier/1/openingHours/2')
+      .set('Authorization', adminBearer())
+      .send({ opensAt: null, closesAt: null, isClosed: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ isClosed: true, opensAt: null, closesAt: null });
+  });
+
+  //the trigger owns updated_at, so the service never sets it by hand
+  it('lets the database trigger move updatedAt', async () => {
+    const before = await pool.query(
+      'SELECT updated_at FROM public.supplier_opening_hours WHERE supplier_id = 1 AND day_of_week = 1',
+    );
+
+    await request(app).put('/supplier/1/openingHours/1').set('Authorization', adminBearer()).send(openLate);
+
+    const after = await pool.query(
+      'SELECT updated_at FROM public.supplier_opening_hours WHERE supplier_id = 1 AND day_of_week = 1',
+    );
+    expect(after.rows[0].updated_at.getTime()).toBeGreaterThan(before.rows[0].updated_at.getTime());
+  });
+
+  it('returns 404 for a supplier that does not exist', async () => {
+    const res = await request(app)
+      .put('/supplier/9999/openingHours/1')
+      .set('Authorization', adminBearer())
+      .send(openLate);
+
+    expect(res.status).toBe(404);
+  });
+
+  /*
+  The foreign key does not know about deleted_at, so without the parent lookup in the
+  service a soft deleted supplier would still be editable through the child table.
+  */
+  it('returns 404 for a soft deleted supplier', async () => {
+    await pool.query(
+      "INSERT INTO public.supplier_opening_hours (supplier_id, day_of_week, opens_at, closes_at, is_closed) VALUES (3, 1, '09:00', '17:00', false)",
+    );
+
+    const res = await request(app)
+      .put('/supplier/3/openingHours/1')
+      .set('Authorization', adminBearer())
+      .send(openLate);
+
+    expect(res.status).toBe(404);
+    expect(res.body.message).toContain('Supplier 3 not found');
+  });
+
+
+  //the check constraint maps to 400, not 500: the client sent an impossible day
+  it('returns 400 when a closed day still carries times', async () => {
+    const res = await request(app)
+      .put('/supplier/1/openingHours/1')
+      .set('Authorization', adminBearer())
+      .send({ opensAt: '09:00:00', closesAt: '17:00:00', isClosed: true });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain('closed with no times');
+  });
+
+  it('returns 400 when an open day has no times', async () => {
+    const res = await request(app)
+      .put('/supplier/1/openingHours/1')
+      .set('Authorization', adminBearer())
+      .send({ opensAt: null, closesAt: null, isClosed: false });
+
+    expect(res.status).toBe(400);
+  });
+
+  /*
+  required() on the body schema. Without it Drizzle would drop the undefined keys and
+  throw "No values to set", which the handler cannot tell apart from a real fault.
+  */
+  it('returns 400 for a body that omits a field', async () => {
+    const res = await request(app)
+      .put('/supplier/1/openingHours/1')
+      .set('Authorization', adminBearer())
+      .send({ isClosed: true });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe('Bad Request: Validation failed');
+  });
+
+  //without param validation this reaches postgres as NaN and comes back a 500
+  it('returns 400 for a non-numeric day', async () => {
+    const res = await request(app)
+      .put('/supplier/1/openingHours/monday')
+      .set('Authorization', adminBearer())
+      .send(openLate);
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for a day outside 0-6', async () => {
+    const res = await request(app)
+      .put('/supplier/1/openingHours/7')
+      .set('Authorization', adminBearer())
+      .send(openLate);
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for a non-numeric supplier id', async () => {
+    const res = await request(app)
+      .put('/supplier/abc/openingHours/1')
+      .set('Authorization', adminBearer())
+      .send(openLate);
+
+    expect(res.status).toBe(400);
   });
 });
 
