@@ -130,18 +130,32 @@ other value is a `409` and nothing is written.
 To start run `docker compose up -d --build` and the app should run on port `3001`.
 All seed data (3) are specified in `supplier-service/supabase/schemas/seed.sql`.
 
-Write routes need an RS256 Bearer token signed with `keys/private.pem`. From
-`supplier-service/` (after `yarn install`):
+Write routes need an RS256 Bearer token signed with `keys/private.pem`. The user
+service puts `roles` on the token as an **array** (`USER` or `ADMINISTRATOR`),
+not a single `role` string. From `supplier-service/` (after `yarn install`):
 
 ```bash
+# User token
 TOKEN=$(node --input-type=module -e "
 import jwt from 'jsonwebtoken';
 import fs from 'node:fs';
-const token = jwt.sign({}, fs.readFileSync('./keys/private.pem', 'utf8'), {
-  algorithm: 'RS256',
-  subject: 'demo-admin',
-  expiresIn: '15m',
-});
+const token = jwt.sign(
+  { roles: ['USER'] },
+  fs.readFileSync('./keys/private.pem', 'utf8'),
+  { algorithm: 'RS256', subject: 'demo-user', expiresIn: '15m' },
+);
+process.stdout.write(token);
+")
+
+# Admin token (use this for the write curls below)
+TOKEN=$(node --input-type=module -e "
+import jwt from 'jsonwebtoken';
+import fs from 'node:fs';
+const token = jwt.sign(
+  { roles: ['ADMIN'] },
+  fs.readFileSync('./keys/private.pem', 'utf8'),
+  { algorithm: 'RS256', subject: 'demo-admin', expiresIn: '15m' },
+);
 process.stdout.write(token);
 ")
 ```
