@@ -21,8 +21,10 @@ services:
       - ./supabase/migrations/20260925102600_add_ts_vector.sql:/docker-entrypoint-initdb.d/z02_fts.sql:ro
       - ./supabase/migrations/20260925102800_add_search_functions.sql:/docker-entrypoint-initdb.d/z03_search_functions.sql:ro
       - ./supabase/migrations/20260927173000_create_unique_index.sql:/docker-entrypoint-initdb.d/z04_unique_index.sql:ro
-      - ./supabase/migrations/20260927190000_updated_at_ms_precision.sql:/docker-entrypoint-initdb.d/z05_updated_at_precision.sql:ro
+      - ./supabase/migrations/20260927190000_updated_at_ms_precision.sql:/docker-entrypoint-initdb.d/z05_updated_at_precision.sql:ro  
+      - ./supabase/migrations/20261004172304_create_supplier_opening_hours.sql:/docker-entrypoint-initdb.d/z06_create_supplier_opening_hours.sql:ro  
       - ./supabase/schemas/seed.sql:/docker-entrypoint-initdb.d/z06_seed.sql:ro
+      - ./supabase/migrations/20261006102848_location_search.sql:/docker-entrypoint-initdb.d/z07_location_search.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
