@@ -9,6 +9,7 @@ import { bigint, integer, numeric, pgTable, timestamp, varchar, uniqueIndex} fro
 import { createInsertSchema, createUpdateSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import {sql} from 'drizzle-orm'
+import {createOpeningHoursSchema, PublicOpeningHours} from '@data/opening-hours-schema';
 
 export const SUPPLIER_CATEGORY = z.enum(['food/coffee', 'printing', 'food', 'shopping', 'other']);
 
@@ -45,8 +46,6 @@ export const supplier = pgTable('Supplier_Database', {
     floor: integer("Floor").notNull(),
     longitude: numeric("Longitude").notNull(),
     latitude: numeric("Latitude").notNull(),
-    startingTime:varchar("StartingTime").default("NA"),
-    closingTime: varchar("ClosingTime").default("NA"),
     imageURL: varchar("ImageURL").default("NA"),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
@@ -68,10 +67,13 @@ export const createSupplierSchema = createInsertSchema(supplier).omit ({
                                     createdAt: true, 
                                     updatedAt: true,
                                     deletedAt: true,
-                                }).extend({
-                                    startingTime: z.string().default("NA").optional(),
-                                    closingTime: z.string().default("NA").optional(),
-                                });
+                                }).extend
+                                ({openingHours: 
+                                    z.array(createOpeningHoursSchema).length(7, 'Opening hours must span 7 days of the week')
+                                }).refine(
+                                    (s) => new Set(s.openingHours.map((h) => h.dayOfWeek)).size == 7, //validate!
+                                    {message: 'Opening hours must contain hours for each day of the week exactly once', path: ['openingHours']},
+                                );
 
 export const updateSupplierSchema = createUpdateSchema(supplier)
                                     .omit({
@@ -79,7 +81,7 @@ export const updateSupplierSchema = createUpdateSchema(supplier)
                                     createdAt: true, 
                                     updatedAt: true,
                                     deletedAt: true,
-                                    }).partial();
+                                    });
 
 export const updateRequestSchema = updateSupplierSchema.extend({
     expectedUpdatedAt: z.coerce.date(),
@@ -93,7 +95,17 @@ export const supplierCategoryQuerySchema = z.object({
 type: SUPPLIER_CATEGORY,
 });
 
-export type Supplier = typeof supplier.$inferSelect;
+
+
+//return values 
+export type SupplierAndDate = typeof supplier.$inferSelect; //this helps with returning all days of the week
+export type PublicSupplier = Omit<SupplierAndDate, 'deletedAt'> //standardize supplier return type
+
+export type SupplierWithHours = PublicSupplier &{openingHours: PublicOpeningHours[]}; //full list
+
+export type SearchSupplier = PublicSupplier & {openingHours: PublicOpeningHours | null};
+
+//for CRUD input validation
 export type CreateSupplierSchema = z.infer<typeof createSupplierSchema>;
 export type UpdateSupplierType = z.infer<typeof updateSupplierSchema>;
 export type SupplierCategory = z.infer<typeof SUPPLIER_CATEGORY>;
