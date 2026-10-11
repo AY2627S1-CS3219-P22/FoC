@@ -133,9 +133,9 @@ export const updateSupplierHours = async(req:Request, res:Response, next:NextFun
 >>>>>>> a76812b (Add in the location post gis functionality)
 export const getNearbySuppliers = async(req:Request, res:Response, next:NextFunction) => {
     try {
-        const { latitude, longitude, radius } = supplierRadiusQuerySchema.parse(req.query);
-        const nearbySuppliers = await getNearbySuppliersService(latitude, longitude, radius);
-        handleResponse(res, 200, nearbySuppliers, `Nearby suppliers within ${radius} meters fetched successfully`);
+        const locationQuery = supplierRadiusQuerySchema.parse(req.query);
+        const nearbySuppliers = await getNearbySuppliersService(locationQuery);
+        handleResponse(res, 200, nearbySuppliers, `Nearby suppliers within ${req.query.radius} meters fetched successfully`);
     } catch (err) {
         next(err);
     }

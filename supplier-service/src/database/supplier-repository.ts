@@ -6,7 +6,7 @@ AI Declaration: Migration to drizzle for createSupplierService and updateSupplie
 */ 
 
 import { db } from '@database/db'; //drizzle-orm
-import { CreateSupplierSchema, PublicSupplier, SearchSupplier, SupplierCategory, SupplierWithHours, UpdateSupplierType, supplier } from '@data/schema';
+import { CreateSupplierSchema, PublicSupplier, SupplierCategory, SupplierWithHours, UpdateSupplierType, supplier, LocationSupplier} from '@data/schema';
 import { UpdateOpeningHours, supplierOpeningHours} from '@data/opening-hours-schema';
 import { getTableColumns, isNull, eq, and, sql, desc} from 'drizzle-orm';
 import { BadRequestError, ConflictError, NotFoundError,  } from '@/middleware/errors';
@@ -237,7 +237,6 @@ export async function getNearbySuppliersService(latitude: number, longitude: num
     const origin = sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography`;
     return db.query.supplier.findMany({
         columns: { deletedAt: false },
-        with: { openingHours: true },
         where: and(
             isNull(supplier.deletedAt),
             sql`ST_DWithin(location, ${origin}, ${radius})`,
