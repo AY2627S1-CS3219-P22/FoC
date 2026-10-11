@@ -1,10 +1,34 @@
-import type { RequestHandler } from 'express';
+import type { RequestHandler, Response } from 'express';
+import type { Roles } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
 import { env, jwtPrivateKey } from '../../env';
 import type { RegisterInput } from '../dto/registerDto';
 import type { LoginInput } from '../dto/loginDto';
 import * as userService from '../services/userService';
+import * as sessionService from '../services/sessionService';
+
+const REFRESH_COOKIE = 'refreshToken';
+
+function signAccessToken(userId: string, roles: Roles[]) {
+  return jwt.sign({ roles }, jwtPrivateKey, {
+    algorithm: 'RS256',
+    subject: userId,
+    expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
+    jwtid: randomUUID(),
+  });
+}
+
+// httpOnly: JS can't read it (XSS-safe). path: only sent to /users/* routes.
+function setRefreshCookie(res: Response, token: string, expiresAt: Date) {
+  res.cookie(REFRESH_COOKIE, token, {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/users',
+    expires: expiresAt,
+  });
+}
 
 // POST /users/register
 export const register: RequestHandler = async (req, res) => {
@@ -30,14 +54,14 @@ export const login: RequestHandler = async (req, res) => {
     return;
   }
 
-  const token = jwt.sign({ roles: result.roles }, jwtPrivateKey, {
-    algorithm: 'RS256',
-    subject: result.userId,
-    expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
-    jwtid: randomUUID(),
-  });
+  // Logging in again on this browser replaces its old session.
+  const oldToken = req.cookies?.[REFRESH_COOKIE];
+  if (oldToken) await sessionService.revokeSession(oldToken);
 
-  res.status(200).json({ token });
+  const session = await sessionService.createSession(result.userId);
+  setRefreshCookie(res, session.token, session.expiresAt);
+
+  res.status(200).json({ token: signAccessToken(result.userId, result.roles) });
 };
 
 // GET /users/me

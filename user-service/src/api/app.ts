@@ -1,10 +1,12 @@
 import express, { type Express } from 'express';
+import cookieParser from 'cookie-parser';
 import { pingDatabase } from '../db';
 import { userRouter } from './routes/userRoutes';
 
 export function createApp(): Express {
   const app = express();
   app.use(express.json());
+  app.use(cookieParser());
 
   app.get('/health', async (_req, res) => {
     const dbUp = await pingDatabase();
