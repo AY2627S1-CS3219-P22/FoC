@@ -58,20 +58,25 @@ of `localhost`, with the actual container listener port.
 import { createCreditClient } from '@foc/grpc';
 import { Metadata } from '@grpc/grpc-js';
 
-const token = process.env.CREDIT_SERVICE_TOKEN;
-if (!token) throw new Error('CREDIT_SERVICE_TOKEN required');
+const serviceToken = process.env.CREDIT_FRONTEND_SERVICE_TOKEN;
+const userToken = process.env.USER_ACCESS_TOKEN;
+const userId = process.env.USER_ID; // Must match the verified user token subject.
+if (!serviceToken || !userToken || !userId) throw new Error('Backend credential and user identity required');
 const metadata = new Metadata();
-metadata.set('x-credit-service-token', token);
-const credit = createCreditClient('localhost:50053');
+metadata.set('x-credit-service-token', serviceToken);
+metadata.set('authorization', 'Bearer ' + userToken);
+const credit = createCreditClient('localhost:50053', { timeoutMs: 3000 });
 try {
-  console.log(await credit.getBalance({ userId: 'registered-user-id' }, { metadata }));
+  const balance = await credit.getBalance({ userId }, { metadata });
+  console.log(balance.availableCredits);
 } finally {
   credit.close();
 }
 ```
 
-With valid metadata this returns a persisted balance or `NOT_FOUND` if the
-account has not been initialised. See Credit Service's README for local setup.
+With valid credentials/ownership this returns a persisted balance, or `NOT_FOUND`
+if the account has not been initialised. Credit Service's scoped credentials and
+TLS setup are documented in its README; keep service secrets in backend configuration.
 Reuse clients across requests and close them at shutdown. New scaffolds expose
 `createClients()` in `grpc/src/grpc/clients.ts`; startup creates these peer clients
 and closes them after the server drains. Credit startup only creates its database pool
@@ -94,8 +99,8 @@ reads the existing User Service proto in place, so retain the repository layout.
 Integrating it into an existing service is a later explicit change: declare the
 dependency in that service's package manager, import the new handlers/clients,
 and connect lifecycle hooks to its existing entrypoint. The scaffold listeners
-use insecure local transport for development. The core credit listener is restricted
-to loopback and requires its configured service token.
+use insecure local transport for development. Credit requires scoped credentials
+for every call and TLS for production/non-loopback listeners.
 
 ## Branch compatibility checked on 4 October 2026
 
