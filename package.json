@@ -4,14 +4,17 @@
   "private": true,
   "workspaces": [
     "shared/grpc",
+    "order-service",
     "order-service/grpc",
     "credit-service/grpc",
     "supplier-service/grpc"
   ],
   "scripts": {
-    "build": "npm run build --workspace @foc/grpc && npm run build --workspace @foc/order-grpc --workspace @foc/credit-grpc --workspace @foc/supplier-grpc",
+    "build": "npm run build --workspace @foc/grpc && npm run build --workspace @foc/order-service --workspace @foc/order-grpc --workspace @foc/credit-grpc --workspace @foc/supplier-grpc",
     "test": "npm run test --workspace @foc/grpc",
-    "grpc:generate": "npm run generate --workspace @foc/grpc"
+    "grpc:generate": "npm run generate --workspace @foc/grpc",
+    "test:order": "npm test --workspace @foc/order-service",
+    "test:order:integration": "npm run test:integration --workspace @foc/order-service"
   },
   "engines": {
     "node": ">=20"
