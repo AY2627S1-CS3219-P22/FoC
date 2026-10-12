@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { CreditError, requireCondition } from '../domain/errors';
-import { CreditAccount, CreditHistoryEntry, HistoryType, MAX_CREDITS, STARTER_CREDITS, Reservation, ReservationStatus } from '../domain/models';
+import { CreditAccount, CreditHistoryEntry, HistoryType, IdempotencyRecord, MAX_CREDITS, STARTER_CREDITS, Reservation, ReservationStatus } from '../domain/models';
 import { balance, historyView, reservationView, type Balance, type CreditHistoryView, type ReservationView } from '../domain/views';
 import type { CreditRepository, CreditUnitOfWork } from '../repositories/interfaces';
 
@@ -20,12 +20,29 @@ function found<T>(value: T | undefined, name: string): T {
   if (value === undefined) throw new CreditError('NOT_FOUND', `${name} not found`);
   return value;
 }
+function retryKey(key: string | undefined, fallback?: string): string {
+  return identifier(key || fallback || '', 'idempotencyKey');
+}
 
 export class CreditService {
   constructor(private readonly database: CreditUnitOfWork) {}
 
-  private write<T>(action: (repository: CreditRepository) => Promise<T>): Promise<T> {
-    return this.database.transaction(({ credit }) => action(credit));
+  private async mutate<T extends Balance | ReservationView>(operation: string, key: string, request: object, resource: string,
+    action: (repository: CreditRepository) => Promise<T>): Promise<T> {
+    const requestHash = createHash('sha256').update(JSON.stringify(request)).digest('hex');
+    return this.database.transaction(async ({ credit }) => {
+      await credit.lockResource(JSON.stringify(['idempotency', operation, key]));
+      const previous = await credit.findIdempotencyRecord(operation, key);
+      if (previous) {
+        requireCondition(previous.requestHash === requestHash, 'Idempotency key was already used with a different request');
+        return previous.result as T;
+      }
+      await credit.lockResource(resource);
+      const result = await action(credit);
+      const userID = 'userId' in result ? result.userId : result.requesterId;
+      await credit.saveIdempotencyRecord(new IdempotencyRecord(userID, key, new Date(), operation, result, requestHash));
+      return result;
+    });
   }
 
   private recordReservation(repository: CreditRepository, userId: string, type: HistoryType, totalDelta: number,
@@ -35,9 +52,9 @@ export class CreditService {
       reservation?.errandID ?? '', reservation?.reservationID ?? '', totalDelta, reservedDelta));
   }
 
-  async initCredits(request: { userId: string }): Promise<Balance> {
+  async initCredits(request: { userId: string; idempotencyKey?: string }): Promise<Balance> {
     const userId = identifier(request.userId, 'userId');
-    return this.write(async repo => {
+    return this.mutate('INIT', retryKey(request.idempotencyKey, userId), { userId }, `account:${userId}`, async repo => {
       const existing = await repo.findByUserId(userId);
       if (existing) return balance(existing);
       const account = new CreditAccount(userId);
@@ -53,17 +70,17 @@ export class CreditService {
     return this.database.transaction(async ({ credit }) => balance(found(await credit.findByUserId(userId), 'Credit account')));
   }
 
-  async createReservation(request: { orderId: string; requesterId: string; amount: number }): Promise<ReservationView> {
+  async createReservation(request: { orderId: string; requesterId: string; amount: number; idempotencyKey?: string }): Promise<ReservationView> {
     const orderId = identifier(request.orderId, 'orderId');
     const requesterId = identifier(request.requesterId, 'requesterId');
     const amount = positive(request.amount, 'amount');
-    return this.write(async repo => {
+    return this.mutate('RESERVE', retryKey(request.idempotencyKey, orderId), { orderId, requesterId, amount }, `order:${orderId}`, async repo => {
       const existing = await repo.findReservation(orderId);
       if (existing) {
         requireCondition(existing.userID === requesterId && existing.creditAmount === amount, 'Order already has a different reservation');
         return reservationView(existing);
       }
-      const account = found((await repo.findAccounts([requesterId]))[0], 'Requester credit account');
+      const account = found((await repo.lockAccounts([requesterId]))[0], 'Requester credit account');
       requireCondition(balance(account).availableCredits >= amount, 'Insufficient available credits');
       account.reservedCreditAmount += amount;
       const reservation = new Reservation(requesterId, orderId, randomUUID(), amount);
@@ -74,14 +91,16 @@ export class CreditService {
     });
   }
 
-  async updateReservation(request: { orderId: string; amount: number }): Promise<ReservationView> {
+  async updateReservation(request: { orderId: string; amount: number; expectedVersion: number; idempotencyKey?: string }): Promise<ReservationView> {
     const orderId = identifier(request.orderId, 'orderId');
     const amount = positive(request.amount, 'amount');
-    return this.write(async repo => {
+    const expectedVersion = positive(request.expectedVersion, 'expectedVersion');
+    return this.mutate('UPDATE', retryKey(request.idempotencyKey), { orderId, amount, expectedVersion }, `order:${orderId}`, async repo => {
       const reservation = found(await repo.findReservation(orderId), 'Reservation');
       requireCondition(reservation.reservationStatus === ReservationStatus.RESERVED, 'Only active reservations can be updated');
+      requireCondition(reservation.version === expectedVersion, 'Reservation version changed; reload before updating');
       requireCondition(reservation.version < MAX_CREDITS, 'Reservation version limit reached');
-      const account = found((await repo.findAccounts([reservation.userID]))[0], 'Requester credit account');
+      const account = found((await repo.lockAccounts([reservation.userID]))[0], 'Requester credit account');
       const delta = amount - reservation.creditAmount;
       requireCondition(balance(account).availableCredits >= delta, 'Insufficient available credits');
       account.reservedCreditAmount += delta;
@@ -94,14 +113,14 @@ export class CreditService {
     });
   }
 
-  async releaseReservation(request: { orderId: string }): Promise<ReservationView> {
+  async releaseReservation(request: { orderId: string; idempotencyKey?: string }): Promise<ReservationView> {
     const orderId = identifier(request.orderId, 'orderId');
-    return this.write(async repo => {
+    return this.mutate('RELEASE', retryKey(request.idempotencyKey, orderId), { orderId }, `order:${orderId}`, async repo => {
       const reservation = found(await repo.findReservation(orderId), 'Reservation');
       if (reservation.reservationStatus === ReservationStatus.RELEASED) return reservationView(reservation);
       requireCondition(reservation.reservationStatus === ReservationStatus.RESERVED, 'Settled reservations cannot be released');
       requireCondition(reservation.version < MAX_CREDITS, 'Reservation version limit reached');
-      const account = found((await repo.findAccounts([reservation.userID]))[0], 'Requester credit account');
+      const account = found((await repo.lockAccounts([reservation.userID]))[0], 'Requester credit account');
       account.reservedCreditAmount -= reservation.creditAmount;
       reservation.reservationStatus = ReservationStatus.RELEASED;
       reservation.version++;
@@ -112,10 +131,10 @@ export class CreditService {
     });
   }
 
-  async transferReservation(request: { orderId: string; courierId: string }): Promise<ReservationView> {
+  async transferReservation(request: { orderId: string; courierId: string; idempotencyKey?: string }): Promise<ReservationView> {
     const orderId = identifier(request.orderId, 'orderId');
     const courierId = identifier(request.courierId, 'courierId');
-    return this.write(async repo => {
+    return this.mutate('SETTLE', retryKey(request.idempotencyKey, orderId), { orderId, courierId }, `order:${orderId}`, async repo => {
       const reservation = found(await repo.findReservation(orderId), 'Reservation');
       if (reservation.reservationStatus === ReservationStatus.TRANSFERRED) {
         requireCondition(reservation.courierID === courierId, 'Reservation was settled to another courier');
@@ -124,7 +143,7 @@ export class CreditService {
       requireCondition(reservation.reservationStatus === ReservationStatus.RESERVED, 'Released reservations cannot be settled');
       requireCondition(reservation.userID !== courierId, 'Requester and courier must be different users');
       requireCondition(reservation.version < MAX_CREDITS, 'Reservation version limit reached');
-      const accounts = await repo.findAccounts([reservation.userID, courierId]);
+      const accounts = await repo.lockAccounts([reservation.userID, courierId]);
       const requester = found(accounts.find(a => a.userID === reservation.userID), 'Requester credit account');
       const courier = found(accounts.find(a => a.userID === courierId), 'Courier credit account');
       requireCondition(courier.totalCreditBalance <= MAX_CREDITS - reservation.creditAmount, 'Courier balance limit exceeded');

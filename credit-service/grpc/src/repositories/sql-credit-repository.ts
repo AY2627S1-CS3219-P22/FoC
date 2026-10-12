@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { CreditAccount, CreditHistoryEntry, HistoryType, Reservation, ReservationStatus, type StoredHistoryEntry } from '../domain/models';
+import { CreditAccount, CreditHistoryEntry, HistoryType, IdempotencyRecord, Reservation, ReservationStatus, type StoredHistoryEntry } from '../domain/models';
 import { historyTypeForStorage } from '../domain/views';
 import type { CreditRepository } from './interfaces';
 
@@ -8,6 +8,7 @@ interface ReservationRow { reservationID: string; errandID: string; userID: stri
   status: 'RESERVED' | 'RELEASED' | 'SETTLED'; courierID: string; version: number }
 interface HistoryRow { sequenceId: string; id: string; userID: string; type: string; totalDelta: number;
   reservedDelta: number; errandID: string; reservationID: string; timestamp: Date }
+interface IdempotencyRow { userID: string; key: string; timestamp: Date; operationType: string; result: unknown; requestHash: string }
 
 const accountColumns = 'user_id AS "userID", total_credits AS "totalCreditBalance", reserved_credits AS "reservedCreditAmount"';
 const reservationColumns = `reservation_id AS "reservationID", order_id AS "errandID",
@@ -33,15 +34,19 @@ function historyFromRow(row: HistoryRow): CreditHistoryEntry {
 export class SqlCreditRepository implements CreditRepository {
   constructor(private readonly client: PoolClient) {}
 
+  async lockResource(resource: string): Promise<void> {
+    await this.client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [resource]);
+  }
+
   async findByUserId(userId: string): Promise<CreditAccount | undefined> {
     const result = await this.client.query<AccountRow>(`SELECT ${accountColumns} FROM credit.accounts WHERE user_id = $1`, [userId]);
     return result.rows[0] ? accountFromRow(result.rows[0]) : undefined;
   }
 
-  async findAccounts(userIds: string[]): Promise<CreditAccount[]> {
-    // Load both participants for an atomic transfer.
+  async lockAccounts(userIds: string[]): Promise<CreditAccount[]> {
+    // Every transfer locks participants in the same order to prevent opposing transfers deadlocking.
     const result = await this.client.query<AccountRow>(
-      `SELECT ${accountColumns} FROM credit.accounts WHERE user_id = ANY($1::text[]) ORDER BY user_id`,
+      `SELECT ${accountColumns} FROM credit.accounts WHERE user_id = ANY($1::text[]) ORDER BY user_id FOR UPDATE`,
       [[...new Set(userIds)].sort()],
     );
     return result.rows.map(accountFromRow);
@@ -98,4 +103,17 @@ export class SqlCreditRepository implements CreditRepository {
     return result.rows.map(row => ({ sequenceId: row.sequenceId, entry: historyFromRow(row) }));
   }
 
+  async findIdempotencyRecord(operation: string, key: string): Promise<IdempotencyRecord | undefined> {
+    const result = await this.client.query<IdempotencyRow>(`SELECT user_id AS "userID", key, created_at AS timestamp,
+      operation AS "operationType", request_hash AS "requestHash", result
+      FROM credit.idempotency_records WHERE operation = $1 AND key = $2`, [operation, key]);
+    const row = result.rows[0];
+    return row ? new IdempotencyRecord(row.userID, row.key, row.timestamp, row.operationType, row.result, row.requestHash) : undefined;
+  }
+
+  async saveIdempotencyRecord(record: IdempotencyRecord): Promise<void> {
+    await this.client.query(`INSERT INTO credit.idempotency_records(operation, key, request_hash, result, user_id, created_at)
+      VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
+    [record.operationType, record.key, record.requestHash, JSON.stringify(record.result), record.userID, record.timestamp]);
+  }
 }

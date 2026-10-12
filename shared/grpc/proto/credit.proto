@@ -6,6 +6,10 @@ service CreditService {
   rpc InitCredits(InitCreditsRequest) returns (Balance);
   rpc GetBalance(GetBalanceRequest) returns (Balance);
   rpc GetCreditHistory(GetCreditHistoryRequest) returns (CreditHistory);
+  // Mutations commit balances, history, and retry results atomically.
+  // Retrying an identical key returns the ORIGINAL response, even after later changes.
+  // Without a key, init/reserve/release/settle use their user/order ID as the key.
+  // Conflicting key reuse or invalid transitions fail with FAILED_PRECONDITION.
   rpc ReserveCredits(ReserveCreditsRequest) returns (Reservation);
   rpc UpdateReservation(UpdateReservationRequest) returns (Reservation);
   rpc ReleaseCredits(ReleaseCreditsRequest) returns (Reservation);
@@ -14,6 +18,7 @@ service CreditService {
 
 message InitCreditsRequest {
   string user_id = 1;
+  string idempotency_key = 2;
 }
 
 message GetBalanceRequest {
@@ -32,20 +37,27 @@ message ReserveCreditsRequest {
   string requester_id = 2;
   // Positive whole credits. Insufficient available balance: FAILED_PRECONDITION.
   int32 amount = 3;
+  string idempotency_key = 4;
 }
 
 message UpdateReservationRequest {
   string order_id = 1;
   int32 amount = 2;
+  // Prevents an old update from overwriting a newer reservation amount.
+  uint32 expected_version = 3;
+  // Required: each intentional update needs a new key; retries reuse it.
+  string idempotency_key = 4;
 }
 
 message ReleaseCreditsRequest {
   string order_id = 1;
+  string idempotency_key = 2;
 }
 
 message SettleCreditsRequest {
   string order_id = 1;
   string courier_id = 2;
+  string idempotency_key = 3;
 }
 
 enum ReservationStatus {

@@ -16,6 +16,8 @@ export class CreditDatabase implements CreditUnitOfWork {
     let discard = false;
     try {
       await client.query('BEGIN');
+      await client.query("SET LOCAL lock_timeout = '5s'");
+      await client.query("SET LOCAL statement_timeout = '10s'");
       const result = await action({ credit: new SqlCreditRepository(client) });
       await client.query('COMMIT');
       return result;

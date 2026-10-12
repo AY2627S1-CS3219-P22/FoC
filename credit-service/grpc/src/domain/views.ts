@@ -1,6 +1,6 @@
 import { HistoryType, ReservationStatus, type CreditAccount, type CreditHistoryEntry, type Reservation } from './models';
 
-// Response snapshots retain existing API field names.
+// Response snapshots retain existing API and stored idempotency-result field names.
 export interface Balance {
   userId: string;
   totalCredits: number;

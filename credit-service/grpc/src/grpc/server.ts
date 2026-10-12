@@ -9,10 +9,10 @@ function rpcError(error: unknown): Pick<ServerErrorResponse, 'code' | 'details'>
   if (error instanceof CreditError) return { code: status[error.code], details: error.message };
   const code = (error as { code?: string } | null)?.code;
   if (typeof code === 'string' && ['40001', '40P01', '55P03', '57014'].includes(code)) {
-    return { code: status.ABORTED, details: 'Credit operation was interrupted' };
+    return { code: status.ABORTED, details: 'Credit operation was interrupted; retry with the same idempotency key' };
   }
   if (typeof code === 'string' && (code.startsWith('08') || ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', '57P01', '57P02', '57P03'].includes(code))) {
-    return { code: status.UNAVAILABLE, details: 'Credit database unavailable' };
+    return { code: status.UNAVAILABLE, details: 'Credit database unavailable; retry with the same idempotency key' };
   }
   console.error('Credit operation failed', error instanceof Error ? error.name : 'Unknown error');
   return { code: status.INTERNAL, details: 'Credit operation failed' };

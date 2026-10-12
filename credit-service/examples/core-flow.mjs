@@ -17,7 +17,7 @@ try {
   await client.initCredits({ userId: requesterId }, options);
   await client.initCredits({ userId: courierId }, options);
   const reservation = await client.reserveCredits({ orderId, requesterId, amount: 4 }, options);
-  await client.updateReservation({ orderId, amount: 3 }, options);
+  await client.updateReservation({ orderId, amount: 3, expectedVersion: reservation.version, idempotencyKey: randomUUID() }, options);
   const settled = await client.settleCredits({ orderId, courierId }, options);
   console.log('Reservation:', settled);
   console.log('Requester:', await client.getBalance({ userId: requesterId }, options));

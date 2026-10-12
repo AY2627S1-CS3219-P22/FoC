@@ -58,3 +58,20 @@ contains the business operations, with request replay/locking added next.
 
 Archive/restore and User/Order/frontend integration remain to implement.
 Disputes are deferred until last.
+
+## Idempotency and concurrency
+
+Every mutation saves its successful response with its operation/key and a hash of
+its parameters in the same transaction as accounts, reservation and history.
+Retries replay that response; conflicting parameters under the same key are rejected.
+Initialisation defaults to user ID, and reserve/release/settle default to order ID.
+Updates require an explicit key and the current reservation version.
+
+Transaction-scoped advisory locks serialize retry keys and orders. Account row
+locks prevent overspending; transfers acquire participant locks in stable order.
+A failed transaction leaves no successful retry record. Reservation version checks
+prevent stale updates. Caller retry handling should reuse the original key/parameters.
+
+The Order race-policy component and its integration instructions are in
+`order-service/docs/race-policy.md`. It selects priority among a pending cohort;
+its persistent queue and order lifecycle integration remain with the Order owner.

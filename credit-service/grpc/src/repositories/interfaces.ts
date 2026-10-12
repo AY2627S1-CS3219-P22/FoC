@@ -1,8 +1,8 @@
-import type { CreditAccount, CreditHistoryEntry, Reservation, StoredHistoryEntry } from '../domain/models';
+import type { CreditAccount, CreditHistoryEntry, IdempotencyRecord, Reservation, StoredHistoryEntry } from '../domain/models';
 
 export interface CreditRepository {
   findByUserId(userId: string): Promise<CreditAccount | undefined>;
-  findAccounts(userIds: string[]): Promise<CreditAccount[]>;
+  lockAccounts(userIds: string[]): Promise<CreditAccount[]>;
   saveCreditAccount(account: CreditAccount): Promise<void>;
   createCreditAccount(account: CreditAccount): Promise<void>;
   findReservation(orderId: string): Promise<Reservation | undefined>;
@@ -10,6 +10,9 @@ export interface CreditRepository {
   saveCreditHistoryEntry(entry: CreditHistoryEntry): Promise<void>;
   findCreditHistoryEntry(id: string): Promise<CreditHistoryEntry | undefined>;
   findCreditHistory(userId: string, before: string | undefined, limit: number): Promise<StoredHistoryEntry[]>;
+  lockResource(resource: string): Promise<void>;
+  findIdempotencyRecord(operation: string, key: string): Promise<IdempotencyRecord | undefined>;
+  saveIdempotencyRecord(record: IdempotencyRecord): Promise<void>;
 }
 export interface TransactionRepositories {
   credit: CreditRepository;

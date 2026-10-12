@@ -70,6 +70,17 @@ export class CreditHistoryEntry {
   ) {}
 }
 
+export class IdempotencyRecord {
+  constructor(
+    public readonly userID: string,
+    public readonly key: string,
+    public readonly timestamp: Date,
+    public readonly operationType: string,
+    public readonly result: unknown,
+    public readonly requestHash: string,
+  ) {}
+}
+
 export interface StoredHistoryEntry {
   sequenceId: string;
   entry: CreditHistoryEntry;
