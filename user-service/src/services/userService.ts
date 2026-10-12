@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../../db';
-import type { RegisterInput } from '../dto/registerDto';
-import type { LoginInput } from '../dto/loginDto';
+import { prisma } from '../db';
+import type { RegisterInput } from '../api/dto/registerDto';
+import type { LoginInput } from '../api/dto/loginDto';
 
 const SALT_ROUNDS = 10;
 

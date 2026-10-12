@@ -371,11 +371,11 @@ user-service/
 │   ├── index.ts           # boots REST + gRPC
 │   ├── env.ts             # zod-validated config
 │   ├── db.ts              # Prisma client + DB ping
+│   ├── services/          # business logic shared by REST + gRPC (DB via Prisma)
 │   ├── api/               # HTTP (REST) transport
 │   │   ├── app.ts         #   Express app + /health, mounts routers
 │   │   ├── routes/        #   path → handler wiring
 │   │   ├── controllers/   #   HTTP glue (read request, call service, send response)
-│   │   ├── services/      #   business logic (uniqueness, hashing, DB via Prisma)
 │   │   ├── middleware/    #   cross-cutting (e.g. zod validation)
 │   │   └── dto/           #   zod schemas: API input/output shapes
 │   └── grpc/server.ts     # gRPC transport

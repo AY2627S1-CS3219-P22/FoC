@@ -5,8 +5,8 @@ import { randomUUID } from 'node:crypto';
 import { env, jwtPrivateKey } from '../../env';
 import type { RegisterInput } from '../dto/registerDto';
 import type { LoginInput } from '../dto/loginDto';
-import * as userService from '../services/userService';
-import * as sessionService from '../services/sessionService';
+import * as userService from '../../services/userService';
+import * as sessionService from '../../services/sessionService';
 
 const REFRESH_COOKIE = 'refreshToken';
 

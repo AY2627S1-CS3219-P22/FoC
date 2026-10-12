@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { prisma } from '../../db';
-import { env } from '../../env';
+import { prisma } from '../db';
+import { env } from '../env';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
