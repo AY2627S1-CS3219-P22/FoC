@@ -330,3 +330,28 @@ test('compiled service entrypoint starts, runs the documented demo and shuts dow
   child.kill('SIGTERM');
   assert.equal(await exited, 0);
 });
+
+test('credit gRPC works over verified TLS and rejects plaintext connections', async t => {
+  const fs = require('node:fs/promises');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { execFileSync } = require('node:child_process');
+  const { credentials, ServerCredentials } = require('@grpc/grpc-js');
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'credit-tls-test-'));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const keyFile = path.join(directory, 'key.pem'); const certFile = path.join(directory, 'cert.pem');
+  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', keyFile,
+    '-out', certFile, '-days', '1', '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1'],
+    { stdio: 'ignore', timeout: 10000 });
+  const cert = await fs.readFile(certFile); const key = await fs.readFile(keyFile);
+  const token = 't'.repeat(64);
+  const server = createGrpcServer(service, { serviceTokens: { 'user-service': token }, audit() {} });
+  const port = await rpc.startServer(server, 0, '127.0.0.1', ServerCredentials.createSsl(null, [{ cert_chain: cert, private_key: key }]));
+  const secure = rpc.createCreditClient(`localhost:${port}`, { credentials: credentials.createSsl(cert) });
+  const insecure = rpc.createCreditClient(`127.0.0.1:${port}`, { timeoutMs: 500 });
+  t.after(async () => { secure.close(); insecure.close(); await rpc.stopServer(server, 100); });
+  const metadata = new Metadata(); metadata.set('x-credit-service-token', token);
+  assert.equal((await secure.initCredits({ userId: id() }, { metadata })).totalCredits, 10);
+  await assert.rejects(insecure.initCredits({ userId: id() }, { metadata }),
+    error => error.code === status.UNAVAILABLE || error.code === status.DEADLINE_EXCEEDED);
+});
