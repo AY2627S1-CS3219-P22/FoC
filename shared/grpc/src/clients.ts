@@ -12,6 +12,10 @@ import type { PublicProfile__Output as PublicProfile } from './generated/user/Pu
 import type { GetOrderRequest } from './generated/order/GetOrderRequest';
 import type { Order__Output as Order } from './generated/order/Order';
 import type { GetBalanceRequest } from './generated/credit/GetBalanceRequest';
+import type { InitCreditsRequest } from './generated/credit/InitCreditsRequest';
+import type { UpdateReservationRequest } from './generated/credit/UpdateReservationRequest';
+import type { GetCreditHistoryRequest } from './generated/credit/GetCreditHistoryRequest';
+import type { CreditHistory__Output as CreditHistory } from './generated/credit/CreditHistory';
 import type { Balance__Output as Balance } from './generated/credit/Balance';
 import type { ReserveCreditsRequest } from './generated/credit/ReserveCreditsRequest';
 import type { Reservation__Output as Reservation } from './generated/credit/Reservation';
@@ -109,6 +113,15 @@ export function createCreditClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 3000);
   const client = new CreditService(target, config.credentials ?? credentials.createInsecure());
   return {
+    initCredits(request: InitCreditsRequest, options: RpcOptions = {}): Promise<Balance> {
+      return unary(callback => client.initCredits(request, options.metadata ?? new Metadata(), callOptions(timeoutMs, options), callback));
+    },
+    updateReservation(request: UpdateReservationRequest, options: RpcOptions = {}): Promise<Reservation> {
+      return unary(callback => client.updateReservation(request, options.metadata ?? new Metadata(), callOptions(timeoutMs, options), callback));
+    },
+    getCreditHistory(request: GetCreditHistoryRequest, options: RpcOptions = {}): Promise<CreditHistory> {
+      return unary(callback => client.getCreditHistory(request, options.metadata ?? new Metadata(), callOptions(timeoutMs, options), callback));
+    },
     getBalance(request: GetBalanceRequest, options: RpcOptions = {}): Promise<Balance> {
       return unary((callback) =>
         client.getBalance(

@@ -11,7 +11,6 @@ const userServer = require('../../../user-service/src/grpc/server.ts');
 const userRequire = createRequire(path.resolve(__dirname, '../../../user-service/package.json'));
 const userCredentials = userRequire('@grpc/grpc-js').ServerCredentials;
 const orderServer = require('../../../order-service/grpc/dist/grpc/server.js');
-const creditServer = require('../../../credit-service/grpc/dist/grpc/server.js');
 const supplierServer = require('../../../supplier-service/grpc/dist/grpc/server.js');
 
 async function listen(t, server, createClient, config, serverCredentials) {
@@ -24,7 +23,7 @@ async function listen(t, server, createClient, config, serverCredentials) {
   return client;
 }
 
-test('every scaffold endpoint is reachable and returns UNIMPLEMENTED', async (t) => {
+test('scaffolds and credit transport stubs return UNIMPLEMENTED', async (t) => {
   const user = await listen(
     t,
     userServer.createGrpcServer(),
@@ -33,13 +32,19 @@ test('every scaffold endpoint is reachable and returns UNIMPLEMENTED', async (t)
     userCredentials.createInsecure(),
   );
   const order = await listen(t, orderServer.createGrpcServer(), rpc.createOrderClient);
-  const credit = await listen(t, creditServer.createGrpcServer(), rpc.createCreditClient);
+  const creditStub = rpc.createServer(rpc.CreditService.service, Object.fromEntries(
+    Object.keys(rpc.CreditService.service).map(method => [method, rpc.unimplemented(method)]),
+  ));
+  const credit = await listen(t, creditStub, rpc.createCreditClient);
   const supplier = await listen(t, supplierServer.createGrpcServer(), rpc.createSupplierClient);
 
   for (const invoke of [
     () => user.getPublicProfile({ userId: 'user-1' }),
     () => order.getOrder({ orderId: 'order-1' }),
     () => credit.getBalance({ userId: 'user-1' }),
+    () => credit.initCredits({ userId: 'user-1' }),
+    () => credit.getCreditHistory({ userId: 'user-1' }),
+    () => credit.updateReservation({ orderId: 'order-1', amount: 2, expectedVersion: 1, idempotencyKey: 'edit-1' }),
     () => credit.reserveCredits({ orderId: 'order-1', requesterId: 'user-1', amount: 4 }),
     () => credit.releaseCredits({ orderId: 'order-1' }),
     () => credit.settleCredits({ orderId: 'order-1', courierId: 'user-2' }),

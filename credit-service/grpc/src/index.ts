@@ -1,12 +1,21 @@
 import { startServer, stopServer } from '@foc/grpc';
 import { env } from './env';
 import { createGrpcServer } from './grpc/server';
-import { createClients } from './grpc/clients';
+import { CreditDatabase, createPool } from './database/database';
+import { CreditService } from './services/credit-service';
 
 async function main(): Promise<void> {
-  const server = createGrpcServer();
-  const port = await startServer(server, env.GRPC_PORT, env.GRPC_HOST);
-  const clients = createClients();
+  const pool = createPool(env.DATABASE_URL);
+  let server: ReturnType<typeof createGrpcServer>;
+  let port: number;
+  try {
+    server = createGrpcServer(new CreditService(new CreditDatabase(pool)), env.CREDIT_SERVICE_TOKEN);
+    await pool.query('SELECT 1 FROM credit.schema_migrations LIMIT 1');
+    port = await startServer(server, env.GRPC_PORT, env.GRPC_HOST);
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
   console.log('credit-service gRPC listening on ' + env.GRPC_HOST + ':' + port);
 
   let shuttingDown = false;
@@ -14,7 +23,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     await stopServer(server);
-    clients.close();
+    await pool.end();
   };
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());

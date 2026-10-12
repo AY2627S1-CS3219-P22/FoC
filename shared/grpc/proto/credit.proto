@@ -3,13 +3,17 @@ syntax = "proto3";
 package credit;
 
 service CreditService {
+  rpc InitCredits(InitCreditsRequest) returns (Balance);
   rpc GetBalance(GetBalanceRequest) returns (Balance);
-  // Mutations must be atomic and idempotent by order_id when implemented.
-  // Repeating an identical operation returns the existing reservation;
-  // conflicting amounts/users or invalid transitions fail with FAILED_PRECONDITION.
+  rpc GetCreditHistory(GetCreditHistoryRequest) returns (CreditHistory);
   rpc ReserveCredits(ReserveCreditsRequest) returns (Reservation);
+  rpc UpdateReservation(UpdateReservationRequest) returns (Reservation);
   rpc ReleaseCredits(ReleaseCreditsRequest) returns (Reservation);
   rpc SettleCredits(SettleCreditsRequest) returns (Reservation);
+}
+
+message InitCreditsRequest {
+  string user_id = 1;
 }
 
 message GetBalanceRequest {
@@ -20,6 +24,7 @@ message Balance {
   string user_id = 1;
   int32 available_credits = 2;
   int32 reserved_credits = 3;
+  int32 total_credits = 4;
 }
 
 message ReserveCreditsRequest {
@@ -27,6 +32,11 @@ message ReserveCreditsRequest {
   string requester_id = 2;
   // Positive whole credits. Insufficient available balance: FAILED_PRECONDITION.
   int32 amount = 3;
+}
+
+message UpdateReservationRequest {
+  string order_id = 1;
+  int32 amount = 2;
 }
 
 message ReleaseCreditsRequest {
@@ -52,4 +62,30 @@ message Reservation {
   ReservationStatus status = 4;
   // Empty until settlement.
   string courier_id = 5;
+  string reservation_id = 6;
+  uint32 version = 7;
+}
+
+message GetCreditHistoryRequest {
+  string user_id = 1;
+  // Default 50, maximum 100.
+  uint32 page_size = 2;
+  string page_token = 3;
+}
+
+message CreditHistoryEntry {
+  string id = 1;
+  string user_id = 2;
+  string type = 3;
+  int32 total_delta = 4;
+  int32 reserved_delta = 5;
+  string order_id = 6;
+  string reservation_id = 7;
+  // UTC ISO 8601 timestamp.
+  string created_at = 8;
+}
+
+message CreditHistory {
+  repeated CreditHistoryEntry entries = 1;
+  string next_page_token = 2;
 }
