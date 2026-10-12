@@ -10,6 +10,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "db:migrate": "tsx src/database/migrate.ts",
+    "security:setup": "node scripts/configure-local.mjs",
     "test": "node --test test/unit.test.cjs",
     "test:integration": "node --test test/integration.test.cjs"
   },
@@ -17,11 +18,13 @@
     "@foc/grpc": "0.1.0",
     "@grpc/grpc-js": "^1.14.5",
     "dotenv": "^18.0.3",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.23.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/pg": "^8.23.1",
     "tsx": "^4.20.0",
     "typescript": "^6.0.0"

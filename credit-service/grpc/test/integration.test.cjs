@@ -257,23 +257,48 @@ test('idempotency migration backfills legacy successful snapshots and keeps thei
   assert.equal((await rows('history', userId)).length, 2);
 });
 
-test('real gRPC endpoints enforce the transport guard and return business errors', async t => {
-  const token = 'test-service-token-'.repeat(4);
-  const server = createGrpcServer(service, token);
+test('real gRPC endpoints enforce caller scopes, user ownership, admin roles and business errors', async t => {
+  const { generateKeyPairSync } = require('node:crypto');
+  const jwt = require('jsonwebtoken');
+  const keys = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const tokens = { 'user-service': 'u'.repeat(64), 'order-service': 'o'.repeat(64),
+    'frontend-service': 'f'.repeat(64), 'admin-service': 'a'.repeat(64) };
+  const audit = [];
+  const server = createGrpcServer(service, { serviceTokens: tokens, userPublicKey: keys.publicKey, audit: event => audit.push(event) });
   const port = await rpc.startServer(server, 0, '127.0.0.1');
   const client = rpc.createCreditClient(`127.0.0.1:${port}`);
   t.after(async () => { client.close(); await rpc.stopServer(server, 100); });
-  const metadata = new Metadata(); metadata.set('x-credit-service-token', token);
-  const options = { metadata }; const userId = id(); const courierId = id(); const orderId = id();
+  const options = (caller, subject, roles = ['USER']) => {
+    const metadata = new Metadata(); metadata.set('x-credit-service-token', tokens[caller]);
+    if (subject) metadata.set('authorization', `Bearer ${jwt.sign({ roles }, keys.privateKey,
+      { algorithm: 'RS256', subject, expiresIn: '15m' })}`);
+    return { metadata };
+  };
+  const userOptions = options('user-service'); const orderOptions = options('order-service');
+  const userId = id(); const courierId = id(); const orderId = id(); const ownRead = options('frontend-service', userId);
   await assert.rejects(client.initCredits({ userId }), rejected(status.UNAUTHENTICATED));
-  assert.equal((await client.initCredits({ userId }, options)).totalCredits, 10);
-  await client.initCredits({ userId: courierId }, options);
-  await assert.rejects(client.reserveCredits({ orderId, requesterId: userId, amount: 11 }, options), rejected(status.FAILED_PRECONDITION));
-  const reservation = await client.reserveCredits({ orderId, requesterId: userId, amount: 4 }, options);
-  await client.updateReservation({ orderId, amount: 3, expectedVersion: reservation.version, idempotencyKey: id() }, options);
-  assert.equal((await client.settleCredits({ orderId, courierId }, options)).status, 'SETTLED');
-  assert.equal((await client.getBalance({ userId }, options)).availableCredits, 7);
-  assert.equal((await client.getCreditHistory({ userId }, options)).entries.length, 4);
+  await assert.rejects(client.initCredits({ userId }, orderOptions), rejected(status.PERMISSION_DENIED));
+  assert.equal((await client.initCredits({ userId }, userOptions)).totalCredits, 10);
+  await client.initCredits({ userId: courierId }, userOptions);
+  await assert.rejects(client.reserveCredits({ orderId, requesterId: userId, amount: 4 }, ownRead), rejected(status.PERMISSION_DENIED));
+  assert.equal((await service.displayCredit({ userId })).reservedCredits, 0);
+  await assert.rejects(client.getBalance({ userId: courierId }, ownRead), rejected(status.PERMISSION_DENIED));
+  await assert.rejects(client.getCreditHistory({ userId }, options('frontend-service')), rejected(status.UNAUTHENTICATED));
+  await assert.rejects(client.getBalance({ userId }, options('admin-service', courierId)), rejected(status.PERMISSION_DENIED));
+  assert.equal((await client.getBalance({ userId }, options('admin-service', courierId, ['USER', 'ADMINISTRATOR']))).totalCredits, 10);
+  await assert.rejects(client.getBalance({ userId: id() }, orderOptions), rejected(status.NOT_FOUND));
+  await assert.rejects(client.reserveCredits({ orderId, requesterId: userId, amount: 0 }, orderOptions), rejected(status.INVALID_ARGUMENT));
+  await assert.rejects(client.reserveCredits({ orderId, requesterId: userId, amount: 11 }, orderOptions), rejected(status.FAILED_PRECONDITION));
+  const reservation = await client.reserveCredits({ orderId, requesterId: userId, amount: 4 }, orderOptions);
+  assert.ok(reservation.reservationId); assert.equal(reservation.version, 1);
+  await client.updateReservation({ orderId, amount: 3, expectedVersion: 1, idempotencyKey: id() }, orderOptions);
+  assert.equal((await client.settleCredits({ orderId, courierId }, orderOptions)).status, 'SETTLED');
+  assert.equal((await client.getBalance({ userId }, ownRead)).availableCredits, 7);
+  assert.equal((await client.getCreditHistory({ userId }, ownRead)).entries.length, 4);
+  const releaseOrder = id();
+  await client.reserveCredits({ orderId: releaseOrder, requesterId: userId, amount: 1 }, orderOptions);
+  assert.equal((await client.releaseCredits({ orderId: releaseOrder }, orderOptions)).status, 'RELEASED');
+  assert.ok(audit.some(event => event.decision === 'allowed') && audit.some(event => event.decision === 'denied'));
 });
 
 test('compiled service entrypoint starts, runs the documented demo and shuts down cleanly', async t => {
@@ -287,7 +312,7 @@ test('compiled service entrypoint starts, runs the documented demo and shuts dow
   await new Promise(resolve => probe.close(resolve));
   const environment = { ...process.env, DATABASE_URL: url, GRPC_HOST: '127.0.0.1', GRPC_PORT: String(port),
     CREDIT_GRPC_ADDR: `127.0.0.1:${port}`, NODE_ENV: 'test',
-    CREDIT_SERVICE_TOKEN: 'test-service-token-'.repeat(4) };
+    CREDIT_USER_SERVICE_TOKEN: 'u'.repeat(64), CREDIT_ORDER_SERVICE_TOKEN: 'o'.repeat(64) };
   const child = spawn(process.execPath, [path.resolve(__dirname, '../dist/index.js')], { env: environment });
   let errors = ''; child.stderr.on('data', chunk => { errors += chunk; });
   t.after(() => { if (child.exitCode === null) child.kill('SIGKILL'); });

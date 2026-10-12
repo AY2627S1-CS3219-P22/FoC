@@ -1,12 +1,13 @@
-import { timingSafeEqual } from 'node:crypto';
 import { status, type handleUnaryCall, type ServerErrorResponse } from '@grpc/grpc-js';
 import { CreditService as Contract, createServer, type CreditServiceHandlers } from '@foc/grpc';
 import { CreditError } from '../domain/errors';
 import type { CreditService } from '../services/credit-service';
 import { CreditController } from '../controllers/credit-controller';
+import { CreditAccessError, CreditAuthorizer, type CreditRpc, type CreditSecurityConfig } from '../security/credit-authorizer';
 
 function rpcError(error: unknown): Pick<ServerErrorResponse, 'code' | 'details'> {
   if (error instanceof CreditError) return { code: status[error.code], details: error.message };
+  if (error instanceof CreditAccessError) return { code: error.code, details: error.message };
   const code = (error as { code?: string } | null)?.code;
   if (typeof code === 'string' && ['40001', '40P01', '55P03', '57014'].includes(code)) {
     return { code: status.ABORTED, details: 'Credit operation was interrupted; retry with the same idempotency key' };
@@ -18,30 +19,25 @@ function rpcError(error: unknown): Pick<ServerErrorResponse, 'code' | 'details'>
   return { code: status.INTERNAL, details: 'Credit operation failed' };
 }
 
-function unary<Request, Response>(action: (request: Request) => Promise<Response>, token: string): handleUnaryCall<Request, Response> {
+function unary<Request, Response>(rpc: CreditRpc, action: (request: Request) => Promise<Response>, authorizer: CreditAuthorizer): handleUnaryCall<Request, Response> {
   return (call, callback) => {
-    const values = call.metadata.get('x-credit-service-token');
-    const actual = values.length === 1 && typeof values[0] === 'string' ? Buffer.from(values[0]) : Buffer.alloc(0);
-    const expected = Buffer.from(token);
-    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
-      callback({ code: status.UNAUTHENTICATED, details: 'Valid service credentials required' });
-      return;
-    }
+    try { authorizer.authorize(rpc, call.metadata, call.request); }
+    catch (error) { callback(rpcError(error)); return; }
     void action(call.request).then(result => callback(null, result), error => callback(rpcError(error)));
   };
 }
 
-export function createGrpcServer(service: CreditService, token: string) {
+export function createGrpcServer(service: CreditService, security: CreditSecurityConfig = { serviceTokens: {} }) {
   const controller = new CreditController(service);
-  if (!token || token.length < 32) throw new Error('Credit service token must be at least 32 characters');
+  const authorizer = new CreditAuthorizer(security);
   const handlers: CreditServiceHandlers = {
-    InitCredits: unary(request => controller.initCredits(request), token),
-    GetBalance: unary(request => controller.getCreditBalance(request), token),
-    GetCreditHistory: unary(request => controller.getCreditHistory(request), token),
-    ReserveCredits: unary(request => controller.reserveCredits(request), token),
-    UpdateReservation: unary(request => controller.updateCredits(request), token),
-    ReleaseCredits: unary(request => controller.releaseCredits(request), token),
-    SettleCredits: unary(request => controller.transferCredits(request), token),
+    InitCredits: unary('InitCredits', request => controller.initCredits(request), authorizer),
+    GetBalance: unary('GetBalance', request => controller.getCreditBalance(request), authorizer),
+    GetCreditHistory: unary('GetCreditHistory', request => controller.getCreditHistory(request), authorizer),
+    ReserveCredits: unary('ReserveCredits', request => controller.reserveCredits(request), authorizer),
+    UpdateReservation: unary('UpdateReservation', request => controller.updateCredits(request), authorizer),
+    ReleaseCredits: unary('ReleaseCredits', request => controller.releaseCredits(request), authorizer),
+    SettleCredits: unary('SettleCredits', request => controller.transferCredits(request), authorizer),
   };
   return createServer(Contract.service, handlers);
 }
