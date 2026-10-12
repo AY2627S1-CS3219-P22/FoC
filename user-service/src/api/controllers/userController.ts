@@ -85,6 +85,16 @@ export const refresh: RequestHandler = async (req, res) => {
   res.status(200).json({ token: signAccessToken(result.userId, result.roles) });
 };
 
+// POST /users/logout
+// Idempotent: always 204, even with no cookie or an already-revoked session.
+export const logout: RequestHandler = async (req, res) => {
+  const token = req.cookies?.[REFRESH_COOKIE];
+  if (token) await sessionService.revokeSession(token);
+
+  clearRefreshCookie(res);
+  res.status(204).end();
+};
+
 // GET /users/me
 export const getMe: RequestHandler = async (req, res) => {
   const user = await userService.getProfileById(req.user!.id);

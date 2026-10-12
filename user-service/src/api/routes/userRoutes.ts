@@ -17,6 +17,9 @@ userRouter.post('/login', validate(loginSchema), userController.login);
 // POST /users/refresh
 userRouter.post('/refresh', userController.refresh);
 
+// POST /users/logout
+userRouter.post('/logout', userController.logout);
+
 // GET /users/me
 userRouter.get('/me', authenticate, userController.getMe);
 
