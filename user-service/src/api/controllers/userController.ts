@@ -20,14 +20,20 @@ function signAccessToken(userId: string, roles: Roles[]) {
 }
 
 // httpOnly: JS can't read it (XSS-safe). path: only sent to /users/* routes.
+const refreshCookieOptions = {
+  httpOnly: true,
+  secure: env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  path: '/users',
+} as const;
+
 function setRefreshCookie(res: Response, token: string, expiresAt: Date) {
-  res.cookie(REFRESH_COOKIE, token, {
-    httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/users',
-    expires: expiresAt,
-  });
+  res.cookie(REFRESH_COOKIE, token, { ...refreshCookieOptions, expires: expiresAt });
+}
+
+// Must use the same options (esp. path) as when set.
+function clearRefreshCookie(res: Response) {
+  res.clearCookie(REFRESH_COOKIE, refreshCookieOptions);
 }
 
 // POST /users/register
@@ -61,6 +67,21 @@ export const login: RequestHandler = async (req, res) => {
   const session = await sessionService.createSession(result.userId);
   setRefreshCookie(res, session.token, session.expiresAt);
 
+  res.status(200).json({ token: signAccessToken(result.userId, result.roles) });
+};
+
+// POST /users/refresh
+export const refresh: RequestHandler = async (req, res) => {
+  const token = req.cookies?.[REFRESH_COOKIE];
+  const result = token ? await sessionService.rotateSession(token) : { ok: false as const };
+
+  if (!result.ok) {
+    clearRefreshCookie(res);
+    res.status(401).json({ error: 'Unauthorized', message: 'Session expired. Please log in again.' });
+    return;
+  }
+
+  setRefreshCookie(res, result.token, result.expiresAt);
   res.status(200).json({ token: signAccessToken(result.userId, result.roles) });
 };
 
