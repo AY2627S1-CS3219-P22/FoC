@@ -18,7 +18,55 @@ creation endpoint.
   UNIMPLEMENTED; it does not start with REST. The provisional shared protobuf
   statuses will be aligned when the business RPC/lifecycle is implemented.
 
-## Local setup
+## Docker setup (database and REST service)
+
+Requires Docker Desktop and User Service's existing public key at
+`user-service/keys/public.pem`. If the key pair does not exist, generate it once
+using User Service's `npm run keys:generate`; do not regenerate an existing pair.
+User Service need not be running. Only its public key is mounted, read-only;
+neither signing keys nor .env files are included in the image.
+
+From the repository root:
+
+```sh
+docker compose -f order-service/compose.yaml up --build -d --wait
+curl -i http://localhost:3002/health
+docker compose -f order-service/compose.yaml ps
+```
+
+Expected: both containers healthy and `/health` returns 200 with
+`{"status":"ok","db":"up"}`. Docker builds the Linux Prisma client, waits for
+PostgreSQL readiness, applies committed migrations, then starts the REST server
+as a non-root user. There is no need for a host Node install or Order .env file
+for this path when the public key already exists. The Prisma CLI is intentionally
+retained in the runtime image to run migrations at startup.
+
+The stack uses its own network/database volume. REST is exposed on 3002 and the
+database on 5433, both on localhost. Stop a host-run Order server or the earlier
+`foc-order-db` container before using those same ports. Alternatively:
+
+```sh
+ORDER_HTTP_PORT=3003 ORDER_DATABASE_PORT=5434 \
+  docker compose -f order-service/compose.yaml up --build -d --wait
+```
+
+Then check `/health` on port 3003. To use another public-key file, set
+`ORDER_PUBLIC_KEY_PATH` to its absolute path. These three settings may also be
+set in `order-service/.env`; Compose always supplies the container's DATABASE_URL
+with host `postgres`, not the host-development URL.
+
+Logs and shutdown:
+
+```sh
+docker compose -f order-service/compose.yaml logs order-service
+docker compose -f order-service/compose.yaml down
+```
+
+Shutdown retains data. `down -v` deletes this stack's database volume, so use it
+only when deliberately resetting its data. Source changes require rebuilding
+the image. The independent gRPC scaffold is not started by this REST stack.
+
+## Local setup (host REST service)
 
 Requires Node.js 20+ and an Order-owned PostgreSQL database. Install dependencies
 from the repository root:
@@ -153,5 +201,5 @@ TEST_DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:5433/order_
 Tests exercise RSA signature/claim validation, scope/ownership authorization,
 database-clock availability, bigint/date serialization, database constraints,
 unique intents, health success/failure and persistence across new clients/API
-instances. Docker deployment, real credit operations and frontend integration
-remain in the later approved phases.
+instances. Real credit operations, combined multi-service end-to-end deployment,
+and frontend integration remain in the later approved phases.

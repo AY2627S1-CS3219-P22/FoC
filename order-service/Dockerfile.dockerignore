@@ -1,0 +1,29 @@
+# This Dockerfile uses the repo root context. Send only its build inputs.
+**
+!package.json
+!package-lock.json
+!shared/
+!shared/grpc/
+!shared/grpc/package.json
+!credit-service/
+!credit-service/grpc/
+!credit-service/grpc/package.json
+!supplier-service/
+!supplier-service/grpc/
+!supplier-service/grpc/package.json
+!order-service/
+!order-service/package.json
+!order-service/tsconfig.json
+!order-service/grpc/
+!order-service/grpc/package.json
+!order-service/prisma/
+!order-service/prisma/**
+!order-service/scripts/
+!order-service/scripts/**
+!order-service/src/
+!order-service/src/**
+# Generate Linux Prisma artifacts in the image, never copy macOS artifacts.
+order-service/src/generated/**
+**/*.pem
+**/*.key
+**/.env*

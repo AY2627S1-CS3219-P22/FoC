@@ -23,3 +23,7 @@
 - Tests use node:test and ephemeral HTTP listeners. Database integration tests
   require TEST_DATABASE_URL naming a dedicated order_service_test database; do
   not migrate, truncate, or reset any existing service/production database.
+- Docker uses the root workspace build context and a Dockerfile-specific ignore
+  file. Generate Prisma inside Linux; do not copy host-generated engines or keys.
+  The per-service Compose stack mounts only User's public key, applies committed
+  migrations after PostgreSQL is healthy, and runs REST as the node user.
