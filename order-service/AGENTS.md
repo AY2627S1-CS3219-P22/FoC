@@ -17,9 +17,16 @@
 - Keep public DTO mapping explicit: supplier bigints become decimal strings and
   timestamps become ISO UTC strings. Never expose internal recovery payloads.
 - /health must probe PostgreSQL. Open-order availability uses database time.
-- Phase 1 is read-only REST; do not expose writes or claim actual credit activity
-  before the later credit integrations exist. grpc/ is the existing independent
-  scaffold and remains UNIMPLEMENTED in Phase 1.
+- Phase 2 core commands are implemented through injected dependency interfaces.
+  Acceptance/pickup work independently; creation/delivery/cancellation require
+  adapters and return 503 with no side effects when they are missing. Never wire
+  test fakes into production or claim credit success without a matching receipt.
+  Expiry/retry batches are callable internally but not scheduled at startup.
+  grpc/ remains an independent UNIMPLEMENTED scaffold until integration.
+- New domain validation lives in domain/orderRules.ts; database operations stay
+  in API services. Mutations lock rows and sample database time after locking.
+  Network calls run outside database transactions. Terminal status and a stable
+  settlement/refund intent are committed together; uncertain outcomes stay pending.
 - Tests use node:test and ephemeral HTTP listeners. Database integration tests
   require TEST_DATABASE_URL naming a dedicated order_service_test database; do
   not migrate, truncate, or reset any existing service/production database.

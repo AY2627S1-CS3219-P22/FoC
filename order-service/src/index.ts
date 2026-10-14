@@ -3,16 +3,26 @@ import { createDatabase, pingDatabase } from './db';
 import { createAuthProvider } from './auth/createAuthProvider';
 import { createApp } from './api/app';
 import { createOrderService } from './api/services/orderService';
+import { createOrderCommands } from './api/services/orderCommands';
 
 async function main(): Promise<void> {
   const env = readEnvironment();
   const authProvider = createAuthProvider(env);
   const db = createDatabase();
-  const app = createApp({ authProvider, orders: createOrderService(db), pingDatabase: () => pingDatabase(db) });
-  const server = app.listen(env.PORT, () => console.log(`Order REST listening on port ${env.PORT}`));
+  const app = createApp({
+    authProvider,
+    orders: createOrderService(db),
+    commands: createOrderCommands(db),
+    pingDatabase: () => pingDatabase(db),
+  });
+  const server = app.listen(env.PORT, () =>
+    console.log(`Order REST listening on port ${env.PORT}`),
+  );
   server.on('error', (error) => {
     console.error('Order REST failed to start:', error);
-    void db.$disconnect().finally(() => { process.exitCode = 1; });
+    void db.$disconnect().finally(() => {
+      process.exitCode = 1;
+    });
   });
   let shuttingDown = false;
   const shutdown = () => {

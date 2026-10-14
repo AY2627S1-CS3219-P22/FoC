@@ -21,8 +21,10 @@ before(async () => {
     orders: {
       async listOrders(user, scope) {
         calls++;
-        if (scope === 'all' && !user.roles.includes('ADMINISTRATOR')) return { ok: false, reason: 'forbidden' };
-        if (scope !== 'all' && !user.roles.includes('USER')) return { ok: false, reason: 'forbidden' };
+        if (scope === 'all' && !user.roles.includes('ADMINISTRATOR'))
+          return { ok: false, reason: 'forbidden' };
+        if (scope !== 'all' && !user.roles.includes('USER'))
+          return { ok: false, reason: 'forbidden' };
         return { ok: true, value: [] };
       },
       async getOrder(user) {
@@ -38,7 +40,9 @@ before(async () => {
 
 after(async () => {
   server.closeAllConnections();
-  await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  await new Promise<void>((resolve, reject) =>
+    server.close((error) => (error ? reject(error) : resolve())),
+  );
 });
 
 async function get(path: string, token = signToken(keys.privateKey)) {
@@ -58,7 +62,11 @@ test('health reports database success and failure without authentication', async
 
 test('missing/malformed/expired auth is rejected before calling services', async () => {
   const previous = calls;
-  const cases: Record<string, string>[] = [{}, { Authorization: 'Basic token' }, { Authorization: 'Bearer bad token' }];
+  const cases: Record<string, string>[] = [
+    {},
+    { Authorization: 'Basic token' },
+    { Authorization: 'Bearer bad token' },
+  ];
   for (const headers of cases) {
     assert.equal((await fetch(baseUrl + '/orders', { headers })).status, 401);
   }
@@ -70,7 +78,11 @@ test('missing/malformed/expired auth is rejected before calling services', async
 
 function jwtExpired() {
   // Expiration validation itself is covered in auth.test; keep HTTP wiring real.
-  return jwt.sign({ roles: ['USER'] }, keys.privateKey, { algorithm: 'RS256', subject: 'user', expiresIn: -1 });
+  return jwt.sign({ roles: ['USER'] }, keys.privateKey, {
+    algorithm: 'RS256',
+    subject: 'user',
+    expiresIn: -1,
+  });
 }
 
 test('list scopes validate input and distinguish student/admin authorization', async () => {
@@ -81,8 +93,15 @@ test('list scopes validate input and distinguish student/admin authorization', a
   }
   assert.equal((await get('/orders')).status, 200);
   assert.equal((await get('/orders?scope=all')).status, 403);
-  assert.equal((await get('/orders?scope=all', signToken(keys.privateKey, 'admin', ['ADMINISTRATOR']))).status, 200);
-  assert.equal((await get('/orders?scope=open', signToken(keys.privateKey, 'admin', ['ADMINISTRATOR']))).status, 403);
+  assert.equal(
+    (await get('/orders?scope=all', signToken(keys.privateKey, 'admin', ['ADMINISTRATOR']))).status,
+    200,
+  );
+  assert.equal(
+    (await get('/orders?scope=open', signToken(keys.privateKey, 'admin', ['ADMINISTRATOR'])))
+      .status,
+    403,
+  );
   const previous = calls;
   assert.equal((await get('/orders?scope=other')).status, 400);
   assert.equal((await get('/orders?scope=open&scope=all')).status, 400);
@@ -97,9 +116,28 @@ test('detail validates UUID and maps missing/forbidden outcomes', async () => {
   assert.equal((await get(`/orders/${id}`, signToken(keys.privateKey, 'stranger'))).status, 403);
 });
 
-test('creation and lifecycle endpoints are unavailable in Phase 1', async () => {
-  for (const path of ['/orders', `/orders/${id}/accept`, `/orders/${id}/deliver`, `/orders/${id}/cancel`]) {
-    const response = await fetch(baseUrl + path, { method: 'POST', headers: { Authorization: `Bearer ${signToken(keys.privateKey)}` } });
-    assert.equal(response.status, 404);
+test('write routes never report success without an injected command service', async () => {
+  for (const path of [`/orders/${id}/accept`, `/orders/${id}/deliver`, `/orders/${id}/cancel`]) {
+    const response = await fetch(baseUrl + path, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${signToken(keys.privateKey)}` },
+    });
+    assert.equal(response.status, 503);
   }
+  const response = await fetch(baseUrl + '/orders', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${signToken(keys.privateKey)}`,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': 'api-test',
+    },
+    body: JSON.stringify({
+      supplierId: '1',
+      destination: 'PGP',
+      requestDetails: 'Test',
+      credits: 4,
+      expiryTime: '2099-01-01T00:00:00Z',
+    }),
+  });
+  assert.equal(response.status, 503);
 });

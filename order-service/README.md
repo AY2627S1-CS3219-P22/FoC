@@ -1,16 +1,23 @@
 # Order Service - Friend on Campus
 
-Phase 1 implements PostgreSQL persistence, provider-independent authentication,
-local RS256 JWT verification, protected order reads, and a DB-aware health check.
-There is no order creation, lifecycle mutation, automatic expiry worker, or
-credit execution yet. New installations therefore list zero orders. Integration
-tests create their own records; there is no production seed or unreserved-order
-creation endpoint.
+Phase 2 implements core creation, acceptance, pickup, delivery, cancellation,
+expiry and credit-retry orchestration on top of Phase 1 persistence/authentication.
+External services are represented by injected interfaces, not real RPC adapters.
+
+**Testing versus production:** integration tests inject test-only User/Supplier/
+Credit implementations and exercise the full workflow against real PostgreSQL.
+Normal `npm run dev`, `npm start`, and Docker startup do not inject those fakes.
+Creation, delivery and cancellation therefore return **503** until real adapters
+are integrated. Acceptance/pickup work for existing reserved orders. Fresh
+databases contain no orders; no endpoint bypasses credit reservation to seed them.
+Expiry/retry batch methods exist but no production scheduler runs them yet.
 
 ## Structure
 
 - `src/api/`: Express routes, controllers, DTOs and services.
 - `src/auth/`: AuthProvider interface, factory and LocalJwtAuthProvider.
+- `src/domain/`: transport-independent lifecycle and authorization rules.
+- `src/dependencies/`: UserDirectory, SupplierDirectory and CreditGateway contracts.
 - `src/db.ts`, `src/env.ts`: database and validated configuration.
 - `prisma/`: Order-owned schema and committed migrations.
 - `tests/`: auth/HTTP tests and real PostgreSQL integration tests.
@@ -143,12 +150,13 @@ destination, requestDetails, credits, expiryTime, status, cancellationReason,
 creditState, createdAt/updatedAt and lifecycle timestamps. Internal creation
 payloads, request fingerprints, idempotency keys and retry errors are not exposed.
 
-Invalid scopes/UUIDs return 400; absent orders return 404. Other routes/methods
-are not implemented. Unexpected errors return generic JSON 500 responses.
+Invalid scopes/UUIDs return 400; absent orders return 404. Unexpected errors return
+generic JSON 500 responses.
 
 Open availability uses database `statement_timestamp()`, with expiry at
 `expiryTime <= database time`. Participant/admin reads retain overdue records;
-Phase 1 does not mutate them into Cancelled. Display dates in Asia/Singapore in
+The expiry batch cancels them when called with a configured Credit gateway;
+normal startup does not yet schedule that batch. Display dates in Asia/Singapore in
 the future frontend adapter; the browser must send offset-bearing ISO instants.
 
 ## Persistence and later credit phases
@@ -157,25 +165,156 @@ the future frontend adapter; the browser must send offset-bearing ISO instants.
 requester/idempotency-key pair. `Order` references that intent using the same
 UUID. `CreditOperation` references the intent so reservation/refund recovery
 records can exist even before an Order is published. Unique order/operation-type
-pairs prevent duplicate intents. Phase 1 contains these tables, not their
-execution/recovery logic.
+pairs prevent duplicate intents. Phase 2 commands use these tables transactionally.
 
 User/Supplier IDs are external references without cross-service foreign keys.
 Order reads use stored public-name and pickup snapshots, so reads never call
-User/Supplier. Phase 2 will populate those snapshots from real services.
+User/Supplier. Creation resolves snapshots through injected interfaces; real
+adapters are deferred. Acceptance leaves optional courierName null until profile
+enrichment is integrated.
 
 Constraints enforce positive credits/supplier IDs, nonblank required text,
 requester/courier separation, assignment, expiry-after-creation, lifecycle
 timestamps, cancellation reasons and status-compatible credit states. Some
 constraints are SQL-only; retain them in future migrations.
 
-`RESERVED` is a stored credit-state value, not a real credit reservation by this
-Phase 1 app. Phase 3 must confirm reservation before publishing an Order.
-The PDF's eventual lifecycle is Unassigned -> Assigned -> Picked-up -> Delivered.
+Creation requires a confirmed reservation receipt matching order ID, requester
+and amount before publishing Unassigned. A stored RESERVED field alone is not
+proof of credit activity. Production has no real Credit adapter yet.
+The PDF lifecycle is Unassigned -> Assigned -> Picked-up -> Delivered.
 Requester cancellation is allowed only while Unassigned. Expiry cancels all
 nonterminal orders, including after pickup, and refunds the requester. A courier
 may therefore hold the item but receive no reward after expiry; item return,
 reimbursement and disputes are unspecified. Delivered/Cancelled are terminal.
+
+## Write APIs and dependency boundaries
+
+All writes require USER; admin-only tokens do not bypass ownership or transitions.
+The acting identity always comes from JWT, not the request body.
+
+| Route | Rule | Normal startup today |
+| --- | --- | --- |
+| `POST /orders` | Create after confirmed reservation; requires Idempotency-Key | 503, no side effects |
+| `POST /orders/:id/accept` | Non-requester; Unassigned and unexpired | Implemented |
+| `POST /orders/:id/pickup` | Assigned courier; Assigned and unexpired | Implemented |
+| `POST /orders/:id/deliver` | Assigned courier; Picked-up and unexpired; settle credits | 503, no side effects |
+| `POST /orders/:id/cancel` | Requester; Unassigned and unexpired; refund | 503, no side effects |
+
+Creation body (all other fields are rejected):
+
+```json
+{
+  "supplierId": "1",
+  "destination": "PGP",
+  "requestDetails": "Pick up one latte",
+  "credits": 4,
+  "expiryTime": "2099-01-01T08:00:00+08:00"
+}
+```
+
+Dates require an explicit offset and are normalized to UTC. Credits are positive
+int32 integers. Supplier IDs are positive decimal strings within PostgreSQL's
+signed bigint range. Lifecycle requests accept no body fields. There is no
+general edit/delete API and no requester confirmation step.
+
+With configured dependencies, new creation returns 201 `{order}`; a repeated
+identical request/key returns 200 with the same order. Changed input with the
+same requester/key returns 409. An uncertain reservation returns 202
+`{creationId,state:"PENDING"}` without a published order. Retry the same body and
+key to resume; do not generate a new key because a timeout may have reserved funds.
+
+Acceptance/pickup return 200 `{order}`. Delivery/cancellation return 200 only
+when the credit receipt is confirmed; otherwise 202 `{order}` with
+SETTLEMENT_PENDING/REFUND_PENDING. Retrying the same terminal action preserves
+the terminal status and reuses its operation ID. Invalid transitions, expired
+orders and dependency rejections return 409; ownership failures 403; missing
+records 404; validation failures 400; unavailable integration 503.
+
+`createOrderCommands(db, dependencies)` exposes `createOrder`, `transition`,
+`expireOrders`, and `retryPendingCredits`. Do not expose the batch methods as
+public student endpoints. Expiry uses a bounded SKIP LOCKED batch; retry methods
+lease pending settlement/refund work for 30 seconds and reclaim expired leases.
+Creation reservation recovery currently uses same-key request replay. These are
+internal methods, not a running worker. Real scheduler cadence, RPC deadlines,
+retry backoff and operational monitoring belong to the later integration phase.
+
+The CreditGateway must enforce atomic/idempotent mutations using stable order
+and operation IDs. Rejected means definitive rejection, while thrown errors or
+timeouts mean unknown. Confirmed-but-unpersisted creation remains resumable;
+expiry before publication records a compensating refund. Permanent credit
+rejections retain a pending financial state and a failed operation for later
+operator investigation; they are never presented as successful payment.
+
+## Test the core functions (without other services)
+
+This is the primary way to test successful creation/lifecycle in this phase.
+Requires Node.js 20+, Docker Desktop, and available port 55435. From repo root:
+
+```sh
+npm ci
+npm run build --workspace @foc/order-service
+npm run test:order
+npm run test:typecheck --workspace @foc/order-service
+
+docker run --detach --name foc-order-core-tests \
+  --publish 127.0.0.1:55435:5432 \
+  --env POSTGRES_USER=order_service \
+  --env POSTGRES_PASSWORD=order_service \
+  --env POSTGRES_DB=order_service_test postgres:16
+
+docker exec foc-order-core-tests pg_isready -U order_service -d order_service_test
+```
+
+Wait until pg_isready reports accepting connections, then:
+
+```sh
+TEST_DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:55435/order_service_test \
+  npm run test:order:integration
+```
+
+Expected: **16 auth/HTTP/domain tests and 21 database integration tests pass**. The
+integration runner applies committed migrations and executes both read and core
+command suites sequentially. It creates test users/supplier snapshots and a
+test-only idempotent credit ledger inside the test process. No real User,
+Supplier or Credit server, JWT key file, or .env file is required for these tests.
+Fixtures are cleaned up; do not expect test orders to remain for manual browsing.
+
+Coverage includes successful creation and HTTP 201, same-key/conflicting/concurrent
+requests, rejected/uncertain/mismatched reservation responses, failed publication,
+compensation on expiry, acceptance races, ownership, pickup, terminal immutability,
+pending settlement/refund replay, picked-up expiry, concurrent expiry/retry batches,
+and the existing Phase 1 persistence/authentication behavior.
+
+Remove only this temporary test container and its temporary data when finished:
+
+```sh
+docker rm --force --volumes foc-order-core-tests
+```
+
+If that container already exists, start it with `docker start foc-order-core-tests`
+instead of repeating docker run. TEST_DATABASE_URL must name order_service_test
+or order_service_test_<suffix>; tests never fall back to the normal DATABASE_URL.
+
+## Manual Docker checks
+
+Start the Docker stack as described above (use port 3003 below if using alternate
+ports). Obtain a student token by logging into User Service, then in the same shell:
+
+```sh
+TOKEN='your-real-token'
+curl -i http://localhost:3003/health
+curl -i http://localhost:3003/orders -H "Authorization: Bearer $TOKEN"
+curl -i http://localhost:3003/orders \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: manual-order-1' \
+  -d '{"supplierId":"1","destination":"PGP","requestDetails":"One latte","credits":4,"expiryTime":"2099-01-01T00:00:00Z"}'
+```
+
+Expected: health 200, list 200 (empty on a new database), creation **503** because
+the real dependencies are not integrated. A missing key/invalid body returns 400;
+no bearer token returns 401. This is expected and is tested; do not enable a
+fake credit gateway in Docker to turn it into a misleading creation success.
 
 ## Verification
 
@@ -201,5 +340,6 @@ TEST_DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:5433/order_
 Tests exercise RSA signature/claim validation, scope/ownership authorization,
 database-clock availability, bigint/date serialization, database constraints,
 unique intents, health success/failure and persistence across new clients/API
-instances. Real credit operations, combined multi-service end-to-end deployment,
+instances, plus the Phase 2 command suites described above. Real credit operations,
+combined multi-service end-to-end deployment,
 and frontend integration remain in the later approved phases.
