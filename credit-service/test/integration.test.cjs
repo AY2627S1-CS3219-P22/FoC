@@ -241,7 +241,7 @@ test('idempotency migration backfills legacy successful snapshots and keeps thei
     await client.query('ALTER TABLE credit.idempotency_records DROP COLUMN user_id');
     await client.query('INSERT INTO credit.idempotency_records(operation, key, request_hash, result) VALUES ($1, $2, $3, $4::jsonb)',
       ['INIT', key, requestHash, JSON.stringify(snapshot)]);
-    await client.query(await readFile(path.resolve(__dirname, '../../db/migrations/002_idempotency_user.sql'), 'utf8'));
+    await client.query(await readFile(path.resolve(__dirname, '../db/migrations/002_idempotency_user.sql'), 'utf8'));
     const record = (await client.query('SELECT user_id, result FROM credit.idempotency_records WHERE key = $1', [key])).rows[0];
     assert.equal(record.user_id, userId);
     assert.deepEqual(record.result, snapshot);
@@ -323,7 +323,7 @@ test('compiled service entrypoint starts, runs the documented demo and shuts dow
     child.stdout.on('data', chunk => { if (chunk.toString().includes('credit-service gRPC listening')) { clearTimeout(timer); resolve(); } });
   });
   const { stdout } = await promisify(execFile)(process.execPath,
-    [path.resolve(__dirname, '../../examples/core-flow.mjs')], { env: environment, timeout: 10000 });
+    [path.resolve(__dirname, '../examples/core-flow.mjs')], { env: environment, timeout: 10000 });
   assert.match(stdout, /totalCredits: 7/);
   assert.match(stdout, /totalCredits: 13/);
   const exited = new Promise(resolve => child.once('exit', resolve));

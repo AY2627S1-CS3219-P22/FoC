@@ -33,16 +33,18 @@ npm run dev --workspace @foc/credit-grpc
 npm run dev --workspace @foc/supplier-grpc
 ```
 
-These are independent gRPC processes under each service's `grpc/` directory.
+These are independent gRPC processes. Credit Service runs from `credit-service/`;
+Order and Supplier still run from their `grpc/` directories.
 Order/supplier scaffolds do not connect to databases or run REST implementations.
 Credit connects to its PostgreSQL database.
 Start User Service separately using its existing README; its existing gRPC
 server and contract are reused without modifications. The opt-in caller example
 is at `user-service/examples/grpc-clients.ts` and is not wired into its startup.
 
-Each scaffold has a `grpc/.env.example`. Copy it to `grpc/.env` and adjust peer
-addresses when needed. Workspace commands run with that directory as the working
-directory, so dotenv reads the correct file. `GRPC_PORT` controls the listener;
+Credit uses `credit-service/.env.example` and `credit-service/.env`. Order and
+Supplier use their respective `grpc/.env.example` and `grpc/.env` files. Adjust peer
+addresses when needed. Workspace commands run in each package directory, so dotenv
+reads the matching file. `GRPC_PORT` controls the listener;
 `*_GRPC_ADDR` controls outbound calls. `GRPC_TIMEOUT_MS` defaults to 3000.
 
 User Service's existing Docker Compose listens on **50051**, while its host-dev

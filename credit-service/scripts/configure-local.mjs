@@ -21,4 +21,4 @@ for (const key of ['CREDIT_USER_SERVICE_TOKEN', 'CREDIT_ORDER_SERVICE_TOKEN']) {
 }
 await writeFile(target, text, { mode: 0o600 });
 await chmod(target, 0o600);
-console.log('Local credit credentials configured in grpc/.env. Existing settings and credentials were preserved.');
+console.log('Local credit credentials configured in credit-service/.env. Existing settings and credentials were preserved.');

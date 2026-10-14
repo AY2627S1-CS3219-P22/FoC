@@ -4,7 +4,7 @@ import { createCreditClient } from '@foc/grpc';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
 
-dotenv.config({ path: fileURLToPath(new URL('../grpc/.env', import.meta.url)), quiet: true });
+dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)), quiet: true });
 if (!process.env.CREDIT_USER_SERVICE_TOKEN || !process.env.CREDIT_ORDER_SERVICE_TOKEN) {
   throw new Error('Run npm run security:setup --workspace @foc/credit-grpc before the local demo');
 }

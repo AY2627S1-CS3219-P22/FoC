@@ -108,7 +108,7 @@ test('startup requires scoped credentials and TLS for production or remote liste
     for (const key of ['CREDIT_ORDER_SERVICE_TOKEN', 'CREDIT_FRONTEND_SERVICE_TOKEN', 'CREDIT_ADMIN_SERVICE_TOKEN',
       'CREDIT_TLS_CERT_PATH', 'CREDIT_TLS_KEY_PATH']) if (!(key in overrides)) delete environment[key];
     return spawnSync(process.execPath, ['-e', `require(${JSON.stringify(path.resolve(__dirname, '../dist/env.js'))})`],
-      { env: environment, encoding: 'utf8', timeout: 5000 });
+      { env: environment, cwd: __dirname, encoding: 'utf8', timeout: 5000 });
   }
   assert.equal(start({}).status, 0);
   const noSecrets = start({ CREDIT_USER_SERVICE_TOKEN: undefined });

@@ -11,6 +11,9 @@ classes and remaining features. The implemented flow is gRPC → `CreditControll
 the diagram's names; adapters retain existing API/database names such as `orderId`
 and `SETTLED`. The reference documents these mappings and the features still pending.
 
+The runnable package lives in `credit-service/`, with implementation in `src/`.
+The `src/grpc/` folder contains its gRPC transport and peer-client wiring.
+
 [FR/NFR requirements and integration responsibilities](docs/requirements.md) map
 the team's specifications to implemented features, remaining work, and policy decisions.
 
@@ -22,7 +25,7 @@ Use Node.js 22 and start Docker Desktop. From the **repository root**:
 npm ci
 npm run build
 docker compose -f credit-service/compose.yaml up -d --wait db
-cp credit-service/grpc/.env.example credit-service/grpc/.env
+cp credit-service/.env.example credit-service/.env
 npm run security:setup --workspace @foc/credit-grpc
 npm run db:migrate --workspace @foc/credit-grpc
 npm run dev --workspace @foc/credit-grpc
@@ -44,7 +47,7 @@ node credit-service/examples/core-flow.mjs
 This creates two demo accounts, reserves 4 credits, updates the reservation to 3,
 and transfers those 3 to the courier. Final total balances are 7 and 13.
 Each run uses new identifiers. The local demo reads scoped credentials from
-`grpc/.env`; history access is tested separately with a User Service JWT.
+`credit-service/.env`; history access is tested separately with a User Service JWT.
 
 Stop the development database without deleting its data:
 

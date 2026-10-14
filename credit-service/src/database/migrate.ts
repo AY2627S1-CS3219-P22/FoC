@@ -6,7 +6,7 @@ import type { Pool } from 'pg';
 import { createPool } from './database';
 
 export async function migrate(pool: Pool): Promise<void> {
-  const directory = path.resolve(__dirname, '../../../db/migrations');
+  const directory = path.resolve(__dirname, '../../db/migrations');
   const files = (await readdir(directory)).filter(file => file.endsWith('.sql')).sort();
   const client = await pool.connect();
   try {
