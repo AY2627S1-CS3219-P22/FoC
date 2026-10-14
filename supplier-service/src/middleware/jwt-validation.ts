@@ -5,6 +5,8 @@ import fs from 'node:fs';
 
 const PUBLIC_KEY = fs.readFileSync(process.env.USER_SERVICE_PUBLIC_KEY_PATH!, 'utf8');
 
+//user-service JWT claim; keep the name ADMIN so routes read requireRole(ADMIN)
+export const ADMIN = 'ADMINISTRATOR';
 
 declare global {
   namespace Express {
@@ -30,10 +32,13 @@ export function authenticate(req:Request, res:Response, next:NextFunction) {
   }
 }
 
-/*
-export const requireRole = (...allowed: string[]) => (req:Request, res:Response, next: NextFunction) =>
-  req.user?.roles?.some((r: string) => allowed.includes(r))
+//must run after authenticate; 401 if there is no req.user, 403 if none of the roles match
+export const requireRole = (...allowed: string[]) => (req:Request, res:Response, next: NextFunction) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  return req.user.roles.some((r) => allowed.includes(r))
     ? next()
     : res.status(403).json({ error: 'Forbidden' });
-*/
+};
 
