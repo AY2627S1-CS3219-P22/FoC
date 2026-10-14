@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { env, jwtPrivateKey } from '../../env';
 import type { RegisterInput } from '../dto/registerDto';
 import type { LoginInput } from '../dto/loginDto';
+import type { UpdateProfileInput } from '../dto/updateProfileDto';
 import * as userService from '../../services/userService';
 import * as sessionService from '../../services/sessionService';
 
@@ -103,6 +104,22 @@ export const getMe: RequestHandler = async (req, res) => {
     return;
   }
   res.status(200).json({ user });
+};
+
+// PATCH /users/me
+export const updateMe: RequestHandler = async (req, res) => {
+  const result = await userService.updateProfile(req.user!.id, req.body as UpdateProfileInput);
+
+  if (!result.ok) {
+    if (result.reason === 'not_found') {
+      res.status(404).json({ error: 'Not Found', message: 'User no longer exists.' });
+    } else {
+      res.status(409).json({ error: 'Conflict', message: 'This username is already in use.' });
+    }
+    return;
+  }
+
+  res.status(200).json({ user: result.user });
 };
 
 // GET /users

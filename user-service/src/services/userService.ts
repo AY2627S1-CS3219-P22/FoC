@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import type { RegisterInput } from '../api/dto/registerDto';
 import type { LoginInput } from '../api/dto/loginDto';
+import type { UpdateProfileInput } from '../api/dto/updateProfileDto';
 
 const SALT_ROUNDS = 10;
 
@@ -87,6 +88,27 @@ export async function getPublicProfile(id: string) {
     where: { id, isDeleted: false },
     select: publicProfileSelect,
   });
+}
+
+export async function updateProfile(id: string, input: UpdateProfileInput) {
+  if (input.username) {
+    const taken = await prisma.user.findFirst({
+      where: { username: input.username, NOT: { id } },
+      select: { id: true },
+    });
+    if (taken) return { ok: false as const, reason: 'username_taken' as const };
+  }
+
+  try {
+    const user = await prisma.user.update({ where: { id }, data: input, select: profileSelect });
+    return { ok: true as const, user };
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === 'P2002') return { ok: false as const, reason: 'username_taken' as const };
+      if (err.code === 'P2025') return { ok: false as const, reason: 'not_found' as const };
+    }
+    throw err;
+  }
 }
 
 export async function listProfiles() {

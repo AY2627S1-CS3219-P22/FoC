@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/authenticate';
 import { requireRole } from '../middleware/requireRole';
 import { registerSchema } from '../dto/registerDto';
 import { loginSchema } from '../dto/loginDto';
+import { updateProfileSchema } from '../dto/updateProfileDto';
 import * as userController from '../controllers/userController';
 
 export const userRouter = Router();
@@ -22,6 +23,9 @@ userRouter.post('/logout', userController.logout);
 
 // GET /users/me
 userRouter.get('/me', authenticate, userController.getMe);
+
+// PATCH /users/me
+userRouter.patch('/me', authenticate, validate(updateProfileSchema), userController.updateMe);
 
 // GET /users
 userRouter.get('/', authenticate, requireRole('ADMINISTRATOR'), userController.listUsers);

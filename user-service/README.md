@@ -134,6 +134,7 @@ not allowed). Roles: `USER` (default) and `ADMINISTRATOR`.
 | POST   | `/users/refresh`   | refresh cookie        | Rotate refresh cookie → new access token        |
 | POST   | `/users/logout`    | refresh cookie        | End this browser's session (F2.2) → `204`       |
 | GET    | `/users/me`        | any authenticated     | Own profile (F2.3)                              |
+| PATCH  | `/users/me`        | any authenticated     | Update own first/last name, username (F2.4)     |
 | GET    | `/users`           | `ADMINISTRATOR`       | List all users                                  |
 | GET    | `/users/:id`       | `ADMINISTRATOR`       | View a specific user                            |
 
