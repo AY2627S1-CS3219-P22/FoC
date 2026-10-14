@@ -1,23 +1,24 @@
 # Local setup quickstart
 
-Requires Docker Desktop. Nothing else needs to be installed: the database and the
-service both run in containers. 
+Requires Docker Desktop. Nothing else needs to be installed: the database, the
+Express app, and the gRPC server all run in containers.
 
-PLEASE NOTE: This is only for local setup. Check that you do not have the production .env file!!!!
+This stack is local only. `compose.yaml` does **not** load `.env`. It hardcodes
+`DATABASE_URL` to the compose `db` service. Do not point a production `.env` at
+this folder while you work here.
 
 ```bash
 cd supplier-service
 docker compose up -d --build
 ```
 
-This starts two containers:
-
+This starts three containers:
 
 | Service | What it is                              | Where                   |
 | ------- | --------------------------------------- | ----------------------- |
 | `db`    | Supabase Postgres 17, seeded at default | `127.0.0.1:54332`       |
-| `app`   | Express supplier service default at     | `http://localhost:3001` |
-
+| `app`   | Express supplier service                | `http://localhost:3001` |
+| `grpc`  | supplier gRPC (`IsOpen` for order)      | `localhost:50054`       |
 
 On its **first** start the `db` container applies everything in
 `supabase/migrations/` in timestamp order and then loads
@@ -42,10 +43,12 @@ docker compose down -v
 docker compose up -d --build
 ```
 
-After changing anything in `src/`, rebuild the app image:
+After changing anything in `src/`, rebuild the app image. After changing
+`grpc/` or `shared/grpc`, rebuild the gRPC image:
 
 ```bash
 docker compose up -d --build app
+docker compose up -d --build grpc
 ```
 
 
@@ -103,8 +106,16 @@ Tech Stack = Express.js, Node, Supabase, Drizzle, JWT(in-progress)
 
 ## Database Connection
 
-`src/database/db.ts` builds a single `pg` pool from `DATABASE_URL`. For the
-production database, set that variable; for local work the default above applies.
+`src/database/db.ts` builds a single `pg` pool from `DATABASE_URL`. Compose sets
+that to `postgresql://postgres:postgres@db:5432/postgres` (container DNS). A
+process on the host that talks to the same database must use port **54332**:
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres
+```
+
+Do not use a production pooler URL for local compose, `yarn test`, or host
+`npm run dev`.
 
 TODO: Set up docker secrets for seamless deployment across different devices
 
@@ -151,6 +162,7 @@ process.stdout.write(token);
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /suppliers`                            | `curl localhost:3001/suppliers`                                                                                                                                                                 |
 | `GET /suppliers/search?q=coffee`            | `curl "localhost:3001/suppliers/search?q=coffee"`                                                                                                                                               |
+| `GET /suppliers/search-radius`              | `curl "localhost:3001/suppliers/search-radius?latitude=1.294167&longitude=103.773611&radius=500"`                                                                                                |
 | `GET /suppliers/category?type=printing`     | `curl "localhost:3001/suppliers/category?type=printing"`                                                                                                                                        |
 | `GET /supplier/:id`                         | `curl localhost:3001/supplier/1`                                                                                                                                                                |
 | `POST /supplier`                            | see the multi-line sample below; the body needs all seven days of `openingHours`                                                                                                                |
@@ -159,7 +171,95 @@ process.stdout.write(token);
 | `PUT /supplier/:id/openingHours/:dayOfWeek` | `curl -X PUT localhost:3001/supplier/1/openingHours/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"opensAt":"08:30:00","closesAt":"18:00:00","isClosed":false}'` |
 
 
+## gRPC sample commands
 
+co-written with grok and edited by @sunpterodactyl
+
+`docker compose up` starts gRPC on port `50054` against the compose database.
+The client one-liners below still run from the **repo root**, because they import
+`@foc/grpc`.
+
+```bash
+cd /path/to/FoC
+npm install
+npm run build --workspace @foc/grpc
+```
+
+If you run the server on the host instead of the compose `grpc` service, point
+it at the published Postgres port (not a production URL):
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres \
+  npm run dev --workspace @foc/supplier-grpc
+```
+
+That prints `supplier-service gRPC listening on 0.0.0.0:50054`. Client samples,
+from the repo root:
+
+```bash
+# IsOpen: seed supplier 1, hours in Asia/Singapore. Prints { isOpen: true|false }
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try {
+  console.log(await supplier.isOpen({ supplierId: '1' }));
+} finally {
+  supplier.close();
+}
+"
+```
+
+`supplierId` is a `uint64`, so it is a **string** on the wire (`'1'`, not `1`).
+
+```bash
+# GetSupplier is still a stub: expect gRPC UNIMPLEMENTED, not a supplier payload
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try {
+  await supplier.getSupplier({ supplierId: '1' });
+} catch (e) {
+  console.log(e.code, e.details);
+} finally {
+  supplier.close();
+}
+"
+```
+
+Failure cases for `IsOpen`:
+
+```bash
+# INVALID_ARGUMENT: supplier_id must be a positive integer
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try { await supplier.isOpen({ supplierId: '0' }); }
+catch (e) { console.log(e.code, e.details); }
+finally { supplier.close(); }
+"
+
+# NOT_FOUND: supplier 3 is soft-deleted in the seed
+node --input-type=module -e "
+import { createSupplierClient } from '@foc/grpc';
+const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+try { await supplier.isOpen({ supplierId: '3' }); }
+catch (e) { console.log(e.code, e.details); }
+finally { supplier.close(); }
+"
+```
+
+The shared transport tests (client wrapper only, no database) are:
+
+```bash
+npm test --workspace @foc/grpc
+```
+
+Order-service already has a peer client at `SUPPLIER_GRPC_ADDR` (default
+`localhost:50054`). After this process is up:
+
+```ts
+const { isOpen } = await clients.supplier.isOpen({ supplierId: String(id) });
+```
 
 ## Creating a supplier
 

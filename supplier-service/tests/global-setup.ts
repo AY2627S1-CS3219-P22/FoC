@@ -29,6 +29,8 @@ const INIT_SCRIPTS: Array<[source: string, target: string]> = [
   ['supabase/migrations/20261004172304_create_supplier_opening_hours.sql', 'z06_opening_hours.sql'],
   //the seed's opening hours reference Supplier_Database, so it has to run after both tables exist
   ['supabase/schemas/seed.sql', 'z07_seed.sql'],
+  //generated location column backfills existing seed rows
+  ['supabase/migrations/20261006102848_location_search.sql', 'z08_location_search.sql'],
 ];
 
 let container: StartedPostgreSqlContainer | undefined;
