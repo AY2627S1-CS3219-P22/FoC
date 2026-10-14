@@ -12,13 +12,15 @@ type TokenOptions = {
   id?: string;
   //seconds; negative values produce an already-expired token
   expiresIn?: number;
+  roles?: string[];
 };
 
 export function signTestToken({
   id = 'test-user',
   expiresIn = 300,
+  roles = ['ADMINISTRATOR'],
 }: TokenOptions = {}): string {
-  return jwt.sign({}, process.env.TEST_JWT_PRIVATE_KEY as string, {
+  return jwt.sign({ roles }, process.env.TEST_JWT_PRIVATE_KEY as string, {
     algorithm: 'RS256',
     subject: id,
     expiresIn,
@@ -26,6 +28,7 @@ export function signTestToken({
 }
 
 export const adminBearer = () => `Bearer ${signTestToken()}`;
+export const userBearer = () => `Bearer ${signTestToken({ roles: ['USER'] })}`;
 
 /*
 Correctly formed and signed, but by a key this service has no reason to trust.

@@ -6,7 +6,8 @@ import {getSupplierByIdService,
     getAllSuppliersService, 
     createSupplierService, 
     searchSuppliersService, 
-    filterSuppliersByCategoryService}  from '@/database/supplier-repository';
+    filterSuppliersByCategoryService,
+    updateSupplierHoursByIdService}  from '@/database/supplier-repository';
 import { SUPPLIER_CATEGORY, updateRequestSchema } from '@/data/schema';
 
 const handleResponse = (res: Response, status: number, data: any, message: string) => {
@@ -92,6 +93,27 @@ export const filterSuppliersByCategory = async(req:Request, res:Response, next:N
      next(err);
     }
 } 
+
+export const updateSupplierHours = async(req:Request, res:Response, next:NextFunction) => {
+
+    //day_of_week is 0 = Sunday in the database, so the labels start there too
+    const DAY_OF_WEEK = ["Sunday","Monday","Tuesday","Wednesday","Thursday", "Friday","Saturday"]
+
+
+    try {
+        const dayOfWeek = Number(req.params.dayOfWeek)
+        const dayOfWeekString = DAY_OF_WEEK[dayOfWeek]; //the number value 0-6
+    
+        const updatedHours = await updateSupplierHoursByIdService
+                                    (Number(req.params.id), 
+                                    {...req.body, 
+                                        dayOfWeek,});
+        handleResponse(res, 200, updatedHours, `Supplier ${req.params.id} hours successfully updated for ${dayOfWeekString}`)
+    }
+    catch(err) {
+        next(err);
+    }
+}
 
 // Idempotency: later, middleware on POST /supplier and PUT /supplier/:id
 // reads Idempotency-Key and replays the first response for the same key.

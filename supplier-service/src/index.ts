@@ -1,10 +1,10 @@
 //This is where the express server lives
 //To export app for local testing app.ts was created
 
-import dotenv from 'dotenv';
+//imports are evaluated before the module body, so .env must load from an import
+//rather than a dotenv.config() call below: app pulls in modules that read env at import time
+import 'dotenv/config';
 import { app } from '@/app';
-
-dotenv.config();
 
 const port = process.env.PORT || 3001; //local .env configuration
 

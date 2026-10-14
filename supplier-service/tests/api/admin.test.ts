@@ -21,8 +21,8 @@ Admin user tests
 - Test: Supplier creation | Expected 201
 
 The admin account is a token signed with the throwaway key pair from
-tests/setup-env.ts, standing in for one the user service would issue. A valid
-signature is enough: this service does not check roles.
+tests/setup-env.ts, standing in for one the user service would issue. Write
+routes require authenticate then requireRole(ADMINISTRATOR).
 */
 
 import request from 'supertest';
@@ -30,7 +30,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { app } from '@/app';
 import pool from '@database/db';
 import { resetDatabase } from '../helpers/reset-database';
-import { adminBearer } from '../helpers/auth-token';
+import { adminBearer, userBearer } from '../helpers/auth-token';
 
 const validSupplier = {
   name: '[Admin Test] Bubble Tea Counter',
@@ -40,6 +40,13 @@ const validSupplier = {
   floor: 1,
   latitude: '1.304400',
   longitude: '103.772600',
+  //createSupplierSchema mandates a full week, so authorization tests still need one
+  openingHours: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+    dayOfWeek,
+    opensAt: '09:00:00',
+    closesAt: '17:00:00',
+    isClosed: false,
+  })),
 };
 
 beforeAll(async () => {
@@ -175,6 +182,17 @@ The writes are the whole reason this service cares who the caller is. These stay
 as todos until authenticate is on the routes and reads JWT_PUBLIC_KEY from the
 environment rather than the request body.
 */
+describe('write routes reject a signed-in user who is not an administrator', () => {
+  it('POST with a USER token is 403', async () => {
+    const res = await request(app)
+      .post('/supplier')
+      .set('Authorization', userBearer())
+      .send(validSupplier);
+
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('write routes reject callers who cannot prove they are an admin', () => {
   it.todo('POST with no token is 401');
   it.todo('PUT with no token is 401');
