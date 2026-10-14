@@ -270,6 +270,30 @@ curl -i -X POST localhost:3002/supplier -H "Authorization: Bearer $TOKEN"   # 40
 > types should move into a shared `@foc/auth` workspace package (single source of
 > truth, no drift). For now, copy the snippet above.
 
+### Fetching a user's public profile (gRPC)
+
+To show a user's name (e.g. on an errand), call `GetPublicProfile` instead of
+reading our database (F2.6). It returns **public fields only** — never email,
+roles or auth data.
+
+- **Address:** `localhost:50052` (plaintext for now — internal traffic only)
+- **Contract:** [`proto/user.proto`](./proto/user.proto) — copy it into your service
+- **RPC:** `user.UserService/GetPublicProfile`
+  - Request: `{ user_id }`
+  - Response: `{ user_id, username, first_name, last_name }`
+  - Errors: `INVALID_ARGUMENT` (empty `user_id`), `NOT_FOUND` (unknown or
+    deleted user), `INTERNAL` (unexpected failure)
+
+No JWT is needed — this is service-to-service, not called by end users.
+
+Try it with [`grpcurl`](https://github.com/fullstorydev/grpcurl) (`brew install grpcurl`):
+
+```bash
+grpcurl -plaintext -import-path proto -proto user.proto \
+  -d '{"user_id":"<user id>"}' \
+  localhost:50052 user.UserService/GetPublicProfile
+```
+
 ---
 
 ## Troubleshooting

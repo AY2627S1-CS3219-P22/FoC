@@ -97,7 +97,7 @@ export const logout: RequestHandler = async (req, res) => {
 
 // GET /users/me
 export const getMe: RequestHandler = async (req, res) => {
-  const user = await userService.getProfileById(req.user!.id);
+  const user = await userService.getProfile(req.user!.id);
   if (!user) {
     res.status(404).json({ error: 'Not Found', message: 'User no longer exists.' });
     return;
@@ -114,7 +114,7 @@ export const listUsers: RequestHandler = async (_req, res) => {
 // GET /users/:id
 export const getUserById: RequestHandler = async (req, res) => {
   const id = String(req.params.id);
-  const user = await userService.getProfileById(id);
+  const user = await userService.getProfile(id);
   if (!user) {
     res.status(404).json({ error: 'Not Found', message: 'User not found.' });
     return;

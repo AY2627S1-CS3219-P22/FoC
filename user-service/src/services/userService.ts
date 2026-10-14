@@ -6,7 +6,8 @@ import type { LoginInput } from '../api/dto/loginDto';
 
 const SALT_ROUNDS = 10;
 
-const publicUserSelect = {
+// Profile: everything except secrets — for the user themselves or an admin.
+const profileSelect = {
   id: true,
   username: true,
   firstName: true,
@@ -14,6 +15,14 @@ const publicUserSelect = {
   email: true,
   roles: true,
   createdAt: true,
+} satisfies Prisma.UserSelect;
+
+// Public profile: what anyone may see — for other services.
+const publicProfileSelect = {
+  id: true,
+  username: true,
+  firstName: true,
+  lastName: true,
 } satisfies Prisma.UserSelect;
 
 export async function register(input: RegisterInput) {
@@ -37,7 +46,7 @@ export async function register(input: RegisterInput) {
         email: input.email,
         passwordHash,
       },
-      select: publicUserSelect,
+      select: profileSelect,
     });
     return { ok: true as const, user };
   } catch (err) {
@@ -67,10 +76,19 @@ export async function login(input: LoginInput) {
   return { ok: true as const, userId: user.id, roles: user.roles };
 }
 
-export async function getProfileById(id: string) {
-  return prisma.user.findUnique({ where: { id }, select: publicUserSelect });
+export async function getProfile(id: string) {
+  return prisma.user.findUnique({ 
+    where: { id }, 
+    select: profileSelect });
+}
+
+export async function getPublicProfile(id: string) {
+  return prisma.user.findUnique({
+    where: { id, isDeleted: false },
+    select: publicProfileSelect,
+  });
 }
 
 export async function listProfiles() {
-  return prisma.user.findMany({ select: publicUserSelect });
+  return prisma.user.findMany({ select: profileSelect });
 }
