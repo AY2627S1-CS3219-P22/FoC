@@ -9,7 +9,7 @@ system-level compliance, performance, deployment, or security targets.
 
 | Requirement | Current implementation | Remaining work / owner |
 | --- | --- | --- |
-| F8.1, F8.1.2: non-negative balances | Account constraints, available-balance checks, account locks, and atomic mutations protect core operations | Apply these invariants to archive/restore and disputes too |
+| F8.1, F8.1.2: non-negative balances | Account constraints, available-balance checks, account locks, and atomic mutations protect core operations | Apply these invariants to archive/restore too |
 | F8.1.1: 10 initial credits on registration | `InitCredits` grants 10 once per user ID | User Service must call it after successful registration, with reliable retries |
 | F8.2.1–F8.2.2: balance breakdown and transfer history | Balance/history RPCs exist | Authenticated backend adapter and frontend display |
 | F8.2.3: reservation history | Creation, update, release, and transfer record signed amounts/deltas, timestamps, and errand references | Add audit entries for remaining operations |
@@ -21,19 +21,16 @@ system-level compliance, performance, deployment, or security targets.
 | F8.7.1: archive only without active errands | Not implemented | User/Order services check deletion eligibility; Credit also checks outstanding holds before archive |
 | F8.7.2, F2.7.3–F2.7.4: archive email/credits and restore matching email within 4 years | Not implemented | Archive persistence, retention/cleanup, verified email matching and restore operation; coordinate with User Service |
 | F8.8.1–F8.8.2: transfers/releases at most once and atomic | Core operations implemented and tested | Confirmed: prevent duplicate effects; replay the original response or report already processed |
-| F8.9.1–F8.9.2: admin dispute adjustment using an existing hold, or reserving/transferring when no hold exists | Not implemented | Credit adjustment flow and audit records; Admin verifies resolved dispute and authorisation (F12.4) |
 
 Archived-user work under F8.7 and F2.7.3–F2.7.4 is deferred at the user's request
 until User Service implements its deletion/archive lifecycle. This includes archive
 storage, credit archive/restore, archive retention/encryption and their integration.
 The confirmed restore rule remains: restore the archived balance without a new
-10-credit grant. Disputes remain deferred until last.
+10-credit grant.
 
-User deletion eligibility includes active/uncompleted errands, open requests, and
-unresolved disputes involving the user as either requester or courier, even if the
-other participant raised the dispute (F2.7.5). A zero reserved balance alone is
-insufficient to establish deletion eligibility. Credit Service does not currently
-know these Order/Admin states.
+User deletion eligibility includes active/uncompleted errands and open requests
+(F2.7.5). A zero reserved balance alone is insufficient to establish deletion
+eligibility. Credit Service does not currently know these Order states.
 
 ## Integration hand-offs
 
@@ -41,7 +38,9 @@ know these Order/Admin states.
 
 Use the shared credit client and actual registered user ID. Connect initialisation
 to registration, and implement recoverable pending work/retries when a downstream
-call fails. Archive/restore integration is deferred until User Service's lifecycle
+call fails. `InitCredits` accepts only `userId`; Credit Service uses that ID as its
+internal retry key and replays the original successful response on retries.
+Archive/restore integration is deferred until User Service's lifecycle
 is ready and the corresponding credit contracts are implemented.
 Use the deletion checks above and the four-year restore rule. Do not claim archive
 support from the current `InitCredits` endpoint.
@@ -53,8 +52,12 @@ available. Atomically coordinate order state transitions and track pending credi
 operations so an uncertain response can be retried/reconciled. A simple
 `GetBalance` precheck cannot replace Credit's atomic check/reserve.
 
-Call `UpdateReservation` with the current version and a new key for each intentional
-edit. Retry that edit with the same key and parameters. Do not call
+Call `UpdateReservation` with the last returned credit reservation version; it is
+separate from the order's own version. Credit Service derives the update identity
+from the order ID and expected version. Retry an uncertain edit with the same amount
+and expected version. Persist the returned version for the next edit; never advance
+it solely because a response timed out. No credit RPC accepts a caller retry key.
+Do not call
 `ReleaseCredits` followed by `ReserveCredits` to edit a reward: those are separate
 transactions, release makes the reservation terminal, and the same errand cannot
 be reserved again through the create operation.
@@ -86,14 +89,14 @@ Coordinate the reservation notice required by F9.2.4 with the Notification owner
 
 | Requirement | Current evidence / remaining work |
 | --- | --- |
-| N3.2: automatic retries without duplicate processing | Credit handles successful retry replay; automatic transient-failure retry handling is not implemented in the shared client. Add bounded retries with the same key/parameters and durable recovery where required |
+| N3.2: automatic retries without duplicate processing | Credit derives stable operation identities and replays successful responses; automatic transient-failure retry handling is not implemented in the shared client. Add bounded retries with the original request/expected version and durable recovery where required |
 | N3.3: no successfully created errand without confirmed reservation | Requires Order Service integration and failure/timeout tests |
 | N4.1–N4.3: at-most-once processing, no lost updates, atomic credit transactions | Implemented and tested for core credit operations; extend to new operations and integrated service flows |
 | N1.1–N1.1.1: 95% of relevant REST requests/pages within 2 seconds at up to 5,000 users | No load/latency evidence yet; measure the complete backend/UI path. The shared default 3-second gRPC timeout does not establish this target |
 | N9.1–N9.1.1: scaling and 5,000 concurrent credit transactions | Not verified; load test, size database connection capacity, and configure application/deployment scaling |
 | N6.1–N6.2: automated CI, at least 70% unit-test coverage, integration checks | Correctness tests exist and last passed; coverage has not been measured and passing test counts do not prove 70% coverage. Add CI/coverage/integration gates |
 | N8.1: parameterised database queries | Implemented for user-supplied values in core repository operations |
-| N8.2–N8.3.1: PII encryption, access restrictions/audit, admin permission checks, default denial | Scoped backend credentials, User Service RS256 JWT ownership checks, admin-role checks for cross-user reads, access-decision logging and mandatory production/non-loopback TLS implemented and tested. Protected log collection, database-at-rest protection and future archive-email encryption remain; dispute/admin mutations are deferred |
+| N8.2–N8.3.1: PII encryption, access restrictions/audit, admin permission checks, default denial | Scoped backend credentials, User Service RS256 JWT ownership checks, admin-role checks for cross-user reads, access-decision logging and mandatory production/non-loopback TLS implemented and tested. Protected log collection, database-at-rest protection and future archive-email encryption remain |
 | N2.1–N2.2.2, N3.1: availability, parallel version routing, zero-downtime deployment and rollback within 30 minutes | Deployment and verification remain; local database Compose does not satisfy these requirements |
 | N7.1–N7.3: stated data handling and four-year inactivity retention | Requires a coordinated retention design across services, distinct from archive-age-based restoration rules |
 | N5.1–N5.2: responsive UI and browser support | Frontend owner must test credit screens with the rest of the application |
@@ -118,9 +121,6 @@ Coordinate the reservation notice required by F9.2.4 with the Notification owner
   again when restoring a returning user's identity. Current initialisation protects
   against repeat grants for one user ID; archive/email identity integration must
   preserve that rule across a returning user's new account ID.
-- **Disputes:** deferred until last at the user's request. Later define adjustment amount/destination, how to handle insufficient
-  available balance without violating F8.1.2, and how an already transferred/released
-  errand receives a distinct audited adjustment without repeating its original transfer.
 - **Four-year boundaries:** define restore eligibility at the exact boundary and
   distinguish archive retention from N7.3's inactivity-based removal rule.
 - **Archive storage:** F2.7.3 explicitly specifies a separate archive database.

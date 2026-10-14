@@ -14,6 +14,11 @@ the other services retain their scaffolds. Existing REST implementations are sep
 Credit setup, database migrations, retry rules, and integration tests are documented
 in [Credit Service](../../credit-service/README.md). The order contract remains a proposal.
 
+Credit mutations derive retry identities internally; callers do not supply an
+idempotency key. For reward updates, persist the returned reservation `version` and
+send it as `expectedVersion`. Retry an uncertain update with its original version
+and amount; a subsequent edit uses the next confirmed reservation version.
+
 ## Run locally
 
 From the repository root, with Node.js 20+:

@@ -22,7 +22,7 @@ try {
   await client.initCredits({ userId: requesterId }, userOptions);
   await client.initCredits({ userId: courierId }, userOptions);
   const reservation = await client.reserveCredits({ orderId, requesterId, amount: 4 }, orderOptions);
-  await client.updateReservation({ orderId, amount: 3, expectedVersion: reservation.version, idempotencyKey: randomUUID() }, orderOptions);
+  await client.updateReservation({ orderId, amount: 3, expectedVersion: reservation.version }, orderOptions);
   const settled = await client.settleCredits({ orderId, courierId }, orderOptions);
   console.log('Reservation:', settled);
   console.log('Requester:', await client.getBalance({ userId: requesterId }, orderOptions));

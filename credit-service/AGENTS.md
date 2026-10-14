@@ -12,8 +12,10 @@ existing gRPC names/response fields, and document any required diagram deviation
 
 All credit RPCs require caller-scoped credentials, including local development.
 Preserve user ownership/admin JWT checks and default-deny access. Returning-account
-restoration replaces starter credits; it must not grant another 10 credits. Dispute
-implementation is deferred until last. See the requirements reference for confirmed policies.
+restoration replaces starter credits; it must not grant another 10 credits.
+Dispute management is outside the agreed scope. Retry identities are derived by
+Credit Service from the user/order ID and, for updates, the expected reservation version.
+See the requirements reference for confirmed policies.
 Archived-user work (archive storage, archive/restore operations, retention and
 their User Service integration) is deferred at the user's request until User Service
 implements its account-deletion/archive lifecycle. Keep the confirmed restore rule

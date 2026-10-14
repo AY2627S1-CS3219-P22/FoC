@@ -66,7 +66,7 @@ JavaScript clients use camelCase fields via `createCreditClient` from `@foc/grpc
 | `GetBalance` | Caller supplies a user ID it is authorised to read | Returns total, reserved, and available credits (`total - reserved`). |
 | `GetCreditHistory` | Same read authorisation | Returns newest-first history, default 50 entries, maximum 100, with a user-bound continuation token. |
 | `ReserveCredits` | Order Service supplies a unique order ID, requester ID, and amount | Holds available credits; one reservation per order. |
-| `UpdateReservation` | Order Service supplies the last reservation version and a new retry key | Changes an active reservation's amount, subject to available balance. |
+| `UpdateReservation` | Order Service supplies the last reservation version | Changes an active reservation's amount, subject to available balance; that order/version identifies retries. |
 | `ReleaseCredits` | Order Service confirms cancellation | Removes the hold without changing total credits. |
 | `SettleCredits` | Order Service confirms completion and the courier ID | Atomically debits requester total/reserved credits and credits the courier total. |
 
@@ -90,25 +90,38 @@ by order; account rows are locked in a consistent order during transfers.
 
 Retry rules:
 
-- Reuse the same `idempotencyKey` for retries of the same request. Keys are scoped
-  by operation; use globally unique keys across callers within each operation.
-- `InitCredits` defaults to the user ID; reserve/release/settle default to the order ID.
-- Updates require an explicit key and `expectedVersion`. Each intentional update
-  needs a new key. A stale version is rejected.
-- A successfully committed key returns its **original response** on retry, even
-  after later changes. Use `GetBalance`/`GetCreditHistory` for current state.
-- Reusing a committed key with different parameters is rejected. Failed transactions
-  leave no successful retry record. Records have no automatic expiry in this phase.
-- Timeout/disconnection can occur after a commit. Retry the same request/key to
-  resolve that uncertainty; do not issue a different key just because the response was lost.
+- Callers do not supply idempotency keys. Credit Service derives an internal identity
+  scoped by operation: user ID for init, order ID for reserve/release/settle, and the
+  JSON-encoded `(orderId, expectedVersion)` pair for updates.
+- `expectedVersion` is the credit reservation's returned `version`, separate from
+  Order Service's own order version. Persist it after each confirmed mutation.
+  Each new edit uses the last confirmed version; retries use the original version
+  and amount. A new edit with a stale version is rejected.
+- A successfully committed operation returns its **original response** on retry,
+  even after later edits, release, or settlement. Saved results are checked before
+  current-state/version checks. Use `GetBalance`/`GetCreditHistory` for current state;
+  an old retry response must not overwrite a newer locally confirmed version.
+- Different parameters for an already committed identity are rejected. For example,
+  changing an update's amount while keeping its order/version is a conflict.
+  Failed transactions leave no successful retry record. Records have no automatic
+  expiry in this phase.
+- Timeout/disconnection can occur after a commit. Retry the same request to resolve
+  that uncertainty; do not advance `expectedVersion` just because the response was lost.
+
+Regenerate clients for the simplified request contracts. The retired protobuf key
+fields are reserved, and existing stored retry records are retained. Earlier
+caller-selected keys are not remapped to the new identities: an update previously
+committed under a custom key can return a stale-version conflict through the new
+contract. Reconcile outstanding requests from that earlier contract before switching
+callers; do not resubmit an uncertain edit using a newer version.
 
 | gRPC status | Meaning |
 | --- | --- |
 | `INVALID_ARGUMENT` (3) | Invalid identifier, amount, version, or pagination request |
 | `NOT_FOUND` (5) | Account or reservation does not exist |
-| `FAILED_PRECONDITION` (9) | Insufficient credits, invalid transition, stale version, or conflicting retry key |
-| `ABORTED` (10) | Database lock/transaction interrupted; retry the same request/key |
-| `UNAVAILABLE` (14) | Database connection unavailable; retry the same request/key |
+| `FAILED_PRECONDITION` (9) | Insufficient credits, invalid transition, stale version, or conflicting retry parameters |
+| `ABORTED` (10) | Database lock/transaction interrupted; retry the same request |
+| `UNAVAILABLE` (14) | Database connection unavailable; retry the same request |
 | `PERMISSION_DENIED` (7) | Service scope, user ownership, or administrator role does not permit this operation |
 | `UNAUTHENTICATED` (16) | Missing/incorrect service credential or invalid/missing required user JWT |
 
@@ -138,7 +151,7 @@ Access decisions produce structured `credit_access` logs containing the RPC, cal
 actor/target identifiers, timestamp, decision and status code. Tokens and request
 bodies are omitted. Deployment still needs protected log collection/retention and
 database-at-rest encryption. Archive email encryption will accompany archive storage;
-no archive or dispute processing is implemented yet.
+no archive processing is implemented yet.
 
 Local development defaults to `127.0.0.1` with insecure transport. TLS is required
 for a non-loopback binding or `NODE_ENV=production`: configure both
@@ -174,6 +187,5 @@ exercise every ordering of competing intents. OpenSSL is required for the TLS te
 - Connect successful registration and order lifecycle changes to these RPCs with
   durable retry/reconciliation handling across services.
 - Deferred until User Service is ready: archived-user storage and account archive/restore, including retention, active-reservation and identity rules.
-- Define and implement dispute adjustments with admin authorisation and audit reasons.
 - Add authenticated balance/history access for frontend/admin users.
 - Containerise the application and configure deployment credentials/transport.

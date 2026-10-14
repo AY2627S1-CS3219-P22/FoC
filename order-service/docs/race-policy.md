@@ -51,9 +51,11 @@ separate lifecycle flow; this component does not implement F8.6.3's scheduler.
    `UpdateReservation` RPC with the existing reservation version. For cancellation
    or expiry, call `ReleaseCredits`. Only Credit Service modifies the hold/balance.
    Send only Order Service's scoped credential.
-6. Retry/reconcile uncertain credit responses with the original key/parameters.
+6. Retry/reconcile uncertain credit responses with the original request, including
+   the credit reservation's original `expectedVersion` for an edit. Credit derives
+   retry identities internally; callers do not supply keys.
    Persist completion before returning success. Return the persisted result for
-   duplicate commands; never dispatch the credit work twice under different keys.
+   duplicate commands; never treat a timeout as a new edit with a newer version.
 
 Test simultaneous intent submission against the actual database, cross-process
 workers, restart recovery, dispatcher failure and credit timeouts once these

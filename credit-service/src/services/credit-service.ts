@@ -20,9 +20,6 @@ function found<T>(value: T | undefined, name: string): T {
   if (value === undefined) throw new CreditError('NOT_FOUND', `${name} not found`);
   return value;
 }
-function retryKey(key: string | undefined, fallback?: string): string {
-  return identifier(key || fallback || '', 'idempotencyKey');
-}
 
 export class CreditService {
   constructor(private readonly database: CreditUnitOfWork) {}
@@ -34,7 +31,7 @@ export class CreditService {
       await credit.lockResource(JSON.stringify(['idempotency', operation, key]));
       const previous = await credit.findIdempotencyRecord(operation, key);
       if (previous) {
-        requireCondition(previous.requestHash === requestHash, 'Idempotency key was already used with a different request');
+        requireCondition(previous.requestHash === requestHash, 'Credit operation was already completed with different parameters');
         return previous.result as T;
       }
       await credit.lockResource(resource);
@@ -52,9 +49,9 @@ export class CreditService {
       reservation?.errandID ?? '', reservation?.reservationID ?? '', totalDelta, reservedDelta));
   }
 
-  async initCredits(request: { userId: string; idempotencyKey?: string }): Promise<Balance> {
+  async initCredits(request: { userId: string }): Promise<Balance> {
     const userId = identifier(request.userId, 'userId');
-    return this.mutate('INIT', retryKey(request.idempotencyKey, userId), { userId }, `account:${userId}`, async repo => {
+    return this.mutate('INIT', userId, { userId }, `account:${userId}`, async repo => {
       const existing = await repo.findByUserId(userId);
       if (existing) return balance(existing);
       const account = new CreditAccount(userId);
@@ -70,11 +67,11 @@ export class CreditService {
     return this.database.transaction(async ({ credit }) => balance(found(await credit.findByUserId(userId), 'Credit account')));
   }
 
-  async createReservation(request: { orderId: string; requesterId: string; amount: number; idempotencyKey?: string }): Promise<ReservationView> {
+  async createReservation(request: { orderId: string; requesterId: string; amount: number }): Promise<ReservationView> {
     const orderId = identifier(request.orderId, 'orderId');
     const requesterId = identifier(request.requesterId, 'requesterId');
     const amount = positive(request.amount, 'amount');
-    return this.mutate('RESERVE', retryKey(request.idempotencyKey, orderId), { orderId, requesterId, amount }, `order:${orderId}`, async repo => {
+    return this.mutate('RESERVE', orderId, { orderId, requesterId, amount }, `order:${orderId}`, async repo => {
       const existing = await repo.findReservation(orderId);
       if (existing) {
         requireCondition(existing.userID === requesterId && existing.creditAmount === amount, 'Order already has a different reservation');
@@ -91,11 +88,13 @@ export class CreditService {
     });
   }
 
-  async updateReservation(request: { orderId: string; amount: number; expectedVersion: number; idempotencyKey?: string }): Promise<ReservationView> {
+  async updateReservation(request: { orderId: string; amount: number; expectedVersion: number }): Promise<ReservationView> {
     const orderId = identifier(request.orderId, 'orderId');
     const amount = positive(request.amount, 'amount');
     const expectedVersion = positive(request.expectedVersion, 'expectedVersion');
-    return this.mutate('UPDATE', retryKey(request.idempotencyKey), { orderId, amount, expectedVersion }, `order:${orderId}`, async repo => {
+    // Each version can be consumed by one successful edit. JSON keeps opaque IDs unambiguous.
+    const key = JSON.stringify([orderId, expectedVersion]);
+    return this.mutate('UPDATE', key, { orderId, amount, expectedVersion }, `order:${orderId}`, async repo => {
       const reservation = found(await repo.findReservation(orderId), 'Reservation');
       requireCondition(reservation.reservationStatus === ReservationStatus.RESERVED, 'Only active reservations can be updated');
       requireCondition(reservation.version === expectedVersion, 'Reservation version changed; reload before updating');
@@ -113,9 +112,9 @@ export class CreditService {
     });
   }
 
-  async releaseReservation(request: { orderId: string; idempotencyKey?: string }): Promise<ReservationView> {
+  async releaseReservation(request: { orderId: string }): Promise<ReservationView> {
     const orderId = identifier(request.orderId, 'orderId');
-    return this.mutate('RELEASE', retryKey(request.idempotencyKey, orderId), { orderId }, `order:${orderId}`, async repo => {
+    return this.mutate('RELEASE', orderId, { orderId }, `order:${orderId}`, async repo => {
       const reservation = found(await repo.findReservation(orderId), 'Reservation');
       if (reservation.reservationStatus === ReservationStatus.RELEASED) return reservationView(reservation);
       requireCondition(reservation.reservationStatus === ReservationStatus.RESERVED, 'Settled reservations cannot be released');
@@ -131,10 +130,10 @@ export class CreditService {
     });
   }
 
-  async transferReservation(request: { orderId: string; courierId: string; idempotencyKey?: string }): Promise<ReservationView> {
+  async transferReservation(request: { orderId: string; courierId: string }): Promise<ReservationView> {
     const orderId = identifier(request.orderId, 'orderId');
     const courierId = identifier(request.courierId, 'courierId');
-    return this.mutate('SETTLE', retryKey(request.idempotencyKey, orderId), { orderId, courierId }, `order:${orderId}`, async repo => {
+    return this.mutate('SETTLE', orderId, { orderId, courierId }, `order:${orderId}`, async repo => {
       const reservation = found(await repo.findReservation(orderId), 'Reservation');
       if (reservation.reservationStatus === ReservationStatus.TRANSFERRED) {
         requireCondition(reservation.courierID === courierId, 'Reservation was settled to another courier');

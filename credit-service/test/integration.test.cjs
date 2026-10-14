@@ -25,30 +25,43 @@ async function rows(table, userId) {
 before(async () => { await migrate(pool); await migrate(pool); });
 after(async () => { await pool.end(); });
 
-test('concurrent initialization grants exactly ten credits once, including different retry keys', async () => {
+test('concurrent initialization uses the user ID as its retry key and grants exactly ten credits once', async () => {
   const userId = id();
-  await Promise.all(Array.from({ length: 20 }, (_, n) => service.initCredits({ userId, idempotencyKey: n % 2 ? id() : userId })));
-  assert.deepEqual(await service.displayCredit({ userId }), { userId, totalCredits: 10, reservedCredits: 0, availableCredits: 10 });
+  // Old JavaScript callers can still include the retired field; it cannot override the server's key.
+  const results = await Promise.all(Array.from({ length: 20 }, (_, n) => service.initCredits(
+    n % 2 ? { userId, idempotencyKey: id() } : { userId },
+  )));
+  const snapshot = { userId, totalCredits: 10, reservedCredits: 0, availableCredits: 10 };
+  for (const result of results) assert.deepEqual(result, snapshot);
+  assert.deepEqual(await service.displayCredit({ userId }), snapshot);
   assert.equal((await rows('history', userId)).length, 1);
+  const retries = await rows('idempotency_records', userId);
+  assert.equal(retries.length, 1);
+  assert.equal(retries[0].operation, 'INIT');
+  assert.equal(retries[0].key, userId);
+  await service.createReservation({ orderId: id(), requesterId: userId, amount: 4 });
+  assert.deepEqual(await service.initCredits({ userId }), snapshot);
+  assert.equal((await service.displayCredit({ userId })).availableCredits, 6);
+  assert.equal((await rows('history', userId)).length, 2);
 });
 
 test('reservations, amount updates and release record deltas without spending total balance', async () => {
   const userId = await user(); const orderId = id();
   const reservation = await service.createReservation({ orderId, requesterId: userId, amount: 4 });
   assert.equal(reservation.status, 'RESERVED');
-  const request = { orderId, amount: 6, expectedVersion: 1, idempotencyKey: id() };
+  const request = { orderId, amount: 6, expectedVersion: reservation.version };
   const updated = await service.updateReservation(request);
   assert.equal(updated.version, 2);
   assert.deepEqual(await service.updateReservation(request), updated);
-  await assert.rejects(service.updateReservation({ ...request, idempotencyKey: id(), amount: 5 }), rejected('FAILED_PRECONDITION'));
+  await assert.rejects(service.updateReservation({ ...request, amount: 5 }), rejected('FAILED_PRECONDITION'));
   assert.equal((await service.displayCredit({ userId })).availableCredits, 4);
   await service.releaseReservation({ orderId });
-  await service.releaseReservation({ orderId, idempotencyKey: id() });
+  await service.releaseReservation({ orderId });
   assert.deepEqual(await service.displayCredit({ userId }), { userId, totalCredits: 10, reservedCredits: 0, availableCredits: 10 });
   const history = await service.displayUserHistory({ userId });
   assert.deepEqual(history.entries.map(e => [e.type, e.totalDelta, e.reservedDelta]),
     [['RELEASED', 0, -6], ['RESERVATION_UPDATED', 0, 2], ['RESERVED', 0, 4], ['INITIAL_GRANT', 10, 0]]);
-  await assert.rejects(service.updateReservation({ ...request, expectedVersion: 3, idempotencyKey: id() }), rejected('FAILED_PRECONDITION'));
+  await assert.rejects(service.updateReservation({ ...request, expectedVersion: 3 }), rejected('FAILED_PRECONDITION'));
 });
 
 test('concurrent reservations cannot overspend', async () => {
@@ -64,7 +77,7 @@ test('concurrent amount updates accept only one request for the same version', a
   const requesterId = await user(); const orderId = id();
   await service.createReservation({ orderId, requesterId, amount: 4 });
   const attempts = await Promise.allSettled([5, 6].map(amount => service.updateReservation({
-    orderId, amount, expectedVersion: 1, idempotencyKey: id(),
+    orderId, amount, expectedVersion: 1,
   })));
   assert.equal(attempts.filter(a => a.status === 'fulfilled').length, 1);
   assert.equal(attempts.find(a => a.status === 'rejected').reason.code, 'FAILED_PRECONDITION');
@@ -73,18 +86,54 @@ test('concurrent amount updates accept only one request for the same version', a
   assert.equal((await service.displayCredit({ userId: requesterId })).reservedCredits, winner.amount);
 });
 
-test('duplicate orders and keys are safe; changed key payloads are rejected', async () => {
+test('update retries use order and expected version, replay after later changes, and reject conflicting amounts', async () => {
+  const requesterId = await user(); const courierId = await user(); const orderId = id();
+  const reservation = await service.createReservation({ orderId, requesterId, amount: 4 });
+  const firstEdit = { orderId, amount: 5, expectedVersion: reservation.version };
+  // A failed attempt does not consume this version or persist a successful result.
+  await assert.rejects(service.updateReservation({ ...firstEdit, amount: 11 }), rejected('FAILED_PRECONDITION'));
+  const results = await Promise.all(Array.from({ length: 20 }, () => service.updateReservation(firstEdit)));
+  const first = results[0];
+  for (const result of results) assert.deepEqual(result, first);
+  assert.equal(first.version, 2);
+  assert.equal((await rows('history', requesterId)).length, 3);
+  const secondEdit = { orderId, amount: 3, expectedVersion: first.version };
+  const second = await service.updateReservation(secondEdit);
+  assert.equal(second.version, 3);
+  assert.deepEqual(await service.updateReservation(firstEdit), first);
+  assert.equal((await service.displayCredit({ userId: requesterId })).reservedCredits, 3);
+  await assert.rejects(service.updateReservation({ ...firstEdit, amount: 6 }), rejected('FAILED_PRECONDITION'));
+  const retries = (await rows('idempotency_records', requesterId)).filter(row => row.operation === 'UPDATE');
+  assert.equal(retries.length, 2);
+  assert.deepEqual(retries.map(row => JSON.parse(row.key)).sort((a, b) => a[1] - b[1]), [[orderId, 1], [orderId, 2]]);
+  await service.transferReservation({ orderId, courierId });
+  assert.deepEqual(await service.updateReservation(firstEdit), first);
+  assert.deepEqual(await service.updateReservation(secondEdit), second);
+  assert.equal((await service.displayCredit({ userId: requesterId })).totalCredits, 7);
+  assert.equal((await service.displayCredit({ userId: courierId })).totalCredits, 13);
+  assert.equal((await rows('history', requesterId)).length, 5);
+  await assert.rejects(service.updateReservation({ orderId, amount: 2, expectedVersion: 4 }), rejected('FAILED_PRECONDITION'));
+  // The same version on another order identifies a separate edit.
+  const otherOrder = id();
+  await service.createReservation({ orderId: otherOrder, requesterId, amount: 1 });
+  assert.equal((await service.updateReservation({ orderId: otherOrder, amount: 2, expectedVersion: 1 })).version, 2);
+});
+
+test('reservation retries use the order ID and reject changed requester or amount', async () => {
   const userId = await user(); const orderId = id();
-  const request = { orderId, requesterId: userId, amount: 4, idempotencyKey: id() };
-  const results = await Promise.all(Array.from({ length: 15 }, (_, n) => service.createReservation({ ...request, idempotencyKey: n % 2 ? id() : request.idempotencyKey })));
+  const request = { orderId, requesterId: userId, amount: 4 };
+  const results = await Promise.all(Array.from({ length: 15 }, () => service.createReservation(request)));
   assert.equal(new Set(results.map(r => r.reservationId)).size, 1);
   assert.equal((await service.displayCredit({ userId })).reservedCredits, 4);
   await assert.rejects(service.createReservation({ ...request, amount: 5 }), rejected('FAILED_PRECONDITION'));
-  await assert.rejects(service.createReservation({ ...request, orderId: id() }), rejected('FAILED_PRECONDITION'));
+  await assert.rejects(service.createReservation({ ...request, requesterId: await user() }), rejected('FAILED_PRECONDITION'));
   await service.releaseReservation({ orderId });
   // Lost-response retries replay the original response; fresh reads give current state.
   assert.deepEqual(await service.createReservation(request), results[0]);
-  assert.equal((await service.createReservation({ ...request, idempotencyKey: id() })).status, 'RELEASED');
+  assert.equal((await pool.query('SELECT status FROM credit.reservations WHERE order_id = $1', [orderId])).rows[0].status, 'RELEASED');
+  const retries = (await rows('idempotency_records', userId)).filter(row => row.operation === 'RESERVE');
+  assert.equal(retries.length, 1);
+  assert.equal(retries[0].key, orderId);
   assert.equal((await service.displayCredit({ userId })).reservedCredits, 0);
   assert.equal((await rows('history', userId)).length, 3);
 });
@@ -92,14 +141,15 @@ test('duplicate orders and keys are safe; changed key payloads are rejected', as
 test('settlement transfers once, conserves total credits and prevents invalid transitions', async () => {
   const requesterId = await user(); const courierId = await user(); const orderId = id();
   await service.createReservation({ orderId, requesterId, amount: 4 });
-  await Promise.all(Array.from({ length: 15 }, (_, n) => service.transferReservation({ orderId, courierId, idempotencyKey: n % 2 ? id() : orderId })));
+  const results = await Promise.all(Array.from({ length: 15 }, () => service.transferReservation({ orderId, courierId })));
+  for (const result of results) assert.deepEqual(result, results[0]);
   const sender = await service.displayCredit({ userId: requesterId }); const recipient = await service.displayCredit({ userId: courierId });
   assert.equal(sender.totalCredits, 6); assert.equal(sender.reservedCredits, 0);
   assert.equal(recipient.totalCredits, 14); assert.equal(sender.totalCredits + recipient.totalCredits, 20);
   assert.equal((await rows('history', requesterId)).length, 3);
   assert.equal((await rows('history', courierId)).length, 2);
   await assert.rejects(service.releaseReservation({ orderId }), rejected('FAILED_PRECONDITION'));
-  await assert.rejects(service.transferReservation({ orderId, courierId: requesterId, idempotencyKey: id() }), rejected('FAILED_PRECONDITION'));
+  await assert.rejects(service.transferReservation({ orderId, courierId: requesterId }), rejected('FAILED_PRECONDITION'));
 });
 
 test('opposing transfers lock accounts consistently', async () => {
@@ -136,21 +186,21 @@ test('missing accounts, insufficient balance and self-transfer leave reservation
 });
 
 test('history write failure rolls back account, reservation and retry record together', async () => {
-  const userId = await user(); const orderId = id(); const key = id();
+  const userId = await user(); const orderId = id();
   const failing = new CreditService({ transaction: action => database.transaction(async repositories => {
     repositories.credit.saveCreditHistoryEntry = async () => { throw new Error('Injected history failure'); };
     return action(repositories);
   }) });
-  await assert.rejects(failing.createReservation({ orderId, requesterId: userId, amount: 4, idempotencyKey: key }), /Injected history failure/);
+  await assert.rejects(failing.createReservation({ orderId, requesterId: userId, amount: 4 }), /Injected history failure/);
   assert.equal((await service.displayCredit({ userId })).reservedCredits, 0);
   assert.equal((await pool.query('SELECT * FROM credit.reservations WHERE order_id = $1', [orderId])).rowCount, 0);
-  assert.equal((await pool.query('SELECT * FROM credit.idempotency_records WHERE key = $1', [key])).rowCount, 0);
+  assert.equal((await pool.query("SELECT * FROM credit.idempotency_records WHERE operation = 'RESERVE' AND key = $1", [orderId])).rowCount, 0);
   assert.equal((await rows('history', userId)).length, 1);
-  await service.createReservation({ orderId, requesterId: userId, amount: 4, idempotencyKey: key });
+  await service.createReservation({ orderId, requesterId: userId, amount: 4 });
 });
 
 test('second transfer history failure rolls back both accounts and permits a safe retry', async () => {
-  const requesterId = await user(); const courierId = await user(); const orderId = id(); const key = id();
+  const requesterId = await user(); const courierId = await user(); const orderId = id();
   await service.createReservation({ orderId, requesterId, amount: 4 });
   const failing = new CreditService({ transaction: action => database.transaction(async repositories => {
     const save = repositories.credit.saveCreditHistoryEntry.bind(repositories.credit);
@@ -159,7 +209,7 @@ test('second transfer history failure rolls back both accounts and permits a saf
       ? Promise.reject(new Error('Injected recipient history failure')) : save(entry);
     return action(repositories);
   }) });
-  const request = { orderId, courierId, idempotencyKey: key };
+  const request = { orderId, courierId };
   await assert.rejects(failing.transferReservation(request), /Injected recipient history failure/);
   assert.deepEqual(await service.displayCredit({ userId: requesterId }),
     { userId: requesterId, totalCredits: 10, reservedCredits: 4, availableCredits: 6 });
@@ -167,7 +217,7 @@ test('second transfer history failure rolls back both accounts and permits a saf
   assert.equal((await rows('history', requesterId)).length, 2);
   assert.equal((await rows('history', courierId)).length, 1);
   assert.equal((await pool.query('SELECT status FROM credit.reservations WHERE order_id = $1', [orderId])).rows[0].status, 'RESERVED');
-  assert.equal((await pool.query('SELECT * FROM credit.idempotency_records WHERE key = $1', [key])).rowCount, 0);
+  assert.equal((await pool.query("SELECT * FROM credit.idempotency_records WHERE operation = 'SETTLE' AND key = $1", [orderId])).rowCount, 0);
   await service.transferReservation(request);
   assert.equal((await service.displayCredit({ userId: courierId })).totalCredits, 14);
 });
@@ -248,12 +298,15 @@ test('idempotency migration backfills legacy successful snapshots and keeps thei
   } finally {
     await client.query('ROLLBACK'); client.release();
   }
-  // Seed an earlier successful response and replay it through the new service.
-  await pool.query(`INSERT INTO credit.idempotency_records(operation, key, request_hash, result, user_id)
-    VALUES ($1, $2, $3, $4::jsonb, $5)`, ['INIT', key, requestHash, JSON.stringify(snapshot), userId]);
+  // The existing user-ID-keyed response stays replayable after later balance changes.
   await service.createReservation({ orderId: id(), requesterId: userId, amount: 4 });
-  assert.deepEqual(await service.initCredits({ userId, idempotencyKey: key }), snapshot);
+  assert.deepEqual(await service.initCredits({ userId }), snapshot);
   assert.equal((await service.displayCredit({ userId })).availableCredits, 6);
+  assert.equal((await rows('history', userId)).length, 2);
+  // Accounts created with a legacy custom key must not receive another grant either.
+  await pool.query("UPDATE credit.idempotency_records SET key = $1 WHERE operation = 'INIT' AND key = $2", [key, userId]);
+  assert.deepEqual(await service.initCredits({ userId }),
+    { userId, totalCredits: 10, reservedCredits: 4, availableCredits: 6 });
   assert.equal((await rows('history', userId)).length, 2);
 });
 
@@ -291,8 +344,11 @@ test('real gRPC endpoints enforce caller scopes, user ownership, admin roles and
   await assert.rejects(client.reserveCredits({ orderId, requesterId: userId, amount: 11 }, orderOptions), rejected(status.FAILED_PRECONDITION));
   const reservation = await client.reserveCredits({ orderId, requesterId: userId, amount: 4 }, orderOptions);
   assert.ok(reservation.reservationId); assert.equal(reservation.version, 1);
-  await client.updateReservation({ orderId, amount: 3, expectedVersion: 1, idempotencyKey: id() }, orderOptions);
+  const edit = { orderId, amount: 3, expectedVersion: reservation.version };
+  const updated = await client.updateReservation(edit, orderOptions);
   assert.equal((await client.settleCredits({ orderId, courierId }, orderOptions)).status, 'SETTLED');
+  assert.deepEqual(await client.updateReservation(edit, orderOptions), updated);
+  await assert.rejects(client.updateReservation({ ...edit, amount: 2 }, orderOptions), rejected(status.FAILED_PRECONDITION));
   assert.equal((await client.getBalance({ userId }, ownRead)).availableCredits, 7);
   assert.equal((await client.getCreditHistory({ userId }, ownRead)).entries.length, 4);
   const releaseOrder = id();

@@ -3,13 +3,15 @@ syntax = "proto3";
 package credit;
 
 service CreditService {
+  // Initialisation always uses user_id as its internal retry key.
   rpc InitCredits(InitCreditsRequest) returns (Balance);
   rpc GetBalance(GetBalanceRequest) returns (Balance);
   rpc GetCreditHistory(GetCreditHistoryRequest) returns (CreditHistory);
   // Mutations commit balances, history, and retry results atomically.
-  // Retrying an identical key returns the ORIGINAL response, even after later changes.
-  // Without a key, init/reserve/release/settle use their user/order ID as the key.
-  // Conflicting key reuse or invalid transitions fail with FAILED_PRECONDITION.
+  // Retry identities are internal: reserve/release/settle use order_id;
+  // updates use (order_id, expected_version). Repeat the original request to retry.
+  // Successful retries return the ORIGINAL response, even after later changes.
+  // Conflicting parameters or invalid transitions fail with FAILED_PRECONDITION.
   rpc ReserveCredits(ReserveCreditsRequest) returns (Reservation);
   rpc UpdateReservation(UpdateReservationRequest) returns (Reservation);
   rpc ReleaseCredits(ReleaseCreditsRequest) returns (Reservation);
@@ -18,7 +20,9 @@ service CreditService {
 
 message InitCreditsRequest {
   string user_id = 1;
-  string idempotency_key = 2;
+  // Retired caller-supplied key; never reuse its field number or name.
+  reserved 2;
+  reserved "idempotency_key";
 }
 
 message GetBalanceRequest {
@@ -37,27 +41,31 @@ message ReserveCreditsRequest {
   string requester_id = 2;
   // Positive whole credits. Insufficient available balance: FAILED_PRECONDITION.
   int32 amount = 3;
-  string idempotency_key = 4;
+  reserved 4;
+  reserved "idempotency_key";
 }
 
 message UpdateReservationRequest {
   string order_id = 1;
   int32 amount = 2;
-  // Prevents an old update from overwriting a newer reservation amount.
+  // Use the version returned by the previous reservation mutation.
+  // Repeat the same version and amount on retry, even if the first response was lost.
   uint32 expected_version = 3;
-  // Required: each intentional update needs a new key; retries reuse it.
-  string idempotency_key = 4;
+  reserved 4;
+  reserved "idempotency_key";
 }
 
 message ReleaseCreditsRequest {
   string order_id = 1;
-  string idempotency_key = 2;
+  reserved 2;
+  reserved "idempotency_key";
 }
 
 message SettleCreditsRequest {
   string order_id = 1;
   string courier_id = 2;
-  string idempotency_key = 3;
+  reserved 3;
+  reserved "idempotency_key";
 }
 
 enum ReservationStatus {
