@@ -138,3 +138,4 @@ export const getUserById: RequestHandler = async (req, res) => {
   }
   res.status(200).json({ user });
 };
+
