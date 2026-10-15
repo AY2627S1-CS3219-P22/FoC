@@ -11,12 +11,13 @@ type NavItem = {
   label: string
   mobileLabel: string
   page: Page
-  icon: "mine" | "orders" | "create" | "activity"
+  icon: "mine" | "orders" | "create" | "activity" | "store"
 }
 
 const navItems: NavItem[] = [
   { label: "Orders", mobileLabel: "Find Errand", page: "orders", icon: "orders" },
   { label: "Create Request", mobileLabel: "Create", page: "create-request", icon: "create" },
+  { label: "Suppliers", mobileLabel: "Stores", page: "suppliers", icon: "store" },
   { label: "My Orders", mobileLabel: "My Orders", page: "my-orders", icon: "mine" },
   { label: "Profile", mobileLabel: "Profile", page: "profile", icon: "activity" },
 ]
@@ -39,6 +40,12 @@ function NavIcon({ icon }: { icon: NavItem["icon"] }) {
       <>
         <path d="M12 5v14M5 12h14" />
         <circle cx="12" cy="12" r="9" />
+      </>
+    ),
+    store: (
+      <>
+        <path d="M4 10h16l-1.5-5h-13z" />
+        <path d="M5 10v10h14V10M10 20v-5h4v5" />
       </>
     ),
     activity: (
