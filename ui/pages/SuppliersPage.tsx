@@ -1,5 +1,8 @@
 import { SUPPLIERS } from "../data/suppliers"
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
+import { getSuppliers } from "../api/suppliers"
+
+type SupplierCard = { id: string; name: string; location: string; type: string; hours: string }
 
 const TYPE_COLORS: Record<string, string> = {
   "F&B":          "bg-orange-50 text-orange-600",
@@ -33,15 +36,34 @@ const TYPE_ICONS: Record<string, React.ReactElement> = {
   ),
 }
 
-
-
-const ALL_TYPES = ["All", "F&B", "Convenience", "Services", "Retail"]
-
 export default function SuppliersPage() {
   const [filter, setFilter] = useState("All")
   const [search, setSearch] = useState("")
+  const [suppliers, setSuppliers] = useState<SupplierCard[]>(SUPPLIERS)
+  const [usingMock, setUsingMock] = useState(true)
 
-  const visible = SUPPLIERS.filter((s) => {
+  // Try the real supplier-service; keep mock data if it is not running
+  useEffect(() => {
+    getSuppliers()
+      .then((data) => {
+        setSuppliers(
+          data.map((s) => ({
+            id: String(s.supplierId),
+            name: s.name,
+            location: `${s.buildingName}, Level ${s.floor}`,
+            type: s.type,
+            hours: "",
+          }))
+        )
+        setUsingMock(false)
+      })
+      .catch(() => setUsingMock(true))
+  }, [])
+
+  // Filter chips come from whatever types exist in the data
+  const ALL_TYPES = ["All", ...Array.from(new Set(suppliers.map((s) => s.type)))]
+
+  const visible = suppliers.filter((s) => {
     const matchType   = filter === "All" || s.type === filter
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
                         s.location.toLowerCase().includes(search.toLowerCase())
@@ -53,6 +75,11 @@ export default function SuppliersPage() {
       <div className="mb-7">
         <h1 className="text-2xl font-semibold text-[#162A46] mb-1">Campus Suppliers</h1>
         <p className="text-sm text-[#3F6B5A]">Stores and services available for errand requests.</p>
+        {usingMock && (
+          <p className="mt-2 inline-block rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700">
+            Showing sample data (supplier service not connected)
+          </p>
+        )}
       </div>
 
       {/* Search + filter row */}

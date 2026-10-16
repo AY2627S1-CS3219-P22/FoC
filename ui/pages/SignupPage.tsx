@@ -1,5 +1,7 @@
-import { useState } from "react"
+import React, { useState } from "react"
 import type { Page } from "../App"
+import { register } from "../api/users"
+import { isServiceDown } from "../api/client"
 
 interface Props {
   onLogin: () => void
@@ -7,14 +9,51 @@ interface Props {
 }
 
 export default function SignupPage({ onLogin, onNavigate }: Props) {
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" })
+  const [form, setForm] = useState({ firstName: "", lastName: "", username: "", email: "", password: "", confirm: "" })
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }))
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  // Same rules as user-service, so users see problems before submitting
+  const validate = () => {
+    if (!form.firstName || !form.lastName || !form.username) return "Please fill in your name and username."
+    if (!/@(u\.)?nus\.edu$/i.test(form.email)) return "Use your NUS email (@u.nus.edu or @nus.edu)."
+    if (form.password.length < 8) return "Password must be at least 8 characters."
+    if (!/[A-Z]/.test(form.password)) return "Password needs an uppercase letter."
+    if (!/[0-9]/.test(form.password)) return "Password needs a number."
+    if (!/[^A-Za-z0-9]/.test(form.password)) return "Password needs a special character."
+    if (form.password !== form.confirm) return "Passwords don't match."
+    return ""
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const problem = validate()
+    if (problem) { setError(problem); return }
+    setError("")
+    setLoading(true)
+    try {
+      const { confirm: _confirm, ...data } = form
+      await register(data)
+      onNavigate("login") // account created, now log in
+    } catch (err) {
+      if (isServiceDown(err)) {
+        onLogin() // user-service not running: continue with mock flow
+      } else {
+        setError(err instanceof Error ? err.message : "Sign up failed.")
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const inputCls =
     "w-full px-3.5 py-2.5 border border-[#E4E8E6] rounded-lg text-sm text-[#1B2522] placeholder-[#9CA3AF] bg-white focus:outline-none focus:border-[#1A4A36] focus:ring-1 focus:ring-[#1A4A36] transition-colors"
 
   const fields: { key: keyof typeof form; label: string; type: string; placeholder: string }[] = [
-    { key: "name",     label: "Full name",         type: "text",     placeholder: "Jordan Tan" },
+    { key: "firstName", label: "First name",        type: "text",     placeholder: "Jordan" },
+    { key: "lastName",  label: "Last name",         type: "text",     placeholder: "Tan" },
+    { key: "username",  label: "Username",          type: "text",     placeholder: "jordantan" },
     { key: "email",    label: "University email",   type: "email",    placeholder: "yourname@u.nus.edu" },
     { key: "password", label: "Password",           type: "password", placeholder: "••••••••" },
     { key: "confirm",  label: "Confirm password",   type: "password", placeholder: "••••••••" },
@@ -45,7 +84,7 @@ export default function SignupPage({ onLogin, onNavigate }: Props) {
             </p>
           </div>
 
-          <form onSubmit={(e) => { e.preventDefault(); onLogin() }} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {fields.map(({ key, label, type, placeholder }) => (
               <div key={key}>
                 <label className="block text-xs font-medium text-[#1B2522] mb-1.5">{label}</label>
@@ -58,11 +97,15 @@ export default function SignupPage({ onLogin, onNavigate }: Props) {
                 />
               </div>
             ))}
+            {error && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
+            )}
             <button
               type="submit"
-              className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] active:scale-[.99] transition-all"
+              disabled={loading}
+              className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] active:scale-[.99] transition-all disabled:opacity-60"
             >
-              Create account
+              {loading ? "Creating account…" : "Create account"}
             </button>
           </form>
 

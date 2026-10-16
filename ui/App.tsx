@@ -9,6 +9,8 @@ import OrderDetailsPage from "./pages/OrderDetailsPage"
 import AcceptedOrderPage from "./pages/AcceptedOrderPage"
 import ProfilePage from "./pages/ProfilePage"
 import AdminPage from "./pages/AdminPage"
+import SuppliersPage from "./pages/SuppliersPage"
+import { SEED_ORDERS } from "./api/orders"
 
 export type Page =
   | "login"
@@ -22,6 +24,7 @@ export type Page =
   | "errand-complete"
   | "profile"
   | "admin"
+  | "suppliers"
 
 export interface Order {
   id: string
@@ -60,91 +63,6 @@ const CURRENT_USER: User = {
   errandsCompleted: 2,
   creditsEarned: 9,
 }
-
-const SEED_ORDERS: Order[] = [
-  {
-    id: "o1",
-    pickupLocation: "COM3",
-    pickupStore: "CoffeeBean @ COM3",
-    deliveryLocation: "PGP",
-    description: "Pick up one iced latte, medium size. No sugar, please double-check the order.",
-    credits: 4,
-    deadline: "3:30 PM",
-    status: "open",
-    requesterId: "u2",
-    requesterName: "Aisha Lim",
-    createdAt: "2:45 PM",
-  },
-  {
-    id: "o2",
-    pickupLocation: "UTown",
-    pickupStore: "Cheers @ UTown",
-    deliveryLocation: "PGPR Block E",
-    description: "One packet of instant noodles (any flavour) and a 1.5L mineral water.",
-    credits: 3,
-    deadline: "5:00 PM",
-    status: "open",
-    requesterId: "u3",
-    requesterName: "Marcus Goh",
-    createdAt: "3:10 PM",
-  },
-  {
-    id: "o3",
-    pickupLocation: "Science Faculty",
-    pickupStore: "Science Canteen",
-    deliveryLocation: "Arts (AS7) Level 4",
-    description: "Chicken rice with drumstick and soup. No cucumber please.",
-    credits: 5,
-    deadline: "1:00 PM",
-    status: "accepted",
-    requesterId: "u4",
-    requesterName: "Priya Nair",
-    courierId: "u5",
-    courierName: "Ryan Chen",
-    createdAt: "12:10 PM",
-  },
-  {
-    id: "o4",
-    pickupLocation: "Engineering",
-    pickupStore: "Print Lab @ Engineering",
-    deliveryLocation: "E1A Room 02-06",
-    description: "Print 20 pages double-sided from USB labelled EE2024_Lab. Black and white is fine.",
-    credits: 6,
-    deadline: "4:30 PM",
-    status: "open",
-    requesterId: "u6",
-    requesterName: "Wei Lin",
-    createdAt: "3:55 PM",
-  },
-  {
-    id: "o5",
-    pickupLocation: "YST",
-    pickupStore: "YST Canteen",
-    deliveryLocation: "UTown Residence",
-    description: "Brown sugar pearl milk tea, 50% sugar, less ice, large.",
-    credits: 4,
-    deadline: "6:00 PM",
-    status: "completed",
-    requesterId: "u1",
-    requesterName: "Jordan Tan",
-    courierId: "u7",
-    courierName: "Sofia Park",
-    createdAt: "5:10 PM",
-  },
-  {
-    id: "o6",
-    pickupLocation: "Central Library",
-    pickupStore: "CLB Bookshop",
-    deliveryLocation: "PGPR Block A",
-    description: "Reserved book: Introduction to Sociology 3rd Ed. under the name Priya Nair.",
-    credits: 5,
-    deadline: "2:00 PM",
-    status: "open",
-    requesterId: "u8",
-    requesterName: "Priya Nair",
-    createdAt: "1:00 PM",
-  },
-]
 
 function SuccessScreen({
   title,
@@ -366,6 +284,7 @@ export default function App() {
           />
         )}
 
+        {page === "suppliers" && <SuppliersPage />}
 
         {page === "profile" && (
           <ProfilePage
