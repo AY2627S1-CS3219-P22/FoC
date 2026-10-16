@@ -119,18 +119,29 @@ connection genuinely works — not just that the web server started.
 
 ## Authentication & Authorization
 
-Login issues a **stateless RS256 JWT** carrying the user's id (`sub`) and `roles`.
-Protected routes run two middlewares: `authenticate` (verifies the token → `401`
-if missing/invalid) then `requireRole(...)` (checks role claims → `403` if not
-allowed). Roles: `USER` (default) and `ADMINISTRATOR`.
+Login issues two tokens:
 
-| Method | Route              | Access                | Purpose                          |
-| ------ | ------------------ | --------------------- | -------------------------------- |
-| POST   | `/users/register`  | public                | Create an account (F1)           |
-| POST   | `/users/login`     | public                | Verify credentials → return JWT  |
-| GET    | `/users/me`        | any authenticated     | Own profile (F2.3)               |
-| GET    | `/users`           | `ADMINISTRATOR`       | List all users                   |
-| GET    | `/users/:id`       | `ADMINISTRATOR`       | View a specific user             |
+- **Access token** — a short-lived (15m) **stateless RS256 JWT** carrying the
+  user's id (`sub`) and `roles`. Returned in the response body; sent as
+  `Authorization: Bearer <token>` on every API call, to any service.
+- **Refresh token** — a long-lived (7d) opaque random string, set as an
+  **httpOnly cookie** (`refreshToken`, path `/users`). Only user-service ever
+  sees it; it is used solely to get a new access token or to log out.
+
+Protected routes run two middlewares: `authenticate` (verifies the access token →
+`401` if missing/invalid) then `requireRole(...)` (checks role claims → `403` if
+not allowed). Roles: `USER` (default) and `ADMINISTRATOR`.
+
+| Method | Route              | Access                | Purpose                                         |
+| ------ | ------------------ | --------------------- | ----------------------------------------------- |
+| POST   | `/users/register`  | public                | Create an account (F1)                          |
+| POST   | `/users/login`     | public                | Verify credentials → access token + refresh cookie |
+| POST   | `/users/refresh`   | refresh cookie        | Rotate refresh cookie → new access token        |
+| POST   | `/users/logout`    | refresh cookie        | End this browser's session (F2.2) → `204`       |
+| GET    | `/users/me`        | any authenticated     | Own profile (F2.3)                              |
+| PATCH  | `/users/me`        | any authenticated     | Update own first/last name, username (F2.4)     |
+| GET    | `/users`           | `ADMINISTRATOR`       | List all users                                  |
+| GET    | `/users/:id`       | `ADMINISTRATOR`       | View a specific user                            |
 
 Quick demo (service running on `:3001`):
 
@@ -146,6 +157,60 @@ curl -i localhost:3001/users    -H "Authorization: Bearer $TOKEN"   # USER    �
 Responses only ever include public fields — `passwordHash` is never returned.
 (To get an admin, promote a user's `roles` to `["ADMINISTRATOR"]` via
 `npx prisma studio`, then log in again.)
+
+### Sessions: refresh & logout
+
+Each login creates a session row (`RefreshToken` table, one per browser/device).
+Only the SHA-256 **hash** of the refresh token is stored, so a database leak
+exposes no usable sessions.
+
+- **Refresh** (`POST /users/refresh`) — **rotates** the token: the old one is
+  revoked and a new one issued, so each refresh token works only once. The new
+  access token carries the user's **current** roles from the database. Each
+  refresh extends the session by another 7 days (sliding expiry). Fails with
+  `401` (and clears the cookie) if the token is missing, expired or revoked.
+- **Logout** (`POST /users/logout`) — revokes this browser's session and clears
+  the cookie. Always returns `204` (safe to call twice). Other devices stay
+  logged in.
+- **Logging in again** on a browser that still has a session revokes the old
+  session first.
+
+**Revocation trade-off:** an access token can't be revoked — other services
+verify it locally, with no call to user-service. After logout (or a role
+change), an existing access token stays valid until it expires (≤15m). Logout
+still ends the session immediately, since no new access tokens can be minted.
+Every access token carries a `jti` claim, so a denylist can be added later
+(e.g. behind an API gateway or shared Redis) without changing the token format.
+
+Try it with curl (`-c` saves cookies to a file, `-b` sends them, like a browser):
+
+```bash
+curl -i -c cookies.txt -X POST localhost:3001/users/login -H 'Content-Type: application/json' -d '{"email":"you@u.nus.edu","password":"YourPassw0rd!"}'
+curl -i -b cookies.txt -c cookies.txt -X POST localhost:3001/users/refresh   # 200, new token + rotated cookie
+curl -i -b cookies.txt -c cookies.txt -X POST localhost:3001/users/logout    # 204, cookie cleared
+curl -i -b cookies.txt -X POST localhost:3001/users/refresh                  # 401, session ended
+```
+
+(`cookies.txt` holds a live session — it's git-ignored; delete it when done.)
+
+### Frontend integration
+
+- Keep the access token **in memory** (not `localStorage`). The refresh cookie is
+  httpOnly — the browser stores and sends it automatically; JS never touches it.
+- Send `credentials: 'include'` (fetch) / `withCredentials: true` (axios) on
+  `/users/login`, `/users/refresh` and `/users/logout`, or the cookie won't be
+  stored/sent.
+- **On app start / page reload:** call `POST /users/refresh`. `200` → logged in
+  (store the new access token). `401` → show the login page.
+- **On any `401` from an API call:** call `/users/refresh` once, then retry the
+  original request with the new token. If refresh also fails → login page.
+- **If `/users/refresh` returns `401`, retry it once** before giving up. Two tabs
+  refreshing at the same moment race on the same token; the loser gets `401`,
+  but the browser already holds the winner's new cookie.
+- **On logout:** call `POST /users/logout`, then drop the in-memory access token.
+- If the UI is served from a different origin than this API, user-service will
+  need CORS with `credentials: true` and an explicit allowed origin (not `*`).
+  Not configured yet — coordinate before deploying.
 
 ---
 
@@ -165,6 +230,8 @@ public key.
    - Algorithm: **RS256** (always pin it on verify)
    - Header: `Authorization: Bearer <token>`
    - Claims: `sub` = user id (string), `roles` = array of `"USER" | "ADMINISTRATOR"`
+   - Lifetime: 15 minutes. Refresh tokens are user-service-only — your service
+     never sees or handles them.
 
 **Verify snippet (Express + `jsonwebtoken`):**
 
@@ -208,6 +275,30 @@ curl -i -X POST localhost:3002/supplier -H "Authorization: Bearer $TOKEN"   # 40
 > **End-state:** once a second service consumes this, the verify logic + contract
 > types should move into a shared `@foc/auth` workspace package (single source of
 > truth, no drift). For now, copy the snippet above.
+
+### Fetching a user's public profile (gRPC)
+
+To show a user's name (e.g. on an errand), call `GetPublicProfile` instead of
+reading our database (F2.6). It returns **public fields only** — never email,
+roles or auth data.
+
+- **Address:** `localhost:50052` (plaintext for now — internal traffic only)
+- **Contract:** [`proto/user.proto`](./proto/user.proto) — copy it into your service
+- **RPC:** `user.UserService/GetPublicProfile`
+  - Request: `{ user_id }`
+  - Response: `{ user_id, username, first_name, last_name }`
+  - Errors: `INVALID_ARGUMENT` (empty `user_id`), `NOT_FOUND` (unknown or
+    deleted user), `INTERNAL` (unexpected failure)
+
+No JWT is needed — this is service-to-service, not called by end users.
+
+Try it with [`grpcurl`](https://github.com/fullstorydev/grpcurl) (`brew install grpcurl`):
+
+```bash
+grpcurl -plaintext -import-path proto -proto user.proto \
+  -d '{"user_id":"<user id>"}' \
+  localhost:50052 user.UserService/GetPublicProfile
+```
 
 ---
 
@@ -272,6 +363,8 @@ Copy `.env.example` → `.env`. `.env` is gitignored — never commit real secre
 | `JWT_PRIVATE_KEY_PATH` | RS256 private key (signs tokens)     | `./keys/private.pem` |
 | `JWT_PUBLIC_KEY_PATH`  | RS256 public key (verifies tokens)   | `./keys/public.pem`  |
 | `JWT_EXPIRES_IN`       | Access-token lifetime                | `15m`                |
+| `REFRESH_TOKEN_TTL_DAYS` | Refresh-token (session) lifetime, days | `7`                |
+| `NODE_ENV`             | `production` marks the refresh cookie `Secure` (HTTPS-only) | `development` |
 
 ## Architecture
 
@@ -301,18 +394,18 @@ Request → routes → middleware → controller → service → Prisma → Post
 ```text
 user-service/
 ├── prisma/
-│   ├── schema.prisma      # User model + Roles enum
+│   ├── schema.prisma      # User + RefreshToken models, Roles enum
 │   └── migrations/        # versioned schema history — commit these
 ├── proto/user.proto       # internal gRPC contract (F2.6)
 ├── src/
 │   ├── index.ts           # boots REST + gRPC
 │   ├── env.ts             # zod-validated config
 │   ├── db.ts              # Prisma client + DB ping
+│   ├── services/          # business logic shared by REST + gRPC (DB via Prisma)
 │   ├── api/               # HTTP (REST) transport
 │   │   ├── app.ts         #   Express app + /health, mounts routers
 │   │   ├── routes/        #   path → handler wiring
 │   │   ├── controllers/   #   HTTP glue (read request, call service, send response)
-│   │   ├── services/      #   business logic (uniqueness, hashing, DB via Prisma)
 │   │   ├── middleware/    #   cross-cutting (e.g. zod validation)
 │   │   └── dto/           #   zod schemas: API input/output shapes
 │   └── grpc/server.ts     # gRPC transport
