@@ -40,8 +40,8 @@ There are two ways to run this service. Choose based on what you're doing.
 ### Path A — Quick run ("just start it") 🚀
 
 Use this when you just want the service **up and running** (e.g. to try it, demo
-it, or work on another service that calls it). Everything runs in Docker; you
-don't need Node installed for this path.
+it, or work on another service that calls it). Everything runs in Docker; Node
+is only needed once, to generate the JWT keys.
 
 ```bash
 docker compose up --build
