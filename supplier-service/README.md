@@ -141,18 +141,32 @@ other value is a `409` and nothing is written.
 To start run `docker compose up -d --build` and the app should run on port `3002`.
 All seed data (3) are specified in `supplier-service/supabase/schemas/seed.sql`.
 
-Write routes need an RS256 Bearer token signed with `keys/private.pem`. From
-`supplier-service/` (after `yarn install`):
+Write routes need an RS256 Bearer token signed with `keys/private.pem`. The user
+service puts `roles` on the token as an **array** (`USER` or `ADMINISTRATOR`),
+not a single `role` string. From `supplier-service/` (after `yarn install`):
 
 ```bash
+# User token
 TOKEN=$(node --input-type=module -e "
 import jwt from 'jsonwebtoken';
 import fs from 'node:fs';
-const token = jwt.sign({}, fs.readFileSync('./keys/private.pem', 'utf8'), {
-  algorithm: 'RS256',
-  subject: 'demo-admin',
-  expiresIn: '15m',
-});
+const token = jwt.sign(
+  { roles: ['USER'] },
+  fs.readFileSync('./keys/private.pem', 'utf8'),
+  { algorithm: 'RS256', subject: 'demo-user', expiresIn: '15m' },
+);
+process.stdout.write(token);
+")
+
+# Admin token (use this for the write curls below)
+TOKEN=$(node --input-type=module -e "
+import jwt from 'jsonwebtoken';
+import fs from 'node:fs';
+const token = jwt.sign(
+  { roles: ['ADMIN'] },
+  fs.readFileSync('./keys/private.pem', 'utf8'),
+  { algorithm: 'RS256', subject: 'demo-admin', expiresIn: '15m' },
+);
 process.stdout.write(token);
 ")
 ```
@@ -160,11 +174,19 @@ process.stdout.write(token);
 
 | API endpoint                                | Sample curl command                                                                                                                                                                             |
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+<<<<<<< HEAD
 | `GET /suppliers`                            | `curl localhost:3002/suppliers`                                                                                                                                                                 |
 | `GET /suppliers/search?q=coffee`            | `curl "localhost:3002/suppliers/search?q=coffee"`                                                                                                                                               |
 | `GET /suppliers/search-radius`              | `curl "localhost:3002/suppliers/search-radius?latitude=1.294167&longitude=103.773611&radius=500"`                                                                                                |
 | `GET /suppliers/category?type=printing`     | `curl "localhost:3002/suppliers/category?type=printing"`                                                                                                                                        |
 | `GET /supplier/:id`                         | `curl localhost:3002/supplier/1`                                                                                                                                                                |
+=======
+| `GET /suppliers`                            | `curl localhost:3001/suppliers`                                                                                                                                                                 |
+| `GET /suppliers/search?q=coffee`            | `curl "localhost:3001/suppliers/search?q=coffee"`                                                                                                                                               |
+| `GET /suppliers/search-radius`              | `curl "localhost:3001/suppliers/search-radius?latitude=1.294167&longitude=103.773611&radius=500"`                                                                                                |
+| `GET /suppliers/category?type=printing`     | `curl "localhost:3001/suppliers/category?type=printing"`                                                                                                                                        |
+| `GET /supplier/:id`                         | `curl localhost:3001/supplier/1`                                                                                                                                                                |
+>>>>>>> a76812b (Add in the location post gis functionality)
 | `POST /supplier`                            | see the multi-line sample below; the body needs all seven days of `openingHours`                                                                                                                |
 | `PUT /supplier/:id`                         | `curl -X PUT localhost:3002/supplier/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'`       |
 | `DELETE /supplier/:id`                      | `curl -X DELETE localhost:3002/supplier/1 -H "Authorization: Bearer $TOKEN"`                                                                                                                    |
