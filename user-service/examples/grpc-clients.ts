@@ -6,10 +6,10 @@ import { createPeerClients } from '@foc/grpc';
 export function createClients() {
   return createPeerClients(
     {
-      user: process.env.USER_GRPC_ADDR ?? 'localhost:50052',
-      order: process.env.ORDER_GRPC_ADDR ?? 'localhost:50051',
-      credit: process.env.CREDIT_GRPC_ADDR ?? 'localhost:50053',
-      supplier: process.env.SUPPLIER_GRPC_ADDR ?? 'localhost:50054',
+      user: process.env.USER_GRPC_ADDR ?? 'localhost:50051',
+      order: process.env.ORDER_GRPC_ADDR ?? 'localhost:50053',
+      credit: process.env.CREDIT_GRPC_ADDR ?? 'localhost:50054',
+      supplier: process.env.SUPPLIER_GRPC_ADDR ?? 'localhost:50052',
     },
     { timeoutMs: Number(process.env.GRPC_TIMEOUT_MS ?? 3000) },
   );

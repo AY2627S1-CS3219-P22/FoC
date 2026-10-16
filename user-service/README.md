@@ -40,8 +40,8 @@ There are two ways to run this service. Choose based on what you're doing.
 ### Path A — Quick run ("just start it") 🚀
 
 Use this when you just want the service **up and running** (e.g. to try it, demo
-it, or work on another service that calls it). Everything runs in Docker; you
-don't need Node installed for this path.
+it, or work on another service that calls it). Everything runs in Docker; Node
+is only needed once, to generate the JWT keys.
 
 ```bash
 docker compose up --build
@@ -52,10 +52,15 @@ starts the service — which **automatically applies database migrations** befor
 booting. When it's ready you'll have:
 
 - REST API on <http://localhost:3001>
-- gRPC on `localhost:50052`
+- gRPC on `localhost:50051`
 
 Stop it with `Ctrl+C`, or wipe everything (including the database) with
 `docker compose down -v`.
+
+> **Note:** the JWT keys are not baked into the image — compose mounts your local
+> `keys/` folder into the container (read-only). Run `npm run keys:generate`
+> first (see above), otherwise the container exits at boot with
+> "Cannot read JWT_PRIVATE_KEY_PATH".
 
 > **Note:** this path applies migrations that are already committed in
 > `prisma/migrations/`. It does **not** create new ones — that's a dev task
@@ -263,7 +268,7 @@ Copy `.env.example` → `.env`. `.env` is gitignored — never commit real secre
 | -------------- | -------------------------------- | ------------------- |
 | `DATABASE_URL`         | Postgres connection string           | see `.env.example`   |
 | `PORT`                 | REST (Express) port                  | `3001`               |
-| `GRPC_PORT`            | gRPC port (internal profile RPC)     | `50052`              |
+| `GRPC_PORT`            | gRPC port (internal profile RPC)     | `50051`              |
 | `JWT_PRIVATE_KEY_PATH` | RS256 private key (signs tokens)     | `./keys/private.pem` |
 | `JWT_PUBLIC_KEY_PATH`  | RS256 public key (verifies tokens)   | `./keys/public.pem`  |
 | `JWT_EXPIRES_IN`       | Access-token lifetime                | `15m`                |

@@ -27,7 +27,7 @@ RUN npm ci --include=dev \
 WORKDIR /repo/supplier-service/grpc
 ENV NODE_ENV=production
 ENV GRPC_HOST=0.0.0.0
-ENV GRPC_PORT=50054
-EXPOSE 50054
+ENV GRPC_PORT=50052
+EXPOSE 50052
 
 CMD ["npx", "tsx", "src/index.ts"]
