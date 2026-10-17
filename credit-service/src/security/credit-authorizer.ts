@@ -3,7 +3,7 @@ import { Metadata, status } from '@grpc/grpc-js';
 import jwt from 'jsonwebtoken';
 
 export type CreditCaller = 'user-service' | 'order-service' | 'frontend-service' | 'admin-service';
-export type CreditRpc = 'InitCredits' | 'GetBalance' | 'GetCreditHistory' | 'ReserveCredits' | 'UpdateReservation' | 'ReleaseCredits' | 'SettleCredits';
+export type CreditRpc = 'InitCredits' | 'GetBalance' | 'GetCreditHistory' | 'ReserveCredits' | 'UpdateReservation' | 'ReleaseCredits' | 'SettleCredits' | 'GetReservation';
 export interface AccessEvent {
   timestamp: string;
   rpc: CreditRpc;
@@ -26,7 +26,7 @@ export class CreditAccessError extends Error {
 
 const permissions: Record<CreditCaller, readonly CreditRpc[]> = {
   'user-service': ['InitCredits', 'GetBalance', 'GetCreditHistory'],
-  'order-service': ['ReserveCredits', 'UpdateReservation', 'ReleaseCredits', 'SettleCredits', 'GetBalance'],
+  'order-service': ['ReserveCredits', 'UpdateReservation', 'ReleaseCredits', 'SettleCredits', 'GetReservation', 'GetBalance'],
   'frontend-service': ['GetBalance', 'GetCreditHistory'],
   'admin-service': ['GetBalance', 'GetCreditHistory'],
 };

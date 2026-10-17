@@ -24,6 +24,10 @@ export class CreditController {
     return this.service.transferReservation(request);
   }
 
+  getReservation(request: Parameters<CreditService['getReservation']>[0]) {
+    return this.service.getReservation(request);
+  }
+
   getCreditBalance(request: Parameters<CreditService['displayCredit']>[0]) {
     return this.service.displayCredit(request);
   }

@@ -69,6 +69,7 @@ JavaScript clients use camelCase fields via `createCreditClient` from `@foc/grpc
 | `UpdateReservation` | Order Service supplies the last reservation version | Changes an active reservation's amount, subject to available balance; that order/version identifies retries. |
 | `ReleaseCredits` | Order Service confirms cancellation | Removes the hold without changing total credits. |
 | `SettleCredits` | Order Service confirms completion and the courier ID | Atomically debits requester total/reserved credits and credits the courier total. |
+| `GetReservation` | Order Service supplies the order ID | Returns the reservation's current status, amount, and version. Read-only; it records no retry result. |
 
 Both participants must already have accounts. Credits are positive whole integers
 within the protobuf `int32` range. The requester cannot also be the courier.
@@ -99,14 +100,19 @@ Retry rules:
   and amount. A new edit with a stale version is rejected.
 - A successfully committed operation returns its **original response** on retry,
   even after later edits, release, or settlement. Saved results are checked before
-  current-state/version checks. Use `GetBalance`/`GetCreditHistory` for current state;
-  an old retry response must not overwrite a newer locally confirmed version.
+  current-state/version checks. Use `GetReservation` for the current reservation
+  state/version, or `GetBalance`/`GetCreditHistory` for account state; an old retry
+  response must not overwrite a newer locally confirmed version.
 - Different parameters for an already committed identity are rejected. For example,
   changing an update's amount while keeping its order/version is a conflict.
   Failed transactions leave no successful retry record. Records have no automatic
   expiry in this phase.
 - Timeout/disconnection can occur after a commit. Retry the same request to resolve
   that uncertainty; do not advance `expectedVersion` just because the response was lost.
+  If Order Service no longer has the original request (for example, after losing its
+  pending-operation record), reconcile with `GetReservation` instead of guessing.
+  A `FAILED_PRECONDITION` stale-version error means another edit committed first:
+  reload with `GetReservation` before deciding whether to send a new edit.
 
 Regenerate clients for the simplified request contracts. The retired protobuf key
 fields are reserved, and existing stored retry records are retained. Earlier

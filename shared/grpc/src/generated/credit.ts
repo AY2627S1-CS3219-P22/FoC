@@ -7,6 +7,7 @@ import type { CreditHistoryEntry as _credit_CreditHistoryEntry, CreditHistoryEnt
 import type { CreditServiceClient as _credit_CreditServiceClient, CreditServiceDefinition as _credit_CreditServiceDefinition } from './credit/CreditService';
 import type { GetBalanceRequest as _credit_GetBalanceRequest, GetBalanceRequest__Output as _credit_GetBalanceRequest__Output } from './credit/GetBalanceRequest';
 import type { GetCreditHistoryRequest as _credit_GetCreditHistoryRequest, GetCreditHistoryRequest__Output as _credit_GetCreditHistoryRequest__Output } from './credit/GetCreditHistoryRequest';
+import type { GetReservationRequest as _credit_GetReservationRequest, GetReservationRequest__Output as _credit_GetReservationRequest__Output } from './credit/GetReservationRequest';
 import type { InitCreditsRequest as _credit_InitCreditsRequest, InitCreditsRequest__Output as _credit_InitCreditsRequest__Output } from './credit/InitCreditsRequest';
 import type { ReleaseCreditsRequest as _credit_ReleaseCreditsRequest, ReleaseCreditsRequest__Output as _credit_ReleaseCreditsRequest__Output } from './credit/ReleaseCreditsRequest';
 import type { Reservation as _credit_Reservation, Reservation__Output as _credit_Reservation__Output } from './credit/Reservation';
@@ -26,6 +27,7 @@ export interface ProtoGrpcType {
     CreditService: SubtypeConstructor<typeof grpc.Client, _credit_CreditServiceClient> & { service: _credit_CreditServiceDefinition }
     GetBalanceRequest: MessageTypeDefinition<_credit_GetBalanceRequest, _credit_GetBalanceRequest__Output>
     GetCreditHistoryRequest: MessageTypeDefinition<_credit_GetCreditHistoryRequest, _credit_GetCreditHistoryRequest__Output>
+    GetReservationRequest: MessageTypeDefinition<_credit_GetReservationRequest, _credit_GetReservationRequest__Output>
     InitCreditsRequest: MessageTypeDefinition<_credit_InitCreditsRequest, _credit_InitCreditsRequest__Output>
     ReleaseCreditsRequest: MessageTypeDefinition<_credit_ReleaseCreditsRequest, _credit_ReleaseCreditsRequest__Output>
     Reservation: MessageTypeDefinition<_credit_Reservation, _credit_Reservation__Output>

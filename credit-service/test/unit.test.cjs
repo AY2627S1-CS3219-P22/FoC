@@ -15,6 +15,7 @@ test('invalid requests fail before accessing the database', async () => {
     () => service.updateReservation({ orderId: 'o', amount: 2 }),
     () => service.updateReservation({ orderId: 'o', amount: 2, expectedVersion: 0 }),
     () => service.updateReservation({ orderId: 'o', amount: 2, expectedVersion: 1.5 }),
+    () => service.getReservation({ orderId: '' }),
     () => service.displayUserHistory({ userId: 'u', pageSize: 101 }),
     () => service.displayUserHistory({ userId: 'u', pageToken: 'invalid' }),
     () => service.displayUserHistory({ userId: 'u', pageToken: Buffer.from(JSON.stringify({ userId: 'other', sequenceId: '1' })).toString('base64url') }),

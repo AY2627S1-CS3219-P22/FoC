@@ -8,7 +8,7 @@ the other services retain their scaffolds. Existing REST implementations are sep
 | -------- | ----------------- | ----------------------------------------------------------------- | ------------------------------------------ |
 | User     | 50052             | `GetPublicProfile`                                                | `user-service/proto/user.proto` (existing) |
 | Order    | 50051             | `GetOrder`                                                        | `shared/grpc/proto/order.proto`            |
-| Credit   | 50053             | `InitCredits`, `GetBalance`, `GetCreditHistory`, `ReserveCredits`, `UpdateReservation`, `ReleaseCredits`, `SettleCredits` | `shared/grpc/proto/credit.proto`           |
+| Credit   | 50053             | `InitCredits`, `GetBalance`, `GetCreditHistory`, `ReserveCredits`, `UpdateReservation`, `ReleaseCredits`, `SettleCredits`, `GetReservation` | `shared/grpc/proto/credit.proto`           |
 | Supplier | 50054             | `GetSupplier`                                                     | `shared/grpc/proto/supplier.proto`         |
 
 Credit setup, database migrations, retry rules, and integration tests are documented

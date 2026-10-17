@@ -30,9 +30,9 @@ test('unconfigured, missing, incorrect and duplicated credentials fail closed', 
   assert.throws(() => authorizer.authorize('InitCredits', duplicate, {}), denied(status.UNAUTHENTICATED));
 });
 
-test('User Service can initialise accounts while Order Service alone can mutate reservations', () => {
+test('User Service can initialise accounts while Order Service alone can mutate or read reservations', () => {
   authorizer.authorize('InitCredits', metadata('user-service'), { userId: 'u' });
-  for (const rpc of ['ReserveCredits', 'UpdateReservation', 'ReleaseCredits', 'SettleCredits']) {
+  for (const rpc of ['ReserveCredits', 'UpdateReservation', 'ReleaseCredits', 'SettleCredits', 'GetReservation']) {
     authorizer.authorize(rpc, metadata('order-service'), {});
     for (const caller of ['user-service', 'frontend-service', 'admin-service']) {
       assert.throws(() => authorizer.authorize(rpc, metadata(caller, sign('admin', ['USER', 'ADMINISTRATOR'])), {}), denied(status.PERMISSION_DENIED));

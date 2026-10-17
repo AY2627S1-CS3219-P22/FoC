@@ -101,14 +101,18 @@ test('update retries use order and expected version, replay after later changes,
   const second = await service.updateReservation(secondEdit);
   assert.equal(second.version, 3);
   assert.deepEqual(await service.updateReservation(firstEdit), first);
+  // Replays return the original snapshot; the read reports current state for reconciliation.
+  assert.deepEqual(await service.getReservation({ orderId }), second);
   assert.equal((await service.displayCredit({ userId: requesterId })).reservedCredits, 3);
   await assert.rejects(service.updateReservation({ ...firstEdit, amount: 6 }), rejected('FAILED_PRECONDITION'));
   const retries = (await rows('idempotency_records', requesterId)).filter(row => row.operation === 'UPDATE');
   assert.equal(retries.length, 2);
   assert.deepEqual(retries.map(row => JSON.parse(row.key)).sort((a, b) => a[1] - b[1]), [[orderId, 1], [orderId, 2]]);
-  await service.transferReservation({ orderId, courierId });
+  const settled = await service.transferReservation({ orderId, courierId });
   assert.deepEqual(await service.updateReservation(firstEdit), first);
   assert.deepEqual(await service.updateReservation(secondEdit), second);
+  assert.deepEqual(await service.getReservation({ orderId }), settled);
+  assert.equal(settled.version, 4);
   assert.equal((await service.displayCredit({ userId: requesterId })).totalCredits, 7);
   assert.equal((await service.displayCredit({ userId: courierId })).totalCredits, 13);
   assert.equal((await rows('history', requesterId)).length, 5);
@@ -174,6 +178,7 @@ test('release racing settlement produces exactly one terminal transition', async
 
 test('missing accounts, insufficient balance and self-transfer leave reservations intact', async () => {
   await assert.rejects(service.displayCredit({ userId: id() }), rejected('NOT_FOUND'));
+  await assert.rejects(service.getReservation({ orderId: id() }), rejected('NOT_FOUND'));
   await assert.rejects(service.createReservation({ orderId: id(), requesterId: id(), amount: 1 }), rejected('NOT_FOUND'));
   const requesterId = await user(); const orderId = id();
   await assert.rejects(service.createReservation({ orderId, requesterId, amount: 11 }), rejected('FAILED_PRECONDITION'));
@@ -346,6 +351,9 @@ test('real gRPC endpoints enforce caller scopes, user ownership, admin roles and
   assert.ok(reservation.reservationId); assert.equal(reservation.version, 1);
   const edit = { orderId, amount: 3, expectedVersion: reservation.version };
   const updated = await client.updateReservation(edit, orderOptions);
+  assert.deepEqual(await client.getReservation({ orderId }, orderOptions), updated);
+  await assert.rejects(client.getReservation({ orderId }, ownRead), rejected(status.PERMISSION_DENIED));
+  await assert.rejects(client.getReservation({ orderId: id() }, orderOptions), rejected(status.NOT_FOUND));
   assert.equal((await client.settleCredits({ orderId, courierId }, orderOptions)).status, 'SETTLED');
   assert.deepEqual(await client.updateReservation(edit, orderOptions), updated);
   await assert.rejects(client.updateReservation({ ...edit, amount: 2 }, orderOptions), rejected(status.FAILED_PRECONDITION));

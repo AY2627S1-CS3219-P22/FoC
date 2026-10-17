@@ -161,6 +161,12 @@ export class CreditService {
     });
   }
 
+  // Reads committed state for reconciliation; retries must still repeat the original mutation.
+  async getReservation(request: { orderId: string }): Promise<ReservationView> {
+    const orderId = identifier(request.orderId, 'orderId');
+    return this.database.transaction(async ({ credit }) => reservationView(found(await credit.findReservation(orderId), 'Reservation')));
+  }
+
   async displayUserHistory(request: { userId: string; pageSize?: number; pageToken?: string }): Promise<{ entries: CreditHistoryView[]; nextPageToken: string }> {
     const userId = identifier(request.userId, 'userId');
     const pageSize = request.pageSize === undefined || request.pageSize === 0 ? 50 : positive(request.pageSize, 'pageSize');

@@ -21,6 +21,7 @@ import type { ReserveCreditsRequest } from './generated/credit/ReserveCreditsReq
 import type { Reservation__Output as Reservation } from './generated/credit/Reservation';
 import type { ReleaseCreditsRequest } from './generated/credit/ReleaseCreditsRequest';
 import type { SettleCreditsRequest } from './generated/credit/SettleCreditsRequest';
+import type { GetReservationRequest } from './generated/credit/GetReservationRequest';
 import type { GetSupplierRequest } from './generated/supplier/GetSupplierRequest';
 import type { Supplier__Output as Supplier } from './generated/supplier/Supplier';
 
@@ -155,6 +156,16 @@ export function createCreditClient(target: string, config: ClientConfig = {}) {
     settleCredits(request: SettleCreditsRequest, options: RpcOptions = {}): Promise<Reservation> {
       return unary((callback) =>
         client.settleCredits(
+          request,
+          options.metadata ?? new Metadata(),
+          callOptions(timeoutMs, options),
+          callback,
+        ),
+      );
+    },
+    getReservation(request: GetReservationRequest, options: RpcOptions = {}): Promise<Reservation> {
+      return unary((callback) =>
+        client.getReservation(
           request,
           options.metadata ?? new Metadata(),
           callOptions(timeoutMs, options),

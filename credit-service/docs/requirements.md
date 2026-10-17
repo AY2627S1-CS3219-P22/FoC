@@ -56,7 +56,8 @@ Call `UpdateReservation` with the last returned credit reservation version; it i
 separate from the order's own version. Credit Service derives the update identity
 from the order ID and expected version. Retry an uncertain edit with the same amount
 and expected version. Persist the returned version for the next edit; never advance
-it solely because a response timed out. No credit RPC accepts a caller retry key.
+it solely because a response timed out. After a stale-version rejection, or when
+the original request is no longer known, reload the reservation with `GetReservation`. No credit RPC accepts a caller retry key.
 Do not call
 `ReleaseCredits` followed by `ReserveCredits` to edit a reward: those are separate
 transactions, release makes the reservation terminal, and the same errand cannot

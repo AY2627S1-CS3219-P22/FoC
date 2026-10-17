@@ -32,6 +32,7 @@ Idempotency is part of `CreditRepository`, not a separately committed store.
 | `updateCredits` | `updateReservation` | Implemented |
 | `releaseCredits` | `releaseReservation` | Implemented |
 | `transferCredits` | `transferReservation` | Implemented |
+| `getReservation` | `getReservation` | Implemented (supporting read, not in the diagram) |
 | `archiveCredits` | `archiveCredit` | Deferred until User Service is ready |
 | `restoreArchivedCredits` | `restoreArchivedAccount` | Deferred until User Service is ready |
 
@@ -95,6 +96,10 @@ account object; records are loaded through the repository.
   Saved responses and request hashes provide exact replay and reject conflicting
   parameters before current-state/version validation. Callers pass no retry key;
   retired protobuf field numbers/names are reserved.
+- `GetReservation` is a supporting read outside the diagram. Order Service uses it to
+  reload the current version after a stale-version rejection and to reconcile pending
+  operations whose original request was lost. It never replaces repeating the
+  original request to resolve an uncertain mutation.
 - Extra locking/transaction helpers support concurrency without changing the diagram's
   controller/service/repository responsibilities.
 

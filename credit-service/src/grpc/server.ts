@@ -38,6 +38,7 @@ export function createGrpcServer(service: CreditService, security: CreditSecurit
     UpdateReservation: unary('UpdateReservation', request => controller.updateCredits(request), authorizer),
     ReleaseCredits: unary('ReleaseCredits', request => controller.releaseCredits(request), authorizer),
     SettleCredits: unary('SettleCredits', request => controller.transferCredits(request), authorizer),
+    GetReservation: unary('GetReservation', request => controller.getReservation(request), authorizer),
   };
   return createServer(Contract.service, handlers);
 }
