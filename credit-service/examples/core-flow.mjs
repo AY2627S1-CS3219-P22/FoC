@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { Metadata } from '@grpc/grpc-js';
+import { readFileSync } from 'node:fs';
+import { credentials, Metadata } from '@grpc/grpc-js';
 import { createCreditClient } from '@foc/grpc';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
@@ -8,7 +9,10 @@ dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)), quiet:
 if (!process.env.CREDIT_USER_SERVICE_TOKEN || !process.env.CREDIT_ORDER_SERVICE_TOKEN) {
   throw new Error('Run npm run security:setup --workspace @foc/credit-grpc before the local demo');
 }
-const client = createCreditClient(process.env.CREDIT_GRPC_ADDR ?? '127.0.0.1:50053');
+// Set CREDIT_GRPC_CA_PATH to the trusted server certificate when the service uses TLS (e.g. the container).
+const caPath = process.env.CREDIT_GRPC_CA_PATH;
+const client = createCreditClient(process.env.CREDIT_GRPC_ADDR ?? '127.0.0.1:50053',
+  caPath ? { credentials: credentials.createSsl(readFileSync(caPath)) } : {});
 const userMetadata = new Metadata();
 userMetadata.set('x-credit-service-token', process.env.CREDIT_USER_SERVICE_TOKEN);
 const orderMetadata = new Metadata();

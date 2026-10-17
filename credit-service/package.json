@@ -11,8 +11,9 @@
     "start": "node dist/index.js",
     "db:migrate": "tsx src/database/migrate.ts",
     "security:setup": "node scripts/configure-local.mjs",
+    "tls:setup": "node scripts/configure-container-tls.mjs",
     "test": "node --test test/unit.test.cjs test/security.test.cjs",
-    "test:integration": "node --test test/integration.test.cjs"
+    "test:integration": "node --test test/integration.test.cjs test/schema.test.cjs"
   },
   "dependencies": {
     "@foc/grpc": "0.1.0",

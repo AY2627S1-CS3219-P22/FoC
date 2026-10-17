@@ -34,7 +34,8 @@ npm run dev --workspace @foc/credit-grpc
 Only copy `.env.example` if you do not already have a credit `.env` file.
 The database uses `127.0.0.1:54333`, separate from the user and supplier databases.
 Compose starts a small `postgres:17-alpine` database; the Node process runs on your
-host. App containerisation is a separate task. Migrations are explicit, transactional,
+host. To run the service itself in a container, see [Run in containers](#run-in-containers).
+Migrations are explicit, transactional,
 and tracked with checksums. Create a new migration when changing an applied schema.
 No seed data is needed: use `InitCredits` to create each account.
 
@@ -49,11 +50,69 @@ and transfers those 3 to the courier. Final total balances are 7 and 13.
 Each run uses new identifiers. The local demo reads scoped credentials from
 `credit-service/.env`; history access is tested separately with a User Service JWT.
 
+See [the schema reference](db/README.md) for tables, relationships, and constraints.
+
 Stop the development database without deleting its data:
 
 ```bash
 docker compose -f credit-service/compose.yaml stop db
 ```
+
+## Run in containers
+
+The Compose `app` profile builds the service image, applies migrations in a one-off
+container, and then starts the gRPC server. From the **repository root**, with Docker
+Desktop running:
+
+```bash
+cp credit-service/.env.example credit-service/.env   # only if you have no .env yet
+npm run security:setup --workspace @foc/credit-grpc
+npm run tls:setup --workspace @foc/credit-grpc
+docker compose -f credit-service/compose.yaml --profile app up -d --build --wait
+```
+
+| Component | Host address | Container address |
+| --- | --- | --- |
+| Credit gRPC (TLS) | `127.0.0.1:50053` | `app:50053` |
+| Development PostgreSQL | `127.0.0.1:54333` | `db:5432` |
+
+The image uses Node.js 22, compiled JavaScript, production dependencies only, and the
+unprivileged `node` user. Its build context is the repository root because the service
+imports the shared `@foc/grpc` workspace; `Dockerfile.dockerignore` allowlists the build
+inputs, and `.env` files and keys never enter the image. Configuration is supplied at
+runtime:
+
+- **Credentials:** Compose reads the scoped service tokens from `credit-service/.env`.
+  The container refuses to start without at least one token.
+- **TLS:** the container listens on `0.0.0.0` with `NODE_ENV=production`, so TLS is
+  mandatory. `tls:setup` creates a local self-signed certificate (valid for
+  `localhost`, `127.0.0.1`, and `credit-service`) in the git-ignored `credit-service/keys/`,
+  mounted read-only into the container. Use CA-issued certificates in deployment.
+  The key is owner-readable only; on a Linux host whose user ID is not 1000, make it
+  readable by the container's `node` user (UID 1000).
+- **User JWTs:** when `CREDIT_USER_JWT_PUBLIC_KEY_PATH` is set in `.env`, the container
+  uses `user-service/keys/public.pem`, mounted read-only.
+
+The health check reports ready only when the gRPC listener completes a TLS handshake
+and the migrated database answers. It calls no RPC, so it needs no credential and
+adds no access-audit entries. Run the demo against the container:
+
+```bash
+CREDIT_GRPC_CA_PATH=credit-service/keys/server-cert.pem node credit-service/examples/core-flow.mjs
+```
+
+Stop the host `npm run dev` process first; both bind `127.0.0.1:50053`. After adding a
+migration, rebuild and rerun it before restarting:
+
+```bash
+docker compose -f credit-service/compose.yaml --profile app build
+docker compose -f credit-service/compose.yaml --profile app run --rm migrate
+docker compose -f credit-service/compose.yaml --profile app up -d --wait
+```
+
+Stop the stack while keeping the `credit-data` volume:
+`docker compose -f credit-service/compose.yaml --profile app down`. This is a local
+stack: ports bind to loopback, and other services join it on a shared network later.
 
 ## API and rules
 
@@ -194,4 +253,4 @@ exercise every ordering of competing intents. OpenSSL is required for the TLS te
   durable retry/reconciliation handling across services.
 - Deferred until User Service is ready: archived-user storage and account archive/restore, including retention, active-reservation and identity rules.
 - Add authenticated balance/history access for frontend/admin users.
-- Containerise the application and configure deployment credentials/transport.
+- Configure deployment credentials and transport: secret storage and CA-issued certificates.

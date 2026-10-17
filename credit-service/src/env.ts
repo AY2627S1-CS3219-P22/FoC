@@ -22,7 +22,8 @@ const schema = z.object({
   SUPPLIER_GRPC_ADDR: z.string().min(1).default('localhost:50054'),
 });
 
-export const env = schema.parse(process.env);
+// Compose passes unset optional settings as empty strings; treat them as absent.
+export const env = schema.parse(Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== '')));
 if (![env.CREDIT_USER_SERVICE_TOKEN, env.CREDIT_ORDER_SERVICE_TOKEN, env.CREDIT_FRONTEND_SERVICE_TOKEN, env.CREDIT_ADMIN_SERVICE_TOKEN].some(Boolean)) {
   throw new Error('Configure scoped credit service credentials; run npm run security:setup --workspace @foc/credit-grpc for local setup');
 }
