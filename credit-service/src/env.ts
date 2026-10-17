@@ -15,11 +15,6 @@ const schema = z.object({
   CREDIT_TLS_CERT_PATH: z.string().min(1).optional(),
   CREDIT_TLS_KEY_PATH: z.string().min(1).optional(),
   GRPC_PORT: z.coerce.number().int().min(1).max(65535).default(50054),
-  GRPC_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
-  USER_GRPC_ADDR: z.string().min(1).default('localhost:50051'),
-  ORDER_GRPC_ADDR: z.string().min(1).default('localhost:50053'),
-  CREDIT_GRPC_ADDR: z.string().min(1).default('localhost:50054'),
-  SUPPLIER_GRPC_ADDR: z.string().min(1).default('localhost:50052'),
 });
 
 // Compose passes unset optional settings as empty strings; treat them as absent.

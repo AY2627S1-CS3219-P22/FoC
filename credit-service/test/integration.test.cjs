@@ -73,6 +73,19 @@ test('concurrent reservations cannot overspend', async () => {
   assert.equal((await rows('history', userId)).length, 6);
 });
 
+test('an update to the current amount still consumes its version', async () => {
+  const requesterId = await user(); const orderId = id();
+  const reservation = await service.createReservation({ orderId, requesterId, amount: 4 });
+  const same = await service.updateReservation({ orderId, amount: 4, expectedVersion: reservation.version });
+  assert.equal(same.version, 2);
+  assert.equal((await service.displayCredit({ userId: requesterId })).reservedCredits, 4);
+  const updates = (await rows('history', requesterId)).filter(row => row.type === 'RESERVATION_UPDATED');
+  assert.deepEqual(updates.map(row => [row.total_delta, row.reserved_delta]), [[0, 0]]);
+  // The next edit uses the returned version; reusing the old one is a conflicting retry.
+  await assert.rejects(service.updateReservation({ orderId, amount: 5, expectedVersion: 1 }), rejected('FAILED_PRECONDITION'));
+  assert.equal((await service.updateReservation({ orderId, amount: 5, expectedVersion: same.version })).version, 3);
+});
+
 test('concurrent amount updates accept only one request for the same version', async () => {
   const requesterId = await user(); const orderId = id();
   await service.createReservation({ orderId, requesterId, amount: 4 });

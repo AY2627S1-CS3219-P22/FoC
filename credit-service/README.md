@@ -12,7 +12,7 @@ the diagram's names; adapters retain existing API/database names such as `orderI
 and `SETTLED`. The reference documents these mappings and the features still pending.
 
 The runnable package lives in `credit-service/`, with implementation in `src/`.
-The `src/grpc/` folder contains its gRPC transport and peer-client wiring.
+The `src/grpc/` folder contains its gRPC transport. Credit Service makes no outbound gRPC calls.
 
 [FR/NFR requirements and integration responsibilities](docs/requirements.md) map
 the team's specifications to implemented features, remaining work, and policy decisions.
@@ -138,7 +138,9 @@ assigned courier before requesting a mutation. User Service must validate regist
 before initialisation. Those callers are **not yet wired into their lifecycle hooks**.
 
 Reservations transition from `RESERVED` to either `RELEASED` or `SETTLED`.
-Updates keep the reservation `RESERVED` and increment its version. Terminal
+Updates keep the reservation `RESERVED` and increment its version. An update to the
+current amount is still an edit: it increments the version and records a zero-delta
+history entry, so the next edit must use the returned version. Terminal
 reservations cannot be reopened or updated. A duplicate create for the same order
 and matching requester/amount returns the existing reservation, including its
 terminal status, without creating another hold. Different details are rejected.

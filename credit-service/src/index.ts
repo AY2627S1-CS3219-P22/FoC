@@ -2,6 +2,7 @@ import { startServer, stopServer } from '@foc/grpc';
 import { env } from './env';
 import { createGrpcServer } from './grpc/server';
 import { CreditDatabase, createPool } from './database/database';
+import { verifyMigrations } from './database/migrate';
 import { CreditService } from './services/credit-service';
 import { securityConfig, transportCredentials } from './security/config';
 
@@ -13,7 +14,7 @@ async function main(): Promise<void> {
   let port: number;
   try {
     server = createGrpcServer(new CreditService(new CreditDatabase(pool)), config);
-    await pool.query('SELECT 1 FROM credit.schema_migrations LIMIT 1');
+    await verifyMigrations(pool);
     port = await startServer(server, env.GRPC_PORT, env.GRPC_HOST, credentials);
   } catch (error) {
     await pool.end();

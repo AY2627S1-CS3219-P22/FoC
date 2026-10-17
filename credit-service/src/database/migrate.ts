@@ -5,8 +5,30 @@ import path from 'node:path';
 import type { Pool } from 'pg';
 import { createPool } from './database';
 
+const migrationsDirectory = path.resolve(__dirname, '../../db/migrations');
+
+// Refuses to serve an outdated or edited schema instead of failing on the first mutation.
+export async function verifyMigrations(pool: Pool, directory = migrationsDirectory): Promise<void> {
+  const files = (await readdir(directory)).filter(file => file.endsWith('.sql')).sort();
+  let applied: Map<string, string>;
+  try {
+    const result = await pool.query<{ name: string; checksum: string }>('SELECT name, checksum FROM credit.schema_migrations');
+    applied = new Map(result.rows.map(row => [row.name, row.checksum]));
+  } catch (error) {
+    if ((error as { code?: string }).code !== '42P01' && (error as { code?: string }).code !== '3F000') throw error;
+    applied = new Map();
+  }
+  const pending: string[] = [];
+  for (const name of files) {
+    const checksum = createHash('sha256').update(await readFile(path.join(directory, name), 'utf8')).digest('hex');
+    if (!applied.has(name)) pending.push(name);
+    else if (applied.get(name) !== checksum) throw new Error(`Applied migration ${name} was modified; create a new migration instead`);
+  }
+  if (pending.length) throw new Error(`Credit database migrations not applied: ${pending.join(', ')}. Run npm run db:migrate --workspace @foc/credit-grpc`);
+}
+
 export async function migrate(pool: Pool): Promise<void> {
-  const directory = path.resolve(__dirname, '../../db/migrations');
+  const directory = migrationsDirectory;
   const files = (await readdir(directory)).filter(file => file.endsWith('.sql')).sort();
   const client = await pool.connect();
   try {

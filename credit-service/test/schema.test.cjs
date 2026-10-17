@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { before, after, test } = require('node:test');
 const { Pool } = require('pg');
-const { migrate } = require('../dist/database/migrate');
+const { migrate, verifyMigrations } = require('../dist/database/migrate');
 
 const url = process.env.CREDIT_TEST_DATABASE_URL;
 if (!url || new URL(url).pathname !== '/credit_test') {
@@ -92,3 +92,22 @@ test('retry records require a unique operation/key', () => transaction(async cli
   await client.query(query, values);
   await assert.rejects(client.query(query, values), { code: '23505' });
 }));
+
+test('startup verification rejects pending or edited migrations', async () => {
+  const { mkdtemp, copyFile, writeFile, readdir, rm } = require('node:fs/promises');
+  const { tmpdir } = require('node:os');
+  const path = require('node:path');
+  const source = path.resolve(__dirname, '../db/migrations');
+  await verifyMigrations(pool);
+  const directory = await mkdtemp(path.join(tmpdir(), 'credit-migrations-'));
+  try {
+    for (const name of await readdir(source)) await copyFile(path.join(source, name), path.join(directory, name));
+    await writeFile(path.join(directory, '999_pending.sql'), 'SELECT 1;');
+    await assert.rejects(verifyMigrations(pool, directory), /not applied: 999_pending\.sql/);
+    await rm(path.join(directory, '999_pending.sql'));
+    await writeFile(path.join(directory, '001_core.sql'), '-- edited');
+    await assert.rejects(verifyMigrations(pool, directory), /001_core\.sql was modified/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
