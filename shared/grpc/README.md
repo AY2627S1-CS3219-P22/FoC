@@ -18,6 +18,9 @@ Credit mutations derive retry identities internally; callers do not supply an
 idempotency key. For reward updates, persist the returned reservation `version` and
 send it as `expectedVersion`. Retry an uncertain update with its original version
 and amount; a subsequent edit uses the next confirmed reservation version.
+`createCreditClient` retries transient failures (`UNAVAILABLE`, `ABORTED`,
+`DEADLINE_EXCEEDED`) automatically by resending the identical request; see the
+Credit Service README for the policy. Other clients do not retry.
 
 ## Run locally
 

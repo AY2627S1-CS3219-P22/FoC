@@ -168,8 +168,14 @@ Retry rules:
   changing an update's amount while keeping its order/version is a conflict.
   Failed transactions leave no successful retry record. Records have no automatic
   expiry in this phase.
-- Timeout/disconnection can occur after a commit. Retry the same request to resolve
-  that uncertainty; do not advance `expectedVersion` just because the response was lost.
+- `createCreditClient` retries automatically: on `UNAVAILABLE`, `ABORTED`, or
+  `DEADLINE_EXCEEDED` it resends the identical request, up to 3 attempts by default,
+  with jittered exponential backoff (100 ms doubling, at most 1 s). `timeoutMs` bounds
+  each attempt; pass the incoming call's `deadline` to bound the whole call. No other
+  error is retried. Tune or disable it with `retry: { maxAttempts, initialBackoffMs,
+  maxBackoffMs }` (`maxAttempts: 1` disables it).
+- Timeout/disconnection can occur after a commit. If the client's attempts are exhausted
+  or the caller restarts, retry the same request later to resolve that uncertainty; do not advance `expectedVersion` just because the response was lost.
   If Order Service no longer has the original request (for example, after losing its
   pending-operation record), reconcile with `GetReservation` instead of guessing.
   A `FAILED_PRECONDITION` stale-version error means another edit committed first:

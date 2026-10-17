@@ -90,7 +90,7 @@ Coordinate the reservation notice required by F9.2.4 with the Notification owner
 
 | Requirement | Current evidence / remaining work |
 | --- | --- |
-| N3.2: automatic retries without duplicate processing | Credit derives stable operation identities and replays successful responses; automatic transient-failure retry handling is not implemented in the shared client. Add bounded retries with the original request/expected version and durable recovery where required |
+| N3.2: automatic retries without duplicate processing | Credit derives stable operation identities and replays successful responses. The shared credit client automatically resends the identical request on `UNAVAILABLE`/`ABORTED`/`DEADLINE_EXCEEDED` with bounded, jittered backoff. Callers still need durable recovery for failures that outlast those attempts or a caller restart |
 | N3.3: no successfully created errand without confirmed reservation | Requires Order Service integration and failure/timeout tests |
 | N4.1–N4.3: at-most-once processing, no lost updates, atomic credit transactions | Implemented and tested for core credit operations; extend to new operations and integrated service flows |
 | N1.1–N1.1.1: 95% of relevant REST requests/pages within 2 seconds at up to 5,000 users | No load/latency evidence yet; measure the complete backend/UI path. The shared default 3-second gRPC timeout does not establish this target |
