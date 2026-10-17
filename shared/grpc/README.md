@@ -6,10 +6,10 @@ Existing REST handlers, repositories, databases, auth, and startup files are unc
 
 | Service  | Default host port | RPCs                                                              | Contract                                   |
 | -------- | ----------------- | ----------------------------------------------------------------- | ------------------------------------------ |
-| User     | 50052             | `GetPublicProfile`                                                | `user-service/proto/user.proto` (existing) |
-| Order    | 50051             | `GetOrder`                                                        | `shared/grpc/proto/order.proto`            |
-| Credit   | 50053             | `GetBalance`, `ReserveCredits`, `ReleaseCredits`, `SettleCredits` | `shared/grpc/proto/credit.proto`           |
-| Supplier | 50054             | `GetSupplier`                                                     | `shared/grpc/proto/supplier.proto`         |
+| User     | 50051             | `GetPublicProfile`                                                | `user-service/proto/user.proto` (existing) |
+| Order    | 50053             | `GetOrder`                                                        | `shared/grpc/proto/order.proto`            |
+| Credit   | 50054             | `GetBalance`, `ReserveCredits`, `ReleaseCredits`, `SettleCredits` | `shared/grpc/proto/credit.proto`           |
+| Supplier | 50052             | `GetSupplier`, `IsOpen`                                           | `shared/grpc/proto/supplier.proto`         |
 
 The order and credit contracts are initial integration proposals because the
 fetched branches have no implementations for those services. Credit mutation
@@ -44,19 +44,18 @@ addresses when needed. Workspace commands run with that directory as the working
 directory, so dotenv reads the correct file. `GRPC_PORT` controls the listener;
 `*_GRPC_ADDR` controls outbound calls. `GRPC_TIMEOUT_MS` defaults to 3000.
 
-User Service's existing Docker Compose listens on **50051**, while its host-dev
-configuration defaults to **50052**. If using that Compose stack, set
-`USER_GRPC_ADDR=localhost:50051` and use another order port, for example
-`GRPC_PORT=50055` / `ORDER_GRPC_ADDR=localhost:50055`. This scaffolding preserves
-the existing Compose configuration. Docker callers use service DNS names instead
-of `localhost`, with the actual container listener port.
+The User Service uses gRPC port **50051**, Supplier **50052**, Order **50053**,
+and Credit **50054**.
+Keep these assignments consistent across host development, Docker Compose, and
+gRPC client configuration. Docker callers use service DNS names instead of
+`localhost`, with the actual container listener port.
 
 ## Calling another service
 
 ```typescript
 import { createCreditClient } from '@foc/grpc';
 
-const credit = createCreditClient('localhost:50053', { timeoutMs: 3000 });
+const credit = createCreditClient('localhost:50054', { timeoutMs: 3000 });
 try {
   const balance = await credit.getBalance({ userId: 'user-uuid' });
   console.log(balance.availableCredits);
