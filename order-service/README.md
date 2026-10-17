@@ -2,13 +2,15 @@
 
 Phase 2 implements core creation, acceptance, pickup, delivery, cancellation,
 expiry and credit-retry orchestration on top of Phase 1 persistence/authentication.
-External services are represented by injected interfaces, not real RPC adapters.
+External services use injected interfaces. Credit now has an opt-in RPC adapter;
+User/Supplier adapters remain pending.
 
 **Testing versus production:** integration tests inject test-only User/Supplier/
 Credit implementations and exercise the full workflow against real PostgreSQL.
 Normal `npm run dev`, `npm start`, and Docker startup do not inject those fakes.
-Creation, delivery and cancellation therefore return **503** until real adapters
-are integrated. Acceptance/pickup work for existing reserved orders. Fresh
+With Credit disabled, creation, delivery and cancellation return **503**.
+With Credit configured, delivery/cancellation invoke it; creation still needs
+User/Supplier adapters. Acceptance/pickup work for existing reserved orders. Fresh
 databases contain no orders; no endpoint bypasses credit reservation to seed them.
 Expiry/retry batch methods exist but no production scheduler runs them yet.
 
@@ -180,7 +182,7 @@ constraints are SQL-only; retain them in future migrations.
 
 Creation requires a confirmed reservation receipt matching order ID, requester
 and amount before publishing Unassigned. A stored RESERVED field alone is not
-proof of credit activity. Production has no real Credit adapter yet.
+proof of credit activity. A real Credit adapter is now opt-in; see the handoff section below.
 The PDF lifecycle is Unassigned -> Assigned -> Picked-up -> Delivered.
 Requester cancellation is allowed only while Unassigned. Expiry cancels all
 nonterminal orders, including after pickup, and refunds the requester. A courier
@@ -188,6 +190,10 @@ may therefore hold the item but receive no reward after expiry; item return,
 reimbursement and disputes are unspecified. Delivered/Cancelled are terminal.
 
 ## Write APIs and dependency boundaries
+
+The startup column below describes the default configuration with Credit disabled.
+With Credit configured, delivery/cancellation call the real gateway; creation still
+requires User/Supplier adapters.
 
 All writes require USER; admin-only tokens do not bypass ownership or transitions.
 The acting identity always comes from JWT, not the request body.
@@ -272,7 +278,7 @@ TEST_DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:55435/order
   npm run test:order:integration
 ```
 
-Expected: **16 auth/HTTP/domain tests and 21 database integration tests pass**. The
+Expected: **21 auth/HTTP/domain/adapter tests and 24 database integration tests pass**. The
 integration runner applies committed migrations and executes both read and core
 command suites sequentially. It creates test users/supplier snapshots and a
 test-only idempotent credit ledger inside the test process. No real User,
@@ -343,3 +349,38 @@ unique intents, health success/failure and persistence across new clients/API
 instances, plus the Phase 2 command suites described above. Real credit operations,
 combined multi-service end-to-end deployment,
 and frontend integration remain in the later approved phases.
+
+## Credit PR integration handoff
+
+The Order adapter targets `origin/credit-core-implementation`'s camelCase client
+contract. Shared protobuf/client changes here add only `GetReservation` and receipt
+fields needed for reconciliation; they do not import the Credit ledger or its retry
+implementation. Merge that PR before expecting real financial operations.
+
+To opt in when running REST locally, set `CREDIT_GRPC_ADDR=127.0.0.1:50054`,
+`CREDIT_ORDER_SERVICE_TOKEN` to the Order credential, and `CREDIT_GRPC_CA_PATH` to
+the trusted Credit server CA/certificate. `CREDIT_RPC_TIMEOUT_MS` defaults to 3000
+and bounds the whole RPC, including shared-client retries after that PR merges.
+Credentials are sent as `x-credit-service-token` on every call. Production and
+non-loopback connections require TLS. In containers use the Credit service DNS
+name with a matching certificate SAN, mount the CA read-only, and inject these
+settings into the Order container; the default Compose stack does not enable it.
+No configuration means Credit-dependent writes remain gated. Invalid configured
+credentials/TLS settings fail startup rather than silently disabling integration.
+
+`createCreditGateway` maps refund to release (no extra balance grant), keeps our
+operation UUID local, and relies on Credit's `(RPC operation, orderId)` retry identity.
+Missing accounts and permission/configuration failures remain recoverable pending
+work. Only sanitized numeric status and reason categories are persisted; raw gRPC
+messages/metadata are not. Transport failures remain uncertain.
+
+Creation recovery bypasses the advisory balance precheck after a reservation has
+been attempted. Before publication it checks the current reservation, including
+when a successful reserve receipt was persisted earlier: mutation replay responses
+may be historical. A missing/mismatched/terminal current reservation leaves creation
+pending for investigation rather than publishing an unfunded order.
+
+User/Supplier production adapters, User registration credit initialization, scheduled
+expiry/recovery, and reward editing are still separate work. Reward editing is not
+exposed: do not call UpdateReservation outside a coordinated durable Order workflow.
+There is no additional requester confirmation before courier delivery settlement.

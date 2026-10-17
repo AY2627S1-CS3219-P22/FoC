@@ -446,3 +446,51 @@ test('HTTP create and lifecycle routes use JWT identity and correct responses', 
     }
   }
 });
+
+test('uncertain reservation recovery bypasses an unavailable balance precheck', async () => {
+  const local = fakeDependencies();
+  const core = createOrderCommands(db, local.dependencies);
+  const data = input(), key = randomUUID();
+  local.control.reserveUnknownOnce = true;
+  const pending = await core.createOrder(requester, data, key);
+  assert.ok(!pending.ok && pending.reason === 'pending');
+  local.dependencies.credits!.getBalance = async () => ({ kind: 'unavailable' });
+  assert.equal(created(await core.createOrder(requester, data, key)).id, pending.creationId);
+  assert.equal(local.counts().debits, 1);
+});
+
+test('historical reserve success cannot publish a currently released reservation', async () => {
+  const local = fakeDependencies();
+  const original = local.dependencies.credits!.reserve;
+  local.dependencies.credits!.reserve = async request => {
+    const response = await original(request);
+    local.reservations.get(request.orderId)!.status = 'RELEASED';
+    return response; // Original successful response, rather than current state.
+  };
+  const core = createOrderCommands(db, local.dependencies);
+  const data = input(), key = randomUUID();
+  const result = await core.createOrder(requester, data, key);
+  assert.ok(!result.ok && result.reason === 'pending');
+  assert.equal(await db.order.findUnique({ where: { id: result.creationId! } }), null);
+  // The persisted successful reserve receipt must also be rechecked on replay.
+  const replay = await core.createOrder(requester, data, key);
+  assert.ok(!replay.ok && replay.reason === 'pending');
+});
+
+test('repairable settlement failures retain a retryable intent and sanitized diagnostics', async () => {
+  const local = fakeDependencies();
+  const core = createOrderCommands(db, local.dependencies);
+  const order = created(await core.createOrder(requester, input(), randomUUID()));
+  await core.transition(courier, order.id, 'accept');
+  await core.transition(courier, order.id, 'pickup');
+  const settle = local.dependencies.credits!.settle;
+  local.dependencies.credits!.settle = async () => ({ kind: 'unavailable', code: 5, reason: 'missing-account-or-reservation' });
+  const pending = await core.transition(courier, order.id, 'deliver');
+  assert.ok(pending.ok && pending.pending);
+  const operation = await db.creditOperation.findUniqueOrThrow({ where: { orderId_type: { orderId: order.id, type: 'SETTLE' } } });
+  assert.equal(operation.state, 'PENDING');
+  assert.equal(operation.lastError, 'unavailable:5:missing-account-or-reservation');
+  local.dependencies.credits!.settle = settle;
+  await core.retryPendingCredits();
+  assert.equal((await db.order.findUniqueOrThrow({ where: { id: order.id } })).creditState, 'SETTLED');
+});

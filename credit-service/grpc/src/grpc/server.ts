@@ -1,6 +1,7 @@
 import { CreditService, createServer, unimplemented, type CreditServiceHandlers } from '@foc/grpc';
 
 export const handlers: CreditServiceHandlers = {
+  GetReservation: unimplemented('GetReservation'),
   GetBalance: unimplemented('GetBalance'),
   ReserveCredits: unimplemented('ReserveCredits'),
   ReleaseCredits: unimplemented('ReleaseCredits'),

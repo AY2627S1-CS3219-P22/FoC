@@ -4,7 +4,9 @@
   "private": true,
   "type": "commonjs",
   "main": "dist/index.js",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "prisma generate && tsc -p tsconfig.json && node scripts/copyPrismaClient.cjs",
@@ -12,7 +14,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "test": "tsx --test tests/auth.test.ts tests/api.test.ts tests/domain.test.ts",
+    "test": "tsx --test tests/auth.test.ts tests/api.test.ts tests/domain.test.ts tests/creditGateway.test.ts",
     "test:integration": "prisma generate && tsx --test --test-concurrency=1 tests/persistence.integration.test.ts tests/commands.integration.test.ts",
     "test:typecheck": "tsc -p tests/tsconfig.json"
   },
@@ -21,7 +23,9 @@
     "dotenv": "^18.0.3",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "@foc/grpc": "0.1.0",
+    "@grpc/grpc-js": "^1.14.5"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

@@ -19,7 +19,8 @@
 - /health must probe PostgreSQL. Open-order availability uses database time.
 - Phase 2 core commands are implemented through injected dependency interfaces.
   Acceptance/pickup work independently; creation/delivery/cancellation require
-  adapters and return 503 with no side effects when they are missing. Never wire
+  adapters and return 503 with no side effects when they are missing. Credit is
+  opt-in via configuredCreditGateway; User/Supplier adapters remain absent. Never wire
   test fakes into production or claim credit success without a matching receipt.
   Expiry/retry batches are callable internally but not scheduled at startup.
   grpc/ remains an independent UNIMPLEMENTED scaffold until integration.

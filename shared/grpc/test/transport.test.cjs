@@ -39,6 +39,7 @@ test('every scaffold endpoint is reachable and returns UNIMPLEMENTED', async (t)
   for (const invoke of [
     () => user.getPublicProfile({ userId: 'user-1' }),
     () => order.getOrder({ orderId: 'order-1' }),
+    () => credit.getReservation({ orderId: 'order-1' }),
     () => credit.getBalance({ userId: 'user-1' }),
     () => credit.reserveCredits({ orderId: 'order-1', requesterId: 'user-1', amount: 4 }),
     () => credit.releaseCredits({ orderId: 'order-1' }),

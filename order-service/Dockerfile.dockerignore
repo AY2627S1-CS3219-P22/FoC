@@ -27,3 +27,11 @@ order-service/src/generated/**
 **/*.pem
 **/*.key
 **/.env*
+!shared/grpc/tsconfig.json
+!shared/grpc/src/
+!shared/grpc/src/**
+!shared/grpc/proto/
+!shared/grpc/proto/**
+!user-service/
+!user-service/proto/
+!user-service/proto/**

@@ -1,10 +1,14 @@
 // Rejected means the dependency definitively rejected the operation. A timeout
 // or lost response must be UNKNOWN, never interpreted as a failed transfer.
+export interface ExternalFailure {
+  code?: number;
+  reason?: 'invalid-input' | 'missing-account-or-reservation' | 'precondition' | 'authentication' | 'permission' | 'transport' | 'protocol';
+}
 export type ExternalResult<T> =
   | { kind: 'confirmed'; value: T }
-  | { kind: 'rejected' }
-  | { kind: 'unavailable' }
-  | { kind: 'unknown' };
+  | ({ kind: 'rejected' } & ExternalFailure)
+  | ({ kind: 'unavailable' } & ExternalFailure)
+  | ({ kind: 'unknown' } & ExternalFailure);
 
 export interface PublicProfile {
   userId: string;
@@ -30,8 +34,8 @@ export interface Reservation {
 }
 export interface CreditGateway {
   getBalance(userId: string): Promise<ExternalResult<{ availableCredits: number }>>;
-  // Implementations MUST be atomic and idempotent by orderId and operationId.
-  // Retries reuse both IDs and the identical payload.
+  // Credit deduplicates by RPC operation type + orderId. operationId is our durable
+  // local tracking ID; adapters need not send it. Retries keep the same payload.
   reserve(input: {
     operationId: string;
     orderId: string;
@@ -47,7 +51,8 @@ export interface CreditGateway {
   getReservation(orderId: string): Promise<ExternalResult<Reservation>>;
 }
 
-// Production has no adapters yet. Missing dependencies explicitly gate writes.
+// Production Credit is opt-in; User/Supplier adapters are still absent.
+// Missing dependencies explicitly gate the operations that need them.
 export interface OrderDependencies {
   users?: UserDirectory;
   suppliers?: SupplierDirectory;

@@ -3,6 +3,8 @@ syntax = "proto3";
 package credit;
 
 service CreditService {
+  // Read current state; mutation replays may return historical receipts.
+  rpc GetReservation(GetReservationRequest) returns (Reservation);
   rpc GetBalance(GetBalanceRequest) returns (Balance);
   // Mutations must be atomic and idempotent by order_id when implemented.
   // Repeating an identical operation returns the existing reservation;
@@ -52,4 +54,10 @@ message Reservation {
   ReservationStatus status = 4;
   // Empty until settlement.
   string courier_id = 5;
+  string reservation_id = 6;
+  uint32 version = 7;
+}
+
+message GetReservationRequest {
+  string order_id = 1;
 }

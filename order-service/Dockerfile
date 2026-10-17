@@ -14,6 +14,9 @@ COPY credit-service/grpc/package.json ./credit-service/grpc/package.json
 COPY supplier-service/grpc/package.json ./supplier-service/grpc/package.json
 RUN npm ci --workspace @foc/order-service
 
+COPY shared/grpc ./shared/grpc
+COPY user-service/proto ./user-service/proto
+RUN npm run build --workspace @foc/grpc
 COPY order-service/prisma ./order-service/prisma
 COPY order-service/src ./order-service/src
 COPY order-service/scripts ./order-service/scripts
@@ -31,6 +34,8 @@ RUN apt-get update \
 # Keep the installed Prisma CLI for migrate deploy at container startup.
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json /app/package-lock.json ./
+COPY --from=build /app/shared/grpc ./shared/grpc
+COPY --from=build /app/user-service/proto ./user-service/proto
 COPY --from=build /app/order-service/package.json ./order-service/package.json
 COPY --from=build /app/order-service/prisma ./order-service/prisma
 COPY --from=build /app/order-service/dist ./order-service/dist

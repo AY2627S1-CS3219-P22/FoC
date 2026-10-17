@@ -113,8 +113,7 @@ export function createOrderCommands(
   db: PrismaClient,
   dependencies: OrderDependencies = {},
 ): OrderCommands {
-  // No executor is installed in startup. These methods are also callable with
-  // explicit test doubles; no successful fake is ever wired into production.
+  // Production can inject a real Credit adapter. Test doubles remain test-only.
   async function completeOperation(order: Order, operation: CreditOperation): Promise<Order> {
     if (operation.state === 'SUCCEEDED' || operation.state === 'PERMANENTLY_FAILED') return order;
     await db.creditOperation.update({
@@ -160,7 +159,7 @@ export function createOrderCommands(
       where: { id: operation.id, state: { not: 'SUCCEEDED' } },
       data: {
         state: response.kind === 'rejected' ? 'PERMANENTLY_FAILED' : 'PENDING',
-        lastError: response.kind,
+        lastError: response.kind === 'confirmed' ? 'receipt-mismatch' : [response.kind, response.code, response.reason].filter(v => v !== undefined).join(':'),
         leaseExpiresAt: null,
       },
     });
@@ -196,7 +195,7 @@ export function createOrderCommands(
       await db.creditOperation.updateMany({
         where: { id: operation.id, state: { not: 'SUCCEEDED' } },
         data: {
-          lastError: response.kind,
+          lastError: response.kind === 'confirmed' ? 'receipt-mismatch' : [response.kind, response.code, response.reason].filter(v => v !== undefined).join(':'),
           state: response.kind === 'rejected' ? 'PERMANENTLY_FAILED' : 'PENDING',
           leaseExpiresAt: null,
         },
@@ -285,15 +284,18 @@ export function createOrderCommands(
         where: { orderId_type: { orderId: creation.orderId, type: 'RESERVE' } },
       });
       if (reserve.state !== 'SUCCEEDED') {
-        const balance = await external(() => dependencies.credits!.getBalance(actor.id));
-        if (balance.kind !== 'confirmed') return failure('pending', creation.orderId);
-        // Balance is advisory: an earlier/concurrent request may have reserved
-        // these funds already. The idempotent reservation is authoritative.
-        if (
-          !Number.isSafeInteger(balance.value.availableCredits) ||
-          balance.value.availableCredits < 0
-        )
-          return failure('pending', creation.orderId);
+        // Once attempted, recovery must not depend on an advisory balance read.
+        if (reserve.attempts === 0) {
+          const balance = await external(() => dependencies.credits!.getBalance(actor.id));
+          if (balance.kind !== 'confirmed') return failure('pending', creation.orderId);
+          // Balance is advisory: an earlier/concurrent request may have reserved
+          // these funds already. The idempotent reservation is authoritative.
+          if (
+            !Number.isSafeInteger(balance.value.availableCredits) ||
+            balance.value.availableCredits < 0
+          )
+            return failure('pending', creation.orderId);
+        }
         await db.creditOperation.update({
           where: { id: reserve.id },
           data: { attempts: { increment: 1 } },
@@ -331,6 +333,15 @@ export function createOrderCommands(
           where: { id: reserve.id },
           data: { state: 'SUCCEEDED', lastError: null },
         });
+      }
+      // Mutation replay receipts are historical. Confirm the live hold even when
+      // a previous attempt durably recorded a successful reservation response.
+      const currentReservation = await external(() =>
+        dependencies.credits!.getReservation(creation.orderId),
+      );
+      if (currentReservation.kind !== 'confirmed' ||
+          !matches(currentReservation.value, creation.orderId, actor.id, input.credits, 'RESERVED')) {
+        return failure('pending', creation.orderId);
       }
       // Reservation is confirmed. If this transaction fails, intent and receipt
       // remain durable; retrying the same key resumes publication without debit.

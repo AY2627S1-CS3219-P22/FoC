@@ -11,6 +11,7 @@ import type { GetPublicProfileRequest } from './generated/user/GetPublicProfileR
 import type { PublicProfile__Output as PublicProfile } from './generated/user/PublicProfile';
 import type { GetOrderRequest } from './generated/order/GetOrderRequest';
 import type { Order__Output as Order } from './generated/order/Order';
+import type { GetReservationRequest } from './generated/credit/GetReservationRequest';
 import type { GetBalanceRequest } from './generated/credit/GetBalanceRequest';
 import type { Balance__Output as Balance } from './generated/credit/Balance';
 import type { ReserveCreditsRequest } from './generated/credit/ReserveCreditsRequest';
@@ -109,6 +110,9 @@ export function createCreditClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 3000);
   const client = new CreditService(target, config.credentials ?? credentials.createInsecure());
   return {
+    getReservation(request: GetReservationRequest, options: RpcOptions = {}): Promise<Reservation> {
+      return unary(callback => client.getReservation(request, options.metadata ?? new Metadata(), callOptions(timeoutMs, options), callback));
+    },
     getBalance(request: GetBalanceRequest, options: RpcOptions = {}): Promise<Balance> {
       return unary((callback) =>
         client.getBalance(
