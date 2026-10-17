@@ -31,9 +31,15 @@ services:
       DATABASE_URL: 'postgresql://user_service:user_service@postgres:5432/user_service?schema=public'
       PORT: '3001'
       GRPC_PORT: '50051'
+      # Keys are mounted at runtime (see volumes), never baked into the image.
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
     ports:
       - '3001:3001'
       - '50051:50051'
+    volumes:
+      # Run `npm run keys:generate` first, or the service exits at boot.
+      - ./keys:/app/keys:ro
     # Apply migrations, then start. `migrate deploy` runs committed migrations
     # (safe for non-dev); use `npm run prisma:migrate` locally to create them.
     command: sh -c "npx prisma migrate deploy && node dist/index.js"

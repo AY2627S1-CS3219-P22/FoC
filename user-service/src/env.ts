@@ -6,7 +6,7 @@ import { z } from 'zod';
 const schema = z.object({
   DATABASE_URL: z.url(),
   PORT: z.coerce.number().int().positive().default(3001),
-  GRPC_PORT: z.coerce.number().int().positive().default(50052),
+  GRPC_PORT: z.coerce.number().int().positive().default(50051),
 
   JWT_PRIVATE_KEY_PATH: z.string().min(1),
   JWT_PUBLIC_KEY_PATH: z.string().min(1),

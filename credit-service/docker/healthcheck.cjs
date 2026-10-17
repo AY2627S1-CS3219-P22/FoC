@@ -5,7 +5,7 @@ const { Pool } = require('pg');
 // Readiness: the gRPC listener completes its (TLS) handshake and the migrated database answers.
 // No RPC is called, so probes need no service credential and add no access-audit entries.
 const cert = process.env.CREDIT_TLS_CERT_PATH;
-const client = new Client(`localhost:${process.env.GRPC_PORT || 50053}`,
+const client = new Client(`localhost:${process.env.GRPC_PORT || 50054}`,
   cert ? credentials.createSsl(readFileSync(cert)) : credentials.createInsecure());
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 2000, max: 1 });
 const listening = new Promise((resolve, reject) =>

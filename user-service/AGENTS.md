@@ -26,7 +26,7 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 - **`/health` must ping the database**, not just return 200.
 - Validate all input with zod (password rules: min 8 chars, ≥1 special, ≥1
   uppercase, ≥1 numeric — F1.1.2).
-- Ports: REST on `3001`, gRPC on `50052` (both configurable via `.env`).
+- Ports: REST on `3001`, gRPC on `50051` (both configurable via `.env`).
 
 ## Structure & conventions
 

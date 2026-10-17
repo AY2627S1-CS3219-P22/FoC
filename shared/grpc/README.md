@@ -6,10 +6,10 @@ the other services retain their scaffolds. Existing REST implementations are sep
 
 | Service  | Default host port | RPCs                                                              | Contract                                   |
 | -------- | ----------------- | ----------------------------------------------------------------- | ------------------------------------------ |
-| User     | 50052             | `GetPublicProfile`                                                | `user-service/proto/user.proto` (existing) |
-| Order    | 50051             | `GetOrder`                                                        | `shared/grpc/proto/order.proto`            |
-| Credit   | 50053             | `InitCredits`, `GetBalance`, `GetCreditHistory`, `ReserveCredits`, `UpdateReservation`, `ReleaseCredits`, `SettleCredits`, `GetReservation` | `shared/grpc/proto/credit.proto`           |
-| Supplier | 50054             | `GetSupplier`                                                     | `shared/grpc/proto/supplier.proto`         |
+| User     | 50051             | `GetPublicProfile`                                                | `user-service/proto/user.proto` (existing) |
+| Order    | 50053             | `GetOrder`                                                        | `shared/grpc/proto/order.proto`            |
+| Credit   | 50054             | `InitCredits`, `GetBalance`, `GetCreditHistory`, `ReserveCredits`, `UpdateReservation`, `ReleaseCredits`, `SettleCredits`, `GetReservation` | `shared/grpc/proto/credit.proto`           |
+| Supplier | 50052             | `GetSupplier`, `IsOpen`                                           | `shared/grpc/proto/supplier.proto`         |
 
 Credit setup, database migrations, retry rules, and integration tests are documented
 in [Credit Service](../../credit-service/README.md). The order contract remains a proposal.
@@ -52,12 +52,11 @@ addresses when needed. Workspace commands run in each package directory, so dote
 reads the matching file. `GRPC_PORT` controls the listener;
 `*_GRPC_ADDR` controls outbound calls. `GRPC_TIMEOUT_MS` defaults to 3000.
 
-User Service's existing Docker Compose listens on **50051**, while its host-dev
-configuration defaults to **50052**. If using that Compose stack, set
-`USER_GRPC_ADDR=localhost:50051` and use another order port, for example
-`GRPC_PORT=50055` / `ORDER_GRPC_ADDR=localhost:50055`. This scaffolding preserves
-the existing Compose configuration. Docker callers use service DNS names instead
-of `localhost`, with the actual container listener port.
+The User Service uses gRPC port **50051**, Supplier **50052**, Order **50053**,
+and Credit **50054**.
+Keep these assignments consistent across host development, Docker Compose, and
+gRPC client configuration. Docker callers use service DNS names instead of
+`localhost`, with the actual container listener port.
 
 ## Calling another service
 
@@ -72,7 +71,7 @@ if (!serviceToken || !userToken || !userId) throw new Error('Backend credential 
 const metadata = new Metadata();
 metadata.set('x-credit-service-token', serviceToken);
 metadata.set('authorization', 'Bearer ' + userToken);
-const credit = createCreditClient('localhost:50053', { timeoutMs: 3000 });
+const credit = createCreditClient('localhost:50054', { timeoutMs: 3000 });
 try {
   const balance = await credit.getBalance({ userId }, { metadata });
   console.log(balance.availableCredits);

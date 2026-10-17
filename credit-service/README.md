@@ -1,7 +1,7 @@
 # Credit Service
 
 TypeScript/Node.js service with PostgreSQL persistence and an internal gRPC API on
-port **50053**. This first implementation covers accounts, reservations, transfers,
+port **50054**. This first implementation covers accounts, reservations, transfers,
 history, and idempotency. Credit Service owns these records; other services access
 them through gRPC rather than editing its database.
 
@@ -73,7 +73,7 @@ docker compose -f credit-service/compose.yaml --profile app up -d --build --wait
 
 | Component | Host address | Container address |
 | --- | --- | --- |
-| Credit gRPC (TLS) | `127.0.0.1:50053` | `app:50053` |
+| Credit gRPC (TLS) | `127.0.0.1:50054` | `app:50054` |
 | Development PostgreSQL | `127.0.0.1:54333` | `db:5432` |
 
 The image uses Node.js 22, compiled JavaScript, production dependencies only, and the
@@ -101,7 +101,7 @@ adds no access-audit entries. Run the demo against the container:
 CREDIT_GRPC_CA_PATH=credit-service/keys/server-cert.pem node credit-service/examples/core-flow.mjs
 ```
 
-Stop the host `npm run dev` process first; both bind `127.0.0.1:50053`. After adding a
+Stop the host `npm run dev` process first; both bind `127.0.0.1:50054`. After adding a
 migration, rebuild and rerun it before restarting:
 
 ```bash

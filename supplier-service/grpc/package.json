@@ -1,14 +1,17 @@
 {
   "name": "@foc/supplier-grpc",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "type": "commonjs",
+  "description": "Supplier Service for Supplier Listings and Search",
+  "author": "@sunpterodactyl, @",
+  "license": "MIT",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "predev": "npm run build --workspace @foc/grpc",
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "start": "tsx src/index.ts"
   },
   "dependencies": {
     "@foc/grpc": "0.1.0",

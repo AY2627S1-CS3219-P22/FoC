@@ -25,7 +25,7 @@ services:
     environment:
       NODE_ENV: production
       GRPC_HOST: 0.0.0.0
-      GRPC_PORT: "50053"
+      GRPC_PORT: "50054"
       DATABASE_URL: postgresql://credit:credit@db:5432/credit
       CREDIT_USER_SERVICE_TOKEN: ${CREDIT_USER_SERVICE_TOKEN:-}
       CREDIT_ORDER_SERVICE_TOKEN: ${CREDIT_ORDER_SERVICE_TOKEN:-}
@@ -42,7 +42,7 @@ services:
       - ./keys:/run/credit-tls:ro
       - ../user-service/keys:/run/user-service-keys:ro
     ports:
-      - "127.0.0.1:50053:50053"
+      - "127.0.0.1:50054:50054"
     depends_on:
       migrate:
         condition: service_completed_successfully

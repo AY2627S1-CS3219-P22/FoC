@@ -20,7 +20,7 @@ FROM node:22-alpine AS runtime
 WORKDIR /app/credit-service
 ENV NODE_ENV=production
 ENV GRPC_HOST=0.0.0.0
-ENV GRPC_PORT=50053
+ENV GRPC_PORT=50054
 
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/shared/grpc/package.json /app/shared/grpc/package.json
@@ -35,7 +35,7 @@ COPY credit-service/docker ./docker
 
 # Credentials, TLS key material and the User Service public key are supplied at runtime.
 USER node
-EXPOSE 50053
+EXPOSE 50054
 HEALTHCHECK --interval=5s --timeout=5s --start-period=10s --retries=5 \
     CMD ["node", "docker/healthcheck.cjs"]
 CMD ["node", "dist/index.js"]
