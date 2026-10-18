@@ -359,6 +359,11 @@ test('real gRPC endpoints enforce caller scopes, user ownership, admin roles and
   assert.equal((await client.getBalance({ userId }, options('admin-service', courierId, ['USER', 'ADMINISTRATOR']))).totalCredits, 10);
   await assert.rejects(client.getBalance({ userId: id() }, orderOptions), rejected(status.NOT_FOUND));
   await assert.rejects(client.reserveCredits({ orderId, requesterId: userId, amount: 0 }, orderOptions), rejected(status.INVALID_ARGUMENT));
+  // Fractions are rejected, not truncated to a whole number on the wire.
+  for (const amount of [3.55, 0.5, 10.5]) {
+    await assert.rejects(client.reserveCredits({ orderId: id(), requesterId: userId, amount }, orderOptions), rejected(status.INVALID_ARGUMENT));
+  }
+  assert.equal((await service.displayCredit({ userId })).reservedCredits, 0);
   await assert.rejects(client.reserveCredits({ orderId, requesterId: userId, amount: 11 }, orderOptions), rejected(status.FAILED_PRECONDITION));
   const reservation = await client.reserveCredits({ orderId, requesterId: userId, amount: 4 }, orderOptions);
   assert.ok(reservation.reservationId); assert.equal(reservation.version, 1);
@@ -401,8 +406,10 @@ test('compiled service entrypoint starts, runs the documented demo and shuts dow
   });
   const { stdout } = await promisify(execFile)(process.execPath,
     [path.resolve(__dirname, '../examples/core-flow.mjs')], { env: environment, timeout: 10000 });
-  assert.match(stdout, /totalCredits: 7/);
-  assert.match(stdout, /totalCredits: 13/);
+  // FORCE_COLOR (set by some terminals) colours console.log output; compare plain text.
+  const plain = require('node:util').stripVTControlCharacters(stdout);
+  assert.match(plain, /totalCredits: 7/);
+  assert.match(plain, /totalCredits: 13/);
   const exited = new Promise(resolve => child.once('exit', resolve));
   child.kill('SIGTERM');
   assert.equal(await exited, 0);

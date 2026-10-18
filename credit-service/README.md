@@ -132,7 +132,9 @@ JavaScript clients use camelCase fields via `createCreditClient` from `@foc/grpc
 | `GetReservation` | Order Service supplies the order ID | Returns the reservation's current status, amount, and version. Read-only; it records no retry result. |
 
 Both participants must already have accounts. Credits are positive whole integers
-within the protobuf `int32` range. The requester cannot also be the courier.
+within the protobuf `int32` range. `createCreditClient` rejects fractional or out-of-range
+numbers with `INVALID_ARGUMENT` before sending, because protobuf encoding would
+otherwise truncate them (3.55 would arrive as 3). The requester cannot also be the courier.
 User and order identifiers are opaque strings; no cross-service database foreign
 keys are created. Order Service must validate order ownership, completion, and the
 assigned courier before requesting a mutation. User Service must validate registration

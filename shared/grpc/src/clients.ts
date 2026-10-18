@@ -128,6 +128,29 @@ export interface CreditClientConfig extends ClientConfig {
   retry?: RetryPolicy;
 }
 
+// Protobuf encoding silently truncates fractions (3.55 becomes 3) and wraps out-of-range
+// integers, so the server never sees the original value. Reject those before sending.
+type WholeRange = { min: number; max: number };
+const int32: WholeRange = { min: -2147483648, max: 2147483647 };
+const uint32: WholeRange = { min: 0, max: 4294967295 };
+
+function rejectInexact(request: object, fields: Record<string, WholeRange>): Promise<never> | undefined {
+  for (const [field, { min, max }] of Object.entries(fields)) {
+    const value = (request as Record<string, unknown>)[field];
+    if (value === undefined) continue;
+    if (typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max) continue;
+    const details = typeof value === 'number' && Number.isInteger(value)
+      ? `${field} is outside the supported range`
+      : `${field} must be a whole number`;
+    return Promise.reject(Object.assign(new Error(`${status.INVALID_ARGUMENT} INVALID_ARGUMENT: ${details}`), {
+      code: status.INVALID_ARGUMENT,
+      details,
+      metadata: new Metadata(),
+    }));
+  }
+  return undefined;
+}
+
 // Transient failures where resending the identical request is the documented recovery.
 const retryableCreditCodes: ReadonlySet<number> = new Set([
   status.UNAVAILABLE,
@@ -185,16 +208,16 @@ export function createCreditClient(target: string, config: CreditClientConfig = 
       return send(options, (metadata, call, callback) => client.initCredits(request, metadata, call, callback));
     },
     updateReservation(request: UpdateReservationRequest, options: RpcOptions = {}): Promise<Reservation> {
-      return send(options, (metadata, call, callback) => client.updateReservation(request, metadata, call, callback));
+      return rejectInexact(request, { amount: int32, expectedVersion: uint32 }) ?? send(options, (metadata, call, callback) => client.updateReservation(request, metadata, call, callback));
     },
     getCreditHistory(request: GetCreditHistoryRequest, options: RpcOptions = {}): Promise<CreditHistory> {
-      return send(options, (metadata, call, callback) => client.getCreditHistory(request, metadata, call, callback));
+      return rejectInexact(request, { pageSize: uint32 }) ?? send(options, (metadata, call, callback) => client.getCreditHistory(request, metadata, call, callback));
     },
     getBalance(request: GetBalanceRequest, options: RpcOptions = {}): Promise<Balance> {
       return send(options, (metadata, call, callback) => client.getBalance(request, metadata, call, callback));
     },
     reserveCredits(request: ReserveCreditsRequest, options: RpcOptions = {}): Promise<Reservation> {
-      return send(options, (metadata, call, callback) => client.reserveCredits(request, metadata, call, callback));
+      return rejectInexact(request, { amount: int32 }) ?? send(options, (metadata, call, callback) => client.reserveCredits(request, metadata, call, callback));
     },
     releaseCredits(request: ReleaseCreditsRequest, options: RpcOptions = {}): Promise<Reservation> {
       return send(options, (metadata, call, callback) => client.releaseCredits(request, metadata, call, callback));

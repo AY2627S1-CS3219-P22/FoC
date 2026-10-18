@@ -216,3 +216,33 @@ test('credit client rejects invalid retry policies', () => {
     assert.throws(() => rpc.createCreditClient('127.0.0.1:1', { retry }), RangeError);
   }
 });
+
+test('credit client rejects fractional or out-of-range numbers before sending', async (t) => {
+  const received = [];
+  const reply = (call, callback) => { received.push(call.request); callback(null, { orderId: 'o', amount: 1 }); };
+  const server = rpc.createServer(rpc.CreditService.service, {
+    ReserveCredits: reply, UpdateReservation: reply,
+    GetCreditHistory: (call, callback) => { received.push(call.request); callback(null, { entries: [] }); },
+  });
+  const client = await listen(t, server, rpc.createCreditClient);
+  const invalid = [
+    () => client.reserveCredits({ orderId: 'o', requesterId: 'u', amount: 3.55 }),
+    () => client.reserveCredits({ orderId: 'o', requesterId: 'u', amount: 0.5 }),
+    () => client.reserveCredits({ orderId: 'o', requesterId: 'u', amount: 2147483648 }),
+    () => client.reserveCredits({ orderId: 'o', requesterId: 'u', amount: Number.NaN }),
+    () => client.updateReservation({ orderId: 'o', amount: 10.5, expectedVersion: 1 }),
+    () => client.updateReservation({ orderId: 'o', amount: 2, expectedVersion: 1.5 }),
+    () => client.updateReservation({ orderId: 'o', amount: 2, expectedVersion: -1 }),
+    () => client.getCreditHistory({ userId: 'u', pageSize: 2.5 }),
+  ];
+  for (const invoke of invalid) {
+    await assert.rejects(invoke(), (error) => error.code === status.INVALID_ARGUMENT && /whole number|supported range/.test(error.details));
+  }
+  assert.equal(received.length, 0);
+  // Whole numbers still reach the server, which owns the business rules (e.g. positive amounts).
+  await client.reserveCredits({ orderId: 'o', requesterId: 'u', amount: 3 });
+  await client.reserveCredits({ orderId: 'o', requesterId: 'u', amount: -1 });
+  await client.updateReservation({ orderId: 'o', amount: 2, expectedVersion: 1 });
+  await client.getCreditHistory({ userId: 'u' });
+  assert.deepEqual(received.map((r) => r.amount ?? r.pageSize), [3, -1, 2, 0]);
+});
