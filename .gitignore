@@ -25,3 +25,5 @@ node_modules/
 logs/
 
 supabase/.temp/start-secrets/supabase_edge_runtime_FoC/env/
+
+mailpit-data/
