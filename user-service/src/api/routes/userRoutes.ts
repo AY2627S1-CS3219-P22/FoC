@@ -50,3 +50,6 @@ userRouter.post('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userCo
 
 // DELETE /users/:id/admin
 userRouter.delete('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userController.revokeAdmin);
+userRouter.post('/otp/request', userController.sendOTPRequest);
+
+userRouter.post('/otp/verify', userController.verifyOTP);
