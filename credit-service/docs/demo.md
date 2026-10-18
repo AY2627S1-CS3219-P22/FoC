@@ -43,6 +43,8 @@ Run each scenario with `node credit-service/examples/demo.mjs <scenario>`.
 | 7 | `access` | 4: which services may invoke each operation | No credential returns `16`; out-of-scope callers return `7`; invalid input returns `3`. |
 | – | `update` | Optional: reward edits | One atomic amount change with version protection, not release + reserve. A stale edit is rejected. |
 
+To run the same checks from Postman, see [the Postman workspace](../postman/README.md).
+
 Optional extras if time allows:
 - Automatic client retries: Test 9 in the PR's acceptance criteria. Stop the service,
   start a call, and restart the service; the call succeeds once the service is back.

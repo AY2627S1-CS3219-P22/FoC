@@ -1,0 +1,7 @@
+# Use this workspace to collaborate
+workspace:
+  id: 920d9e0b-dbab-4c55-82bd-3fa0e0c6ebb2
+
+localResources:
+  specs:
+    - ../../shared/grpc/proto/credit.proto
