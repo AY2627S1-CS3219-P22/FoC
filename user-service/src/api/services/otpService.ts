@@ -11,7 +11,7 @@ Service requirement details
 
 */
 
-import {crypto} from 
+import hmac from 'crypto'
 
 function verifyOTP(id, challengeId, otp) {
     return 0;
@@ -20,4 +20,3 @@ function verifyOTP(id, challengeId, otp) {
 function sendOTPRequest(email, challengeId) {
     return 0;
 }
-   

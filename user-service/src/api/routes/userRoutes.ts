@@ -23,4 +23,6 @@ userRouter.get('/', authenticate, requireRole('ADMINISTRATOR'), userController.l
 // GET /users/:id
 userRouter.get('/:id', authenticate, requireRole('ADMINISTRATOR'), userController.getUserById);
 
-userRouter.post('/otp', authenticate, )
+userRouter.post('/otp/request', userController.sendOTPRequest);
+
+userRouter.post('/otp/verify', userController.verifyOTP);

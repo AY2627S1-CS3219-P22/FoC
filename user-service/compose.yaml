@@ -44,5 +44,23 @@ services:
     # (safe for non-dev); use `npm run prisma:migrate` locally to create them.
     command: sh -c "npx prisma migrate deploy && node dist/index.js"
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit
+    restart: always
+    ports:
+      - "8025:8025" # WEB GUI
+      - "1025:1025" # SMTP
+    volumes:
+      - ./mailpit-data:/data  # Separate database
+    env_file:
+      - testing.env 
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 15s
+      start_period: 10s
+      timeout: 30s      # optional (default is 30s)
+      retries: 3        # optional (default is 3)
+
 volumes:
   user_service_pgdata:
