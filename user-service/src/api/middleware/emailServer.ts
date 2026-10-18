@@ -34,4 +34,4 @@ export const sendEmail = async ({ to, subject, text, html }: EmailOptions): Prom
       throw error;
     }
   };
-//Define nodemailer
+  
