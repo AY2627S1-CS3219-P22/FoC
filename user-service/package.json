@@ -9,6 +9,7 @@
     "dev": "tsx watch src/index.ts",
     "keys:generate": "mkdir -p keys && openssl genpkey -algorithm RSA -out keys/private.pem -pkeyopt rsa_keygen_bits:2048 && openssl rsa -in keys/private.pem -pubout -out keys/public.pem",
     "prebuild": "npm run build --prefix ../shared/messaging",
+    "keys:otp": "mkdir -p keys && openssl rand -base64 32 > keys/otp.key",
     "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
@@ -26,12 +27,14 @@
     "@grpc/proto-loader": "^0.8.1",
     "@prisma/client": "^6.19.3",
     "@types/nodemailer": "^8.0.2",
+    "@types/redis": "^4.0.10",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "dotenv": "^18.0.3",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^10.1.2",
+    "redis": "^6.3.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {

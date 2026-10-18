@@ -33,6 +33,8 @@ services:
     depends_on:
       user-db:
         condition: service_healthy
+      redis-cache:
+        condition: service_healthy
     environment:
       DATABASE_URL: 'postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@user-db:5432/${POSTGRES_DB}?schema=public'
     networks: [internal]
@@ -66,15 +68,15 @@ services:
       JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
       JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
       RABBITMQ_URL: amqp://guest:guest@host.docker.internal:5672
+      REDIS_URL: redis://redis-cache:6379
+      OTP_HMAC_KEY_PATH: /app/keys/otp.key
+    ports:
+      - '3001:3001'
+      - '50051:50051'
     volumes:
       # Run `npm run keys:generate` first, else service exits at boot.
       - ./keys:/app/keys:ro
     networks: [internal]
-
-# Private network for service-to-service traffic. Every service's compose file
-# declares the same `internal`, the root compose merges them into one network.
-networks:
-  internal:
 
   mailpit:
     image: axllent/mailpit:latest
@@ -86,13 +88,36 @@ networks:
     volumes:
       - ./mailpit-data:/data  # Separate database
     env_file:
-      - testing.env 
+      - testing.env
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
       interval: 15s
       start_period: 10s
       timeout: 30s      # optional (default is 30s)
       retries: 3        # optional (default is 3)
+    networks: [internal]
+
+  redis-cache:
+    image: redis:7.4-alpine
+    container_name: local_redis_cache
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes #persistent data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks: [internal]
+
+# Private network for service-to-service traffic. Every service's compose file
+# declares the same `internal`, the root compose merges them into one network.
+networks:
+  internal:
 
 volumes:
   user_service_pgdata:
+  redis_data:

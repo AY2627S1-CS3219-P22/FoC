@@ -1,6 +1,7 @@
 import { RabbitMQClient, CREDIT_USER_QUEUE } from '@foc/messaging';
 import { env } from './env';
 import { prisma } from './db';
+import { connectRedis, disconnectRedis } from './redis';
 import { createApp } from './api/app';
 import { startGrpcServer } from './grpc/server';
 import { OutboxStore } from './events/outboxStore';
@@ -8,6 +9,7 @@ import { startDispatcher } from './events/outboxDispatcher';
 
 // Boots both servers: Express (REST) and gRPC (internal RPC).
 async function main(): Promise<void> {
+  await connectRedis();
   const app = createApp();
   const httpServer = app.listen(env.PORT, () => {
     console.log(`REST server listening on http://localhost:${env.PORT}`);
@@ -74,6 +76,7 @@ async function main(): Promise<void> {
       // already closed or never connected
     }
     await prisma.$disconnect();
+    await disconnectRedis();
     process.exit(0);
   };
 
