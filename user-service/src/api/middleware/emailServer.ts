@@ -1,0 +1,4 @@
+/*
+Email server for OTP send
+Using Nodemailer
+*/

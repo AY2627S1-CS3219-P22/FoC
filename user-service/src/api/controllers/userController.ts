@@ -9,6 +9,7 @@ import type { UpdateProfileInput } from '../dto/updateProfileDto';
 import * as userService from '../../services/userService';
 import * as sessionService from '../../services/sessionService';
 import * as adminService from '../../services/adminService';
+import * as otpService from '../../services/otpService';
 
 const REFRESH_COOKIE = 'refreshToken';
 
@@ -144,6 +145,7 @@ export const getUserById: RequestHandler = async (req, res) => {
   res.status(200).json({ user });
 };
 
+
 // Shared by the admin-role endpoints.
 function sendAdminError(res: Response, reason: 'forbidden' | 'not_found' | 'last_admin') {
   if (reason === 'forbidden') {
@@ -176,4 +178,61 @@ export const revokeAdmin: RequestHandler = async (req, res) => {
   }
   res.status(200).json({ user: result.user });
 };
+
+
+//POST /users/otp/request - post a request for OTP generation
+//TODO: Add in error handling for too many attempts rejection
+//TODO: Add in error handling for invalidated OTP
+export const sendOTPRequest: RequestHandler = async(req, res) => {
+    const id = String(req.params.id) ;
+    const challengeId = String(req.body.challengeId);
+
+    try{
+      const user = await userService.getProfileById(id);
+
+      if(!user) {
+        res.status(404).json({error: 'Not Found', message: 'User not found.'});
+        return;
+      }
+
+      await otpService.sendOTPRequest(user.email, challengeId);
+      res.status(200).json({ message: `OTP sent to ${user.email}` });
+  } catch {
+    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to send OTP.' });
+  }
+};
+
+//POST /users/otp/verify - verify/validate OTP is correct
+export const verifyOTP: RequestHandler = async(req, res) => {
+  const id = String(req.params.id);
+  const challengeId = req.body.challengeId;
+  const otp = req.body.otp;
+
+  try {
+
+    const user = await userService.getProfileById(id);
+
+      if(!user) {
+        res.status(404).json({error: 'Not Found', message: 'User not found.'});
+        return;
+      }
+      
+      const isVerified = await otpService.verifyOTP(id, challengeId, otp); //throws an error based
+      
+      if (isVerified == false) {
+        res.status(400).json({error: "400: Not verified", message: "Bad Request. Invalid OTP"})
+        return
+      } 
+      if (isVerified == true) {
+        res.status(200).json({message: 'OTP valid for login'});
+        return
+      }
+  }
+
+  catch(err) {
+
+    return 0;
+
+  }
+}
 
