@@ -47,6 +47,7 @@ node credit-service/examples/core-flow.mjs
 
 This creates two demo accounts, reserves 4 credits, updates the reservation to 3,
 and transfers those 3 to the courier. Final total balances are 7 and 13.
+For a scenario-by-scenario presentation demo, see the [demo runbook](docs/demo.md).
 Each run uses new identifiers. The local demo reads scoped credentials from
 `credit-service/.env`; history access is tested separately with a User Service JWT.
 
