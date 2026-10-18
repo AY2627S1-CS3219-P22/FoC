@@ -7,7 +7,6 @@ import type { LoginInput } from '../dto/loginDto';
 import * as userService from '../services/userService';
 import * as otpService from '../services/otpService';
 import { otpStringSchema } from '../dto/otpDto';
-import { OTP_HEADER } from '../middleware/hmac';
 
 // POST /users/register
 export const register: RequestHandler = async (req, res) => {
@@ -70,14 +69,11 @@ export const getUserById: RequestHandler = async (req, res) => {
   res.status(200).json({ user });
 };
 
-// POST /users/:id/otp/request
+// POST /users/:id/otp/request 
+// AI declaration
 export const sendOTPRequest: RequestHandler = async (req, res) => {
   const id = String(req.params.id);
-  const challengeId = typeof req.body?.challengeId === 'string' ? req.body.challengeId : '';
-  if (!challengeId) {
-    res.status(400).json({ error: 'Bad Request', message: 'challengeId is required.' });
-    return;
-  }
+  const challengeId = String(req.body.challengeId);
 
   try {
     const user = await userService.getProfileById(id);
@@ -86,37 +82,37 @@ export const sendOTPRequest: RequestHandler = async (req, res) => {
       return;
     }
 
-    const result = await otpService.sendOTPRequest({
-      userId: user.id,
-      email: user.email,
-      challengeId,
-    });
+    const result = await otpService.sendOTPRequest({userId: user.id, email: user.email,challengeId,});
 
     if (!result.ok) {
-      res.setHeader('Retry-After', String(result.retryAfterSeconds));
+      if (result.retryAfterSeconds) {
+        res.setHeader('Retry-After', String(result.retryAfterSeconds));
+      }
       res.status(429).json({ error: 'Too Many Requests', message: 'Try again after some time.' });
       return;
     }
-
-    res.setHeader(OTP_HEADER, result.sealedOtp);
     res.status(200).json({ message: `OTP sent to ${user.email}` });
+    return
   } catch {
     res.status(500).json({ error: 'Internal Server Error', message: 'Failed to send OTP.' });
   }
 };
 
-// POST /users/:id/otp/verify
+// POST /users/:id/otp/verify 
+// AI declaration
 export const verifyOTP: RequestHandler = async (req, res) => {
   const id = String(req.params.id);
-  const challengeId = typeof req.body?.challengeId === 'string' ? req.body.challengeId : '';
-  const parsedOtp = otpStringSchema.safeParse(req.body?.otp);
-  if (!challengeId || !parsedOtp.success || !req.otp) {
+  const parsedOtp = otpStringSchema.safeParse(req.body);
+
+  if ( !parsedOtp.success) {
     res.status(400).json({
       error: 'Bad Request',
       message: 'challengeId and a 6-digit OTP are required.',
     });
     return;
   }
+
+  const {otp, challengeId} = parsedOtp.data; 
 
   try {
     const user = await userService.getProfileById(id);
@@ -128,8 +124,7 @@ export const verifyOTP: RequestHandler = async (req, res) => {
     const result = await otpService.verifyOTP({
       userId: user.id,
       challengeId,
-      otp: parsedOtp.data,
-      headerOtp: req.otp,
+      otp: otp,
     });
 
     if (!result.ok) {

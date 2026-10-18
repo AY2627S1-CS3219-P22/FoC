@@ -14,6 +14,8 @@ const schema = z.object({
 
   REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
   OTP_HMAC_KEY_PATH: z.string().min(1),
+  OTP_HASH_SECRET: z.string().min(32),
+  REDIS_OTP_LUA: z.string().min(1),
 });
 
 const parsed = schema.safeParse(process.env);
