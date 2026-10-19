@@ -41,8 +41,10 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 **Folder layout:**
 - `src/api/` = HTTP (REST) transport; `src/grpc/` = gRPC transport.
 - Shared building blocks (`env.ts`, `db.ts`) live at `src/` root.
-- Services live under their transport for now; extract to a shared
-  `src/services/` only when a second transport actually needs them.
+- Services live in `src/services/`, shared by both transports (moved out of
+  `src/api/` once gRPC needed them). Transports import services; services never
+  import transport code — except `import type` of DTO input shapes from
+  `api/dto/`, which is compile-time only and accepted to avoid duplicating them.
 
 **File naming — camelCase, resource-prefixed:** `userController.ts`,
 `userService.ts`, `userRoutes.ts`, `registerDto.ts`. Generic files with no

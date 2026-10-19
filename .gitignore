@@ -11,6 +11,9 @@ out/
 *.key
 env/
 
+# curl cookie jars from local testing — hold live session tokens
+cookies.txt
+
 # OS
 .DS_Store
 Thumbs.db
