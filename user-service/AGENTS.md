@@ -23,6 +23,11 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 - **No cross-service database access.** This service owns its own DB/schema; talk
   to other services over gRPC/REST only.
 - **Passwords are hashed (bcryptjs), never encrypted/decrypted.**
+- **All Administrator-role changes go through `adminService`:** one transaction
+  that calls `lockAdminSet` first and writes an `AdminRoleChange` row. Never
+  update an admin's `roles`/`isDeleted` directly (or via Prisma Studio). The lock
+  plus `ensureNotLastAdmin` is what guarantees at least one active admin under
+  concurrent requests — account deletion must call `ensureNotLastAdmin` too.
 - **`/health` must ping the database**, not just return 200.
 - Validate all input with zod (password rules: min 8 chars, ≥1 special, ≥1
   uppercase, ≥1 numeric — F1.1.2).
