@@ -4,13 +4,15 @@ import { z } from 'zod';
 
 // Validate config at boot so we fail fast with a clear message.
 const schema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   DATABASE_URL: z.url(),
   PORT: z.coerce.number().int().positive().default(3001),
-  GRPC_PORT: z.coerce.number().int().positive().default(50052),
+  GRPC_PORT: z.coerce.number().int().positive().default(50051),
 
   JWT_PRIVATE_KEY_PATH: z.string().min(1),
   JWT_PUBLIC_KEY_PATH: z.string().min(1),
   JWT_EXPIRES_IN: z.string().default('15m'),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
 });
 
 const parsed = schema.safeParse(process.env);

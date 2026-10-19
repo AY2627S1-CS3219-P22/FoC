@@ -1,0 +1,28 @@
+$kind: grpc-request
+description: "One atomic change, protected by the reservation version."
+url: "{{credit_url}}"
+methodPath: credit.CreditService.UpdateReservation
+methodDescriptor: CpQECgxjcmVkaXQucHJvdG8SBmNyZWRpdCJ5ChhVcGRhdGVSZXNlcnZhdGlvblJlcXVlc3QSFAoIb3JkZXJfaWQYASABKAlCAhABEhIKBmFtb3VudBgCIAEoBUICEAESHAoQZXhwZWN0ZWRfdmVyc2lvbhgDIAEoDUICEAFKBAgEEARSD2lkZW1wb3RlbmN5X2tleSLBAQoLUmVzZXJ2YXRpb24SFAoIb3JkZXJfaWQYASABKAlCAhABEhgKDHJlcXVlc3Rlcl9pZBgCIAEoCUICEAESEgoGYW1vdW50GAMgASgFQgIQARIlCgZzdGF0dXMYBCABKA4yEVJlc2VydmF0aW9uU3RhdHVzQgIQARIWCgpjb3VyaWVyX2lkGAUgASgJQgIQARIaCg5yZXNlcnZhdGlvbl9pZBgGIAEoCUICEAESEwoHdmVyc2lvbhgHIAEoDUICEAEqYAoRUmVzZXJ2YXRpb25TdGF0dXMSIgoeUkVTRVJWQVRJT05fU1RBVFVTX1VOU1BFQ0lGSUVEEAASDAoIUkVTRVJWRUQQARIMCghSRUxFQVNFRBACEgsKB1NFVFRMRUQQAzJbCg1DcmVkaXRTZXJ2aWNlEkoKEVVwZGF0ZVJlc2VydmF0aW9uEiAuY3JlZGl0LlVwZGF0ZVJlc2VydmF0aW9uUmVxdWVzdBoTLmNyZWRpdC5SZXNlcnZhdGlvbg==
+message:
+  content: |-
+    {"order_id": "{{order_id}}", "amount": 6, "expected_version": 1}
+metadata:
+  - key: x-credit-service-token
+    value: "{{order_token}}"
+settings: {}
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      const data = (pm.response.messages.idx(0) || {}).data || {};
+      // Postman may show snake_case or camelCase names, and proto3 can omit zero values.
+      const field = (snake, camel) => data[snake] ?? data[camel] ?? 0;
+      pm.test('call succeeded', () => pm.expect(Number(pm.response.statusCode)).to.equal(0));
+      pm.test('amount is 6', () => pm.expect(field('amount', 'amount')).to.equal(6));
+      pm.test('version is 2', () => pm.expect(field('version', 'version')).to.equal(2));
+    language: text/javascript
+schema:
+  source: specification
+  specificationId: ../../shared/grpc/proto/credit.proto
+order: 8000

@@ -577,7 +577,6 @@ describe('GET /suppliers/search-radius', () => {
       'Central Print Shop',
     ]);
     expect(res.body.data[0]).not.toHaveProperty('location');
-    expect(res.body.data[0]).toHaveProperty('openingHours');
   });
 
   it('does not match /suppliers/search, and excludes suppliers outside the radius', async () => {

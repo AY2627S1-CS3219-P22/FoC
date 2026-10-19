@@ -1,0 +1,29 @@
+$kind: grpc-request
+description: ""
+url: "{{credit_url}}"
+methodPath: credit.CreditService.InitCredits
+methodDescriptor: Cp0CCgxjcmVkaXQucHJvdG8SBmNyZWRpdCJAChJJbml0Q3JlZGl0c1JlcXVlc3QSEwoHdXNlcl9pZBgBIAEoCUICEAFKBAgCEAJSD2lkZW1wb3RlbmN5X2tleSJ2CgdCYWxhbmNlEhMKB3VzZXJfaWQYASABKAlCAhABEh0KEWF2YWlsYWJsZV9jcmVkaXRzGAIgASgFQgIQARIcChByZXNlcnZlZF9jcmVkaXRzGAMgASgFQgIQARIZCg10b3RhbF9jcmVkaXRzGAQgASgFQgIQATJLCg1DcmVkaXRTZXJ2aWNlEjoKC0luaXRDcmVkaXRzEhouY3JlZGl0LkluaXRDcmVkaXRzUmVxdWVzdBoPLmNyZWRpdC5CYWxhbmNl
+message:
+  content: |-
+    {"user_id": "{{courier_id}}"}
+metadata:
+  - key: x-credit-service-token
+    value: "{{user_token}}"
+settings: {}
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      const data = (pm.response.messages.idx(0) || {}).data || {};
+      // Postman may show snake_case or camelCase names, and proto3 can omit zero values.
+      const field = (snake, camel) => data[snake] ?? data[camel] ?? 0;
+      pm.test('call succeeded', () => pm.expect(Number(pm.response.statusCode)).to.equal(0));
+      pm.test('total is 10', () => pm.expect(field('total_credits', 'totalCredits')).to.equal(10));
+      pm.test('reserved is 0', () => pm.expect(field('reserved_credits', 'reservedCredits')).to.equal(0));
+      pm.test('available is 10', () => pm.expect(field('available_credits', 'availableCredits')).to.equal(10));
+    language: text/javascript
+schema:
+  source: specification
+  specificationId: ../../shared/grpc/proto/credit.proto
+order: 3000
