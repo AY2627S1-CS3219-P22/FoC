@@ -1,0 +1,52 @@
+import { Prisma } from '@prisma/client';
+import { prisma } from '../db';
+import type { RegisterInput } from '../api/dto/registerDto';
+import { buildNewUser, duplicateField, profileSelect } from './userService';
+
+// App-wide key for the admin lock.
+const ADMIN_LOCK_KEY = 32190001;
+
+export const activeAdminWhere = {
+  roles: { has: 'ADMINISTRATOR' },
+  isDeleted: false,
+} satisfies Prisma.UserWhereInput;
+
+// Call first in any transaction that changes who is an admin, so those run one
+// at a time. Released when the transaction ends.
+async function lockAdminSet(tx: Prisma.TransactionClient) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${ADMIN_LOCK_KEY}::bigint)`;
+}
+
+export async function isInitialized() {
+  return (await prisma.systemBootstrap.findUnique({ where: { id: 1 } })) !== null;
+}
+
+// Runs at most once per database
+export async function bootstrapAdmin(input: RegisterInput) {
+  // Hash before taking the lock — bcrypt is slow and needs no lock.
+  const data = await buildNewUser(input);
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      await lockAdminSet(tx);
+
+      if (await tx.systemBootstrap.findUnique({ where: { id: 1 } })) {
+        return { ok: false as const, reason: 'already_initialized' as const };
+      }
+
+      const user = await tx.user.create({
+        data: { ...data, roles: ['USER', 'ADMINISTRATOR'] },
+        select: profileSelect,
+      });
+      await tx.systemBootstrap.create({ data: { adminUserId: user.id } });
+      await tx.adminRoleChange.create({
+        data: { actorId: null, targetId: user.id, action: 'GRANT' },
+      });
+      return { ok: true as const, user };
+    });
+  } catch (err) {
+    const field = duplicateField(err);
+    if (field) return { ok: false as const, reason: `${field}_taken` as const };
+    throw err;
+  }
+}
