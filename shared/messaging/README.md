@@ -12,7 +12,7 @@ shared/messaging/
 │   │   ├── order.ts       # order event payloads
 │   │   └── supplier.ts    # supplier event payloads
 │   ├── index.ts           # RabbitMQClient singleton (connect, publish, consume, DLQ)
-│   ├── queueLog.ts        # broker.log plus one log file per queue
+│   ├── queueLog.ts        # broker.log plus one file per queue
 │   └── topology.ts        # queues, exchanges, retry / DLQ / DLX names
 ├── compose.yaml           # local RabbitMQ broker — start from here
 ├── package.json           # @foc/messaging dependencies
@@ -127,6 +127,33 @@ Returning normally acks the message. Throwing asks the client to retry, then dea
 
 Retries wait for a confirm before acking the original delivery. A rejected retry confirm requeues that delivery instead of dropping it.
 
+### RabbitMQ Package
+
+`@foc/messaging` is an internal npm workspace (`amqplib`). Build with `npm run build --workspace @foc/messaging`. Pass the broker URL from the environment (`RABBITMQ_URL`); do not hard-code credentials in service code.
+
+**Start the broker** from this folder:
+
+```bash
+docker compose -f shared/messaging/compose.yaml up -d
+```
+
+**Create a client** in a service (connect at startup, close on shutdown):
+
+```ts
+import { RabbitMQClient, QUEUES } from '@foc/messaging';
+
+const broker = new RabbitMQClient({
+  url: process.env.RABBITMQ_URL,
+  serviceName: 'order-service',
+  queues: [QUEUES.orderSupplier, QUEUES.orderCredits],
+  maxRetries: 3,
+});
+
+await broker.connect();
+// ... publish / consume ...
+await broker.close();
+```
+
 ### RabbitMQ Testing - Mock Events
 
 What does this do you may ask? Basically it creates a new message broker at our localhost 5672, and under the name of order service. The queue reads from an enum of fixed types of queues and assumes the order supplier queue. 
@@ -167,6 +194,8 @@ cat logs/rabbitmq/order.supplier-events.log
 ```
 
 Each line is JSON. `logs/rabbitmq/broker.log` is the centralized log. Each queue also gets its own file, for example `logs/rabbitmq/credit.payment-events.log`. Dead-lettered messages are written to the queue file and to `<queue>.dlq.log`. `logDir` defaults to `logs/rabbitmq` under the process working directory.
+
+Logs record `eventId`, action, and retry count — not the message payload or the broker URL.
 
 **IMPORTANT** - Idempotency checks belong in a service's consumer logic
 

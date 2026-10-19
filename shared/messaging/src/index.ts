@@ -95,11 +95,10 @@ export class RabbitMQClient {
 
     await channel.consume(
       queue,
-      (msg) => {
-        this.handleDelivery(queue, msg, handler, maxRetries).catch((err) => {
+      (msg: ConsumeMessage | null) => {
+        this.handleDelivery(queue, msg, handler, maxRetries).catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err);
           this.log.error('delivery-failure', queue, { message });
-          console.error(`[${this.config.serviceName ?? 'rabbitmq'}] delivery failure on ${queue}`, err);
         });
       },
       { noAck: false },
@@ -147,11 +146,17 @@ export class RabbitMQClient {
   private confirmSend(queue: string, body: Buffer, options: Options.Publish): Promise<boolean> {
     const channel = this.requireChannel();
     return new Promise((resolve) => {
-      const buffered = channel.sendToQueue(queue, body, options, (err) => {
-        resolve(!err);
-      });
-      if (!buffered) {
-        this.log.info('publish-blocked', queue, { eventId: options.messageId });
+      try {
+        const buffered = channel.sendToQueue(queue, body, options, (err: Error | null) => {
+          resolve(!err);
+        });
+        if (!buffered) {
+          this.log.info('publish-blocked', queue, { eventId: options.messageId });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.log.error('publish-rejected', queue, { eventId: options.messageId, message });
+        resolve(false);
       }
     });
   }
@@ -176,7 +181,8 @@ export class RabbitMQClient {
   ): Promise<void> {
     if (!msg) return;
     const channel = this.requireChannel();
-    const retryCount = Number(msg.properties.headers?.[RETRY_HEADER] ?? 0);
+    const parsedRetry = Number(msg.properties.headers?.[RETRY_HEADER] ?? 0);
+    const retryCount = Number.isFinite(parsedRetry) ? parsedRetry : maxRetries;
 
     const messageId = msg.properties.messageId ?? '';
 
