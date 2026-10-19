@@ -294,7 +294,7 @@ To show a user's name (e.g. on an errand), call `GetPublicProfile` instead of
 reading our database (F2.6). It returns **public fields only** — never email,
 roles or auth data.
 
-- **Address:** `localhost:50052` (plaintext for now — internal traffic only)
+- **Address:** `localhost:50051` (plaintext for now — internal traffic only)
 - **Contract:** [`proto/user.proto`](./proto/user.proto) — copy it into your service
 - **RPC:** `user.UserService/GetPublicProfile`
   - Request: `{ user_id }`
@@ -309,7 +309,7 @@ Try it with [`grpcurl`](https://github.com/fullstorydev/grpcurl) (`brew install 
 ```bash
 grpcurl -plaintext -import-path proto -proto user.proto \
   -d '{"user_id":"<user id>"}' \
-  localhost:50052 user.UserService/GetPublicProfile
+  localhost:50051 user.UserService/GetPublicProfile
 ```
 
 ---
