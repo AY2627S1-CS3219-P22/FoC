@@ -50,3 +50,40 @@ export async function bootstrapAdmin(input: RegisterInput) {
     throw err;
   }
 }
+
+// Re-checks the caller in the DB: their token's roles can be up to 15m stale.
+async function checkActorAndTarget(tx: Prisma.TransactionClient, actorId: string, targetId: string) {
+  const actor = await tx.user.findFirst({
+    where: { id: actorId, ...activeAdminWhere },
+    select: { id: true },
+  });
+  if (!actor) return { ok: false as const, reason: 'forbidden' as const };
+
+  const target = await tx.user.findFirst({
+    where: { id: targetId, isDeleted: false },
+    select: profileSelect,
+  });
+  if (!target) return { ok: false as const, reason: 'not_found' as const };
+
+  return { ok: true as const, target };
+}
+
+export async function grantAdmin(actorId: string, targetId: string) {
+  return prisma.$transaction(async (tx) => {
+    await lockAdminSet(tx);
+
+    const check = await checkActorAndTarget(tx, actorId, targetId);
+    if (!check.ok) return check;
+    if (check.target.roles.includes('ADMINISTRATOR')) {
+      return { ok: true as const, user: check.target };
+    }
+
+    const user = await tx.user.update({
+      where: { id: targetId },
+      data: { roles: { push: 'ADMINISTRATOR' } },
+      select: profileSelect,
+    });
+    await tx.adminRoleChange.create({ data: { actorId, targetId, action: 'GRANT' } });
+    return { ok: true as const, user };
+  });
+}

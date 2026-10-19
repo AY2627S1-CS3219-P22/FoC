@@ -8,6 +8,7 @@ import type { LoginInput } from '../dto/loginDto';
 import type { UpdateProfileInput } from '../dto/updateProfileDto';
 import * as userService from '../../services/userService';
 import * as sessionService from '../../services/sessionService';
+import * as adminService from '../../services/adminService';
 
 const REFRESH_COOKIE = 'refreshToken';
 
@@ -141,5 +142,25 @@ export const getUserById: RequestHandler = async (req, res) => {
     return;
   }
   res.status(200).json({ user });
+};
+
+// Shared by the admin-role endpoints.
+function sendAdminError(res: Response, reason: 'forbidden' | 'not_found') {
+  if (reason === 'forbidden') {
+    res.status(403).json({ error: 'Forbidden', message: 'Only an active administrator can change admin roles.' });
+  } else {
+    res.status(404).json({ error: 'Not Found', message: 'User not found.' });
+  }
+}
+
+// POST /users/:id/admin
+// Idempotent: 200 whether the role was granted now or already held.
+export const grantAdmin: RequestHandler = async (req, res) => {
+  const result = await adminService.grantAdmin(req.user!.id, String(req.params.id));
+  if (!result.ok) {
+    sendAdminError(res, result.reason);
+    return;
+  }
+  res.status(200).json({ user: result.user });
 };
 
