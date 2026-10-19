@@ -28,4 +28,23 @@ model User {
   isDeleted    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+}
+
+// One row per login session, for its whole life: rotation swaps the token on
+// this same row, so every change to a session serializes on one row lock.
+// The raw token only ever lives in the client's httpOnly cookie; we store its
+// SHA-256 hash, so a DB leak exposes no sessions.
+model RefreshToken {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash         String    @unique
+  previousTokenHash String?   @unique // the token just rotated away; lets logout still find the session
+  expiresAt         DateTime
+  revokedAt         DateTime? // set on logout; non-null = session ended
+  createdAt         DateTime  @default(now())
+
+  @@index([userId])
 }

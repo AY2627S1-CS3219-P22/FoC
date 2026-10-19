@@ -1,6 +1,7 @@
 import {
   credentials,
   Metadata,
+  status,
   type CallOptions,
   type ChannelCredentials,
   type ClientUnaryCall,
@@ -13,13 +14,20 @@ import type { GetOrderRequest } from './generated/order/GetOrderRequest';
 import type { Order__Output as Order } from './generated/order/Order';
 import type { GetReservationRequest } from './generated/credit/GetReservationRequest';
 import type { GetBalanceRequest } from './generated/credit/GetBalanceRequest';
+import type { InitCreditsRequest } from './generated/credit/InitCreditsRequest';
+import type { UpdateReservationRequest } from './generated/credit/UpdateReservationRequest';
+import type { GetCreditHistoryRequest } from './generated/credit/GetCreditHistoryRequest';
+import type { CreditHistory__Output as CreditHistory } from './generated/credit/CreditHistory';
 import type { Balance__Output as Balance } from './generated/credit/Balance';
 import type { ReserveCreditsRequest } from './generated/credit/ReserveCreditsRequest';
 import type { Reservation__Output as Reservation } from './generated/credit/Reservation';
 import type { ReleaseCreditsRequest } from './generated/credit/ReleaseCreditsRequest';
 import type { SettleCreditsRequest } from './generated/credit/SettleCreditsRequest';
+import type { GetReservationRequest } from './generated/credit/GetReservationRequest';
 import type { GetSupplierRequest } from './generated/supplier/GetSupplierRequest';
 import type { Supplier__Output as Supplier } from './generated/supplier/Supplier';
+import type { IsOpenRequest } from './generated/supplier/IsOpenRequest';
+import type { IsOpenResponse__Output as IsOpenResponse } from './generated/supplier/IsOpenResponse';
 
 export interface ClientConfig {
   timeoutMs?: number;
@@ -40,15 +48,18 @@ function positiveTimeout(timeoutMs: number): number {
   return timeoutMs;
 }
 
-function callOptions(defaultTimeout: number, options: RpcOptions): CallOptions {
-  const timeout = positiveTimeout(options.timeoutMs ?? defaultTimeout);
-  const localDeadline = Date.now() + timeout;
-  const upstreamDeadline =
+function upstreamDeadline(options: RpcOptions): number {
+  const deadline =
     options.deadline instanceof Date ? options.deadline.getTime() : (options.deadline ?? Infinity);
-  if (Number.isNaN(upstreamDeadline)) {
+  if (Number.isNaN(deadline)) {
     throw new RangeError('deadline must be a valid Date or timestamp');
   }
-  return { deadline: Math.min(localDeadline, upstreamDeadline) };
+  return deadline;
+}
+
+function callOptions(defaultTimeout: number, options: RpcOptions): CallOptions {
+  const timeout = positiveTimeout(options.timeoutMs ?? defaultTimeout);
+  return { deadline: Math.min(Date.now() + timeout, upstreamDeadline(options)) };
 }
 
 function unary<Response>(
@@ -106,52 +117,117 @@ export function createOrderClient(target: string, config: ClientConfig = {}) {
   };
 }
 
-export function createCreditClient(target: string, config: ClientConfig = {}) {
+export interface RetryPolicy {
+  // Total attempts, including the first. 1 disables retries.
+  maxAttempts?: number;
+  initialBackoffMs?: number;
+  maxBackoffMs?: number;
+}
+
+export interface CreditClientConfig extends ClientConfig {
+  // timeoutMs bounds each attempt; an RpcOptions deadline bounds the whole call.
+  retry?: RetryPolicy;
+}
+
+// Protobuf encoding silently truncates fractions (3.55 becomes 3) and wraps out-of-range
+// integers, so the server never sees the original value. Reject those before sending.
+type WholeRange = { min: number; max: number };
+const int32: WholeRange = { min: -2147483648, max: 2147483647 };
+const uint32: WholeRange = { min: 0, max: 4294967295 };
+
+function rejectInexact(request: object, fields: Record<string, WholeRange>): Promise<never> | undefined {
+  for (const [field, { min, max }] of Object.entries(fields)) {
+    const value = (request as Record<string, unknown>)[field];
+    if (value === undefined) continue;
+    if (typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max) continue;
+    const details = typeof value === 'number' && Number.isInteger(value)
+      ? `${field} is outside the supported range`
+      : `${field} must be a whole number`;
+    return Promise.reject(Object.assign(new Error(`${status.INVALID_ARGUMENT} INVALID_ARGUMENT: ${details}`), {
+      code: status.INVALID_ARGUMENT,
+      details,
+      metadata: new Metadata(),
+    }));
+  }
+  return undefined;
+}
+
+// Transient failures where resending the identical request is the documented recovery.
+const retryableCreditCodes: ReadonlySet<number> = new Set([
+  status.UNAVAILABLE,
+  status.ABORTED,
+  status.DEADLINE_EXCEEDED,
+]);
+
+function retryPolicy(policy: RetryPolicy = {}): Required<RetryPolicy> {
+  const resolved = { maxAttempts: 3, initialBackoffMs: 100, maxBackoffMs: 1000, ...policy };
+  if (!Number.isSafeInteger(resolved.maxAttempts) || resolved.maxAttempts < 1 || resolved.maxAttempts > 10) {
+    throw new RangeError('retry.maxAttempts must be an integer from 1 to 10');
+  }
+  for (const name of ['initialBackoffMs', 'maxBackoffMs'] as const) {
+    if (!Number.isSafeInteger(resolved[name]) || resolved[name] < 0) {
+      throw new RangeError(`retry.${name} must be a non-negative safe integer`);
+    }
+  }
+  return resolved;
+}
+
+async function withRetries<Response>(
+  policy: Required<RetryPolicy>,
+  options: RpcOptions,
+  attempt: () => Promise<Response>,
+): Promise<Response> {
+  const deadline = upstreamDeadline(options);
+  for (let attempts = 1; ; attempts++) {
+    try {
+      return await attempt();
+    } catch (error) {
+      const code = (error as { code?: unknown } | null)?.code;
+      if (attempts >= policy.maxAttempts || typeof code !== 'number' || !retryableCreditCodes.has(code)) {
+        throw error;
+      }
+      // Full jitter stops callers that failed together from retrying in lockstep.
+      const delay = Math.random() * Math.min(policy.maxBackoffMs, policy.initialBackoffMs * 2 ** (attempts - 1));
+      if (Date.now() + delay >= deadline) throw error;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
+export function createCreditClient(target: string, config: CreditClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 3000);
+  const retry = retryPolicy(config.retry);
   const client = new CreditService(target, config.credentials ?? credentials.createInsecure());
+  // Every credit RPC is safe to resend unchanged: reads have no side effects, and Credit
+  // Service replays a committed mutation's original response for the identical request.
+  const send = <Response>(options: RpcOptions, invoke: (metadata: Metadata, callOptions: CallOptions,
+    callback: requestCallback<Response>) => ClientUnaryCall): Promise<Response> =>
+    withRetries(retry, options, () => unary<Response>((callback) =>
+      invoke(options.metadata?.clone() ?? new Metadata(), callOptions(timeoutMs, options), callback)));
   return {
-    getReservation(request: GetReservationRequest, options: RpcOptions = {}): Promise<Reservation> {
-      return unary(callback => client.getReservation(request, options.metadata ?? new Metadata(), callOptions(timeoutMs, options), callback));
+    initCredits(request: InitCreditsRequest, options: RpcOptions = {}): Promise<Balance> {
+      return send(options, (metadata, call, callback) => client.initCredits(request, metadata, call, callback));
+    },
+    updateReservation(request: UpdateReservationRequest, options: RpcOptions = {}): Promise<Reservation> {
+      return rejectInexact(request, { amount: int32, expectedVersion: uint32 }) ?? send(options, (metadata, call, callback) => client.updateReservation(request, metadata, call, callback));
+    },
+    getCreditHistory(request: GetCreditHistoryRequest, options: RpcOptions = {}): Promise<CreditHistory> {
+      return rejectInexact(request, { pageSize: uint32 }) ?? send(options, (metadata, call, callback) => client.getCreditHistory(request, metadata, call, callback));
     },
     getBalance(request: GetBalanceRequest, options: RpcOptions = {}): Promise<Balance> {
-      return unary((callback) =>
-        client.getBalance(
-          request,
-          options.metadata ?? new Metadata(),
-          callOptions(timeoutMs, options),
-          callback,
-        ),
-      );
+      return send(options, (metadata, call, callback) => client.getBalance(request, metadata, call, callback));
     },
     reserveCredits(request: ReserveCreditsRequest, options: RpcOptions = {}): Promise<Reservation> {
-      return unary((callback) =>
-        client.reserveCredits(
-          request,
-          options.metadata ?? new Metadata(),
-          callOptions(timeoutMs, options),
-          callback,
-        ),
-      );
+      return rejectInexact(request, { amount: int32 }) ?? send(options, (metadata, call, callback) => client.reserveCredits(request, metadata, call, callback));
     },
     releaseCredits(request: ReleaseCreditsRequest, options: RpcOptions = {}): Promise<Reservation> {
-      return unary((callback) =>
-        client.releaseCredits(
-          request,
-          options.metadata ?? new Metadata(),
-          callOptions(timeoutMs, options),
-          callback,
-        ),
-      );
+      return send(options, (metadata, call, callback) => client.releaseCredits(request, metadata, call, callback));
     },
     settleCredits(request: SettleCreditsRequest, options: RpcOptions = {}): Promise<Reservation> {
-      return unary((callback) =>
-        client.settleCredits(
-          request,
-          options.metadata ?? new Metadata(),
-          callOptions(timeoutMs, options),
-          callback,
-        ),
-      );
+      return send(options, (metadata, call, callback) => client.settleCredits(request, metadata, call, callback));
+    },
+    getReservation(request: GetReservationRequest, options: RpcOptions = {}): Promise<Reservation> {
+      return send(options, (metadata, call, callback) => client.getReservation(request, metadata, call, callback));
     },
     close(): void {
       client.close();
@@ -166,6 +242,16 @@ export function createSupplierClient(target: string, config: ClientConfig = {}) 
     getSupplier(request: GetSupplierRequest, options: RpcOptions = {}): Promise<Supplier> {
       return unary((callback) =>
         client.getSupplier(
+          request,
+          options.metadata ?? new Metadata(),
+          callOptions(timeoutMs, options),
+          callback,
+        ),
+      );
+    },
+    isOpen(request: IsOpenRequest, options: RpcOptions = {}): Promise<IsOpenResponse> {
+      return unary((callback) =>
+        client.isOpen(
           request,
           options.metadata ?? new Metadata(),
           callOptions(timeoutMs, options),

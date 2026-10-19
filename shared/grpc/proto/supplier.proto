@@ -4,12 +4,21 @@ package supplier;
 
 service SupplierService {
   rpc GetSupplier(GetSupplierRequest) returns (Supplier);
+  rpc IsOpen(IsOpenRequest) returns (IsOpenResponse);
 }
 
 message GetSupplierRequest {
   // Drizzle/Supabase uses a positive bigint identity, not a UUID.
   // The JS loader represents uint64 values as decimal strings.
   uint64 supplier_id = 1;
+}
+
+message IsOpenRequest {
+  uint64 supplier_id = 1;
+}
+
+message IsOpenResponse {
+  bool is_open = 1;
 }
 
 message Supplier {

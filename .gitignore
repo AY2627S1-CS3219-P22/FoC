@@ -11,9 +11,14 @@ out/
 *.key
 env/
 
+# curl cookie jars from local testing — hold live session tokens
+cookies.txt
+
 # OS
 .DS_Store
 Thumbs.db
 
 # node_modules
 node_modules/
+
+supabase/.temp/start-secrets/supabase_edge_runtime_FoC/env/

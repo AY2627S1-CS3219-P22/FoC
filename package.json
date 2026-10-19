@@ -6,7 +6,7 @@
     "shared/grpc",
     "order-service",
     "order-service/grpc",
-    "credit-service/grpc",
+    "credit-service",
     "supplier-service/grpc"
   ],
   "scripts": {

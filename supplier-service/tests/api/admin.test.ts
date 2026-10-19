@@ -21,8 +21,12 @@ Admin user tests
 - Test: Supplier creation | Expected 201
 
 The admin account is a token signed with the throwaway key pair from
-tests/setup-env.ts, standing in for one the user service would issue. A valid
-signature is enough: this service does not check roles.
+tests/setup-env.ts, standing in for one the user service would issue. Write
+<<<<<<< HEAD
+routes require authenticate then requireRole(ADMINISTRATOR).
+=======
+routes require authenticate + requireRole(ADMIN).
+>>>>>>> 9fd95d2 (Lost this data due to git rebase forced. Redid it with Claude)
 */
 
 import request from 'supertest';
@@ -30,7 +34,11 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { app } from '@/app';
 import pool from '@database/db';
 import { resetDatabase } from '../helpers/reset-database';
-import { adminBearer } from '../helpers/auth-token';
+<<<<<<< HEAD
+import { adminBearer, userBearer } from '../helpers/auth-token';
+=======
+import { adminBearer, foreignBearer, signTestToken, userBearer } from '../helpers/auth-token';
+>>>>>>> 9fd95d2 (Lost this data due to git rebase forced. Redid it with Claude)
 
 const validSupplier = {
   name: '[Admin Test] Bubble Tea Counter',
@@ -40,6 +48,13 @@ const validSupplier = {
   floor: 1,
   latitude: '1.304400',
   longitude: '103.772600',
+  //createSupplierSchema mandates a full week, so authorization tests still need one
+  openingHours: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+    dayOfWeek,
+    opensAt: '09:00:00',
+    closesAt: '17:00:00',
+    isClosed: false,
+  })),
 };
 
 beforeAll(async () => {
@@ -170,29 +185,125 @@ describe('admin POST /supplier', () => {
   });
 });
 
+<<<<<<< HEAD
 /*
 The writes are the whole reason this service cares who the caller is. These stay
 as todos until authenticate is on the routes and reads JWT_PUBLIC_KEY from the
 environment rather than the request body.
 */
-describe('write routes reject callers who cannot prove they are an admin', () => {
-  it.todo('POST with no token is 401');
-  it.todo('PUT with no token is 401');
-  it.todo('DELETE with no token is 401');
+describe('write routes reject a signed-in user who is not an administrator', () => {
+  it('POST with a USER token is 403', async () => {
+    const res = await request(app)
+      .post('/supplier')
+      .set('Authorization', userBearer())
+      .send(validSupplier);
 
-  it.todo('POST with a malformed token is 401');
-  it.todo('PUT with a malformed token is 401');
-  it.todo('DELETE with a malformed token is 401');
-
-  //signed properly, but by a key this service has no reason to trust
-  it.todo('POST with a token signed by an unknown key is 401');
-  it.todo('PUT with a token signed by an unknown key is 401');
-  it.todo('DELETE with a token signed by an unknown key is 401');
-
-  it.todo('POST with an expired admin token is 401');
-  it.todo('PUT with an expired admin token is 401');
-  it.todo('DELETE with an expired admin token is 401');
-
-  //the key must come from our environment, never from something the caller sends
-  it.todo('POST cannot smuggle its own verifying key in the body');
+    expect(res.status).toBe(403);
+  });
 });
+
+=======
+>>>>>>> 9fd95d2 (Lost this data due to git rebase forced. Redid it with Claude)
+describe('write routes reject callers who cannot prove they are an admin', () => {
+  const expiredAdmin = () => `Bearer ${signTestToken({ id: 'test-admin', expiresIn: -10 })}`;
+
+  it('POST with no token is 401', async () => {
+    const res = await request(app).post('/supplier').send(validSupplier);
+    expect(res.status).toBe(401);
+  });
+
+  it('PUT with no token is 401', async () => {
+    const res = await request(app).put('/supplier/1').send({ buildingName: 'COM2' });
+    expect(res.status).toBe(401);
+  });
+
+  it('DELETE with no token is 401', async () => {
+    const res = await request(app).delete('/supplier/1');
+    expect(res.status).toBe(401);
+  });
+
+  it('POST with a malformed token is 401', async () => {
+    const res = await request(app)
+      .post('/supplier')
+      .set('Authorization', 'Bearer not-a-jwt')
+      .send(validSupplier);
+    expect(res.status).toBe(401);
+  });
+
+  it('PUT with a malformed token is 401', async () => {
+    const res = await request(app)
+      .put('/supplier/1')
+      .set('Authorization', 'Bearer not-a-jwt')
+      .send({ buildingName: 'COM2' });
+    expect(res.status).toBe(401);
+  });
+
+  it('DELETE with a malformed token is 401', async () => {
+    const res = await request(app).delete('/supplier/1').set('Authorization', 'Bearer not-a-jwt');
+    expect(res.status).toBe(401);
+  });
+
+  it('POST with a token signed by an unknown key is 401', async () => {
+    const res = await request(app)
+      .post('/supplier')
+      .set('Authorization', foreignBearer())
+      .send(validSupplier);
+    expect(res.status).toBe(401);
+  });
+
+  it('PUT with a token signed by an unknown key is 401', async () => {
+    const res = await request(app)
+      .put('/supplier/1')
+      .set('Authorization', foreignBearer())
+      .send({ buildingName: 'COM2' });
+    expect(res.status).toBe(401);
+  });
+
+  it('DELETE with a token signed by an unknown key is 401', async () => {
+    const res = await request(app).delete('/supplier/1').set('Authorization', foreignBearer());
+    expect(res.status).toBe(401);
+  });
+
+  it('POST with an expired admin token is 401', async () => {
+    const res = await request(app)
+      .post('/supplier')
+      .set('Authorization', expiredAdmin())
+      .send(validSupplier);
+    expect(res.status).toBe(401);
+  });
+
+  it('PUT with an expired admin token is 401', async () => {
+    const res = await request(app)
+      .put('/supplier/1')
+      .set('Authorization', expiredAdmin())
+      .send({ buildingName: 'COM2' });
+    expect(res.status).toBe(401);
+  });
+
+  it('DELETE with an expired admin token is 401', async () => {
+    const res = await request(app).delete('/supplier/1').set('Authorization', expiredAdmin());
+    expect(res.status).toBe(401);
+  });
+
+  it('POST with a USER token is 403', async () => {
+    const res = await request(app)
+      .post('/supplier')
+      .set('Authorization', userBearer())
+      .send(validSupplier);
+    expect(res.status).toBe(403);
+  });
+
+  it('PUT with a USER token is 403', async () => {
+    const res = await request(app)
+      .put('/supplier/1')
+      .set('Authorization', userBearer())
+      .send({ buildingName: 'COM2' });
+    expect(res.status).toBe(403);
+  });
+
+  it('DELETE with a USER token is 403', async () => {
+    const res = await request(app).delete('/supplier/1').set('Authorization', userBearer());
+    expect(res.status).toBe(403);
+  });
+});
+
