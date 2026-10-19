@@ -1,10 +1,12 @@
 import { env } from './env';
 import { prisma } from './db';
+import { connectRedis, disconnectRedis } from './redis';
 import { createApp } from './api/app';
 import { startGrpcServer } from './grpc/server';
 
 // Boots both servers: Express (REST) and gRPC (internal RPC).
 async function main(): Promise<void> {
+  await connectRedis();
   const app = createApp();
   const httpServer = app.listen(env.PORT, () => {
     console.log(`REST server listening on http://localhost:${env.PORT}`);
@@ -19,6 +21,7 @@ async function main(): Promise<void> {
     httpServer.close();
     grpcServer.forceShutdown();
     await prisma.$disconnect();
+    await disconnectRedis();
     process.exit(0);
   };
 

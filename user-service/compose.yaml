@@ -26,6 +26,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis-cache:
+        condition: service_healthy
     environment:
       # In-network the DB host is the service name, not localhost.
       DATABASE_URL: 'postgresql://user_service:user_service@postgres:5432/user_service?schema=public'
@@ -34,15 +36,58 @@ services:
       # Keys are mounted at runtime (see volumes), never baked into the image.
       JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
       JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+      REDIS_URL: redis://redis-cache:6379
+      OTP_HMAC_KEY_PATH: /app/keys/otp.key
+      # Local placeholder. At least 32 characters; replace for a shared deployment.
+      OTP_HASH_SECRET: replace-with-a-random-string-at-least-32-chars
+      REDIS_OTP_LUA: /app/scripts/atomic.lua
+      # Mailpit is another container, so localhost:1025 is not the mail server.
+      SMTP_HOST: mailpit
+      SMTP_PORT: '1025'
     ports:
       - '3001:3001'
       - '50051:50051'
     volumes:
       # Run `npm run keys:generate` first, or the service exits at boot.
       - ./keys:/app/keys:ro
+      # The runtime image does not include src/, so the OTP script is mounted.
+      - ./src/scripts/atomic.lua:/app/scripts/atomic.lua:ro
     # Apply migrations, then start. `migrate deploy` runs committed migrations
     # (safe for non-dev); use `npm run prisma:migrate` locally to create them.
     command: sh -c "npx prisma migrate deploy && node dist/index.js"
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit
+    restart: always
+    ports:
+      - "8025:8025" # WEB GUI
+      - "1025:1025" # SMTP
+    volumes:
+      - ./mailpit-data:/data  # Separate database
+    env_file:
+      - testing.env 
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 15s
+      start_period: 10s
+      timeout: 30s      # optional (default is 30s)
+      retries: 3        # optional (default is 3)
+
+  redis-cache: 
+    image: redis:7.4-alpine
+    container_name: local_redis_cache
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes #persistent data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
 volumes:
   user_service_pgdata:
+  redis_data:

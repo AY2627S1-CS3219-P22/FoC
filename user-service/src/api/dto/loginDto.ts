@@ -7,3 +7,4 @@ export const loginSchema = z.object({
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
+export type email = z.infer<typeof loginSchema>['email'];
