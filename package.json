@@ -5,7 +5,7 @@
   "workspaces": [
     "shared/grpc",
     "order-service/grpc",
-    "credit-service",
+    "credit-service/grpc",
     "supplier-service/grpc"
   ],
   "scripts": {

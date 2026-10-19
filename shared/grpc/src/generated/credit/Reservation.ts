@@ -8,8 +8,6 @@ export interface Reservation {
   'amount'?: (number);
   'status'?: (_credit_ReservationStatus);
   'courierId'?: (string);
-  'reservationId'?: (string);
-  'version'?: (number);
 }
 
 export interface Reservation__Output {
@@ -18,6 +16,4 @@ export interface Reservation__Output {
   'amount': (number);
   'status': (_credit_ReservationStatus__Output);
   'courierId': (string);
-  'reservationId': (string);
-  'version': (number);
 }
