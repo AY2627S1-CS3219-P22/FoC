@@ -1,6 +1,8 @@
 import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
-import amqp, { type Channel, type ChannelModel, type ConsumeMessage } from 'amqplib';
+import path from 'node:path';
+import amqp, { type ChannelModel, type ConfirmChannel, type ConsumeMessage, type Options } from 'amqplib';
+import { QueueLogger } from './queueLog';
 import { deadLetterExchange, deadLetterQueue, MAX_RETRIES, RETRY_HEADER } from './topology';
 
 export type RabbitMQConfig = {
@@ -8,6 +10,8 @@ export type RabbitMQConfig = {
   queues?: string[];
   serviceName?: string;
   maxRetries?: number;
+  /** Directory for broker.log and one file per queue. Default: logs/rabbitmq */
+  logDir?: string;
 };
 
 export type QueueMessage<T = unknown> = {
@@ -33,17 +37,23 @@ export type QueueHandler<T = unknown> = (message: QueueMessage<T>) => Promise<vo
 //Singleton 
 export class RabbitMQClient {
   private readonly config: RabbitMQConfig;
+  private readonly log: QueueLogger;
   private connection: ChannelModel | undefined;
-  private channel: Channel | undefined;
+  private channel: ConfirmChannel | undefined;
 
   constructor(config: RabbitMQConfig = {}) {
     this.config = config;
+    this.log = new QueueLogger(
+      config.logDir ?? path.join(process.cwd(), 'logs', 'rabbitmq'),
+      config.serviceName ?? 'rabbitmq',
+    );
   }
 
   async connect(): Promise<void> {
     const url = this.config.url || 'amqp://guest:guest@localhost:5672';
     this.connection = await amqp.connect(url);
-    this.channel = await this.connection.createChannel();
+    this.channel = await this.connection.createConfirmChannel();
+    this.log.info('connected');
 
     if (this.config.queues) {
       for (const queue of this.config.queues) {
@@ -57,10 +67,10 @@ export class RabbitMQClient {
     await this.connection?.close();
     this.channel = undefined;
     this.connection = undefined;
+    this.log.info('closed');
   }
 
   async publishToQueue(queue: string, message: object, eventId?: string): Promise<boolean> {
-    const channel = this.requireChannel();
     await this.assertQueueWithDeadLetter(queue);
 
     const id =
@@ -69,11 +79,13 @@ export class RabbitMQClient {
         ? (message as { eventId: string }).eventId
         : randomUUID());
 
-    return channel.sendToQueue(queue, Buffer.from(JSON.stringify(message)), {
+    const sent = await this.confirmSend(queue, Buffer.from(JSON.stringify(message)), {
       persistent: true,
       messageId: id,
       contentType: 'application/json',
     });
+    this.log.info(sent ? 'published' : 'publish-rejected', queue, { eventId: id });
+    return sent;
   }
 
   async consumeFromQueue<T = unknown>(queue: string, handler: QueueHandler<T>): Promise<boolean> {
@@ -84,10 +96,15 @@ export class RabbitMQClient {
     await channel.consume(
       queue,
       (msg) => {
-        void this.handleDelivery(queue, msg, handler, maxRetries);
+        this.handleDelivery(queue, msg, handler, maxRetries).catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          this.log.error('delivery-failure', queue, { message });
+          console.error(`[${this.config.serviceName ?? 'rabbitmq'}] delivery failure on ${queue}`, err);
+        });
       },
       { noAck: false },
     );
+    this.log.info('consuming', queue);
     return true;
   }
 
@@ -118,11 +135,25 @@ export class RabbitMQClient {
   2. Narrows the type declaration so callers can use it without extra if(! this.channel) checks
 
   */
-  private requireChannel(): Channel {
+  private requireChannel(): ConfirmChannel {
     if (!this.channel) {
       throw new Error('RabbitMQ channel is not connected');
     }
     return this.channel;
+  }
+
+  // Waits for the broker ack. `false` from sendToQueue only means the socket
+  // buffer is full; the confirm callback is still the result that matters.
+  private confirmSend(queue: string, body: Buffer, options: Options.Publish): Promise<boolean> {
+    const channel = this.requireChannel();
+    return new Promise((resolve) => {
+      const buffered = channel.sendToQueue(queue, body, options, (err) => {
+        resolve(!err);
+      });
+      if (!buffered) {
+        this.log.info('publish-blocked', queue, { eventId: options.messageId });
+      }
+    });
   }
 
   /*
@@ -147,25 +178,34 @@ export class RabbitMQClient {
     const channel = this.requireChannel();
     const retryCount = Number(msg.properties.headers?.[RETRY_HEADER] ?? 0);
 
+    const messageId = msg.properties.messageId ?? '';
+
     let payload: T;
     try {
       payload = JSON.parse(msg.content.toString()) as T;
     } catch {
       channel.nack(msg, false, false); //make sure no acknowledgement incites retry
+      this.log.error('dead-letter', [queue, deadLetterQueue(queue)], {
+        eventId: messageId,
+        reason: 'invalid-json',
+      });
       return;
     }
 
+    const eventId =
+      messageId ||
+      (typeof (payload as { eventId?: unknown }).eventId === 'string'
+        ? (payload as { eventId: string }).eventId
+        : '');
+
     try {
-      const eventId =
-        msg.properties.messageId ??
-        (typeof (payload as { eventId?: unknown }).eventId === 'string'
-          ? (payload as { eventId: string }).eventId
-          : '');
       await handler({ eventId, payload, retryCount });
       channel.ack(msg);
-    } catch {
+      this.log.info('acked', queue, { eventId, retryCount });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       if (retryCount < maxRetries) {
-        const republished = channel.sendToQueue(queue, msg.content, {
+        const republished = await this.confirmSend(queue, msg.content, {
           persistent: true,
           messageId: msg.properties.messageId,
           contentType: msg.properties.contentType ?? 'application/json',
@@ -173,12 +213,15 @@ export class RabbitMQClient {
         });
         if (republished) {
           channel.ack(msg);
+          this.log.info('retry', queue, { eventId, retryCount: retryCount + 1, message });
         } else {
           channel.nack(msg, false, true);
+          this.log.error('retry-blocked', queue, { eventId, retryCount, message });
         }
         return;
       }
       channel.nack(msg, false, false);
+      this.log.error('dead-letter', [queue, deadLetterQueue(queue)], { eventId, retryCount, message });
     }
   }
 }

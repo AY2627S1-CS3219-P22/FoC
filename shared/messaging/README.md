@@ -12,6 +12,7 @@ shared/messaging/
 │   │   ├── order.ts       # order event payloads
 │   │   └── supplier.ts    # supplier event payloads
 │   ├── index.ts           # RabbitMQClient singleton (connect, publish, consume, DLQ)
+│   ├── queueLog.ts        # broker.log plus one log file per queue
 │   └── topology.ts        # queues, exchanges, retry / DLQ / DLX names
 ├── compose.yaml           # local RabbitMQ broker — start from here
 ├── package.json           # @foc/messaging dependencies
@@ -96,32 +97,78 @@ const event: SupplierUpdated = {
 await broker.publishToQueue(QUEUES.orderSupplier, event, event.eventId);
 ```
 
-### RabbitMQ Package
+### Idempotent consumers
 
-`@foc/messaging` is an internal npm workspace (`amqplib`). Build with `npm run build --workspace @foc/messaging`. Default broker URL is `amqp://guest:guest@localhost:5672`.
+The client will deliver the same `eventId` more than once. A retry republishes the original body with the same `messageId`, and RabbitMQ can redeliver after a crash before `ack`. The handler has to treat a second delivery as a no-op.
 
-**Start the broker** from this folder:
+This is not an outbox or an inbox. The publisher still sends by calling `publishToQueue`. The consumer does not keep a copy of the payload. It only remembers which ids it has already applied.
 
-```bash
-docker compose -f shared/messaging/compose.yaml up -d
-```
-
-**Create a client** in a service (connect at startup, close on shutdown):
+Use `msg.eventId` as that id. It is the AMQP `messageId`, which `publishToQueue` sets from the payload's `eventId` or a UUID.
 
 ```ts
-import { RabbitMQClient, QUEUES } from '@foc/messaging';
+await broker.consumeFromQueue<CreditCommand>(QUEUES.creditPayments, async (msg) => {
+  const alreadyApplied = await hasProcessed(msg.eventId);
+  if (alreadyApplied) return;
 
-const broker = new RabbitMQClient({
-  url: process.env.RABBITMQ_URL,
-  serviceName: 'order-service',
-  queues: [QUEUES.orderSupplier, QUEUES.orderCredits],
-  maxRetries: 3,
+  await apply(msg.payload);
+  await remember(msg.eventId);
 });
-
-await broker.connect();
-// ... publish / consume ...
-await broker.close();
 ```
+
+`remember` must survive a process restart (a database row or a Redis key, not an in-memory `Set`). Check and write in the same transaction as the business change when the store allows it. If `apply` succeeds and `remember` fails, the retry runs `apply` again, so `apply` itself must be safe to run twice for that same id.
+
+Returning normally acks the message. Throwing asks the client to retry, then dead-letter after `maxRetries`.
+
+### Publisher confirms
+
+`connect()` opens a confirm channel with `createConfirmChannel()`. `publishToQueue` waits for the broker ack and returns `true` only after that ack. `false` means the broker rejected the publish (`publish-rejected` in the log). Retry that call with the same `eventId`.
+
+`publish-blocked` means the socket buffer filled. The publish is still in flight, and the return value is still the later broker ack. A lost confirm response can make the publisher try again after the broker already stored the message, which is why the consumer must be idempotent on `eventId`.
+
+Retries wait for a confirm before acking the original delivery. A rejected retry confirm requeues that delivery instead of dropping it.
+
+### RabbitMQ Testing - Mock Events
+
+What does this do you may ask? Basically it creates a new message broker at our localhost 5672, and under the name of order service. The queue reads from an enum of fixed types of queues and assumes the order supplier queue. 
+
+Now the broker is publishing (a producer action) a supplier.updated event to the queue and giving the relevant supplierId. The order event now chooses what to do with this message in its own consumer.
+
+```
+docker compose up -d
+
+npx tsx <<'EOF'
+import { RabbitMQClient} from './src/index.ts';
+import {QUEUES } from './src/topology.ts';
+
+async function main() {
+  const broker = new RabbitMQClient({
+    url: 'amqp://guest:guest@localhost:5672',
+    serviceName: 'order-service',
+    queues: [QUEUES.orderSupplier],
+    logDir: 'logs/rabbitmq',
+  });
+  await broker.connect();
+  await broker.publishToQueue(
+    QUEUES.orderSupplier,
+    { type: 'supplier.updated', eventId: 'evt-log-demo', supplierId: '42' },
+    'evt-log-demo',
+  );
+  await broker.close();
+}
+main();
+EOF
+```
+
+>To read the output we can run the following commands saved as their own log files
+
+```
+cat logs/rabbitmq/broker.log
+cat logs/rabbitmq/order.supplier-events.log
+```
+
+Each line is JSON. `logs/rabbitmq/broker.log` is the centralized log. Each queue also gets its own file, for example `logs/rabbitmq/credit.payment-events.log`. Dead-lettered messages are written to the queue file and to `<queue>.dlq.log`. `logDir` defaults to `logs/rabbitmq` under the process working directory.
+
+**IMPORTANT** - Idempotency checks belong in a service's consumer logic
 
 **IMPORTANT** - The broker is not yet published as an npm package, and does not yet exist as a single source of truth (on the cloud).
 
