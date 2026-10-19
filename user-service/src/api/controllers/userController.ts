@@ -74,10 +74,14 @@ export const login: RequestHandler = async (req, res) => {
 // POST /users/refresh
 export const refresh: RequestHandler = async (req, res) => {
   const token = req.cookies?.[REFRESH_COOKIE];
-  const result = token ? await sessionService.rotateSession(token) : { ok: false as const };
+  const result = token
+    ? await sessionService.rotateSession(token)
+    : { ok: false as const, reason: 'invalid' as const };
 
   if (!result.ok) {
-    clearRefreshCookie(res);
+    // Superseded = another tab just rotated it; this response may arrive after
+    // that one's Set-Cookie, so clearing here would delete the newer cookie.
+    if (result.reason === 'invalid') clearRefreshCookie(res);
     res.status(401).json({ error: 'Unauthorized', message: 'Session expired. Please log in again.' });
     return;
   }

@@ -160,18 +160,26 @@ Responses only ever include public fields — `passwordHash` is never returned.
 
 ### Sessions: refresh & logout
 
-Each login creates a session row (`RefreshToken` table, one per browser/device).
-Only the SHA-256 **hash** of the refresh token is stored, so a database leak
-exposes no usable sessions.
+Each login creates **one session row** (`RefreshToken` table, one per
+browser/device) that lives for the whole session. Only the SHA-256 **hash** of
+the refresh token is stored, so a database leak exposes no usable sessions.
 
-- **Refresh** (`POST /users/refresh`) — **rotates** the token: the old one is
-  revoked and a new one issued, so each refresh token works only once. The new
-  access token carries the user's **current** roles from the database. Each
-  refresh extends the session by another 7 days (sliding expiry). Fails with
-  `401` (and clears the cookie) if the token is missing, expired or revoked.
-- **Logout** (`POST /users/logout`) — revokes this browser's session and clears
+- **Refresh** (`POST /users/refresh`) — **rotates** the token: a new one is
+  issued on the same session row and the old one stops working, so each refresh
+  token works only once. The new access token carries the user's **current**
+  roles from the database. Each refresh extends the session by another 7 days
+  (sliding expiry). Fails with `401` if the token is missing, expired or revoked
+  (and clears the cookie) — or if another tab rotated it a moment ago (cookie
+  left alone, since the browser already holds the newer one).
+- **Logout** (`POST /users/logout`) — ends this browser's session and clears
   the cookie. Always returns `204` (safe to call twice). Other devices stay
-  logged in.
+  logged in. It also works with the token that was *just* rotated away, so a
+  logout racing a background refresh still ends the session.
+- **Cleanup:** each login first deletes that user's ended sessions (logged out
+  or expired), so the table doesn't grow without bound.
+- **Why one row per session:** refresh, logout and re-login all update that
+  single row, so Postgres's row lock makes concurrent requests on one session
+  run one after another — none can leave a live token behind.
 - **Logging in again** on a browser that still has a session revokes the old
   session first.
 
@@ -206,7 +214,11 @@ curl -i -b cookies.txt -X POST localhost:3001/users/refresh                  # 4
   original request with the new token. If refresh also fails → login page.
 - **If `/users/refresh` returns `401`, retry it once** before giving up. Two tabs
   refreshing at the same moment race on the same token; the loser gets `401`,
-  but the browser already holds the winner's new cookie.
+  but the browser already holds the winner's new cookie (the server deliberately
+  doesn't clear it in that case).
+- **Recommended:** share one in-flight refresh per tab ("single-flight") — if
+  several requests hit `401` at once, they all await the same `/users/refresh`
+  call instead of each starting their own.
 - **On logout:** call `POST /users/logout`, then drop the in-memory access token.
 - If the UI is served from a different origin than this API, user-service will
   need CORS with `credentials: true` and an explicit allowed origin (not `*`).
