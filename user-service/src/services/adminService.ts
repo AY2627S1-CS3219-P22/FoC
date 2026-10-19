@@ -87,3 +87,33 @@ export async function grantAdmin(actorId: string, targetId: string) {
     return { ok: true as const, user };
   });
 }
+
+// Call only after lockAdminSet in the same transaction, or the count can be stale.
+export async function ensureNotLastAdmin(tx: Prisma.TransactionClient, userId: string) {
+  const others = await tx.user.count({ where: { ...activeAdminWhere, NOT: { id: userId } } });
+  if (others === 0) return { ok: false as const, reason: 'last_admin' as const };
+  return { ok: true as const };
+}
+
+export async function revokeAdmin(actorId: string, targetId: string) {
+  return prisma.$transaction(async (tx) => {
+    await lockAdminSet(tx);
+
+    const check = await checkActorAndTarget(tx, actorId, targetId);
+    if (!check.ok) return check;
+    if (!check.target.roles.includes('ADMINISTRATOR')) {
+      return { ok: true as const, user: check.target };
+    }
+
+    const guard = await ensureNotLastAdmin(tx, targetId);
+    if (!guard.ok) return guard;
+
+    const user = await tx.user.update({
+      where: { id: targetId },
+      data: { roles: check.target.roles.filter((role) => role !== 'ADMINISTRATOR') },
+      select: profileSelect,
+    });
+    await tx.adminRoleChange.create({ data: { actorId, targetId, action: 'REVOKE' } });
+    return { ok: true as const, user };
+  });
+}

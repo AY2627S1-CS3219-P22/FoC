@@ -35,3 +35,6 @@ userRouter.get('/:id', authenticate, requireRole('ADMINISTRATOR'), userControlle
 
 // POST /users/:id/admin
 userRouter.post('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userController.grantAdmin);
+
+// DELETE /users/:id/admin
+userRouter.delete('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userController.revokeAdmin);
