@@ -1,0 +1,3 @@
+# Postman writes environment and global values here, including service tokens.
+environments/
+globals/

@@ -1,0 +1,23 @@
+$kind: grpc-request
+description: ""
+url: "{{credit_url}}"
+methodPath: credit.CreditService.InitCredits
+methodDescriptor: Cp0CCgxjcmVkaXQucHJvdG8SBmNyZWRpdCJAChJJbml0Q3JlZGl0c1JlcXVlc3QSEwoHdXNlcl9pZBgBIAEoCUICEAFKBAgCEAJSD2lkZW1wb3RlbmN5X2tleSJ2CgdCYWxhbmNlEhMKB3VzZXJfaWQYASABKAlCAhABEh0KEWF2YWlsYWJsZV9jcmVkaXRzGAIgASgFQgIQARIcChByZXNlcnZlZF9jcmVkaXRzGAMgASgFQgIQARIZCg10b3RhbF9jcmVkaXRzGAQgASgFQgIQATJLCg1DcmVkaXRTZXJ2aWNlEjoKC0luaXRDcmVkaXRzEhouY3JlZGl0LkluaXRDcmVkaXRzUmVxdWVzdBoPLmNyZWRpdC5CYWxhbmNl
+message:
+  content: |-
+    {"user_id": "{{$guid}}"}
+metadata:
+  - key: x-credit-service-token
+    value: "{{order_token}}"
+settings: {}
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('rejected with PERMISSION_DENIED (7)', () => pm.expect(Number(pm.response.statusCode)).to.equal(7));
+    language: text/javascript
+schema:
+  source: specification
+  specificationId: ../../shared/grpc/proto/credit.proto
+order: 21000
