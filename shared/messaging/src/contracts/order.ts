@@ -2,12 +2,14 @@
 TODO: Add in order status
 */
 export type OrderStatus =
-  | 'COMPLETED'
-  | 'CANCELLED'
-  | 'EXPIRED';
+  | "UNASSIGNED"
+  | "ASSIGNED"
+  | "PICKED_UP"
+  | "DELIVERED"
+  | "CANCELLED";
 
 /*
-TODO: Verify the order event base
+TODO: Verify the order event base --order event owner to change
 */
 interface OrderEventBase {
   eventId: string;
