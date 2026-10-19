@@ -21,6 +21,7 @@ Thumbs.db
 # node_modules
 node_modules/
 
-supabase/.temp/start-secrets/supabase_edge_runtime_FoC/env/
+# RabbitMQ client logs (broker.log plus one file per queue)
+logs/
 
-**logs/
+supabase/.temp/start-secrets/supabase_edge_runtime_FoC/env/
