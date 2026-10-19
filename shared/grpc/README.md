@@ -1,26 +1,19 @@
 # gRPC endpoint scaffolding
 
 The shared `@foc/grpc` package provides generated TypeScript contracts, Promise
-clients, deadlines, and server helpers. Credit Service now implements its core RPCs;
-the other services retain their scaffolds. Existing REST implementations are separate.
+clients, deadlines, and server helpers. Every endpoint remains `UNIMPLEMENTED`.
+Existing REST handlers, repositories, databases, auth, and startup files are unchanged.
 
 | Service  | Default host port | RPCs                                                              | Contract                                   |
 | -------- | ----------------- | ----------------------------------------------------------------- | ------------------------------------------ |
 | User     | 50051             | `GetPublicProfile`                                                | `user-service/proto/user.proto` (existing) |
 | Order    | 50053             | `GetOrder`                                                        | `shared/grpc/proto/order.proto`            |
-| Credit   | 50054             | `InitCredits`, `GetBalance`, `GetCreditHistory`, `ReserveCredits`, `UpdateReservation`, `ReleaseCredits`, `SettleCredits`, `GetReservation` | `shared/grpc/proto/credit.proto`           |
+| Credit   | 50054             | `GetBalance`, `ReserveCredits`, `ReleaseCredits`, `SettleCredits` | `shared/grpc/proto/credit.proto`           |
 | Supplier | 50052             | `GetSupplier`, `IsOpen`                                           | `shared/grpc/proto/supplier.proto`         |
 
-Credit setup, database migrations, retry rules, and integration tests are documented
-in [Credit Service](../../credit-service/README.md). The order contract remains a proposal.
-
-Credit mutations derive retry identities internally; callers do not supply an
-idempotency key. For reward updates, persist the returned reservation `version` and
-send it as `expectedVersion`. Retry an uncertain update with its original version
-and amount; a subsequent edit uses the next confirmed reservation version.
-`createCreditClient` retries transient failures (`UNAVAILABLE`, `ABORTED`,
-`DEADLINE_EXCEEDED`) automatically by resending the identical request; see the
-Credit Service README for the policy. Other clients do not retry.
+The order and credit contracts are initial integration proposals because the
+fetched branches have no implementations for those services. Credit mutation
+comments describe the intended behavior for future handlers; no ledger logic is implemented.
 
 ## Run locally
 
@@ -32,8 +25,7 @@ npm run build
 npm test
 ```
 
-Start order/supplier scaffolds in separate terminals. Set up the database and `.env`
-using the Credit Service README before starting its process:
+Start each new scaffold in a separate terminal:
 
 ```bash
 npm run dev --workspace @foc/order-grpc
@@ -41,18 +33,15 @@ npm run dev --workspace @foc/credit-grpc
 npm run dev --workspace @foc/supplier-grpc
 ```
 
-These are independent gRPC processes. Credit Service runs from `credit-service/`;
-Order and Supplier still run from their `grpc/` directories.
-Order/supplier scaffolds do not connect to databases or run REST implementations.
-Credit connects to its PostgreSQL database.
+These are independent gRPC processes under each service's `grpc/` directory.
+They do not connect to databases or run the service's REST implementation.
 Start User Service separately using its existing README; its existing gRPC
 server and contract are reused without modifications. The opt-in caller example
 is at `user-service/examples/grpc-clients.ts` and is not wired into its startup.
 
-Credit uses `credit-service/.env.example` and `credit-service/.env`. Order and
-Supplier use their respective `grpc/.env.example` and `grpc/.env` files. Adjust peer
-addresses when needed. Workspace commands run in each package directory, so dotenv
-reads the matching file. `GRPC_PORT` controls the listener;
+Each scaffold has a `grpc/.env.example`. Copy it to `grpc/.env` and adjust peer
+addresses when needed. Workspace commands run with that directory as the working
+directory, so dotenv reads the correct file. `GRPC_PORT` controls the listener;
 `*_GRPC_ADDR` controls outbound calls. `GRPC_TIMEOUT_MS` defaults to 3000.
 
 The User Service uses gRPC port **50051**, Supplier **50052**, Order **50053**,
@@ -65,31 +54,20 @@ gRPC client configuration. Docker callers use service DNS names instead of
 
 ```typescript
 import { createCreditClient } from '@foc/grpc';
-import { Metadata } from '@grpc/grpc-js';
 
-const serviceToken = process.env.CREDIT_FRONTEND_SERVICE_TOKEN;
-const userToken = process.env.USER_ACCESS_TOKEN;
-const userId = process.env.USER_ID; // Must match the verified user token subject.
-if (!serviceToken || !userToken || !userId) throw new Error('Backend credential and user identity required');
-const metadata = new Metadata();
-metadata.set('x-credit-service-token', serviceToken);
-metadata.set('authorization', 'Bearer ' + userToken);
 const credit = createCreditClient('localhost:50054', { timeoutMs: 3000 });
 try {
-  const balance = await credit.getBalance({ userId }, { metadata });
+  const balance = await credit.getBalance({ userId: 'user-uuid' });
   console.log(balance.availableCredits);
 } finally {
   credit.close();
 }
 ```
 
-With valid credentials/ownership this returns a persisted balance, or `NOT_FOUND`
-if the account has not been initialised. Credit Service's scoped credentials and
-TLS setup are documented in its README; keep service secrets in backend configuration.
+Until handlers are implemented, this call rejects with gRPC `UNIMPLEMENTED`.
 Reuse clients across requests and close them at shutdown. New scaffolds expose
 `createClients()` in `grpc/src/grpc/clients.ts`; startup creates these peer clients
-and closes them after the server drains. Credit startup only creates its database pool
-and server, since core operations do not require outbound calls. All clients preserve gRPC error codes,
+and closes them after the server drains. All clients preserve gRPC error codes,
 details, and metadata. Per-call options accept `metadata`, `timeoutMs`, and an
 incoming RPC's `deadline`. No automatic application retries are added.
 Finite deadlines follow the [gRPC deadline guidance](https://grpc.io/docs/guides/deadlines/).
@@ -108,8 +86,7 @@ reads the existing User Service proto in place, so retain the repository layout.
 Integrating it into an existing service is a later explicit change: declare the
 dependency in that service's package manager, import the new handlers/clients,
 and connect lifecycle hooks to its existing entrypoint. The scaffold listeners
-use insecure local transport for development. Credit requires scoped credentials
-for every call and TLS for production/non-loopback listeners.
+currently use the same insecure local transport as User Service.
 
 ## Branch compatibility checked on 4 October 2026
 

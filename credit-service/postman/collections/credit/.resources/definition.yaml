@@ -1,4 +1,0 @@
-$kind: collection
-description: |-
-  Credit Service demo flow. Run the requests in order with the "Credit local" environment.
-  Request 1 creates fresh IDs, so the flow can be repeated. See credit-service/postman/README.md.
