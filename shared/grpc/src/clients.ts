@@ -12,7 +12,6 @@ import type { GetPublicProfileRequest } from './generated/user/GetPublicProfileR
 import type { PublicProfile__Output as PublicProfile } from './generated/user/PublicProfile';
 import type { GetOrderRequest } from './generated/order/GetOrderRequest';
 import type { Order__Output as Order } from './generated/order/Order';
-import type { GetReservationRequest } from './generated/credit/GetReservationRequest';
 import type { GetBalanceRequest } from './generated/credit/GetBalanceRequest';
 import type { InitCreditsRequest } from './generated/credit/InitCreditsRequest';
 import type { UpdateReservationRequest } from './generated/credit/UpdateReservationRequest';

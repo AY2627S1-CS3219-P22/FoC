@@ -6,8 +6,7 @@
 !shared/grpc/
 !shared/grpc/package.json
 !credit-service/
-!credit-service/grpc/
-!credit-service/grpc/package.json
+!credit-service/package.json
 !supplier-service/
 !supplier-service/grpc/
 !supplier-service/grpc/package.json

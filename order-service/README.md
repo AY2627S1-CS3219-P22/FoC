@@ -352,10 +352,10 @@ and frontend integration remain in the later approved phases.
 
 ## Credit PR integration handoff
 
-The Order adapter targets `origin/credit-core-implementation`'s camelCase client
-contract. Shared protobuf/client changes here add only `GetReservation` and receipt
-fields needed for reconciliation; they do not import the Credit ledger or its retry
-implementation. Merge that PR before expecting real financial operations.
+The Order adapter uses the merged Credit Service's camelCase client contract,
+including current reservation lookup and automatic retries. Credit now lives at
+`credit-service/` (not `credit-service/grpc/`). Shared protobufs are the wire
+authority; regenerate their types after contract changes.
 
 To opt in when running REST locally, set `CREDIT_GRPC_ADDR=127.0.0.1:50054`,
 `CREDIT_ORDER_SERVICE_TOKEN` to the Order credential, and `CREDIT_GRPC_CA_PATH` to
@@ -384,3 +384,31 @@ User/Supplier production adapters, User registration credit initialization, sche
 expiry/recovery, and reward editing are still separate work. Reward editing is not
 exposed: do not call UpdateReservation outside a coordinated durable Order workflow.
 There is no additional requester confirmation before courier delivery settlement.
+
+
+## Verification after merging main
+
+The merged Credit ledger can be tested with Order persistence over real gRPC.
+User/Supplier snapshots remain test doubles in this suite; it does not certify
+registration hooks or a complete deployed system. Use two separate dedicated test
+databases, never the normal service databases:
+
+```sh
+npm ci
+npm run build
+TEST_DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:55435/order_service_test \
+CREDIT_TEST_DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:55435/credit_test \
+  npm run test:credit-integration --workspace @foc/order-service
+```
+
+The three compatibility tests check reserve/publication and one-time settlement,
+cancellation without an extra balance grant, and picked-up expiry plus the distinction
+between historical mutation receipts and current reservation state. Test migrations
+are applied only to these explicitly named test databases. Run this suite separately
+from other suites using the same Credit test database.
+
+User Service now implements public-profile lookup and refresh-token sessions, but
+Order's UserDirectory adapter is still absent. Existing signed access JWTs remain
+compatible. Supplier's GetSupplier RPC remains a stub; IsOpen alone cannot provide
+Order's pickup snapshot. The separate pending-intent race policy is still not wired
+to the REST row-lock implementation; no queue priority or reward editing is claimed.

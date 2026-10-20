@@ -1,17 +1,9 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const path = require('node:path');
-const { createRequire } = require('node:module');
 require('tsx/cjs');
 const { status, Metadata } = require('@grpc/grpc-js');
 const rpc = require('../dist');
-const userServer = require('../../../user-service/src/grpc/server.ts');
-// Existing services may have their own dependency installation. Server credentials
-// must come from the same grpc-js instance that constructed the existing server.
-const userRequire = createRequire(path.resolve(__dirname, '../../../user-service/package.json'));
-const userCredentials = userRequire('@grpc/grpc-js').ServerCredentials;
 const orderServer = require('../../../order-service/grpc/dist/grpc/server.js');
-const supplierServer = require('../../../supplier-service/grpc/dist/grpc/server.js');
 
 async function listen(t, server, createClient, config, serverCredentials) {
   const port = await rpc.startServer(server, 0, '127.0.0.1', serverCredentials);
@@ -23,20 +15,19 @@ async function listen(t, server, createClient, config, serverCredentials) {
   return client;
 }
 
-test('scaffolds and credit transport stubs return UNIMPLEMENTED', async (t) => {
-  const user = await listen(
-    t,
-    userServer.createGrpcServer(),
-    rpc.createUserClient,
-    undefined,
-    userCredentials.createInsecure(),
-  );
+test('order scaffold and isolated peer transport stubs return UNIMPLEMENTED', async (t) => {
+  // Peer implementations now access databases/configuration at startup. Keep
+  // this transport test isolated; service integration suites test real handlers.
+  const stub = service => rpc.createServer(service, Object.fromEntries(
+    Object.keys(service).map(method => [method, rpc.unimplemented(method)]),
+  ));
+  const user = await listen(t, stub(rpc.UserService.service), rpc.createUserClient);
   const order = await listen(t, orderServer.createGrpcServer(), rpc.createOrderClient);
   const creditStub = rpc.createServer(rpc.CreditService.service, Object.fromEntries(
     Object.keys(rpc.CreditService.service).map(method => [method, rpc.unimplemented(method)]),
   ));
   const credit = await listen(t, creditStub, rpc.createCreditClient);
-  const supplier = await listen(t, supplierServer.createGrpcServer(), rpc.createSupplierClient);
+  const supplier = await listen(t, stub(rpc.SupplierService.service), rpc.createSupplierClient);
 
   for (const invoke of [
     () => user.getPublicProfile({ userId: 'user-1' }),
@@ -49,7 +40,6 @@ test('scaffolds and credit transport stubs return UNIMPLEMENTED', async (t) => {
     () => credit.reserveCredits({ orderId: 'order-1', requesterId: 'user-1', amount: 4 }),
     () => credit.releaseCredits({ orderId: 'order-1' }),
     () => credit.settleCredits({ orderId: 'order-1', courierId: 'user-2' }),
-    () => credit.getReservation({ orderId: 'order-1' }),
     () => supplier.getSupplier({ supplierId: '1' }),
   ]) {
     await assert.rejects(invoke(), (error) => error.code === status.UNIMPLEMENTED);

@@ -16,7 +16,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "test": "tsx --test tests/auth.test.ts tests/api.test.ts tests/domain.test.ts tests/creditGateway.test.ts",
     "test:integration": "prisma generate && tsx --test --test-concurrency=1 tests/persistence.integration.test.ts tests/commands.integration.test.ts",
-    "test:typecheck": "tsc -p tests/tsconfig.json"
+    "test:typecheck": "tsc -p tests/tsconfig.json",
+    "test:credit-integration": "npm run build --workspace @foc/grpc && npm run build --workspace @foc/credit-grpc && prisma generate && tsx --test tests/creditCompatibility.integration.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

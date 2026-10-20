@@ -1,9 +1,10 @@
 # Order race-policy integration
 
 `grpc/src/services/order-race-policy.ts` implements a tested policy component for
-F6.3.3–F6.3.4, F6.4.3 and F7.2.4. The current branch and refreshed
-`origin/order-setup` have only a `GetOrder` gRPC scaffold. This component is not yet
-wired into order endpoints, an order database or a durable queue.
+F6.3.3–F6.3.4, F6.4.3 and F7.2.4. Order REST now has database-backed lifecycle commands with row locking, while
+`GetOrder` remains a gRPC scaffold. This policy component is not wired into REST
+commands or a durable pending-intent queue. Existing REST concurrency serializes
+mutations but does not implement priority across a cohort of pending intents.
 
 ## Meaning of concurrent
 

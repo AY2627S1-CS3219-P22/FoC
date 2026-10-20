@@ -23,7 +23,34 @@ export interface CreditServiceClient extends grpc.Client {
   getBalance(argument: _credit_GetBalanceRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
   getBalance(argument: _credit_GetBalanceRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
   getBalance(argument: _credit_GetBalanceRequest, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
-  
+
+  GetCreditHistory(argument: _credit_GetCreditHistoryRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_CreditHistory__Output>): grpc.ClientUnaryCall;
+  GetCreditHistory(argument: _credit_GetCreditHistoryRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_CreditHistory__Output>): grpc.ClientUnaryCall;
+  GetCreditHistory(argument: _credit_GetCreditHistoryRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_CreditHistory__Output>): grpc.ClientUnaryCall;
+  GetCreditHistory(argument: _credit_GetCreditHistoryRequest, callback: grpc.requestCallback<_credit_CreditHistory__Output>): grpc.ClientUnaryCall;
+  getCreditHistory(argument: _credit_GetCreditHistoryRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_CreditHistory__Output>): grpc.ClientUnaryCall;
+  getCreditHistory(argument: _credit_GetCreditHistoryRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_CreditHistory__Output>): grpc.ClientUnaryCall;
+  getCreditHistory(argument: _credit_GetCreditHistoryRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_CreditHistory__Output>): grpc.ClientUnaryCall;
+  getCreditHistory(argument: _credit_GetCreditHistoryRequest, callback: grpc.requestCallback<_credit_CreditHistory__Output>): grpc.ClientUnaryCall;
+
+  GetReservation(argument: _credit_GetReservationRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  GetReservation(argument: _credit_GetReservationRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  GetReservation(argument: _credit_GetReservationRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  GetReservation(argument: _credit_GetReservationRequest, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  getReservation(argument: _credit_GetReservationRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  getReservation(argument: _credit_GetReservationRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  getReservation(argument: _credit_GetReservationRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  getReservation(argument: _credit_GetReservationRequest, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+
+  InitCredits(argument: _credit_InitCreditsRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
+  InitCredits(argument: _credit_InitCreditsRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
+  InitCredits(argument: _credit_InitCreditsRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
+  InitCredits(argument: _credit_InitCreditsRequest, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
+  initCredits(argument: _credit_InitCreditsRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
+  initCredits(argument: _credit_InitCreditsRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
+  initCredits(argument: _credit_InitCreditsRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
+  initCredits(argument: _credit_InitCreditsRequest, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
+
   ReleaseCredits(argument: _credit_ReleaseCreditsRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   ReleaseCredits(argument: _credit_ReleaseCreditsRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   ReleaseCredits(argument: _credit_ReleaseCreditsRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
@@ -50,22 +77,42 @@ export interface CreditServiceClient extends grpc.Client {
   settleCredits(argument: _credit_SettleCreditsRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   settleCredits(argument: _credit_SettleCreditsRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   settleCredits(argument: _credit_SettleCreditsRequest, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
-  
+
+  UpdateReservation(argument: _credit_UpdateReservationRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  UpdateReservation(argument: _credit_UpdateReservationRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  UpdateReservation(argument: _credit_UpdateReservationRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  UpdateReservation(argument: _credit_UpdateReservationRequest, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  updateReservation(argument: _credit_UpdateReservationRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  updateReservation(argument: _credit_UpdateReservationRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  updateReservation(argument: _credit_UpdateReservationRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+  updateReservation(argument: _credit_UpdateReservationRequest, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
+
 }
 
 export interface CreditServiceHandlers extends grpc.UntypedServiceImplementation {
   GetBalance: grpc.handleUnaryCall<_credit_GetBalanceRequest__Output, _credit_Balance>;
-  
+
+  GetCreditHistory: grpc.handleUnaryCall<_credit_GetCreditHistoryRequest__Output, _credit_CreditHistory>;
+
+  GetReservation: grpc.handleUnaryCall<_credit_GetReservationRequest__Output, _credit_Reservation>;
+
+  InitCredits: grpc.handleUnaryCall<_credit_InitCreditsRequest__Output, _credit_Balance>;
+
   ReleaseCredits: grpc.handleUnaryCall<_credit_ReleaseCreditsRequest__Output, _credit_Reservation>;
 
   ReserveCredits: grpc.handleUnaryCall<_credit_ReserveCreditsRequest__Output, _credit_Reservation>;
 
   SettleCredits: grpc.handleUnaryCall<_credit_SettleCreditsRequest__Output, _credit_Reservation>;
-  
+
+  UpdateReservation: grpc.handleUnaryCall<_credit_UpdateReservationRequest__Output, _credit_Reservation>;
+
 }
 
 export interface CreditServiceDefinition extends grpc.ServiceDefinition {
   GetBalance: MethodDefinition<_credit_GetBalanceRequest, _credit_Balance, _credit_GetBalanceRequest__Output, _credit_Balance__Output>
+  GetCreditHistory: MethodDefinition<_credit_GetCreditHistoryRequest, _credit_CreditHistory, _credit_GetCreditHistoryRequest__Output, _credit_CreditHistory__Output>
+  GetReservation: MethodDefinition<_credit_GetReservationRequest, _credit_Reservation, _credit_GetReservationRequest__Output, _credit_Reservation__Output>
+  InitCredits: MethodDefinition<_credit_InitCreditsRequest, _credit_Balance, _credit_InitCreditsRequest__Output, _credit_Balance__Output>
   ReleaseCredits: MethodDefinition<_credit_ReleaseCreditsRequest, _credit_Reservation, _credit_ReleaseCreditsRequest__Output, _credit_Reservation__Output>
   ReserveCredits: MethodDefinition<_credit_ReserveCreditsRequest, _credit_Reservation, _credit_ReserveCreditsRequest__Output, _credit_Reservation__Output>
   SettleCredits: MethodDefinition<_credit_SettleCreditsRequest, _credit_Reservation, _credit_SettleCreditsRequest__Output, _credit_Reservation__Output>

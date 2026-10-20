@@ -10,7 +10,7 @@ COPY package.json package-lock.json ./
 COPY shared/grpc/package.json ./shared/grpc/package.json
 COPY order-service/package.json ./order-service/package.json
 COPY order-service/grpc/package.json ./order-service/grpc/package.json
-COPY credit-service/grpc/package.json ./credit-service/grpc/package.json
+COPY credit-service/package.json ./credit-service/package.json
 COPY supplier-service/grpc/package.json ./supplier-service/grpc/package.json
 RUN npm ci --workspace @foc/order-service
 

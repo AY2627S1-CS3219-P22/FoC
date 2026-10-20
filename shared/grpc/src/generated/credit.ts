@@ -26,6 +26,9 @@ export interface ProtoGrpcType {
     CreditHistoryEntry: MessageTypeDefinition<_credit_CreditHistoryEntry, _credit_CreditHistoryEntry__Output>
     CreditService: SubtypeConstructor<typeof grpc.Client, _credit_CreditServiceClient> & { service: _credit_CreditServiceDefinition }
     GetBalanceRequest: MessageTypeDefinition<_credit_GetBalanceRequest, _credit_GetBalanceRequest__Output>
+    GetCreditHistoryRequest: MessageTypeDefinition<_credit_GetCreditHistoryRequest, _credit_GetCreditHistoryRequest__Output>
+    GetReservationRequest: MessageTypeDefinition<_credit_GetReservationRequest, _credit_GetReservationRequest__Output>
+    InitCreditsRequest: MessageTypeDefinition<_credit_InitCreditsRequest, _credit_InitCreditsRequest__Output>
     ReleaseCreditsRequest: MessageTypeDefinition<_credit_ReleaseCreditsRequest, _credit_ReleaseCreditsRequest__Output>
     Reservation: MessageTypeDefinition<_credit_Reservation, _credit_Reservation__Output>
     ReservationStatus: EnumTypeDefinition
