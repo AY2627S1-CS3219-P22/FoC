@@ -167,6 +167,12 @@ To get an admin account, see [Administrator accounts](#administrator-accounts).
 
 ### Administrator accounts
 
+> **Upgrading from before F3?** Admins used to be created by setting `roles` in
+> Prisma Studio. Don't do this anymore, because it skips the last-admin check and the
+> audit record, and can leave accounts without the `USER` role. Reset your local database once
+> (see [Reset the database completely](#reset-the-database-completely)), then
+> create your admin with the command below.
+
 **Creating the first admin.** Run once per **database** (not per container or
 pod — they all share the same DB), from an interactive terminal:
 
