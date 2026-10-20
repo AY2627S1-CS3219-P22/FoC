@@ -1,19 +1,81 @@
+<!--
+AI Assistance Disclosure:
+Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
+Scope: Documented the human-finalized nine-RPC credit contract, initialization payload/replay, SHA-256 key specification, and generated-file attribution.
+Author review: Pending human review.
+Prompts and key responses: ../../credit-service/ai/usage-log.md, entries 007–012.
+-->
+
 # gRPC endpoint scaffolding
 
 The shared `@foc/grpc` package provides generated TypeScript contracts, Promise
-clients, deadlines, and server helpers. Every endpoint remains `UNIMPLEMENTED`.
-Existing REST handlers, repositories, databases, auth, and startup files are unchanged.
+clients, deadlines, and server helpers. Order and credit handlers remain
+`UNIMPLEMENTED`; User Service public-profile lookup and Supplier `IsOpen` have
+implementations. This credit-contract update does not implement service handlers.
 
 | Service  | Default host port | RPCs                                                              | Contract                                   |
 | -------- | ----------------- | ----------------------------------------------------------------- | ------------------------------------------ |
 | User     | 50051             | `GetPublicProfile`                                                | `user-service/proto/user.proto` (existing) |
 | Order    | 50053             | `GetOrder`                                                        | `shared/grpc/proto/order.proto`            |
-| Credit   | 50054             | `GetBalance`, `ReserveCredits`, `ReleaseCredits`, `SettleCredits` | `shared/grpc/proto/credit.proto`           |
+| Credit   | 50054             | `InitCredits`, `GetBalance`, `GetUserCreditHistory`, `GetOrderCreditHistory`, `ReserveCredits`, `UpdateReservation`, `ReleaseCredits`, `SettleCredits`, `GetReservation` | `shared/grpc/proto/credit.proto`           |
 | Supplier | 50052             | `GetSupplier`, `IsOpen`                                           | `shared/grpc/proto/supplier.proto`         |
 
-The order and credit contracts are initial integration proposals because the
-fetched branches have no implementations for those services. Credit mutation
-comments describe the intended behavior for future handlers; no ledger logic is implemented.
+The order contract remains an initial integration proposal. All nine
+credit RPCs now reflect the human-specified credit schema and idempotency flow,
+documented in [the credit-service reference](../../credit-service/docs/user-decisions.md).
+No credit business operations are implemented.
+
+## Credit contract alignment
+
+- `InitCredits` takes `user_id` and returns `InitCreditsResponse` with exactly
+  `user_id`, `total_credits`, `reserved_credits`, and `available_credits`.
+  Duplicate calls replay the original saved success without another grant.
+- `Balance` contains exactly `total_credits`, `reserved_credits`, and computed
+  `available_credits`, without user ID or timestamps.
+- `Reservation` carries `reservation_id`, `order_id`, `requester_id`, optional
+  `courier_id`, `amount`, `status`, and `version`, without timestamps.
+  The external `amount` maps to SQL `credit_amount`.
+- The latest human-supplied contract specifies `amount` for reserve/update and
+  reservation reads. `ReserveCreditsRequest` and `Reservation` use `amount` at
+  existing field number `3`; the interim `credit_amount`/`creditAmount` API name
+  is superseded. SQL continues to use `credit_amount`.
+- Mutation requests do not accept caller idempotency keys. The human specified
+  deterministic recomputation by Credit Service from each request, with a lock on
+  `(operation_type, key)`, lookup/hash comparison, and atomic persistence.
+  The human confirmed SHA-256. No hashing/locking business logic is implemented.
+  `SettleCredits`
+  corresponds to the database's existing `transfer` operation type.
+- `UpdateReservation` takes `order_id`, `amount`, and `expected_version` and
+  returns `Reservation`. `GetReservation` is read-only and returns exactly
+  `status`, `amount`, and `version` in `GetReservationResponse`.
+- `CreditHistoryEntry` contains all eight SQL history fields, preserving signed
+  deltas and optional order/reservation IDs.
+- Both history RPCs return `CreditHistoryPage` with `entries` and
+  `next_page_token`. The contract specifies newest-first pagination; stubs do not
+  execute database queries or implement page ordering/token behavior yet.
+- New fields are appended without changing existing field numbers or enum
+  numeric values, following the [Protobuf update documentation](https://protobuf.dev/programming-guides/proto3/#updating).
+- The requested schema migration renames `requestor_id` to `requester_id` and
+  replaces stored `transferred` status with `SETTLED`. The human subsequently
+  confirmed uppercase statuses everywhere; migration 003 converts existing
+  lowercase values and sets the default to `RESERVED`. SQL and proto now use
+  `RESERVED`, `RELEASED`, and `SETTLED`.
+
+The human supplied the nine-method RPC list in
+[exchange 009](../../credit-service/ai/prompts/009-finalized-rpc-list.md).
+Request messages are prepared for initialization, user/order history,
+reservation updates, and reservation lookup. History request pagination fields
+are optional; update requests carry `expected_version`. Reservation update/lookup
+declarations, client wrappers, and unimplemented handlers are added. The two
+history declarations/wrappers/stubs share the confirmed page/entry messages.
+Initialization now has its finalized response, Promise wrapper, and unimplemented
+handler. It must allocate 10 credits only at first registration, handle failure
+or delay after User Service registration, and avoid another initial grant on
+duplicates or future restoration. The human chose the general original-success
+replay rule for duplicate initialization, superseding a separate already-allocated
+payload. No extra status fields or application error-code mapping were added.
+No initialization, pagination, hashing/locking, or credit business behavior has
+been implemented by this contract work.
 
 ## Run locally
 
@@ -64,7 +126,7 @@ try {
 }
 ```
 
-Until handlers are implemented, this call rejects with gRPC `UNIMPLEMENTED`.
+Until credit handlers are implemented, this call rejects with gRPC `UNIMPLEMENTED`.
 Reuse clients across requests and close them at shutdown. New scaffolds expose
 `createClients()` in `grpc/src/grpc/clients.ts`; startup creates these peer clients
 and closes them after the server drains. All clients preserve gRPC error codes,
@@ -80,6 +142,11 @@ types. Fields use snake_case on the wire and camelCase in JavaScript; enums deco
 as strings, uint64/int64 as strings, and timestamps as `{ seconds, nanos }`.
 Run `npm run grpc:generate` after changing contracts, then build/test and commit
 the generated files in `src/generated/` alongside the protos.
+
+Credit TypeScript files regenerated during usage-log entries 007 and 009–012 have
+attribution headers for the AI-influenced proto change. Regeneration overwrites
+those headers; preserve or restore them when regenerating the same assisted
+contract, and record later assistance in the service usage log.
 
 `@foc/grpc` is an internal monorepo workspace package. Its loader deliberately
 reads the existing User Service proto in place, so retain the repository layout.

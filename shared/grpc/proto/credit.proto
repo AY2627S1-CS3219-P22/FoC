@@ -1,25 +1,85 @@
+// AI Assistance Disclosure:
+// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
+// Scope: Implemented the human-finalized nine-RPC credit contract, initialization payload, replay rule, and SHA-256 key specification.
+// Author review: Pending human review.
+// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012.
+// AI-generated; human review pending.
+
 syntax = "proto3";
 
 package credit;
 
+import "google/protobuf/timestamp.proto";
+
 service CreditService {
+  // First-registration allocation only. Duplicates replay the saved success without granting again.
+  rpc InitCredits(InitCreditsRequest) returns (InitCreditsResponse);
   rpc GetBalance(GetBalanceRequest) returns (Balance);
-  // Mutations must be atomic and idempotent by order_id when implemented.
-  // Repeating an identical operation returns the existing reservation;
-  // conflicting amounts/users or invalid transitions fail with FAILED_PRECONDITION.
+  // Newest-first, paginated history using the same page/entry message for both lookups.
+  rpc GetUserCreditHistory(GetUserCreditHistoryRequest) returns (CreditHistoryPage);
+  rpc GetOrderCreditHistory(GetOrderCreditHistoryRequest) returns (CreditHistoryPage);
+  // Credit Service recomputes a deterministic key from the request on every call.
+  // Keys use SHA-256 of request fields; callers do not supply keys.
+  // Under the specified replay rule, a matching saved request returns its original response.
+  // Mutations must remain atomic when implemented.
+  // SettleCredits uses the existing "transfer" operation type in the database.
   rpc ReserveCredits(ReserveCreditsRequest) returns (Reservation);
+  rpc UpdateReservation(UpdateReservationRequest) returns (Reservation);
+  // Releases an active hold without increasing total credits.
   rpc ReleaseCredits(ReleaseCreditsRequest) returns (Reservation);
+  // Transfers the held amount from requester to courier.
   rpc SettleCredits(SettleCreditsRequest) returns (Reservation);
+  // Read-only current status, amount, and version.
+  rpc GetReservation(GetReservationRequest) returns (GetReservationResponse);
 }
 
 message GetBalanceRequest {
   string user_id = 1;
 }
 
-message Balance {
+// Initialization grants 10 credits only at first registration, never again on restoration.
+// Failed or delayed initialization after User Service registration must be retryable.
+// Repeated requests must not grant another initial allocation.
+message InitCreditsRequest {
   string user_id = 1;
+}
+
+message InitCreditsResponse {
+  string user_id = 1;
+  int32 total_credits = 2;
+  int32 reserved_credits = 3;
+  int32 available_credits = 4;
+}
+
+message GetUserCreditHistoryRequest {
+  string user_id = 1;
+  optional int32 page_size = 2;
+  optional string page_token = 3;
+}
+
+message GetOrderCreditHistoryRequest {
+  string order_id = 1;
+  optional int32 page_size = 2;
+  optional string page_token = 3;
+}
+
+message UpdateReservationRequest {
+  string order_id = 1;
+  int32 amount = 2;
+  int32 expected_version = 3;
+}
+
+message GetReservationRequest {
+  string order_id = 1;
+}
+
+message Balance {
+  reserved 1, 5, 6;
+  reserved "user_id", "created_at", "updated_at";
+  // Computed as total_credits - reserved_credits; not stored in the database.
   int32 available_credits = 2;
   int32 reserved_credits = 3;
+  int32 total_credits = 4;
 }
 
 message ReserveCreditsRequest {
@@ -27,15 +87,21 @@ message ReserveCreditsRequest {
   string requester_id = 2;
   // Positive whole credits. Insufficient available balance: FAILED_PRECONDITION.
   int32 amount = 3;
+  reserved 4;
+  reserved "idempotency_key";
 }
 
 message ReleaseCreditsRequest {
   string order_id = 1;
+  reserved 2;
+  reserved "idempotency_key";
 }
 
 message SettleCreditsRequest {
   string order_id = 1;
   string courier_id = 2;
+  reserved 3;
+  reserved "idempotency_key";
 }
 
 enum ReservationStatus {
@@ -50,6 +116,33 @@ message Reservation {
   string requester_id = 2;
   int32 amount = 3;
   ReservationStatus status = 4;
-  // Empty until settlement.
-  string courier_id = 5;
+  // Absent until settlement, corresponding to nullable courier_id in SQL.
+  optional string courier_id = 5;
+  string reservation_id = 6;
+  int32 version = 7;
+  reserved 8, 9;
+  reserved "created_at", "updated_at";
+}
+
+message GetReservationResponse {
+  ReservationStatus status = 1;
+  int32 amount = 2;
+  int32 version = 3;
+}
+
+// Every column of credit_history.
+message CreditHistoryEntry {
+  string id = 1;
+  string user_id = 2;
+  optional string order_id = 3;
+  optional string reservation_id = 4;
+  string type = 5;
+  int32 total_amount_change = 6;
+  int32 total_reserved_change = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message CreditHistoryPage {
+  repeated CreditHistoryEntry entries = 1;
+  string next_page_token = 2;
 }

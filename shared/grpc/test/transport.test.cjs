@@ -1,3 +1,9 @@
+// AI Assistance Disclosure:
+// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
+// Scope: Updated credit request signatures and all nine credit scaffold endpoint checks; corrected the stale User Service stub assertion.
+// Author review: Pending human review.
+// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012.
+
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const path = require('node:path');
@@ -24,7 +30,7 @@ async function listen(t, server, createClient, config, serverCredentials) {
   return client;
 }
 
-test('every scaffold endpoint is reachable and returns UNIMPLEMENTED', async (t) => {
+test('scaffold stubs are reachable and the implemented user RPC validates missing IDs', async (t) => {
   const user = await listen(
     t,
     userServer.createGrpcServer(),
@@ -37,16 +43,21 @@ test('every scaffold endpoint is reachable and returns UNIMPLEMENTED', async (t)
   const supplier = await listen(t, supplierServer.createGrpcServer(), rpc.createSupplierClient);
 
   for (const invoke of [
-    () => user.getPublicProfile({ userId: 'user-1' }),
     () => order.getOrder({ orderId: 'order-1' }),
+    () => credit.initCredits({ userId: 'user-1' }),
     () => credit.getBalance({ userId: 'user-1' }),
+    () => credit.getUserCreditHistory({ userId: 'user-1' }),
+    () => credit.getOrderCreditHistory({ orderId: 'order-1' }),
     () => credit.reserveCredits({ orderId: 'order-1', requesterId: 'user-1', amount: 4 }),
+    () => credit.updateReservation({ orderId: 'order-1', amount: 5, expectedVersion: 1 }),
     () => credit.releaseCredits({ orderId: 'order-1' }),
     () => credit.settleCredits({ orderId: 'order-1', courierId: 'user-2' }),
+    () => credit.getReservation({ orderId: 'order-1' }),
     () => supplier.getSupplier({ supplierId: '1' }),
   ]) {
     await assert.rejects(invoke(), (error) => error.code === status.UNIMPLEMENTED);
   }
+  await assert.rejects(user.getPublicProfile({}), (error) => error.code === status.INVALID_ARGUMENT);
 });
 
 test('public profile fields use the existing user wire contract', async (t) => {
@@ -120,7 +131,7 @@ test('clients enforce a finite timeout and respect an earlier upstream deadline'
   const server = rpc.createServer(rpc.CreditService.service, {
     GetBalance(call, callback) {
       if (call.request.userId === 'ready') {
-        callback(null, { userId: 'ready', availableCredits: 0, reservedCredits: 0 });
+        callback(null, { totalCredits: 0, availableCredits: 0, reservedCredits: 0 });
       } else {
         receivedDeadline = call.getDeadline();
         // Intentionally leave this test RPC pending until its deadline.

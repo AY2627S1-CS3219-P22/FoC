@@ -1,0 +1,49 @@
+# AI Assistance Disclosure:
+# Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
+# Scope: Added local PostgreSQL 17, gRPC scaffold configuration, and pg connection variables for migration tooling.
+# Author review: Pending human review.
+# Prompts and key responses: ai/usage-log.md, entries 003 and 005.
+# AI-generated; human review pending.
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: credit_service
+      POSTGRES_USER: credit_service
+      POSTGRES_PASSWORD: ${CREDIT_POSTGRES_PASSWORD:?Set CREDIT_POSTGRES_PASSWORD in the selected env file}
+    ports:
+      - '${CREDIT_POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - credit_service_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U credit_service -d credit_service']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  credit-service:
+    build:
+      context: ..
+      dockerfile: credit-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: '5432'
+      PGDATABASE: credit_service
+      PGUSER: credit_service
+      PGPASSWORD: ${CREDIT_POSTGRES_PASSWORD:?Set CREDIT_POSTGRES_PASSWORD in the selected env file}
+      GRPC_HOST: 0.0.0.0
+      GRPC_PORT: '50054'
+      GRPC_TIMEOUT_MS: '3000'
+      USER_GRPC_ADDR: user-service:50051
+      ORDER_GRPC_ADDR: order-service:50053
+      CREDIT_GRPC_ADDR: credit-service:50054
+      SUPPLIER_GRPC_ADDR: supplier-service:50052
+    ports:
+      - '50054:50054'
+
+volumes:
+  credit_service_pgdata:
