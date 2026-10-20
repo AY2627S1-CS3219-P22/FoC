@@ -1,9 +1,9 @@
 <!--
 AI Assistance Disclosure:
-Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-20 (Asia/Singapore).
-Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, the finalized nine-RPC contract, and human-confirmed SHA-256/initialization replay.
+Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
+Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–012 below and the linked prompt archives.
+Prompts and key responses: Entries 001–025 below and the linked prompt archives.
 -->
 
 # AI usage log
@@ -572,6 +572,684 @@ starts with the exchange below; it does not establish earlier team AI history.
 - **Remaining human input:** Review of generated artifacts. Concrete pagination,
   locking, and operation/error details remain for the later business-implementation
   step; no further success-payload clarification is required for this contract.
+
+## 013 — Clarify existing business behaviour before implementation
+
+- **Timestamp:** 2026-10-20 10:04 SGT (UTC+08:00).
+- **Tool/model:** OpenAI Codex, GPT-6.
+- **Modes/scenario:** Bounded requirements interpretation and explanation of
+  existing human-specified functions; documentation/disclosure maintenance.
+- **Exact prompt and key response:** [Verbatim request and clarification response](prompts/013-business-behaviour-clarifications.md).
+- **Key output:** Compared the existing function descriptions, schema, contract,
+  F8 requirements, and consistency requirements. Identified unanswered existing
+  cases concerning reservation reuse, versions, invalid states, missing accounts,
+  history deltas/pagination, validation/errors, access checks, and implementation
+  definitions. Explained the existing deterministic-key rule for identical release
+  requests if an order is reserved again, and asked the human to clarify the
+  relationship with F8.9.2. No new behaviour, schema/interface changes, locking
+  strategy, prioritization, or decision rationale was selected or drafted.
+- **Affected locations:** `README.md`, `credit-service/README.md`,
+  `credit-service/ai/prompts/013-business-behaviour-clarifications.md`, and this log.
+- **Agent verification:** Read the recorded human decisions, SQL migrations,
+  requirement references, current gRPC handler scaffold, and repository instructions.
+  Checked documentation links, attribution pointers, the final README disclosure
+  location, and whitespace. No code changed; build/runtime/database tests were
+  not repeated for this documentation and clarification exchange.
+- **Human review/edits:** Pending. Questions are not approved requirements or
+  accepted design changes; the author must supply the decisions.
+- **Sources/licensing:** Used only the repository and human-supplied material.
+  No external source was consulted and no third-party code was copied.
+- **Instruction files used:** Root `AGENTS.md` and empty
+  `credit-service/AGENTS.md`. No skills were invoked.
+- **Remaining human input:** Answers to the bounded clarification questions and
+  finalized implementation definitions before dependent business code is generated.
+
+## 014 — Record business definitions and implement reservation constraints
+
+- **Timestamp:** 2026-10-20 11:30 SGT (UTC+08:00).
+- **Tool/model:** OpenAI Codex, GPT-6.
+- **Modes/scenario:** Formatting human-supplied business/implementation definitions,
+  bounded consistency review and technical explanation, implementation and
+  PostgreSQL tests for explicitly finalized schema constraints.
+- **Exact prompt and key responses:** [Business rules/design, hash inputs,
+  transaction flow, access rules, and clarification questions](prompts/014-business-rules-and-implementation-design.md).
+- **Key output:** Recorded latest edge cases, version/error/validation rules,
+  controller/service/repository responsibilities, READ COMMITTED transaction and
+  lock order, distinct key/hash definitions, deferred client retries, and requested
+  concurrency tests. Recorded the human's removal of disputes/F8.9.2 from scope.
+  Added migration 004 for UNIQUE(order_id), SETTLED iff courier_id is set, and
+  courier != requester. Did not choose history type changes, snapshot/cursor
+  design, transaction binding, concrete resource locks, service authentication,
+  extra enforcement mechanisms, error reason interface, or fallback semantics.
+- **Affected locations:** `README.md`, `credit-service/README.md`,
+  `credit-service/docs/user-decisions.md`,
+  `credit-service/migrations/004_reservation_invariants.sql`,
+  `credit-service/grpc/test/reservation-invariants.test.cjs`,
+  `credit-service/ai/prompts/014-business-rules-and-implementation-design.md`, and
+  this log. The tested migration was applied to the local development database
+  after a read-only check found no violating rows.
+  Also updated `shared/grpc/README.md` and comment-only
+  `shared/grpc/proto/credit.proto` documentation to distinguish the new plain-ID
+  lookup keys from the SHA-256 request hash. Wire definitions/generated types
+  were unchanged; regeneration was not required.
+- **Agent verification:** All 15 credit migration/schema checks passed against
+  PostgreSQL 17 using isolated temporary schemas, with zero skips/failures.
+  Verified invalid existing rows roll back the migration without data repair,
+  duplicates are rejected for all statuses, settlement/courier consistency and
+  participant distinction hold, and preceding account/history/retry writes roll
+  back following a constraint error. Temporary schemas were removed.
+  Docker rebuild/start passed, including shared/credit TypeScript builds.
+  Runtime checks confirmed migration 004 is packaged, all three local constraints
+  are validated, and reservation-test schemas were removed. Affected-file header,
+  log-pointer, local-link, final README disclosure, service-local AI directory,
+  and whitespace checks passed.
+  No main business handlers, service retry loop, or requested business-concurrency
+  scenarios have been implemented or tested in this change.
+- **Human review/edits:** Pending review of generated artifacts. All implemented
+  schema constraints were explicitly supplied by the human. No human approval of
+  the unanswered questions or generated implementation is inferred.
+- **Sources/licensing:** Consulted primary [gRPC authentication](https://grpc.io/docs/guides/auth/),
+  [deadlines](https://grpc.io/docs/guides/deadlines/),
+  [PostgreSQL 17 explicit locking](https://www.postgresql.org/docs/17/explicit-locking.html),
+  [UUID types](https://www.postgresql.org/docs/17/datatype-uuid.html), and
+  [READ COMMITTED visibility](https://www.postgresql.org/docs/17/transaction-iso.html).
+  These support factual explanations, not AI-selected security/locking designs.
+  No third-party implementation code was copied.
+- **Instruction files used:** Root `AGENTS.md` and empty
+  `credit-service/AGENTS.md`. No skills were invoked.
+- **Remaining human input:** Questions archived in exchange 014 about history
+  values/pagination, concrete locking and transaction binding, caller/admin
+  identity and permissions, error-metadata interface, UUID validation, missing
+  retry-record reservation fallback, and database enforcement mechanisms.
+  Client retry attempt/backoff/deadline policy remains for the later retry step.
+
+## 015 — Record proposed userCreated-triggered initialization
+
+- **Timestamp:** 2026-10-20 16:41 SGT (UTC+08:00).
+- **Tool/model:** OpenAI Codex, GPT-6.
+- **Modes/scenario:** Bounded interpretation/formatting of the human's proposed
+  change and documentation/disclosure maintenance.
+- **Exact prompt and key response:** [Proposed event workflow and response](prompts/015-proposed-user-created-initialization.md).
+- **Key output:** Recorded that the human and User Service are considering a
+  userCreated event as the initialization trigger. Related the proposal to the
+  existing one-time/atomic grant and missing-account read rules. Identified event
+  contract/transport, publication/processing/acknowledgment behaviour, replacement
+  scope, and restoration distinction as human decisions before implementation.
+  No architecture recommendations, event schema, broker, acknowledgment/retry
+  strategy, or decision rationale was generated.
+- **Affected locations:** `README.md`, `credit-service/README.md`,
+  `credit-service/docs/user-decisions.md`,
+  `credit-service/ai/prompts/015-proposed-user-created-initialization.md`, and
+  this log.
+- **Agent verification:** Read repository instructions and current recorded
+  decisions. Documentation attribution, pointers/links, final root README section,
+  service-local records, and whitespace checks passed. No implementation, schema, database,
+  dependencies, or gRPC wire definitions changed; tests/build were not repeated.
+- **Human review/edits:** Pending. The human described the workflow as under
+  consideration; this does not establish final authorization of an event design
+  or removal of InitCredits.
+- **Sources/licensing:** Used repository and human-supplied material only.
+  No external source consulted and no third-party code copied.
+- **Instruction files used:** Root `AGENTS.md` and empty
+  `credit-service/AGENTS.md`. No skills invoked.
+- **Remaining human input:** Final event workflow and contract definitions before
+  dependent implementation. Earlier unrelated business-definition questions
+  remain as recorded in exchange 014.
+
+## 016 — Confirm user.created scope and remove initialization RPC
+
+- **Timestamp:** 2026-10-20 17:31 SGT (UTC+08:00).
+- **Tool/model:** OpenAI Codex, GPT-6.
+- **Modes/scenario:** Implementation and type regeneration of the human-decided
+  RPC removal, bounded contract/integration verification, transport-test updates,
+  and documentation formatting.
+- **Exact prompt and key responses:** [Final event scope, delivery rules,
+  read-only source inspection, and clarification questions](prompts/016-user-created-event-contract.md).
+- **Key output:** Recorded RabbitMQ/shared messaging, the four supplied payload
+  fields, acknowledgment after commit/verified prior grant, shared-client failure
+  retries, User Service publication ownership, and one grant per userId even
+  across different events. Removed InitCredits, its proto request/response,
+  Promise wrapper, stub, and two generated types; regenerated/attributed fourteen
+  remaining credit TypeScript files. Added exact eight-RPC/no-init-client coverage.
+  No event queue, payload details beyond the supplied fields, consumer,
+  inconsistent-account outcome, schema, or grant/locking logic was selected or
+  implemented. Existing unrelated definitions remain pending.
+- **Affected locations:** `README.md`, `credit-service/README.md`,
+  `credit-service/docs/user-decisions.md`, `shared/grpc/README.md`,
+  `shared/grpc/proto/credit.proto`, `shared/grpc/src/clients.ts`,
+  `credit-service/grpc/src/grpc/server.ts`,
+  `shared/grpc/test/credit-contract.test.cjs`,
+  `shared/grpc/test/transport.test.cjs`,
+  `shared/grpc/src/generated/credit.ts` and the thirteen remaining attributed
+  generated credit messages/service types, deleted generated InitCreditsRequest.ts
+  and InitCreditsResponse.ts, this log, and
+  `credit-service/ai/prompts/016-user-created-event-contract.md`.
+- **Agent verification:** Proto generation, full workspace build, and all nine
+  shared transport/contract tests passed. Docker rebuild/start passed. Packaged
+  runtime checks confirmed exactly eight RPCs, no initialization wrapper or
+  retired generated message artifacts, and a reachable remaining scaffold.
+  All 25 affected-file attributions, log pointers, documentation links, final root
+  README disclosure, service-local AI records, and whitespace checks passed.
+  No database migrations or business implementation changed;
+  database tests were not repeated.
+- **Read-only integration inspection:** GitHub CLI was unavailable and browser
+  retrieval could not fetch the PR. Fetched refs/pull/57/head from origin for
+  inspection only, without checkout or merge; inspected commit
+  b8b924db95a60a36f9bc6b8c1880bf5ae96fb939. Verified shared-client ack/retry code
+  and default MAX_RETRIES=3. Git tree/grep found no user.created contract/queue/
+  publisher in that snapshot or this local branch; no publisher implementation
+  is claimed to have been verified.
+- **Human review/edits:** The human finalized event-triggered initialization
+  and complete InitCredits RPC replacement. Generated code/docs await review.
+- **Sources/licensing:** Read the repository and
+  [PR 57](https://github.com/AY2627S1-CS3219-P22/FoC/pull/57), including its shared
+  messaging implementation/README/topology and User Service registration code.
+  No PR code was copied or merged. No architecture rationale or additional
+  messaging pattern was generated.
+- **Instruction files used:** Root `AGENTS.md` and empty
+  `credit-service/AGENTS.md`. No skills invoked.
+- **Remaining human input:** Publisher branch/file and exact queue, plus handling
+  of an existing account without initial-grant evidence. Earlier history-type,
+  lock/transaction and other business implementation definitions remain pending
+  as recorded in exchange 014; grant uniqueness per userId is now explicit.
+
+## 017 — Implement the credit-side user.created callback before the publisher
+
+- **Timestamp:** 2026-10-20 21:02 SGT (UTC+08:00).
+- **Tool/model:** OpenAI Codex, GPT-6.
+- **Modes/scenario:** Callback/registration boilerplate and implementation from
+  human-specified event/service behaviour; handler-boundary tests and bounded
+  clarification of existing failure semantics.
+- **Exact prompts and key response:** [Publisher-first assumption, permanent
+  no-write failure, callback response, and questions](prompts/017-consumer-first-and-permanent-failure.md).
+- **Key output:** Added user.created event shape, callback, and registration
+  helper compatible with the inspected shared consumeFromQueue API. Registration
+  accepts a connected shared client and a supplied queue, without selecting a
+  queue name or installing/copying the unmerged shared package. The callback waits
+  for initCredits completion, passes only userId, validates the supplied identity
+  rules, and propagates service failures without successful completion.
+  No grant transaction or alternate permanent-error API was selected in this
+  initial callback slice; exchange 018 adds the transaction after human answers.
+- **Affected locations:** `credit-service/grpc/src/messaging/userCreated.ts`,
+  `credit-service/grpc/test/user-created.test.cjs`,
+  `credit-service/ai/prompts/017-consumer-first-and-permanent-failure.md`,
+  `README.md`, `credit-service/README.md`,
+  `credit-service/docs/user-decisions.md`, and this log.
+- **Agent verification:** Callback/type build passed. The 19 then-current credit
+  checks passed with PostgreSQL enabled, including the existing 15 migration
+  checks and four callback-boundary tests. Refreshed PR 57 read-only; head remained
+  b8b924db95a60a36f9bc6b8c1880bf5ae96fb939, whose client retries all rejected
+  handlers without a permanent-failure special case. No broker was started or
+  live acknowledgment/dead-letter routing tested.
+- **Human review/edits:** Pending review of generated artifacts. The human
+  authorizes implementation before the publisher exists and requires no writes
+  or successful acknowledgment for an unconfirmed existing account.
+- **Sources/licensing:** Read the previously inspected
+  [shared client source](https://github.com/AY2627S1-CS3219-P22/FoC/blob/b8b924db95a60a36f9bc6b8c1880bf5ae96fb939/shared/messaging/src/index.ts)
+  and repository conventions. No PR code was copied or merged.
+- **Instruction files used:** Root `AGENTS.md` and empty
+  `credit-service/AGENTS.md`. No skills invoked.
+- **Remaining human input at this point:** Retry/dead-letter outcome,
+  INITIAL_GRANT versus existing label, and concrete lock mechanism; resolved in
+  exchange 018 except the namespace/string-to-bigint mapping.
+
+## 018 — Implement INITIAL_GRANT transaction and PostgreSQL advisory locks
+
+- **Timestamp:** Recorded 2026-10-20 21:11 SGT (UTC+08:00).
+- **Tool/model:** OpenAI Codex, GPT-6.
+- **Modes/scenario:** Implementation and migration generation after human
+  finalization, PostgreSQL documentation verification, integration/concurrency
+  testing, and disclosure documentation.
+- **Exact prompts and key responses:** [Bounded retry then dead-letter,
+  INITIAL_GRANT, bigint transaction locks, requested verification, and remaining
+  encoding question](prompts/018-initial-grant-and-advisory-locks.md).
+- **Key output:** Added the initial-allocation slice of CreditService,
+  CreditRepository, and SqlCreditRepository. CreditService owns one READ COMMITTED
+  transaction and passes its connection to the repository. The repository locks
+  supplied bigint identifiers with pg_advisory_xact_lock, without committing or
+  rolling back. The service hashes the specified INIT/userId array, replays saved
+  success, or locks the account and inserts account/history/result atomically.
+  It confirms a prior grant through saved result or INITIAL_GRANT history,
+  logs confirmed existing grants after completion, and fails an unconfirmed
+  existing account with ALREADY_EXISTS and no writes. Added migration 005 to
+  translate initial history to INITIAL_GRANT; other history/idempotency operation
+  values remain unchanged. Declared @types/pg development dependency.
+- **Key implementation limit:** A namespace/string-to-bigint encoder is a
+  required constructor argument. No production encoding was selected; database
+  tests use fixture-only numeric IDs. The callback/registration helper is ready
+  for a connected shared client/queue/service, but the application entrypoint
+  is not wired to RabbitMQ and no unmerged package was installed or copied.
+- **Affected locations:** `README.md`, `credit-service/README.md`,
+  `credit-service/docs/user-decisions.md`, `shared/grpc/README.md`,
+  `credit-service/grpc/src/messaging/userCreated.ts`,
+  `credit-service/grpc/src/services/{CreditService,validation}.ts`,
+  `credit-service/grpc/src/repositories/{CreditRepository,SqlCreditRepository}.ts`,
+  `credit-service/grpc/test/{initial-allocation,user-created}.test.cjs`,
+  `credit-service/migrations/005_initial_grant_history_type.sql`,
+  `credit-service/grpc/package.json`, `package-lock.json`,
+  `credit-service/ai/prompts/018-initial-grant-and-advisory-locks.md`, and this log.
+  JSON attribution uses the human-approved exception from entry 005.
+- **Agent verification:** All 31 credit checks passed with PostgreSQL enabled and
+  zero skips/failures. Verified migration of legacy history, single atomic grant,
+  24 concurrent distinct event deliveries for one user, saved-response replay
+  after changed balances, confirmed history without a saved result, no-write
+  unconfirmed accounts/hash mismatch, failures at history/result insertion with
+  rollback and later retry, actual advisory-lock timeout with rollback/retry,
+  and lock release after commit and rollback. Full workspace build passed.
+  Docker rebuild/start passed. Runtime verified packaged grant service/repository/
+  callback modules, active migration 005, the PostgreSQL bigint advisory function,
+  and cleanup of allocation-test schemas. All 15 affected documentation/code file
+  headers, log pointers/local links, final README disclosure, service-local AI
+  records, and whitespace checks passed.
+  The tested migration was applied to the local development database.
+  Initial tests without PGDATABASE skipped integration checks; the subsequent
+  PostgreSQL-enabled runs passed all checks. No live RabbitMQ delivery was tested.
+- **Human review/edits:** Pending review of generated artifacts. The human chose
+  INITIAL_GRANT, transaction-level bigint advisory locks, and bounded retry then
+  dead-letter. No new permanent-error mechanism or production lock encoding was
+  generated as a design choice.
+- **Sources/licensing:** Verified
+  [PostgreSQL 17 advisory functions](https://www.postgresql.org/docs/17/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS),
+  [transaction-lock lifetime](https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS),
+  and [node-postgres same-connection transactions](https://node-postgres.com/features/transactions).
+  @types/pg 8.23.1 declares MIT in the lockfile. No third-party implementation
+  code or PR package was copied/merged.
+- **Instruction files used:** Root `AGENTS.md` and empty
+  `credit-service/AGENTS.md`. No skills invoked.
+- **Remaining human input:** Exact namespace/key-to-signed-bigint encoding.
+  The shared package/queue are eventual integration inputs, rather than a
+  prerequisite for the callback/transaction implementation. Other business
+  operations and their earlier unresolved definitions remain outside this slice.
+
+## 019 — Implement the human-finalized signed bigint advisory-key encoding
+
+- **Timestamp:** 2026-10-20 22:00 SGT (UTC+08:00).
+- **Tool/model:** OpenAI Codex, GPT-6.
+- **Modes/scenario:** Implementation from the human's exact algorithm,
+  constructor/repository wiring, encoding/concurrency verification, and disclosure
+  documentation.
+- **Exact prompt and key response:** [Namespace/key JSON, UTF-8 SHA-256, first
+  eight signed big-endian bytes, decimal-string SQL argument](prompts/019-advisory-lock-key-encoding.md).
+- **Key output:** Added advisoryLockKey and wired every SqlCreditRepository
+  advisory-lock call to it. Removed the temporary encoder type/constructor
+  injection; CreditService now takes only its pool and the repository only its
+  transaction connection. Replaced fixture numeric IDs in allocation/concurrency
+  tests with the production mapping. No schema, RPC, namespace values, messaging
+  topology, or grant behaviour changed.
+- **Affected locations:** `README.md`, `credit-service/README.md`,
+  `credit-service/docs/user-decisions.md`,
+  `credit-service/grpc/src/repositories/{CreditRepository,SqlCreditRepository,advisoryLockKey}.ts`,
+  `credit-service/grpc/src/services/CreditService.ts`,
+  `credit-service/grpc/test/{initial-allocation,advisory-lock-key}.test.cjs`,
+  `credit-service/ai/prompts/019-advisory-lock-key-encoding.md`, and this log.
+- **Agent verification:** Full workspace build and all 33 credit checks passed,
+  with PostgreSQL enabled and zero skips/failures. Used independent Python
+  hashlib/compact JSON/UTF-8/struct.unpack('>q') calculations to generate eight
+  fixed vectors covering signs, values beyond Number precision, UTF-8, escaping,
+  and namespace/key tuple boundaries. PostgreSQL tests directly contended for
+  independently known signed bigint identifiers, confirming exact decimal SQL
+  transport and release on commit/rollback. Existing concurrent allocation,
+  duplicate replay, rollback, and lock-timeout checks now use the production
+  encoder. Docker rebuild/start passed. Packaged runtime checks verified positive
+  and negative vectors and cross-connection contention/release on the exact
+  decimal bigint. All 11 affected code/documentation attributions, log pointers/
+  local links, final README disclosure, service-local AI records, and whitespace
+  checks passed. No schema, dependency, or persisted data changes were required.
+- **Human review/edits:** The human finalized the complete encoding. Generated
+  code/docs await human review; test success does not establish human approval.
+- **Sources/licensing:** Used the human's exact algorithm, existing Node crypto/
+  Buffer APIs, and previously recorded PostgreSQL references. Python standard
+  library was used only to compute independent verification vectors. No new
+  external source was consulted or third-party implementation code copied.
+- **Instruction files used:** Root `AGENTS.md` and empty
+  `credit-service/AGENTS.md`. No skills invoked.
+- **Remaining human input:** No remaining advisory-key encoding question.
+  Live RabbitMQ startup/shared-package integration and the other previously
+  recorded business-operation definitions remain outside this encoding change.
+
+## 020 — Begin remaining core credit logic; preserve human design decisions
+
+- **Timestamp:** 2026-10-20 22:05 SGT (UTC+08:00).
+- **Tool/model:** OpenAI Codex, GPT-6.
+- **Modes/scenario:** Implementation of human-finalized balance/reservation
+  reads and reservation update behaviour, SQL repository boilerplate, debugging/
+  concurrency/rollback checks, bounded clarification of remaining definitions,
+  and documentation/disclosure maintenance.
+- **Exact prompt and key response:** [Core-logic request, explicit teammate
+  integration ownership, implementation response, and clarification questions](prompts/020-remaining-core-business-logic.md).
+- **Key output:** Added CreditService getBalance/getReservation/updateReservation,
+  service-level error codes and the human's existing VERSION_CONFLICT reason.
+  Added account saving, reservation find/create/save, typed reservation results,
+  and generic saved-result typing. Added service-owned READ COMMITTED mutation
+  handling: retry-key lock/replay, order-resource lock, work, atomic result save,
+  commit/rollback. Update validates and follows the supplied check order,
+  locks the account before reading its balance, changes reserved credits by
+  difference, increments version once, writes signed update history and saves
+  the response together. Reads never create accounts or write history.
+- **Boundaries:** RabbitMQ startup and User Service implementation are explicitly
+  assigned to teammates. No new history enum, UUID-format policy, pagination/
+  snapshot design, caller authentication, reason-metadata interface, or missing
+  retry-record Reserve fallback was selected. Existing update history value is
+  retained. Reserve/release/settle/history and controller wiring await those
+  definitions; this entry does not claim all core logic is finished.
+- **Affected locations:** `README.md`, `credit-service/README.md`,
+  `credit-service/docs/user-decisions.md`,
+  `credit-service/grpc/src/repositories/{CreditRepository,SqlCreditRepository}.ts`,
+  `credit-service/grpc/src/services/{CreditService,validation}.ts`,
+  `credit-service/grpc/test/core-credit.test.cjs`,
+  `credit-service/ai/prompts/020-remaining-core-business-logic.md`, and this log.
+- **Agent verification:** All 44 credit checks passed with PostgreSQL enabled,
+  zero failures/skips. The 11 new core checks verify pre-connection validation,
+  no-write balance/reservation reads, signed hold differences, using the existing
+  hold when increasing to the full total balance, rejection without state changes,
+  replay before version checks, shared-version concurrency, shared-account
+  overspend prevention, and injected history/result failures with full rollback
+  and later retry. Temporary schemas are removed. Full workspace build and Docker
+  rebuild/start passed. Runtime verified packaged core methods, no implicit
+  account creation, missing reservation reads, and cleaned core-test schemas.
+  Affected-file attributions/log pointers, local links, final README disclosure,
+  service-local AI records, and whitespace checks passed. No schema/dependency or
+  persisted application-data changes were required.
+- **Human review/edits:** Pending review of generated artifacts and answers to
+  the recorded remaining behaviour/interface questions. Existing user changes
+  are preserved; no reviewer approval is inferred from tests.
+- **Sources/licensing:** Used the human's recorded requirements and repository
+  implementation conventions. No new external source was consulted or
+  third-party implementation code copied.
+- **Instruction files used:** Root `AGENTS.md` and empty
+  `credit-service/AGENTS.md`. No skills invoked.
+- **Remaining human input:** Full history labels, history cursor/snapshot
+  semantics, existing-reservation fallback without retry record, UUID validation,
+  and controller service identity/history permissions/reason metadata.
+
+## 021 — Implement finalized reservation mutations, history schema, and authentication
+
+- **Timestamp:** Began 2026-10-20 23:45 SGT (UTC+08:00); verification/documentation
+  continued into 2026-10-21 00:07 SGT alongside exchange 022.
+- **Tool/model:** OpenAI Codex, GPT-6.
+- **Modes/scenario:** Implementation from human-finalized business/schema/access
+  definitions, generated contract boilerplate, debugging and integration tests,
+  bounded wire-detail clarification, documentation/disclosure maintenance.
+- **Exact prompts/key exchanges:** [Four exact answers, key responses, and the
+  REST follow-up question](prompts/021-history-and-authentication.md). Original
+  questions are in exchange 020; the REST answer is in exchange 022.
+- **Key output:** Implemented reserve/release/settle with service-owned READ
+  COMMITTED transactions, retry/order/account locks, atomic balances/reservation/
+  signed history/results, saved-response replay, exact missing-record fallbacks,
+  named error reasons, UUID validation before connection, account ordering, and
+  full rollback. Update now writes the human's exact RESERVARTION_UPDATED label.
+  Migration 006 converts legacy labels, adds always-generated bigint sequence_id,
+  unique/user-desc indexes and a partial unique INITIAL_GRANT index. Applied
+  migrations 001–005 were preserved; 006 also handles init_credits for legacy
+  input. Idempotency operation names remain unchanged. SQL history querying
+  supports sequence boundaries and keeps bigint values as strings.
+- **Contract/controller:** Removed both history RPCs, history request/page/entry
+  messages, generated files and client wrappers; regenerated remaining credit
+  types with attribution restored. Connected six order-only RPCs with secret-
+  derived identity, constant-time SHA-256 digest comparison, authentication before
+  business logic, reason trailers, transient error mapping, and TLS required
+  unless explicit local mode. Added RS256 user-token verification for the
+  subsequent REST integration. Configured local service-token/TLS variables.
+- **Affected locations:** Root README; credit-service README, usage log, prompt
+  archive 021, docs/user-decisions.md, compose.yaml, .env.docker.example,
+  grpc/.env.example, grpc/package.json; root package-lock.json;
+  credit-service/migrations/006_history_types_and_paging.sql;
+  grpc/src/api/{auth,errors,tls}.ts, src/{env,index}.ts,
+  src/grpc/server.ts, src/services/{CreditService,validation}.ts,
+  src/repositories/{CreditRepository,SqlCreditRepository}.ts;
+  tests auth/core-credit/history/initial-allocation;
+  shared/grpc README, proto/credit.proto, src/clients.ts,
+  src/generated/credit.ts and regenerated/removed credit types,
+  test/{credit-contract,transport}.test.cjs. Existing earlier uncommitted work
+  was preserved. Exchange 022 subsequently extends the overlapping files.
+- **Dependency attribution:** Added jsonwebtoken ^9.0.3 and development
+  @types/jsonwebtoken ^9.0.10, matching the existing User Service declarations.
+  The human-approved JSON attribution exception is documented in the service
+  README and this log. No package manifest header comment was added.
+- **Agent verification:** Before REST completion, all 65 credit checks passed
+  with PostgreSQL enabled, zero failures/skips; eight shared tests and full
+  workspace build passed. Added tests verify parallel reserves/no overspend,
+  12 duplicate reserves, missing-record no-write fallbacks in all statuses,
+  competing settle/release, opposing settlements without deadlock, missing/self
+  couriers, full rollback on the second transfer history row, exact migration
+  conversions and rollback for duplicate grants/ambiguous legacy transfers,
+  sequence ordering/precision beyond 2^53, writes during paging and late commits,
+  six-RPC authentication, unauthorized identities, error trailers, JWT validation,
+  and TLS configuration. Scoped coverage before REST was 98.14% lines/94.03%
+  branches. Initial sandboxed network tests failed EPERM; reruns with approved
+  local listener/database access passed. No such failure was treated as success.
+  Migration 006 was applied once to the local development database. Docker
+  rebuild/start and no-write runtime token/error/UUID checks passed. After
+  exchange 022, the suite has 70 passing credit checks; see below.
+- **Human review:** Pending review of generated implementation/docs. The human
+  supplied the decisions; agent-run checks do not establish human validation.
+  Root AGENTS.md and existing empty credit-service/AGENTS.md were used. No skills
+  invoked. No agent delegation, commit, PR, merge, or deployment was performed.
+- **Sources/licensing:** Verified PostgreSQL 17
+  [identity columns](https://www.postgresql.org/docs/17/ddl-identity-columns.html)
+  and [transaction timestamps](https://www.postgresql.org/docs/17/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT),
+  [jsonwebtoken verification](https://github.com/auth0/node-jsonwebtoken#jwtverifytoken-secretorpublickey-options-callback),
+  [Node timingSafeEqual](https://nodejs.org/api/crypto.html#cryptotimingsafeequala-b),
+  and [gRPC authentication](https://grpc.io/docs/guides/auth/). Prior PostgreSQL
+  advisory-lock references are recorded in entries 018–019. No third-party
+  implementation code was copied. No new license-compatibility assurance or
+  human review is claimed.
+- **Scope:** RabbitMQ startup and User Service implementation remain with
+  teammates. REST paths/bookmark shape were left pending until the human's
+  answer in exchange 022. No new schema/interface choices filled those gaps.
+
+## 022 — Implement human-finalized own-balance/history REST and bookmarks
+
+- **Timestamp:** 2026-10-21 00:01–00:11 SGT (UTC+08:00), with final documentation
+  and checks completed during this same session.
+- **Tool/model:** OpenAI Codex, GPT-6.
+- **Modes/scenario:** Implementation after human wire definitions, startup and
+  Docker boilerplate, meaningful pagination/authentication tests, documentation.
+- **Exact prompt/key response:** [REST paths, fields, bookmark definition, and
+  implementation response](prompts/022-rest-wire-details.md).
+- **Key output:** Added getUserCreditHistory with default 50/max 100, sequence-
+  descending limit+1 queries, scoped bookmarks, and null final token. Added
+  strict base64url/UTF-8/JSON decoding: exactly userId/sequenceId, current subject,
+  positive digits-only decimal sequence with no leading zeros within signed
+  bigint range. Added GET /credits/me/balance and GET /credits/me/history with
+  optional pageSize/pageToken, camelCase responses, ISO UTC dates, null links,
+  decimal sequenceId, and error/message payloads. The RS256 subject selects the
+  user; query IDs and admin claims provide no additional reach. Connected REST
+  port 3004 startup/shutdown alongside gRPC 50054. Docker mounts only the User
+  Service public PEM read-only, never its private key. No key contents/tokens
+  were written to disclosures. Tests generate their own temporary RSA keys.
+- **Affected locations:** credit-service/grpc/src/services/{CreditService,
+  historyBookmark}.ts; src/api/{rest,errors}.ts; src/index.ts;
+  test/{rest,history,auth}.test.cjs; credit-service/Dockerfile, compose.yaml,
+  .env.docker.example, README.md, docs/user-decisions.md, ai/usage-log.md and
+  prompts/022-rest-wire-details.md; shared/grpc/README.md; root README.
+- **Agent verification:** Full workspace build passed. All 70 credit checks
+  passed with PostgreSQL and local listeners, no failures/skips. Eight shared
+  contract/transport checks passed. New REST/bookmark tests cover malformed,
+  extra/missing/wrong-user fields, invalid UTF-8/base64url/JSON, numeric precision/
+  signed-bigint bounds, sizes before DB connection, RS256 expiry/subject,
+  admin subject isolation, ISO/null serialization, query parsing/errors,
+  103-entry paging with 50/100 sizes, writes after page one, unknown-user empty
+  history, and service/internal error handling. Scoped Node coverage command:
+  `node --experimental-test-coverage '--test-coverage-include=**/credit-service/grpc/src/{services,repositories,messaging,api,grpc}/**/*.ts' --test credit-service/grpc/test/*.test.cjs`
+  with local PG variables reported 98.29% lines, 94.44% branches, 98.16% functions.
+  Startup/env/generated code is excluded from that report. Docker rebuild/start
+  passed; logs confirm both listeners. Runtime no-write checks confirm both REST
+  reads reject absent/invalid JWTs with 401 error/message, and authenticated gRPC
+  returns NOT_FOUND with ACCOUNT_NOT_FOUND trailers. Actual User Service private
+  signing keys were not read for runtime tests; successful JWT behavior was
+  exercised with generated test keys. Temporary database schemas are removed.
+  A final debugging check inspected installed pg-pool/pg connection errors:
+  code-less pool acquisition timeout, connection timeout, and unexpected disconnect
+  messages now map to UNAVAILABLE as required for transient database failures.
+  Assertions were added to the existing error-classification test; all 70 checks
+  passed again and the credit build/Docker rebuild passed. Final current-doc link,
+  attribution/header pointer, root README last-section, service-local AI location,
+  and tracked diff whitespace checks passed. Prompt archives retain original
+  trailing whitespace where supplied by the human.
+- **Human review:** Pending. Root AGENTS.md and the existing empty service
+  AGENTS.md used; no skills invoked. Existing personal env files and teammates'
+  implementations were not edited. No commit/merge/publication performed.
+- **Sources/licensing:** Used the human's exact wire definitions and existing
+  User Service authenticate/error payload conventions. Source references for
+  JWT/crypto/PostgreSQL are in entry 021. No copied third-party implementation.
+- **Remaining integration:** RabbitMQ startup/User Service event publication are
+  explicitly teammate-owned. Application retries in createCreditClient are a
+  subsequent requested integration and are not implemented here; finite
+  deadlines/codes/trailers are preserved. Archival/restoration remain deferred.
+
+## 023 — Explain current directory layout; request the human's remaining layout choice
+
+- **Timestamp:** 2026-10-21 00:15 SGT (UTC+08:00).
+- **Tool/model and mode:** OpenAI Codex, GPT-6; explanation of existing files,
+  bounded clarification, and disclosure documentation.
+- **Exact prompt/key response:** [Directory-layout question](prompts/023-directory-layout-question.md).
+- **Key output:** Inspected the existing paths. grpc is currently the Node
+  workspace containing REST handlers, service/repository code and startup, as
+  well as gRPC. Recorded the human's proposed sibling grpc/rest folders and
+  requested their placement of shared business/repository/startup code. No
+  target architecture or layout was proposed or selected by AI; no source files
+  were moved and no workspace/package boundaries changed.
+- **Affected files:** This log, prompt archive 023, service README attribution,
+  and the root README's final consolidated disclosure.
+- **Checks:** Read-only file listing; disclosure links and tracked diff whitespace.
+  No code changed; no new build/test run was necessary. Earlier verification
+  results remain in entries 021–022.
+- **Review/sources:** Human target-layout decision and review pending. Used
+  repository files and the user's existing rules; no external sources/code or
+  skills. Root AGENTS.md and existing service instructions still apply.
+
+## 024 — Relocate Credit Service to the human-finalized src layout
+
+- **Timestamp:** 2026-10-21 00:21–00:29 SGT (UTC+08:00).
+- **Tool/model and modes:** OpenAI Codex, GPT-6; refactoring/implementation of
+  the human's explicit directory placement, configuration boilerplate, debugging,
+  verification, documentation and disclosure maintenance.
+- **Exact prompt/key responses:** [Human-finalized source layout and recorded
+  responses](prompts/024-service-src-layout.md). This resolves the layout question
+  in entry 023. The assistant did not select the requested layer directories.
+- **Key output:** Source now lives at credit-service/src with domains, repos,
+  services, grpc, rest, events, env.ts and index.ts. Moved existing entity type
+  declarations unchanged from CreditRepository into domains/types.ts. Repositories
+  moved to repos and the user.created helper to events. Existing service-secret
+  and user-JWT verifier functions are in their respective grpc/rest directories;
+  handlers catch each transport's corresponding authentication error. TLS/error
+  mapping resides with gRPC, retaining REST's existing use of the shared mapping.
+  Package files, test, scripts and .env.example moved to the credit-service root.
+  The npm identifier @foc/credit-grpc and existing commands are preserved; its
+  workspace/link path is credit-service. Updated imports, TypeScript build,
+  migration-test relative paths, public-key default/example relative path,
+  shared transport-test compiled-module lookup, Docker COPY/working directory,
+  Supplier Dockerfile's credit-manifest COPY path, and current documentation.
+  Removed the obsolete ignored compiled output and empty outer grpc directory.
+  No personal env content was read or overwritten. Existing SQL migrations,
+  schema, business rules, RPC/REST fields and historical prompt archives remain.
+- **Affected locations:** Root AGENTS.md (manifest path only), package.json,
+  package-lock.json and final README disclosure; credit-service/package.json,
+  tsconfig.json, .env.example, Dockerfile, src/**, test/**, scripts/**, README.md,
+  docs/user-decisions.md, this log and prompt archive 024; retired authored paths
+  under credit-service/grpc; shared/grpc README and test/transport.test.cjs;
+  supplier-service/Dockerfile.grpc (credit manifest path and attribution only).
+  Files have updated attribution pointers after relocation. AI records remain
+  exclusively under credit-service/ai.
+- **JSON attribution:** The relocated manifest and root lock continue to use
+  the method approved in entry 005. The necessary root package.json workspace
+  path edit is attributed using the same comment-free JSON documentation method
+  in the service README and this log. tsconfig uses TypeScript-supported JSONC
+  attribution comments; its compiler settings are unchanged.
+- **Agent verification:** Full workspace build passed. All 70 credit tests
+  passed against PostgreSQL/local listeners, no failures/skips; all eight shared
+  contract/transport tests passed using the new compiled module path. The
+  existing migration CLI/schema tests passed with relocated scripts/migrations.
+  npm workspace link now resolves to credit-service. Two offline install
+  attempts failed because registry metadata was not cached; an approved online
+  npm install completed. Docker npm ci, compilation, image rebuild and startup
+  passed. Runtime no-write tests confirmed both REST routes reject absent JWTs,
+  unauthenticated gRPC rejection, authenticated NOT_FOUND/ACCOUNT_NOT_FOUND
+  trailers, and the new /repo/credit-service working directory plus packaged
+  dist/grpc, dist/rest, scripts and migrations paths. The Supplier image was not
+  separately rebuilt; its single changed COPY source was checked to exist.
+  Header/log pointers, current documentation links, root README's final
+  disclosure placement and tracked diff whitespace were checked. No new tests
+  were added for the file move; the existing behavior tests verified it.
+  The coverage figures in entry 022 remain that earlier run, not a fresh
+  post-relocation coverage measurement.
+- **Review/sources/instructions:** Human review pending. Used repository files
+  and the human's exact layout; no new external sources or third-party code.
+  Read root AGENTS.md, the existing empty credit-service/AGENTS.md and
+  supplier-service/AGENTS.md for the necessary Dockerfile path update. No skill
+  was invoked. No source schema/architecture rationale or trade-off analysis
+  was generated. No agent delegation, commit, merge or deployment performed.
+- **Remaining integrations:** RabbitMQ startup/User Service publication remain
+  teammate-owned. Client application retries and archival/restoration were not
+  part of this directory refactor and remain as recorded earlier.
+
+## 025 — Correct history spelling, typed validation, mutation documentation and REST routing
+
+- **Timestamp:** 2026-10-21 01:56–02:04 SGT (UTC+08:00).
+- **Tool/model and modes:** OpenAI Codex, GPT-6; human-directed implementation/
+  debugging, meaningful regression tests, bounded clarification, documentation
+  and disclosure maintenance.
+- **Exact prompt/key exchanges:** [Full request, migration/error confirmations,
+  and key responses](prompts/025-validation-routing-and-spelling.md).
+- **Human decisions:** Correct RESERVARTION_UPDATED to RESERVATION_UPDATED.
+  The human confirms no shared database has applied migration 006; it may be
+  edited in place. Existing business/authentication/transient error mappings
+  must remain; only unexpected failures use generic INTERNAL/500. Match REST
+  routes before authentication; retain unsupported-method 404 as the requested
+  known limitation. Document saved mutation response snapshots/GetReservation.
+- **Key output:** Edited migration 006's legacy update conversion/type check
+  in place and changed CreditService's update history to RESERVATION_UPDATED.
+  Added ValidationError extends Error for deliberate identifier/amount/version/
+  page-size/bookmark/event validation. Only that class maps to INVALID_ARGUMENT
+  and REST 400. Ordinary TypeError stays unexpected, producing generic Internal
+  credit-service error and logging the original error on the server. Known
+  business reasons, authentication, and transient-database codes are preserved.
+  Bookmark decoding converts only expected malformed JSON/UTF-8 input failures;
+  unexpected decoder exceptions propagate. REST now authenticates only after a
+  known GET route is matched. Unknown paths and unsupported methods return 404;
+  known GET routes without a token return 401. Added proto/README mutation
+  snapshot wording; no wire fields or replay behavior changed. Historical prompt
+  archives and prior log entries retain their original spelling.
+- **Local database correction:** Migration 006 had already run locally. In one
+  transaction locked public.credit_history, dropped its type check, updated
+  the misspelled label to RESERVATION_UPDATED, and installed the corrected check
+  from migration 006. Committed after verifying unchanged non-type row data,
+  row count, and all index definitions. Zero local rows required renaming; the
+  check was corrected. No sequence/identity/index statement was rerun, no data
+  reset, and no follow-up migration 007 added. External shared deployments were
+  not inspected; the human supplied the no-shared-application confirmation.
+- **Affected locations:** credit-service/migrations/006_history_types_and_paging.sql;
+  src/services/{CreditService,validation,historyBookmark}.ts;
+  src/grpc/errors.ts; src/rest/server.ts; src/events/userCreated.ts;
+  test/{auth,core-credit,initial-allocation,rest,history,user-created}.test.cjs;
+  credit-service README, docs/user-decisions.md, this log and prompt archive 025;
+  shared/grpc/proto/credit.proto and README; root README final disclosure.
+- **Agent verification:** Full workspace build passed. All 74 credit tests
+  passed with PostgreSQL and temporary API listeners, no failures/skips. Eight
+  shared contract/transport tests passed. New regression coverage checks an
+  ordinary TypeError from a real service call returns generic gRPC INTERNAL,
+  no private message/reason trailer, and the exact error object is logged;
+  HTTP service TypeError returns generic 500 and the original error is logged;
+  intentional validation remains INVALID_ARGUMENT/400 without a DB connection;
+  known mappings remain; unknown paths without tokens are 404, both known GET
+  routes without tokens are 401, POST to either route is 404 with/without a
+  valid token; and saved reserve snapshots replay after updates/releases while
+  GetReservation returns current state, without writes. Updated fresh-schema
+  migration tests accept the corrected label and reject the old typo. The local
+  database correction verified row/index preservation. Code generation ran for
+  the proto comment change; generated bodies were unchanged and prior generated
+  files/attributions were retained. Docker rebuild/start passed. No-write runtime
+  checks verified REST 404/401/POST404, typed INVALID_ARGUMENT, and preserved
+  NOT_FOUND/ACCOUNT_NOT_FOUND behavior. Header/log/documentation links and
+  tracked diff whitespace checked. Coverage figures from entry 022 remain
+  historical, not a new run for these changes.
+- **Human review/sources/instructions:** Human review pending. Used the human's
+  decisions and repository code/tests; no new external sources or copied
+  third-party implementation. Read root AGENTS.md and existing empty service
+  AGENTS.md. No skill, delegation, commit, merge or deployment performed.
+- **Remaining integrations:** RabbitMQ startup/User Service publication remain
+  teammate-owned; automatic client retries and archival/restoration are unchanged.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the

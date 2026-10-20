@@ -1,9 +1,8 @@
 -- AI Assistance Disclosure:
 -- Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
 -- Scope: Implemented the human-confirmed uppercase reservation statuses and default.
--- Author review: Pending human review.
+-- Author review: [HUMAN-REVIEWED]
 -- Prompts and key responses: ../ai/usage-log.md, entry 008.
--- AI-generated; human review pending.
 
 ALTER TABLE reservations DROP CONSTRAINT reservations_status_check;
 

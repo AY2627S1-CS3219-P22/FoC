@@ -1,9 +1,8 @@
 -- AI Assistance Disclosure:
 -- Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
 -- Scope: Implemented the human-requested reservation schema alignment with the shared credit contract.
--- Author review: Pending human review.
+-- Author review: [HUMAN-REVIEWED]
 -- Prompts and key responses: ../ai/usage-log.md, entry 007.
--- AI-generated; human review pending.
 
 ALTER TABLE reservations RENAME COLUMN requestor_id TO requester_id;
 

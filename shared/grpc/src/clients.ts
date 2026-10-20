@@ -1,8 +1,8 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
-// Scope: Added Promise client wrappers for human-finalized initialization, reservation, and history RPCs using existing deadline/metadata handling.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
+// Scope: Added human-finalized credit wrappers using existing deadline/metadata handling; removed initialization and both history wrappers.
 // Author review: Pending human review.
-// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 010–012.
+// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 010–012, 016 and 021.
 // AI-generated additions; human review pending.
 
 import {
@@ -27,11 +27,6 @@ import type { SettleCreditsRequest } from './generated/credit/SettleCreditsReque
 import type { UpdateReservationRequest } from './generated/credit/UpdateReservationRequest';
 import type { GetReservationRequest } from './generated/credit/GetReservationRequest';
 import type { GetReservationResponse__Output as GetReservationResponse } from './generated/credit/GetReservationResponse';
-import type { GetUserCreditHistoryRequest } from './generated/credit/GetUserCreditHistoryRequest';
-import type { GetOrderCreditHistoryRequest } from './generated/credit/GetOrderCreditHistoryRequest';
-import type { CreditHistoryPage__Output as CreditHistoryPage } from './generated/credit/CreditHistoryPage';
-import type { InitCreditsRequest } from './generated/credit/InitCreditsRequest';
-import type { InitCreditsResponse__Output as InitCreditsResponse } from './generated/credit/InitCreditsResponse';
 import type { GetSupplierRequest } from './generated/supplier/GetSupplierRequest';
 import type { Supplier__Output as Supplier } from './generated/supplier/Supplier';
 import type { IsOpenRequest } from './generated/supplier/IsOpenRequest';
@@ -126,39 +121,9 @@ export function createCreditClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 3000);
   const client = new CreditService(target, config.credentials ?? credentials.createInsecure());
   return {
-    initCredits(request: InitCreditsRequest, options: RpcOptions = {}): Promise<InitCreditsResponse> {
-      return unary((callback) =>
-        client.initCredits(
-          request,
-          options.metadata ?? new Metadata(),
-          callOptions(timeoutMs, options),
-          callback,
-        ),
-      );
-    },
     getBalance(request: GetBalanceRequest, options: RpcOptions = {}): Promise<Balance> {
       return unary((callback) =>
         client.getBalance(
-          request,
-          options.metadata ?? new Metadata(),
-          callOptions(timeoutMs, options),
-          callback,
-        ),
-      );
-    },
-    getUserCreditHistory(request: GetUserCreditHistoryRequest, options: RpcOptions = {}): Promise<CreditHistoryPage> {
-      return unary((callback) =>
-        client.getUserCreditHistory(
-          request,
-          options.metadata ?? new Metadata(),
-          callOptions(timeoutMs, options),
-          callback,
-        ),
-      );
-    },
-    getOrderCreditHistory(request: GetOrderCreditHistoryRequest, options: RpcOptions = {}): Promise<CreditHistoryPage> {
-      return unary((callback) =>
-        client.getOrderCreditHistory(
           request,
           options.metadata ?? new Metadata(),
           callOptions(timeoutMs, options),

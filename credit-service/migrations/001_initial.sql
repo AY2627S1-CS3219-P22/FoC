@@ -1,9 +1,8 @@
 -- AI Assistance Disclosure:
 -- Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
 -- Scope: Implemented the human-specified four-table schema, defaults, relationships, and value constraints.
--- Author review: Pending human review.
+-- Author review: [HUMAN-REVIEWED]
 -- Prompts and key responses: ../ai/usage-log.md, entries 004–006.
--- AI-generated; human review pending.
 
 CREATE TABLE credit_accounts (
     user_id text PRIMARY KEY,

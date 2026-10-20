@@ -1,8 +1,8 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
-// Scope: Updated credit request signatures and all nine credit scaffold endpoint checks; corrected the stale User Service stub assertion.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
+// Scope: Verified six authenticated credit RPCs, removed initialization/history calls, and corrected the stale User Service stub assertion.
 // Author review: Pending human review.
-// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012.
+// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012, 016, 021 and 024.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -17,7 +17,7 @@ const userServer = require('../../../user-service/src/grpc/server.ts');
 const userRequire = createRequire(path.resolve(__dirname, '../../../user-service/package.json'));
 const userCredentials = userRequire('@grpc/grpc-js').ServerCredentials;
 const orderServer = require('../../../order-service/grpc/dist/grpc/server.js');
-const creditServer = require('../../../credit-service/grpc/dist/grpc/server.js');
+const creditServer = require('../../../credit-service/dist/grpc/server.js');
 const supplierServer = require('../../../supplier-service/grpc/dist/grpc/server.js');
 
 async function listen(t, server, createClient, config, serverCredentials) {
@@ -30,7 +30,7 @@ async function listen(t, server, createClient, config, serverCredentials) {
   return client;
 }
 
-test('scaffold stubs are reachable and the implemented user RPC validates missing IDs', async (t) => {
+test('scaffold stubs are reachable, credit rejects unauthenticated calls, and user validates missing IDs', async (t) => {
   const user = await listen(
     t,
     userServer.createGrpcServer(),
@@ -39,23 +39,24 @@ test('scaffold stubs are reachable and the implemented user RPC validates missin
     userCredentials.createInsecure(),
   );
   const order = await listen(t, orderServer.createGrpcServer(), rpc.createOrderClient);
-  const credit = await listen(t, creditServer.createGrpcServer(), rpc.createCreditClient);
+  const credit = await listen(t, creditServer.createGrpcServer({}, {}), rpc.createCreditClient);
   const supplier = await listen(t, supplierServer.createGrpcServer(), rpc.createSupplierClient);
 
   for (const invoke of [
     () => order.getOrder({ orderId: 'order-1' }),
-    () => credit.initCredits({ userId: 'user-1' }),
+    () => supplier.getSupplier({ supplierId: '1' }),
+  ]) {
+    await assert.rejects(invoke(), (error) => error.code === status.UNIMPLEMENTED);
+  }
+  for (const invoke of [
     () => credit.getBalance({ userId: 'user-1' }),
-    () => credit.getUserCreditHistory({ userId: 'user-1' }),
-    () => credit.getOrderCreditHistory({ orderId: 'order-1' }),
     () => credit.reserveCredits({ orderId: 'order-1', requesterId: 'user-1', amount: 4 }),
     () => credit.updateReservation({ orderId: 'order-1', amount: 5, expectedVersion: 1 }),
     () => credit.releaseCredits({ orderId: 'order-1' }),
     () => credit.settleCredits({ orderId: 'order-1', courierId: 'user-2' }),
     () => credit.getReservation({ orderId: 'order-1' }),
-    () => supplier.getSupplier({ supplierId: '1' }),
   ]) {
-    await assert.rejects(invoke(), (error) => error.code === status.UNIMPLEMENTED);
+    await assert.rejects(invoke(), (error) => error.code === status.UNAUTHENTICATED);
   }
   await assert.rejects(user.getPublicProfile({}), (error) => error.code === status.INVALID_ARGUMENT);
 });

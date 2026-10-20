@@ -1,9 +1,9 @@
 <!--
 AI Assistance Disclosure:
-Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-20 (Asia/Singapore).
-Scope: Recorded the user's AI-use rules, credit-service log location, and approved JSON attribution exception.
+Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
+Scope: Recorded the user's AI-use rules, credit-service log location, approved JSON attribution exception, and relocated manifest path.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: credit-service/ai/usage-log.md, entries 001–002 and 005.
+Prompts and key responses: credit-service/ai/usage-log.md, entries 001–002, 005 and 024.
 -->
 
 # Repository instructions
@@ -44,7 +44,8 @@ Follow the user's assignment rules recorded in
   interpreter directives. For formats without comments, obtain the human's
   decision on an acceptable attribution method before creating the file.
 - JSON exception approved by the user on 2026-10-20 (usage-log entry 005):
-  attribute `credit-service/grpc/package.json` and the root `package-lock.json`
+  attribute `credit-service/package.json` (relocated from
+  `credit-service/grpc/package.json` in exchange 024) and the root `package-lock.json`
   in `credit-service/README.md` and the service usage log. These files cannot
   contain comments. Do not ask again for this approved attribution method.
 - Label pasted AI implementation blocks using a supported comment such as
