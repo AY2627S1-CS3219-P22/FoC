@@ -20,49 +20,34 @@ if (!orderUrl || !/^\/order_service_test(?:_[a-z0-9]+)?$/.test(new URL(orderUrl)
   throw new Error('Dedicated TEST_DATABASE_URL required');
 if (!creditUrl || new URL(creditUrl).pathname !== '/credit_test')
   throw new Error('Dedicated CREDIT_TEST_DATABASE_URL named credit_test required');
-// Optional external checkout/export: test the unmerged Credit implementation
-// without copying its source or replacing this branch's Credit service.
-const featureRoot = process.env.CREDIT_IMPLEMENTATION_ROOT;
+// Use the current Credit implementation, or an explicitly supplied checkout/export.
 let pool: any;
 let server: ReturnType<typeof import('@foc/grpc').createServer>;
 let initialize: (userId: string) => Promise<unknown>;
 let migrateCredit: () => Promise<void>;
-let cleanupCredit: () => Promise<void> = async () => {};
-if (featureRoot) {
-  const root = path.resolve(featureRoot);
-  const { Pool } = require('pg');
-  const { CreditService } = require(path.join(root, 'dist/services/CreditService'));
-  const { createGrpcServer } = require(path.join(root, 'dist/grpc/server'));
-  const { createUserCreatedHandler } = require(path.join(root, 'dist/events/userCreated'));
-  // Every run has a private schema inside the explicitly selected test DB.
-  const schema = `order_credit_${randomUUID().replaceAll('-', '')}`;
-  pool = new Pool({ connectionString: creditUrl, options: `-c search_path=${schema}` });
-  const service = new CreditService(pool);
-  server = createGrpcServer(service, { 'order-service': 'o'.repeat(64) });
-  const onCreated = createUserCreatedHandler(service);
-  initialize = userId => onCreated({ payload: {
-    type: 'user.created', userId, eventId: randomUUID(), occurredAt: new Date().toISOString(),
-  } });
-  migrateCredit = async () => {
-    await pool.query(`CREATE SCHEMA "${schema}"`);
-    const directory = path.join(root, 'migrations');
-    for (const file of readdirSync(directory).filter(name => /^00[1-6]_.*\.sql$/.test(name)).sort()) {
-      await pool.query(readFileSync(path.join(directory, file), 'utf8'));
-    }
-  };
-  cleanupCredit = async () => { await pool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`); };
-} else {
-  const { createPool, CreditDatabase } = require('../../credit-service/dist/database/database');
-  const { migrate } = require('../../credit-service/dist/database/migrate');
-  const { CreditService } = require('../../credit-service/dist/services/credit-service');
-  const { createGrpcServer } = require('../../credit-service/dist/grpc/server');
-  pool = createPool(creditUrl);
-  server = createGrpcServer(new CreditService(new CreditDatabase(pool)), {
-    serviceTokens: { 'order-service': 'o'.repeat(64), 'user-service': 'u'.repeat(64) }, audit() {},
-  });
-  migrateCredit = () => migrate(pool);
-  initialize = userId => client.initCredits({ userId }, metadata('u'.repeat(64)));
-}
+let cleanupCredit: () => Promise<void>;
+const root = path.resolve(process.env.CREDIT_IMPLEMENTATION_ROOT ?? path.join(__dirname, '../../credit-service'));
+const { Pool } = require('pg');
+const { CreditService } = require(path.join(root, 'dist/services/CreditService'));
+const { createGrpcServer } = require(path.join(root, 'dist/grpc/server'));
+const { createUserCreatedHandler } = require(path.join(root, 'dist/events/userCreated'));
+// Every run has a private schema inside the explicitly selected test DB.
+const schema = `order_credit_${randomUUID().replaceAll('-', '')}`;
+pool = new Pool({ connectionString: creditUrl, options: `-c search_path=${schema}` });
+const service = new CreditService(pool);
+server = createGrpcServer(service, { 'order-service': 'o'.repeat(64) });
+const onCreated = createUserCreatedHandler(service);
+initialize = userId => onCreated({ payload: {
+  type: 'user.created', userId, eventId: randomUUID(), occurredAt: new Date().toISOString(),
+} });
+migrateCredit = async () => {
+  await pool.query(`CREATE SCHEMA "${schema}"`);
+  const directory = path.join(root, 'migrations');
+  for (const file of readdirSync(directory).filter(name => /^00[1-6]_.*\.sql$/.test(name)).sort()) {
+    await pool.query(readFileSync(path.join(directory, file), 'utf8'));
+  }
+};
+cleanupCredit = async () => { await pool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`); };
 const db = new PrismaClient({ datasources: { db: { url: orderUrl } } });
 const requester = identity(randomUUID()), courier = identity(randomUUID());
 let connection: ReturnType<typeof configuredCreditGateway>;

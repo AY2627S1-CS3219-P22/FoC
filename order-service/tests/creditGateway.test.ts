@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { retryCreditRpc } from '../src/dependencies/retryCreditRpc';
 import { configuredCreditGateway } from '../src/dependencies/configuredCreditGateway';
 import { createCreditGateway, type CreditClient } from '../src/dependencies/creditGateway';
 
@@ -110,15 +109,4 @@ test('configured adapter retries transient failures with the same payload and me
     assert.equal((await connection.gateway.reserve({ ...receipt, operationId: 'local' })).kind, 'confirmed');
     assert.equal(attempts, 3);
   } finally { connection.close(); await stopServer(server, 100); }
-});
-
-test('Credit retries stop on permanent errors, exhaustion and overall deadline', async () => {
-  for (const [code, budget, expected] of [[3, 2000, 1], [5, 2000, 1], [7, 2000, 1],
-    [9, 2000, 1], [16, 2000, 1], [14, 2000, 3], [4, 2000, 3], [14, 1, 1]]) {
-    let attempts = 0;
-    const error = { code };
-    await assert.rejects(retryCreditRpc(async () => { attempts++; throw error; },
-      { deadline: Date.now() + budget }), value => value === error);
-    assert.equal(attempts, expected);
-  }
 });

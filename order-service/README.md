@@ -278,7 +278,7 @@ TEST_DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:55435/order
   npm run test:order:integration
 ```
 
-Expected: **23 auth/HTTP/domain/adapter tests and 24 database integration tests pass**. The
+Expected: **22 auth/HTTP/domain/adapter tests and 24 database integration tests pass**. The
 integration runner applies committed migrations and executes both read and core
 command suites sequentially. It creates test users/supplier snapshots and a
 test-only idempotent credit ledger inside the test process. No real User,
@@ -358,9 +358,10 @@ including current reservation lookup and automatic retries. Credit now lives at
 authority; regenerate their types after contract changes.
 
 To opt in when running REST locally, set `CREDIT_GRPC_ADDR=127.0.0.1:50054`,
-`CREDIT_ORDER_SERVICE_TOKEN` to the Order credential, and `CREDIT_GRPC_CA_PATH` to
-the trusted Credit server CA/certificate. `CREDIT_RPC_TIMEOUT_MS` defaults to 3000
-and bounds the whole RPC, including shared-client retries after that PR merges.
+`CREDIT_ORDER_SERVICE_TOKEN` to the Order credential. Only set `CREDIT_GRPC_CA_PATH`
+when Credit runs with TLS, using the trusted CA/certificate supplied by its operator.
+Leave it unset for local loopback plaintext testing. `CREDIT_RPC_TIMEOUT_MS` defaults
+to 3000 and bounds the whole RPC, including retries performed by the shared client.
 Credentials are sent as `x-credit-service-token` on every call. Production and
 non-loopback connections require TLS. In containers use the Credit service DNS
 name with a matching certificate SAN, mount the CA read-only, and inject these
@@ -388,7 +389,9 @@ There is no additional requester confirmation before courier delivery settlement
 
 ## Verification after merging main
 
-The merged Credit ledger can be tested with Order persistence over real gRPC.
+After integrating feat/credit-implementation, its Credit ledger can be tested with
+Order persistence over real gRPC. The old Credit implementation is no longer supported
+by this suite; use the external-branch command below before integration.
 User/Supplier snapshots remain test doubles in this suite; it does not certify
 registration hooks or a complete deployed system. Use two separate dedicated test
 databases, never the normal service databases:
@@ -401,7 +404,8 @@ CREDIT_TEST_DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:5543
   npm run test:credit-integration --workspace @foc/order-service
 ```
 
-The three compatibility tests check reserve/publication and one-time settlement,
+The four compatibility tests check missing-account/duplicate event initialization,
+reserve/publication and one-time settlement,
 cancellation without an extra balance grant, and picked-up expiry plus the distinction
 between historical mutation receipts and current reservation state. Test migrations
 are applied only to these explicitly named test databases. Run this suite separately
@@ -414,14 +418,14 @@ Order's pickup snapshot. The separate pending-intent race policy is still not wi
 to the REST row-lock implementation; no queue priority or reward editing is claimed.
 
 
-## Compatibility with unmerged feat/credit-implementation
+## Compatibility with feat/credit-implementation
 
-Order now owns up to three identical RPC attempts, with 100ms/200ms backoff,
-for UNAVAILABLE, ABORTED and DEADLINE_EXCEEDED only. All attempts share one
-CREDIT_RPC_TIMEOUT_MS deadline. Shared-client retries are disabled to prevent
-nested retries. Exhausted or ambiguous mutations remain pending; current
-GetReservation state is still checked before order publication. The camelCase
-RPC fields and x-credit-service-token credential match this branch.
+Retries happen in the shared gRPC client for UNAVAILABLE, ABORTED and
+DEADLINE_EXCEEDED, within one CREDIT_RPC_TIMEOUT_MS deadline. Order does not add
+per-call retries. Exhausted or ambiguous mutations remain pending; CreditOperation
+and retryPendingCredits still provide durable workflow recovery. Current
+GetReservation state is checked before order publication. The camelCase RPC fields
+and x-credit-service-token credential match this branch.
 
 The new Credit implementation initializes accounts through user.created, not
 InitCredits RPC. Order does not create accounts. Until the User/broker integration
