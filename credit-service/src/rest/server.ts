@@ -5,6 +5,9 @@
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../../ai/usage-log.md, entries 005–026 (prior scopes retained).
 // Changes in entry 026: Pending human review; prior review markers apply to earlier content.
+// Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Added public database health and omitted internal history sequence IDs from REST entries.
+// New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
 
 import { createServer, type ServerResponse } from 'node:http';
 import { status } from '@grpc/grpc-js';
@@ -24,11 +27,16 @@ function optionalQuery(query: URLSearchParams, name: string): string | undefined
   return values[0];
 }
 
-export function createRestServer(service: CreditService, publicKeyPem: string) {
+export function createRestServer(service: CreditService, publicKeyPem: string, pingDatabase: () => Promise<boolean>) {
   const identify = userTokenVerifier(publicKeyPem);
   return createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? '/', 'http://credit-service');
+      if (request.method === 'GET' && url.pathname === '/health') {
+        const dbUp = await pingDatabase();
+        json(response, dbUp ? 200 : 503, { status: dbUp ? 'ok' : 'degraded', db: dbUp ? 'up' : 'down' });
+        return;
+      }
       if (request.method !== 'GET' || !['/credits/me/balance', '/credits/me/history'].includes(url.pathname)) {
         json(response, 404, { error: 'Not Found', message: 'Endpoint not found.' });
         return;
@@ -43,7 +51,8 @@ export function createRestServer(service: CreditService, publicKeyPem: string) {
           userId, pageSize: rawSize === undefined ? undefined : Number(rawSize),
           pageToken: optionalQuery(url.searchParams, 'pageToken'),
         });
-        json(response, 200, result);
+        const entries = result.entries.map(({ sequenceId: _sequenceId, ...entry }) => entry);
+        json(response, 200, { entries, nextPageToken: result.nextPageToken });
       }
     } catch (error) {
       if (error instanceof AuthenticationError) {

@@ -2,8 +2,8 @@
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Added human-finalized credit wrappers and bounded application retries with one overall deadline and configurable backoff.
 // Author review: Pending human review.
-// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 010–012, 016, 021, 026 and 027.
-// Changes in entries 026–027: Pending human review; prior review markers apply to earlier content.
+// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 010–012, 016, 021, 026–027 and 029.
+// Changes in entries 026–027 and restoration in 029: Pending human review; prior review markers apply to earlier content.
 // AI-generated additions; human review pending.
 
 import {

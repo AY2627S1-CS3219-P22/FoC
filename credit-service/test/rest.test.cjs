@@ -5,6 +5,9 @@
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../ai/usage-log.md, entries 005–026 (prior scopes retained).
 // Changes in entry 026: Pending human review; prior review markers apply to earlier content.
+// Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Covered public health responses and omission of internal history sequence IDs.
+// New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -53,7 +56,7 @@ test('matched REST routes authenticate before business logic and derive user sco
         type: 'INITIAL_GRANT', totalAmountChange: 10, totalReservedChange: 0, createdAt: new Date('2026-10-20T00:00:00.000Z') }], nextPageToken: null };
     },
   };
-  const server = createRestServer(service, publicKey.export({ type: 'spki', format: 'pem' }));
+  const server = createRestServer(service, publicKey.export({ type: 'spki', format: 'pem' }), async () => true);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const origin = 'http://127.0.0.1:' + server.address().port;
@@ -73,7 +76,10 @@ test('matched REST routes authenticate before business logic and derive user sco
   const data = await page.json();
   assert.equal(data.nextPageToken, null);
   assert.equal(data.entries[0].userId, 'student');
-  assert.equal(data.entries[0].sequenceId, '9007199254740993');
+  assert.equal(Object.hasOwn(data.entries[0], 'sequenceId'), false);
+  assert.deepEqual(Object.keys(data.entries[0]).sort(), [
+    'id', 'userId', 'orderId', 'reservationId', 'type', 'totalAmountChange', 'totalReservedChange', 'createdAt',
+  ].sort());
   assert.equal(data.entries[0].createdAt, '2026-10-20T00:00:00.000Z');
   assert.equal(data.entries[0].orderId, null);
   assert.deepEqual(calls, [{ userId: 'student' }, { userId: 'student', pageSize: 2, pageToken: 'bookmark' }]);
@@ -94,7 +100,7 @@ test('REST reports account/database failures and logs unexpected service errors,
   t.mock.method(console, 'error', (...args) => logged.push(args));
   const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   let failure;
-  const server = createRestServer({ async getBalance() { throw failure; } }, publicKey.export({ type: 'spki', format: 'pem' }));
+  const server = createRestServer({ async getBalance() { throw failure; } }, publicKey.export({ type: 'spki', format: 'pem' }), async () => true);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const headers = { authorization: 'Bearer ' + jwt.sign({ sub: 'student' }, privateKey, { algorithm: 'RS256', expiresIn: 60 }) };
@@ -126,7 +132,7 @@ test('unknown REST paths return 404 without authentication; both known GET route
     async getBalance() { calls += 1; throw new Error('Must not reach service'); },
     async getUserCreditHistory() { calls += 1; throw new Error('Must not reach service'); },
   };
-  const server = createRestServer(service, publicKey.export({ type: 'spki', format: 'pem' }));
+  const server = createRestServer(service, publicKey.export({ type: 'spki', format: 'pem' }), async () => true);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const origin = 'http://127.0.0.1:' + server.address().port;
@@ -144,7 +150,7 @@ test('unknown REST paths return 404 without authentication; both known GET route
 test('known limitation: unsupported REST methods return 404 rather than 405, even without a token', async (t) => {
   const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const service = { async getBalance() { assert.fail('Wrong method must not call business logic'); } };
-  const server = createRestServer(service, publicKey.export({ type: 'spki', format: 'pem' }));
+  const server = createRestServer(service, publicKey.export({ type: 'spki', format: 'pem' }), async () => true);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const origin = 'http://127.0.0.1:' + server.address().port;
@@ -154,4 +160,33 @@ test('known limitation: unsupported REST methods return 404 rather than 405, eve
       assert.equal((await fetch(origin + path, { method: 'POST', headers })).status, 404);
     }
   }
+});
+
+
+test('public GET /health follows User and Order database health responses without authentication', async (t) => {
+  const { publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  let dbUp = true;
+  let probes = 0;
+  const service = {
+    async getBalance() { assert.fail('Health must not read balances'); },
+    async getUserCreditHistory() { assert.fail('Health must not read history'); },
+  };
+  const server = createRestServer(service, publicKey.export({ type: 'spki', format: 'pem' }), async () => {
+    probes += 1;
+    return dbUp;
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const url = 'http://127.0.0.1:' + server.address().port + '/health';
+  for (const headers of [{}, { authorization: 'Bearer invalid' }]) {
+    const response = await fetch(url, { headers });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { status: 'ok', db: 'up' });
+  }
+  dbUp = false;
+  const degraded = await fetch(url);
+  assert.equal(degraded.status, 503);
+  assert.deepEqual(await degraded.json(), { status: 'degraded', db: 'down' });
+  assert.equal((await fetch(url, { method: 'POST' })).status, 404);
+  assert.equal(probes, 3);
 });

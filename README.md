@@ -3,7 +3,14 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Added and updated the final AI Use Summary section; existing project content was not generated in these exchanges.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: credit-service/ai/usage-log.md, entries 001–028.
+Prompts and key responses: credit-service/ai/usage-log.md, entries 001–033.
+Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Updated the consolidated disclosure for constraints, health, history replies and internal reference removal.
+New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
+Entry 032: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded local Git exclusions; human review pending.
+Entry 033: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Corrected Credit REST port status and recorded README verification; human review pending.
 -->
 
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
@@ -63,7 +70,7 @@ the same inside and outside containers to make service configuration predictable
 | User service | 3001 | 50051 |
 | Supplier service | 3002 | 50052 |
 | Order service | 3003 (reserved) | 50053 |
-| Credit service | 3004 (reserved) | 50054 |
+| Credit service | 3004 | 50054 |
 
 PostgreSQL containers continue to listen on `5432` internally. Host mappings
 may differ when databases share a machine, for example supplier Postgres uses
@@ -83,7 +90,7 @@ Earlier or other team usage has not yet been supplied for this summary.
   debugging/testing, refactoring, documentation, and explanations.
 - **Scope:** Repository AI-use rules and service-local logs; archiving the human's
   requirements and design; Docker/PostgreSQL 17 setup; human-specified SQL schema,
-  six migrations and pg tooling; shared credit proto/client/generated types;
+  seven migrations and pg tooling; shared credit proto/client/generated types;
   replacement of InitCredits RPC with the internal user.created allocation
   callback; account/reservation/history/idempotency repositories; initialization,
   balance/reservation reads, reserve/update/release/settle transactions; specified
@@ -98,6 +105,8 @@ Earlier or other team usage has not yet been supplied for this summary.
   and full-reservation lookup responses; bounded shared Credit client retries
   with client/per-call settings and one overall deadline; no-write same-courier
   settlement fallback and different-courier conflicts when retry records are absent;
+  local Postman REST/gRPC demos and tests-first Order/Credit/concurrent-acceptance
+  collections, temporary-script exclusion and demo preparation instructions;
   corresponding docs and disclosures. RabbitMQ startup and User
   Service publication are assigned to teammates and not wired by this work.
   Credit retries use the human's three-attempt, 1,300 ms defaults and specified
@@ -107,8 +116,15 @@ Earlier or other team usage has not yet been supplied for this summary.
   prioritization, backlog/sprint planning, architecture/design decisions, decision
   rationales, trade-off analyses, or risk justifications were generated.
 - **Prompts and key exchanges:** [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md)
-  links exact prompts and key outputs for entries 001–028. The latest exchange
-  records the human-defined settled-reservation fallback and regression checks.
+  links exact prompts and key outputs for entries 001–033. Exchange 033 checks
+  the service README against current health/API/schema/event code. Exchange 032 moves
+  personal exclusions into local Git metadata. Exchange 031 records positive database checks, internal-only history sequence IDs, public
+  database health and untracking internal references. History CHECKs enforce the
+  human-confirmed operation deltas and exact 10-credit initial grant. Entry 030
+  records the human's Postman scenarios, Order branch selection and tests-first
+  integration scope. Entry 029 records restoration of the original shared Credit
+  retry code, tests and README sections. Entry 028 records the
+  human-defined settled-reservation fallback and regression checks.
   Entry 027 records the shared Credit retry settings and checks.
   Entry 026 records balance user IDs and full Reservation
   lookup responses for Order Service integration.
@@ -116,14 +132,22 @@ Earlier or other team usage has not yet been supplied for this summary.
   attribution comments.
   The human approved the [service README attribution table](credit-service/README.md#attribution-for-json-files)
   for comment-free package.json/package-lock.json changes.
-- **Verification and review:** Full workspace build, 77 credit tests against
+- **Verification and review:** Latest workspace build, 84 credit tests against
   PostgreSQL/local listeners, and 51 shared contract/transport/retry tests passed,
-  with zero failures/skips. A scoped Node report from exchange 022, before the
+  with zero failures/skips. New checks cover migration rollback, direct SQL
+  amount/version rejections, public health and REST paging against database order.
+  Migration 007 is applied to the local Credit database. A scoped Node report
+  from exchange 022, before the
   layout relocation, for implemented credit core/API
   source reported 98.29% lines/94.44% branches; startup/env/generated code was
-  excluded. Migration 006 is applied locally. Earlier Docker build/start and
+  excluded. Earlier Docker build/start and
   no-write runtime authentication/trailer checks passed on ports 3004/50054. Prior checks
-  remain in the log. Human review and validation are pending; agent checks do
+  remain in the log. Entry 030 Postman verification passed 187 actual REST assertions;
+  44 gRPC requests/84 assertions passed through a local adapter against real
+  Credit, including restart persistence. All four updated collections pass lint,
+  and 103 scripts parse; native Postman gRPC execution still requires login here. Order/Credit
+  and concurrency await Order's existing User/Supplier integrations and were
+  not verified live. Human review and validation are pending; agent checks do
   not establish author approval.
 - **Sources/licensing:** Consulted official [PostgreSQL 17](https://www.postgresql.org/docs/17/index.html),
   [PostgreSQL Docker image](https://github.com/docker-library/docs/blob/master/postgres/README.md),

@@ -4,17 +4,22 @@
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../ai/usage-log.md, entries 005–025 (prior scopes retained).
+// Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Verified REST pagination against database ordering without exposing sequence IDs.
+// New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { readFile } = require('node:fs/promises');
 const { join } = require('node:path');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, generateKeyPairSync } = require('node:crypto');
+const jwt = require('jsonwebtoken');
 const { Client, Pool } = require('pg');
 require('tsx/cjs');
 const { ValidationError } = require('../src/services/validation.ts');
 const { CreditService } = require('../src/services/CreditService.ts');
 const { SqlCreditRepository } = require('../src/repos/SqlCreditRepository.ts');
+const { createRestServer } = require('../src/rest/server.ts');
 
 const migrations = ['001_initial.sql', '002_align_credit_contract.sql', '003_uppercase_reservation_status.sql', '004_reservation_invariants.sql'];
 const latest = '006_history_types_and_paging.sql';
@@ -32,9 +37,9 @@ test('history migration and sequence paging use the human-defined labels and acc
     try { await client.query(sql); await client.query('COMMIT'); }
     catch (error) { await client.query('ROLLBACK'); throw error; }
   };
-  const insert = async (type, change = 0, userId = 'legacy') => client.query(
-    'INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change) VALUES ($1, $2, $3, 0) RETURNING id',
-    [userId, type, change],
+  const insert = async (type, change = 0, userId = 'legacy', reserved = 0) => client.query(
+    'INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change) VALUES ($1, $2, $3, $4) RETURNING id',
+    [userId, type, change, reserved],
   );
   try {
     await client.connect(); connected = true;
@@ -60,7 +65,7 @@ test('history migration and sequence paging use the human-defined labels and acc
 
     await t.test('one migration converts all legacy types and creates the exact sequence and grant indexes', async () => {
       const expected = ['INITIAL_GRANT', 'RESERVED', 'RESERVATION_UPDATED', 'RELEASED', 'TRANSFER_OUT', 'TRANSFER_IN'];
-      for (const [type, change] of [['init_credits', 10], ['reserve', 0], ['update', 0], ['release', 0], ['transfer', -3], ['transfer', 3]]) await insert(type, change);
+      for (const [type, change, reserved] of [['init_credits', 10, 0], ['reserve', 0, 3], ['update', 0, -1], ['release', 0, -2], ['transfer', -3, -3], ['transfer', 3, 0]]) await insert(type, change, 'legacy', reserved);
       await apply(latest);
       const rows = (await client.query('SELECT * FROM credit_history ORDER BY sequence_id')).rows;
       assert.deepEqual(rows.map((row) => row.type).sort(), expected.sort());
@@ -79,6 +84,8 @@ test('history migration and sequence paging use the human-defined labels and acc
       }
       await assert.rejects(client.query("INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change, sequence_id) VALUES ('other', 'RESERVED', 0, 1, 999)"), (error) => error.code === '428C9');
     });
+
+    await apply('007_credit_delta_constraints.sql');
 
     await t.test('sequence boundary excludes writes during paging and preserves bigint precision', async () => {
       const service = new CreditService(pool);
@@ -137,6 +144,44 @@ test('history migration and sequence paging use the human-defined labels and acc
       await assert.rejects(service.getUserCreditHistory({ userId: 'other', pageToken: first.nextPageToken }), ValidationError);
     });
 
+    await t.test('REST pages omit sequence IDs and match database sequence order across a later write', async () => {
+      const service = new CreditService(pool);
+      const userId = randomUUID();
+      await service.initCredits({ userId });
+      for (let i = 0; i < 3; i += 1) {
+        const orderId = randomUUID();
+        await service.reserveCredits({ orderId, requesterId: userId, amount: 1 });
+        await service.releaseCredits({ orderId });
+      }
+      const expected = (await client.query(
+        'SELECT id, sequence_id FROM credit_history WHERE user_id = $1 ORDER BY sequence_id DESC', [userId],
+      )).rows;
+      assert.ok(expected.every((row) => BigInt(row.sequence_id) > 9007199254740992n));
+      const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      const server = createRestServer(service, publicKey.export({ type: 'spki', format: 'pem' }), async () => true);
+      await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const origin = 'http://127.0.0.1:' + server.address().port;
+      const headers = { authorization: 'Bearer ' + jwt.sign({ sub: userId }, privateKey, { algorithm: 'RS256', expiresIn: 60 }) };
+      const seen = [];
+      let token;
+      try {
+        do {
+          const response = await fetch(origin + '/credits/me/history?pageSize=2' + (token ? '&pageToken=' + encodeURIComponent(token) : ''), { headers });
+          assert.equal(response.status, 200);
+          const page = await response.json();
+          for (const entry of page.entries) {
+            assert.equal(Object.hasOwn(entry, 'sequenceId'), false);
+            assert.equal(Object.hasOwn(entry, 'sequence_id'), false);
+            seen.push(entry.id);
+          }
+          if (!token) await service.reserveCredits({ orderId: randomUUID(), requesterId: userId, amount: 1 });
+          token = page.nextPageToken;
+        } while (token);
+        assert.deepEqual(seen, expected.map((row) => row.id));
+        assert.equal(new Set(seen).size, expected.length);
+      } finally { await new Promise((resolve) => server.close(resolve)); }
+    });
+
     await t.test('an uncommitted history writer holds the user account lock through commit', { timeout: 10000 }, async () => {
       const service = new CreditService(pool);
       const userId = randomUUID();
@@ -147,7 +192,7 @@ test('history migration and sequence paging use the human-defined labels and acc
       let pending;
       try {
         await client.query('SELECT user_id FROM credit_accounts WHERE user_id = $1 FOR UPDATE', [userId]);
-        const { rows: [late] } = await client.query("INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change) VALUES ($1, 'RESERVATION_UPDATED', 0, 0) RETURNING sequence_id", [userId]);
+        const { rows: [late] } = await client.query("INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change) VALUES ($1, 'RESERVATION_UPDATED', 0, 1) RETURNING sequence_id", [userId]);
         pending = service.updateReservation({ orderId, amount: 3, expectedVersion: 1 });
         // The page query can see committed rows while the later insert remains invisible.
         const reader = await pool.connect();

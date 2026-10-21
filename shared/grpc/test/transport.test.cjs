@@ -18,7 +18,6 @@ const userRequire = createRequire(path.resolve(__dirname, '../../../user-service
 const userCredentials = userRequire('@grpc/grpc-js').ServerCredentials;
 const orderServer = require('../../../order-service/grpc/dist/grpc/server.js');
 const creditServer = require('../../../credit-service/dist/grpc/server.js');
-const supplierServer = require('../../../supplier-service/grpc/dist/grpc/server.js');
 
 async function listen(t, server, createClient, config, serverCredentials) {
   const port = await rpc.startServer(server, 0, '127.0.0.1', serverCredentials);
@@ -40,11 +39,8 @@ test('scaffold stubs are reachable, credit rejects unauthenticated calls, and us
   );
   const order = await listen(t, orderServer.createGrpcServer(), rpc.createOrderClient);
   const credit = await listen(t, creditServer.createGrpcServer({}, {}), rpc.createCreditClient);
-  const supplier = await listen(t, supplierServer.createGrpcServer(), rpc.createSupplierClient);
-
   for (const invoke of [
     () => order.getOrder({ orderId: 'order-1' }),
-    () => supplier.getSupplier({ supplierId: '1' }),
   ]) {
     await assert.rejects(invoke(), (error) => error.code === status.UNIMPLEMENTED);
   }

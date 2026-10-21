@@ -3,7 +3,14 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–028 below and the linked prompt archives.
+Prompts and key responses: Entries 001–033 below and the linked prompt archives.
+Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Recorded the latest implementation request, changes and actual verification.
+New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
+Entry 032: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded the human-requested move to local Git exclusions; review pending.
+Entry 033: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded source-based README verification and documentation corrections; review pending.
 -->
 
 # AI usage log
@@ -12,6 +19,9 @@ Maintain this credit-service log throughout implementation. Archive substantive 
 verbatim, including follow-ups and corrections, and record key responses and
 actual outcomes. Do not infer human approval from agent-run checks. This log
 starts with the exchange below; it does not establish earlier team AI history.
+Historical affected-path mentions include three internal reference documents that
+were untracked in exchange 031. Those mentions record past work, not required
+submission files; retained disclosure content is under this ai directory.
 
 ## 001 — Disclosure setup
 
@@ -1388,6 +1398,183 @@ starts with the exchange below; it does not establish earlier team AI history.
   Read root AGENTS.md and the empty credit-service/AGENTS.md. Used the human's
   explicit behavior and repository code; no external source, copied third-party
   implementation, dependency, skill, delegation, commit, push or deployment.
+
+## 029 — Restore the original shared Credit retries
+
+- **Timestamp:** 2026-10-21 19:29–19:31 SGT (UTC+08:00).
+- **Tool/model and modes:** OpenAI Codex, GPT-6; restoration/refactoring of the
+  human-finalized implementation, regression verification and documentation.
+- **Exact prompt/key responses:** [Retry restoration request and key
+  response](prompts/029-restore-shared-client-retries.md).
+- **Human-defined change:** Restore the previously implemented shared Credit
+  retries, tests and README sections. The original settings in entry 027 apply;
+  no new retry policy was selected by AI.
+- **Key output:** Restored only the three remaining uncommitted removal edits
+  from HEAD 68c12a0: shared clients and shared/service READMEs. All six Credit
+  wrappers again use the original three-attempt loop, 1,300 ms default total
+  budget, 50 ms base, multiplier 2, cap 500 ms, half-base plus random-half jitter,
+  configurable client/per-call overrides, fixed overall/upstream deadline checks,
+  and unchanged final errors. The existing 43-check retry suite was already
+  present and byte-identical to HEAD; retained it without rewriting tests.
+  Settlement fallback/user.created handler changes remain untouched. Restored
+  runtime source and README content match HEAD except updated attribution links.
+  Historical rollback log files that the human undid were not recreated.
+- **Affected locations:** shared/grpc/src/clients.ts; shared/grpc/README.md;
+  credit-service/README.md; this log and prompt archive 029; root README final
+  AI Use Summary. Retry tests were verified and retained unchanged.
+- **Agent verification:** Full workspace build, all 51 shared checks (including
+  the 43 retry checks), and all 77 credit checks against PostgreSQL/local
+  listeners passed with zero failures/skips. Retry tests cover all six methods,
+  request/metadata/error preservation, code selection, growth/capping/jitter,
+  configuration precedence and shared/upstream/expired deadlines. Business
+  tests still cover the no-write settlement fallback. Test schemas are removed
+  afterward; no application-data writes. Diff whitespace and runtime-source
+  equality with the committed implementation checked.
+- **Human review/sources/instructions:** Changes await human review. Read root
+  AGENTS.md and the empty credit-service/AGENTS.md. Used the human's request and
+  existing repository implementation. No external source, copied third-party
+  implementation, new dependency, skill, delegation, commit, push or deployment.
+
+## 030 — Local Postman Credit and Order/Credit demos
+
+- **Timestamp:** Verification and cleanup completed 2026-10-21 23:18 SGT
+  (UTC+08:00); documentation finalized in the same session.
+- **Tool/model and modes:** OpenAI Codex, GPT-6; implementation of tests against
+  human-finalized behavior, test scaffolding, debugging and documentation.
+- **Exact prompts/key responses:** [Full demo list, exact clarification answers,
+  responses and actual outcomes](prompts/030-postman-demo-tests.md).
+- **Human-defined scope:** Separate freshly reset REST/gRPC/Order fixtures;
+  register/login A/B/C/D, seed only A/B/C using the existing temporary script;
+  all enumerated Credit operations, replay/error/auth/paging/restart cases;
+  Order idempotency/lifecycle/outage recovery with Credit balance/history after
+  each online step; test A's bookmark with B's JWT. Human selected the
+  feature/order-create branch and confirmed writing shared tests before its
+  missing integrations are ready. No new application behavior was defined.
+- **Key output/affected paths:** postman/README.md; scripts/{build-demo,prepare-demo}.py;
+  four generated native v3 YAML collection trees under postman/collections
+  (18 REST, 44 gRPC, 29 Order/Credit and one concurrency request definition);
+  .gitignore explicit credit-service/scripts/seeduser.js exclusion; this log,
+  prompt archive 030 and root README final disclosure. The seed remains unchanged
+  and untracked. Existing postman/.postman ignores were preserved, so demo
+  artifacts are local-only. All generated text files have supported comment
+  headers; no comment-free JSON attribution exception was needed.
+- **Preparation/demo behavior:** The helper uses existing User REST and the
+  supplied seed script, keeps generated synthetic credentials in local YAML,
+  and never resets databases. Paging setup creates 26 reserve/release pairs;
+  REST follows all 53 rows with a native request loop and verifies default 50.
+  Restart/outage steps are manual. Shared tests follow local Order branch
+  commit 538ae88 and record its existing UserDirectory/SupplierDirectory/
+  CreditGateway prerequisites. Concurrent acceptance starts B/C HTTP requests
+  before awaiting either and checks one winner and unchanged credit hold.
+- **Agent verification:** All four collections pass official v3 schema checks
+  and Postman CLI lint; 102 generated scripts parse; both Python files compile.
+  Actual CLI REST runs passed 13 baseline + five duplicate-seed + 169 final
+  pagination/validation assertions. All 44 gRPC requests and 84 assertions pass
+  against real Credit using a temporary local script-API adapter, including
+  restart persistence. Native Postman gRPC execution requires login here and
+  was not run; no cloud login/publication/reporting. Order/Credit and concurrency
+  remain lint/schema/parse checked, not live-integration verified. Initial paging
+  setup-order failure and its corrected rerun are recorded in the prompt archive.
+  Existing service test/build figures are historical, not new runs for this task.
+- **Cleanup:** Removed only the synthetic verification Credit rows and used
+  local environment files. Removed the isolated User verification Docker
+  project/volume created for these checks. Existing databases were not wiped;
+  Credit was restarted without changing its data. No unrelated human edits
+  were overwritten. Whitespace and seed/Postman ignore checks performed.
+- **Sources/instructions/review:** Used root AGENTS.md, empty service instructions,
+  local CLI help, repository source and official Postman docs/schema linked in
+  the demo README. No third-party implementation copied, project dependency,
+  skill/plugin, delegation, staging/commit, push or remote deployment. New
+  outputs await human review; agent checks do not establish author validation.
+
+## 031 — Database constraints, public history, health and local references
+
+- **Timestamp:** 2026-10-22 00:08 SGT (UTC+08:00); request received across the
+  previous day's session boundary.
+- **Tool/model and modes:** OpenAI Codex, GPT-6; implementation/tests against
+  supplied behavior, bounded clarification, debugging and documentation.
+- **Exact prompt/key responses:** [Verbatim request, confirmed history-sign
+  clarification and actual outputs](prompts/031-constraints-history-health.md).
+- **Human-defined changes:** Positive reservation amount/version constraints;
+  history-sign checks (exact SQL combinations confirmed, grant exactly 10); internal-only
+  history sequence IDs with database-backed tests; untrack three exact internal
+  reference files; public health following existing User/Order behavior.
+- **Affected paths:** migrations/007_credit_delta_constraints.sql;
+  test/{constraints,history,rest}.test.cjs; src/rest/server.ts and src/index.ts;
+  service/shared/root README updates; .gitignore; prompt archive 003 attachment
+  links; this log and archive 031; local ignored postman README, generator,
+  preparation helper and regenerated collection YAML. Only the three requested
+  document removals were staged by git rm --cached; their files remain locally.
+  Unrelated ongoing human edits were preserved, including shared transport tests.
+- **Implementation:** PostgreSQL validates amount/version > 0 on inserts and
+  updates. New migration rejects invalid existing rows transactionally without
+  deleting/repairing them. Applied migrations are unchanged, and local application
+  database migration 007 was subsequently applied successfully. REST removes sequenceId at the public
+  serialization boundary; internal repository fields and paging tokens remain.
+  The DB-backed HTTP test checks public entry order and late-write exclusion.
+  Postman preparation reads expected IDs ordered by sequence_id directly from PG.
+  Health probes SELECT 1 without JWT and returns User/Order's 200 ok/up or
+  503 degraded/down JSON. Historical path mentions/exact prompts remain in the
+  AI archives; broken active links to local-only reference copies were removed.
+- **Agent verification:** Workspace build passed; 84 Credit checks passed using
+  isolated PostgreSQL schemas and localhost listeners, with zero failures/skips;
+  all 51 shared checks passed. The initial sandboxed shared run failed eight
+  listener checks with EPERM; permitted rerun passed all checks. Both Python
+  helpers compile; 110 YAML files pass the retained official v3 schema;
+  103 generated Postman scripts parse; all four CLI collection
+  lint runs have zero errors/warnings (19/44/29/1 request definitions). Existing
+  historical live Postman figures belong to entry 030, not a new live run.
+  All three removed-from-index documents remain on disk and are explicitly
+  ignored. Seed exclusion remains; no credentials read or new runtime seed used.
+- **Limitations/review:** The human confirmed the exact history signs and an initial grant of exactly
+  10. New code/docs/tests await human review.
+  Full diff whitespace checking reports one concurrent human edit in shared
+  transport.test.cjs; this task's scoped changes have no whitespace errors.
+  Existing Order demo prerequisites remain; no live combined Order run claimed.
+- **Sources/instructions:** Root AGENTS.md and existing local source/Order branch
+  health implementation; CLI help and previously retained Postman schema only.
+  No new external source, third-party implementation, dependency, skill, agent,
+  commit, push, publishing or deployment. AI attribution remains in ai/ and the
+  final README section; internal design/requirements copies are not required
+  attribution artifacts.
+
+## 032 — Keep personal exclusions out of shared Git rules
+
+- **Date/timezone:** 2026-10-22, Asia/Singapore (UTC+08:00).
+- **Tool/model/mode:** OpenAI Codex, GPT-6; repository housekeeping and disclosure.
+- **Exact prompt/key response:** [Verbatim request and result](prompts/032-local-git-exclusions.md).
+- **Changes:** Removed the listed reference-document entries from .gitignore;
+  both demo-directory entries were already absent there. Local .git/info/exclude
+  now covers the five requested paths, plus the previously designated temporary
+  seed script. All requested paths were already untracked. Retained the staged
+  three-document removals from entry 031, and preserved every local copy.
+- **Affected paths:** .gitignore; local-only .git/info/exclude; this log and archive
+  032; root README final disclosure. Unrelated edits preserved.
+- **Checks:** Inspected index/status, exact ignore-rule origins, local existence,
+  absence of these paths in shared .gitignore, and scoped whitespace. No application
+  behavior changed; no application tests required or rerun.
+- **Review/provenance:** Human review pending. Used root AGENTS.md and local Git;
+  no external sources, skill, delegation, new dependency, commit or push.
+
+## 033 — Check README coverage of current behavior
+
+- **Date/timezone:** 2026-10-22, Asia/Singapore (UTC+08:00).
+- **Tool/model/mode:** OpenAI Codex, GPT-6; documentation review/improvement.
+- **Exact prompt/key responses:** [README review request and findings](prompts/033-readme-review.md).
+- **Changes:** Verified health authentication/probe/status/payload against code;
+  clarified existing-container rebuild and current Compose healthcheck coverage;
+  documented existing optional event metadata/delivery shape; listed latest
+  health/constraint/history regressions and dated their prior test results;
+  corrected root README's Credit REST port status. Existing latest API/schema/
+  retry/replay documentation already matched code.
+- **Affected paths:** credit-service/README.md; root README final disclosure/port
+  table; this log and prompt archive 033. No application or configuration changes.
+- **Checks:** Compared REST/startup/event/domain/retry/schema source and existing
+  tests, public examples, Dockerfile and Compose; scoped whitespace and local
+  Markdown links checked. No tests rerun or container rebuild performed. Previous
+  84 Credit/51 shared results belong to exchange 031, not this documentation task.
+- **Review/sources:** Human review pending; root AGENTS.md and existing repository
+  files only. No external source, skill, delegation, dependency, commit or push.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the

@@ -4,6 +4,9 @@
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../ai/usage-log.md, entries 005–024 (prior scopes retained).
+// Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Connected REST health to a PostgreSQL SELECT 1 probe.
+// New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
 
 import { startServer, stopServer } from '@foc/grpc';
 import { readFile } from 'node:fs/promises';
@@ -21,7 +24,14 @@ async function main(): Promise<void> {
   pool.on('error', () => console.error('Credit database idle connection error'));
   const service = new CreditService(pool);
   const server = createGrpcServer(service, { 'order-service': env.CREDIT_ORDER_SERVICE_TOKEN });
-  const rest = createRestServer(service, publicKeyPem);
+  const rest = createRestServer(service, publicKeyPem, async () => {
+    try {
+      await pool.query('SELECT 1');
+      return true;
+    } catch {
+      return false;
+    }
+  });
   let port: number;
   try {
     port = await startServer(server, env.GRPC_PORT, env.GRPC_HOST, credentials);
