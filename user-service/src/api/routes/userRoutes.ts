@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/requireRole';
 import { registerSchema } from '../dto/registerDto';
 import { loginSchema } from '../dto/loginDto';
 import { updateProfileSchema } from '../dto/updateProfileDto';
+import { otpRequestSchema, otpStringSchema } from '../dto/otpDto';
 import * as userController from '../controllers/userController';
 
 export const userRouter = Router();
@@ -38,6 +39,8 @@ userRouter.post('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userCo
 
 // DELETE /users/:id/admin
 userRouter.delete('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userController.revokeAdmin);
-userRouter.post('/otp/request', userController.sendOTPRequest);
 
-userRouter.post('/otp/verify', userController.verifyOTP);
+
+userRouter.post('/:id/otp/request', authenticate, userController.sendOTPRequest);
+
+userRouter.post('/:id/otp/verify', authenticate, userController.verifyOTP);

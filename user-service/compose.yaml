@@ -90,8 +90,8 @@ services:
     container_name: mailpit
     restart: always
     ports:
-      - "8025:8025" # WEB GUI
-      - "1025:1025" # SMTP
+      - "127.0.0.1:8025:8025" # WEB GUI
+      - "127.0.0.1:1025:1025" # SMTP
     volumes:
       - ./mailpit-data:/data  # Separate database
     env_file:
@@ -109,7 +109,7 @@ services:
     container_name: local_redis_cache
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes #persistent data
