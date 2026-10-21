@@ -1,6 +1,7 @@
 import { SUPPLIERS } from "../data/suppliers"
 import { useEffect, useState } from "react"
 import type { User, Order, Page } from "../App"
+import { getSuppliers, type SupplierCard } from "../api/suppliers"
 
 const DELIVERY_LOCATIONS = [
   "PGP", "PGPR Block A", "PGPR Block B", "PGPR Block E",
@@ -70,7 +71,15 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
   }
   const [supplierSearch, setSupplierSearch] = useState("")
   const [supplierType, setSupplierType] = useState("All")
-  const visibleSuppliers = SUPPLIERS.filter((supplier) =>
+  const [suppliers, setSuppliers] = useState<SupplierCard[]>(SUPPLIERS)
+
+  // falls back to the mock list if supplier-service isn't running
+  useEffect(() => {
+    getSuppliers().then(setSuppliers).catch(() => {})
+  }, [])
+
+  const supplierTypes = ["All", ...new Set(suppliers.map((s) => s.type))]
+  const visibleSuppliers = suppliers.filter((supplier) =>
     (supplierType === "All" || supplier.type === supplierType) &&
     `${supplier.name} ${supplier.location}`.toLowerCase().includes(supplierSearch.trim().toLowerCase())
   )
@@ -154,7 +163,7 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
             />
           </div>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Supplier category">
-            {["All", "F&B", "Convenience", "Services", "Retail"].map((type) => (
+            {supplierTypes.map((type) => (
               <button
                 key={type}
                 type="button"

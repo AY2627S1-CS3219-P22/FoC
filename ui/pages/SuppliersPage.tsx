@@ -1,8 +1,6 @@
 import { SUPPLIERS } from "../data/suppliers"
 import React, { useEffect, useState } from "react"
-import { getSuppliers } from "../api/suppliers"
-
-type SupplierCard = { id: string; name: string; location: string; type: string; hours: string }
+import { getSuppliers, type SupplierCard } from "../api/suppliers"
 
 const TYPE_COLORS: Record<string, string> = {
   "F&B":          "bg-orange-50 text-orange-600",
@@ -46,15 +44,7 @@ export default function SuppliersPage() {
   useEffect(() => {
     getSuppliers()
       .then((data) => {
-        setSuppliers(
-          data.map((s) => ({
-            id: String(s.supplierId),
-            name: s.name,
-            location: `${s.buildingName}, Level ${s.floor}`,
-            type: s.type,
-            hours: "",
-          }))
-        )
+        setSuppliers(data)
         setUsingMock(false)
       })
       .catch(() => setUsingMock(true))
