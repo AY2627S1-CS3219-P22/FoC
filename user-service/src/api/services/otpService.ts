@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import {sendEmail} from '../middleware/emailServer'
 import {redis} from '../../redis'
 import {env} from '../../env'
+import {otpRequestInput} from '../dto/otpDto'
 
 const OTP_TTL_SECONDS = 120;
 const REQUEST_WINDOW_SECONDS = 600;
@@ -23,28 +24,28 @@ const MAX_REQUESTS = 3;
 const MAX_ATTEMPTS = 3;
 
 // Shared by every instance of this service. Used only to hash OTPs, never sent out.
-const secret = env.OTP_HASH_SECRET;
+const secret = fs.readFileSync(env.OTP_HMAC_KEY_PATH, 'utf8').trim(); //replaced env pointer with fs readFile
 
 //Helper Functions
-function hashOTP(input: Session, otp: string): string {
+function hashOTP(input: otpRequestInput, otp: string): string {
     return createHmac('sha256', secret!)
       .update(JSON.stringify([input.userId, input.challengeId, otp]))
       .digest('hex');
   }
 
-type Session = { userId: string; challengeId: string };
+
 type Result =
   | { ok: true }
   | {
       ok: false;
-      reason: 'throttled' | 'locked' | 'missing' | 'challenge' | 'mismatch';
+      reason: 'throttled' | 'locked' | 'missing' | 'challenge' | 'mismatch' | 'invalid';
       retryAfterSeconds?: number;
     };
 
 
 
 export async function verifyOTP(
-    input: Session & { otp: string }
+    input: otpRequestInput & { otp: string }
   ): Promise<Result> {
     return updateOTP(
       'verify',
@@ -55,7 +56,7 @@ export async function verifyOTP(
 
 
 export async function sendOTPRequest(
-  input: Session & { email: string }
+  input: otpRequestInput & { email: string }
 ): Promise<Result> {
   const otp = String(randomInt(100000, 1000000));
   const token = randomUUID();
@@ -92,7 +93,7 @@ const OTP_SCRIPT = fs.readFileSync(env.REDIS_OTP_LUA, 'utf8');
 // All keys use one hash slot, so the script also works with Redis Cluster.
 async function updateOTP(
     action: 'send' | 'verify' | 'cancel',
-    input: Session,
+    input: otpRequestInput,
     otpHash = '',
     token = '',
   ): Promise<Result> {

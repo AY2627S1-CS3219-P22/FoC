@@ -6,7 +6,7 @@ import type { RegisterInput } from '../dto/registerDto';
 import type { LoginInput } from '../dto/loginDto';
 import * as userService from '../services/userService';
 import * as otpService from '../services/otpService';
-import { otpStringSchema } from '../dto/otpDto';
+import { otpRequestSchema, type OtpRequestBody, type OtpVerifyBody } from '../dto/otpDto';
 
 // POST /users/register
 export const register: RequestHandler = async (req, res) => {
@@ -69,11 +69,10 @@ export const getUserById: RequestHandler = async (req, res) => {
   res.status(200).json({ user });
 };
 
-// POST /users/:id/otp/request 
-// AI declaration
+// POST /users/:id/otp/request
 export const sendOTPRequest: RequestHandler = async (req, res) => {
   const id = String(req.params.id);
-  const challengeId = String(req.body.challengeId);
+  const { challengeId } = req.body as OtpRequestBody;
 
   try {
     const user = await userService.getProfileById(id);
@@ -82,7 +81,7 @@ export const sendOTPRequest: RequestHandler = async (req, res) => {
       return;
     }
 
-    const result = await otpService.sendOTPRequest({userId: user.id, email: user.email,challengeId,});
+    const result = await otpService.sendOTPRequest({userId: user.id,email: user.email,challengeId,});
 
     if (!result.ok) {
       if (result.retryAfterSeconds) {
@@ -91,28 +90,19 @@ export const sendOTPRequest: RequestHandler = async (req, res) => {
       res.status(429).json({ error: 'Too Many Requests', message: 'Try again after some time.' });
       return;
     }
-    res.status(200).json({ message: `OTP sent to ${user.email}` });
-    return
+    res.status(200).json({ message: 'OTP sent' });
   } catch {
     res.status(500).json({ error: 'Internal Server Error', message: 'Failed to send OTP.' });
   }
 };
 
 // POST /users/:id/otp/verify 
-// AI declaration
+// takes in both the otp and challengeId body
 export const verifyOTP: RequestHandler = async (req, res) => {
   const id = String(req.params.id);
-  const parsedOtp = otpStringSchema.safeParse(req.body);
+  const parsedOtp = otpRequestSchema.safeParse(req.body);
 
-  if ( !parsedOtp.success) {
-    res.status(400).json({
-      error: 'Bad Request',
-      message: 'challengeId and a 6-digit OTP are required.',
-    });
-    return;
-  }
-
-  const {otp, challengeId} = parsedOtp.data; 
+  const { otp, challengeId } = req.body as OtpVerifyBody;
 
   try {
     const user = await userService.getProfileById(id);
@@ -124,7 +114,7 @@ export const verifyOTP: RequestHandler = async (req, res) => {
     const result = await otpService.verifyOTP({
       userId: user.id,
       challengeId,
-      otp: otp,
+      otp,
     });
 
     if (!result.ok) {

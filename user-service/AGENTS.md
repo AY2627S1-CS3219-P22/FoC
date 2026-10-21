@@ -29,6 +29,7 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 - Ports: REST on `3001`, gRPC on `50051` (both configurable via `.env`).
 - **OTP state lives in Redis, not Postgres.** Codes expire (2 minutes), are
   single-use, and a new request overwrites the previous one. Client: `src/redis.ts`.
+- **OTP HTTP routes require a JWT, the caller must match `:id`
 - **The OTP key is a local file, same pattern as the JWT keys.** `npm run keys:otp`
   writes `keys/otp.key` (git-ignored). Boot reads `OTP_HMAC_KEY_PATH` and refuses
   to start if it is missing. The code is sealed with AES-256-GCM before it is

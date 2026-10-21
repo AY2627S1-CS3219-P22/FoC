@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/authenticate';
 import { requireRole } from '../middleware/requireRole';
 import { registerSchema } from '../dto/registerDto';
 import { loginSchema } from '../dto/loginDto';
+import { otpRequestSchema, otpStringSchema } from '../dto/otpDto';
 import * as userController from '../controllers/userController';
 
 export const userRouter = Router();
@@ -23,6 +24,6 @@ userRouter.get('/', authenticate, requireRole('ADMINISTRATOR'), userController.l
 // GET /users/:id
 userRouter.get('/:id', authenticate, requireRole('ADMINISTRATOR'), userController.getUserById);
 
-userRouter.post('/:id/otp/request', userController.sendOTPRequest);
+userRouter.post('/:id/otp/request', authenticate, userController.sendOTPRequest);
 
-userRouter.post('/:id/otp/verify', userController.verifyOTP);
+userRouter.post('/:id/otp/verify', authenticate, userController.verifyOTP);
