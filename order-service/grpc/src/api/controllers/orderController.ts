@@ -1,9 +1,10 @@
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
-// Scope: Implemented author-approved cancellation HTTP wiring.
+// Scope: Implemented author-approved order commands and administrator listing.
 // Author review: Pending; see ../../../../usage-log.md.
 import type { RequestHandler } from 'express';
 import type { createOrderLifecycle } from '../../services/orderLifecycle';
 import { z } from 'zod';
+import { listAllOrders } from '../../services/orderQueries';
 import { createOrderSchema, editOrderSchema, idempotencyKeySchema } from '../dto/orderInput';
 import type { createOrderCreation, CommandResult } from '../../services/orderCreation';
 import type { createOrderEdits } from '../../services/orderEdits';
@@ -52,3 +53,10 @@ export function editOrder(edits?: ReturnType<typeof createOrderEdits>): RequestH
     try { sendResult(res, await edits.edit(id.data, res.locals.user.id, key.data, body.data)); } catch (error) { next(error); }
   };
 }
+
+export const getAllOrders: RequestHandler = async (_req, res, next) => {
+  try {
+    const orders = await listAllOrders();
+    res.json({ orders: orders.map(order => ({ ...order, supplierId: order.supplierId.toString() })) });
+  } catch (error) { next(error); }
+};

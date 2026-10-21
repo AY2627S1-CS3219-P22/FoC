@@ -37,3 +37,10 @@ export const requireUser: RequestHandler = (_req, res, next) => {
   if (!user.roles.includes('USER')) { res.status(403).json({ error: 'forbidden' }); return; }
   next();
 };
+
+export const requireAdministrator: RequestHandler = (_req, res, next) => {
+  const user = res.locals.user;
+  if (!user) { res.status(401).json({ error: 'unauthorized' }); return; }
+  if (!user.roles.includes('ADMINISTRATOR')) { res.status(403).json({ error: 'forbidden' }); return; }
+  next();
+};

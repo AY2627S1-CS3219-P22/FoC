@@ -402,3 +402,35 @@ suite does not certify a full deployed peer-service flow. Acceptance/pickup/deli
 listing/history UI and operator reconciliation endpoints are not implemented here.
 
 Credit contract source commit: 15bb4cde30de15822d2f4be3a06c85fc5f36edb5
+
+## 2026-10-22: administrator all-orders endpoint
+
+Tool: ChatGPT (Codex). Modes: implementation, tests and documentation.
+
+Exact user prompts:
+
+> Could you set up an endpoint with authorisation for administrators for the admin dashboard to view all orders? (Includes expired and completed orders too but can be filtered out if admin chooses in the view)
+
+> GET /orders
+
+> I think just supply information for now. I will work with the admin dashboard person to see if they will do the rest from their end
+
+Key response: “I’ll add administrator-only GET /orders, returning all orders in
+{ "orders": [...] } with the existing public order fields. I’ll leave filtering
+and pagination to the dashboard for now.”
+
+Implemented an ADMINISTRATOR role guard and GET route before the USER-only write
+guard; added a read service with explicit public-field selection, controller JSON
+mapping, and newest-first deterministic ordering. Includes every persisted status,
+including DELIVERED and CANCELLED/EXPIRY. No pending internal creation records or
+recovery payloads are returned. No schema or dependency changes.
+
+Affected files: grpc/src/auth/authenticate.ts, grpc/src/api/routes/orderRoutes.ts,
+grpc/src/api/controllers/orderController.ts, grpc/src/services/orderQueries.ts,
+grpc/tests/lifecycle.integration.cjs, Order README, root README disclosure and this log.
+Human author review remains pending. Verification: TypeScript/Prisma build passed;
+all 24 dedicated PostgreSQL/HTTP/gRPC integration tests passed, including the new
+administrator endpoint test. Verified ADMINISTRATOR and mixed-role access, USER
+denial, missing-token denial, all persisted statuses, internal-field exclusion,
+and unchanged USER-only write authorization. Docker rebuilt and both containers
+are healthy; git diff --check passed. Disposable admin test container removed.

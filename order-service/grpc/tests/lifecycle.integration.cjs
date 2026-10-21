@@ -172,3 +172,29 @@ test('pending creation compensates instead of publishing when supplier is now cl
  const f=fixture();f.reserveMode='after';const r=await f.creation.submit(f.user,'closed-during-recovery',f.input());assert.equal(r.status,202);f.closed=true;await due(r.creationId);await f.creation.recoverBatch();
  assert.equal(await db.order.count({where:{id:r.creationId}}),0);assert.equal(f.ledger.get(r.creationId).status,'RELEASED');assert.equal((await db.orderCreation.findUniqueOrThrow({where:{orderId:r.creationId}})).state,'FAILED');
 });
+
+test('administrator GET /orders includes all statuses and history with role separation and public fields',async t=>{
+ const f=fixture();const ids=[];
+ for(const [status,reason] of [['UNASSIGNED',null],['ASSIGNED',null],['PICKED_UP',null],['DELIVERED',null],['CANCELLED','REQUESTER'],['CANCELLED','EXPIRY']]) {
+  const order=await create(f,'admin-'+status+'-'+reason);ids.push(order.id);
+  await db.order.update({where:{id:order.id},data:{status,cancellationReason:reason,
+   ...(status==='DELIVERED'?{deliveredAt:new Date(),creditState:'SETTLED'}:{}),
+   ...(status==='CANCELLED'?{cancelledAt:new Date(),creditState:'REFUNDED'}:{})}});
+ }
+ f.reserveMode='after';const pending=await f.creation.submit(f.user,'admin-pending',f.input());assert.equal(pending.status,202);
+ const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+ const app=createApp(publicKey.export({type:'spki',format:'pem'}));
+ const server=app.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(r=>server.close(r)));const base='http://127.0.0.1:'+server.address().port+'/orders';
+ const headers=roles=>({Authorization:'Bearer '+jwt.sign({roles},privateKey,{algorithm:'RS256',subject:'dashboard-admin',expiresIn:60})});
+ assert.equal((await fetch(base)).status,401);
+ assert.equal((await fetch(base,{headers:headers(['USER'])})).status,403);
+ for(const roles of [['ADMINISTRATOR'],['USER','ADMINISTRATOR']]) {
+  const response=await fetch(base,{headers:headers(roles)});assert.equal(response.status,200);const body=await response.json();assert.ok(Array.isArray(body.orders));
+  const ownFixtures=body.orders.filter(order=>ids.includes(order.id));assert.equal(ownFixtures.length,6);assert.ok(!body.orders.some(order=>order.id===pending.creationId));
+  assert.ok(ownFixtures.some(order=>order.status==='DELIVERED'));assert.ok(ownFixtures.some(order=>order.cancellationReason==='EXPIRY'));
+  for(const order of ownFixtures){assert.equal(order.requesterId,f.user);assert.equal(order.supplierId,'1');assert.ok(order.createdAt.endsWith('Z'));assert.ok(!('payload' in order));assert.ok(!('creation' in order));assert.ok(!('idempotencyKey' in order));assert.ok(!('creditOperations' in order));assert.ok(!('editOperations' in order));}
+ }
+ // Administrator-only access to reads does not grant USER command permissions.
+ assert.equal((await fetch(base,{method:'POST',headers:{...headers(['ADMINISTRATOR']),'Content-Type':'application/json'},body:'{}'})).status,403);
+ assert.equal((await fetch(base,{method:'POST',headers:{...headers(['USER']),'Content-Type':'application/json'},body:'{}'})).status,400);
+});

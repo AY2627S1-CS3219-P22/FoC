@@ -216,6 +216,7 @@ comes from the signed subject. ADMINISTRATOR alone does not grant permission.
 
 | Method / route | Behavior | Success |
 | --- | --- | --- |
+| GET /orders | ADMINISTRATOR only; all orders, including history | 200 |
 | POST /orders | Create after confirmed credit reservation | 201, 200 replay, 202 pending |
 | PATCH /orders/:id | Requester edits an unassigned, unexpired order | 200, 202 pending |
 | POST /orders/:id/cancel | Requester cancels an unassigned, unexpired order; retains history | 200, 202 pending refund |
@@ -322,3 +323,31 @@ Verified on 2026-10-22: 8 unit/authentication/gRPC tests and 23 PostgreSQL/HTTP/
 integration tests passed (31 total). Docker build/startup, both migrations and
 HTTP health passed. These results use test-only peers for successful lifecycle
 workflows; production peer integration remains subject to the status above.
+
+### Administrator dashboard: GET /orders
+
+Requires a valid User Service bearer JWT with ADMINISTRATOR role. USER alone
+returns 403; missing/invalid credentials return 401. An administrator does not
+also need USER for this read. Existing write endpoints still require USER.
+The configured User public key is required, as for other authenticated endpoints.
+
+```sh
+curl http://localhost:3003/orders \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+Returns HTTP 200 with `{ "orders": [...] }`. Each entry contains the existing
+public Order fields: IDs, participant names, pickup information, destination,
+request details, credits, status, cancellation reason, credit state, expiry and
+lifecycle/audit timestamps. Supplier IDs are decimal strings; timestamps are ISO
+UTC strings and absent optional values are null. Internal creation payloads,
+idempotency keys and recovery/edit operations are excluded.
+
+All persisted Order rows are returned, newest first (createdAt descending, then
+id descending), including DELIVERED, CANCELLED/EXPIRY, requester cancellations,
+and overdue active rows. Pending unpublished creations have no Order row and
+are excluded. An empty database returns `{ "orders": [] }`. There are currently
+no server-side filters or pagination. The dashboard can filter the returned
+information, using DELIVERED for completed orders and cancellationReason EXPIRY
+for orders cancelled by expiry. No User/Supplier/Credit RPC is needed for this
+read; the response uses stored snapshots.
