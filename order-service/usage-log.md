@@ -343,3 +343,62 @@ Verification:
 Author review remains pending. Changes affect package-lock.json and this log;
 originally staged content is preserved in the index until the author stages
 these newer working-tree changes.
+
+## 2026-10-22: Create/edit/cancel/expiry lifecycle implementation
+
+Tool: ChatGPT through Codex; exact model identifier not exposed. Modes: implementation,
+debugging, tests and documentation. Human author review remains pending.
+
+### Prompts and key exchanges
+
+- [Author lifecycle decisions](ai-prompts/lifecycle-decisions.md) archives user prompts,
+  the final first-lock-wins approval, edit-operation schema and latest idempotency rule.
+- [Pasted creation API contract](ai-prompts/creation-api-contract.md) archives the attached
+  text used for the route/body/response implementation.
+- Assistant checked this branch and corrected the assumption that a settlement/refund
+  worker already existed: only persistence fields were present.
+- Assistant asked for the durable edit representation and concurrent duplicate rule.
+  Author supplied OrderEditOperation and explicitly removed five-minute content detection.
+- Key implementation update: “I’ll follow your latest duplicate rule: the same key resumes
+  the original creation, and a different key starts a separate request even if the body
+  matches. I’ll also add the approved OrderEditOperation table so credit-changing edits
+  retain their proposed changes and expected Credit version across restarts.”
+
+### Locations and scope
+
+Order grpc package/scripts, JWT authentication, API DTOs/controllers/routes/app,
+User/Supplier adapters, local agreed Credit protobuf and client, creation/edit/lifecycle
+services, worker startup/configuration, unit/gRPC/HTTP/PostgreSQL tests, Prisma schema
+and new edit-operation migration, .env.example, opt-in compose.lifecycle.yaml,
+Order README, root README disclosure, shared root package-lock.json, and these records.
+The existing applied migration was not changed. Root package-lock additions preserve
+all prior package versions; no teammate manifests, source or shared wire contracts changed.
+
+Credit protobuf copied from origin/feat/credit-implementation; original attribution
+comments retained. The source commit is recorded below. Generated code was reviewed
+by the assistant, compiled and exercised in tests; no human review is claimed.
+
+### Implemented behavior
+
+POST /orders, PATCH /orders/:id, POST /orders/:id/cancel; USER JWT/ownership enforcement;
+nonblank text, positive whole int32 credits, offset-bearing expiry at least one hour
+at initial validation, current supplier-open checks; stable-key creation replay/conflict;
+credit reservation reconciliation before publication; durable credit edits using
+UpdateReservation/expectedVersion; history-preserving cancellation; expiry through pickup;
+automatic durable recovery and compensation, initial attempt plus five bounded retries.
+Unresolved states stay recorded for reconciliation and are not reported as paid/refunded.
+
+### Verification and limits
+
+Final checks: TypeScript/Prisma build passed; 8 unit/authentication/gRPC tests and
+23 dedicated PostgreSQL/HTTP/gRPC lifecycle tests passed (31 total). Docker image
+built, both containers healthy, /health returned 200, and Prisma reported both
+migrations applied. Opt-in Compose configuration validated. All existing root
+lockfile package keys and versions were preserved; git diff --check passed.
+The disposable lifecycle test container was removed after verification; the normal
+Order stack remains running. Test doubles exist only in tests.
+Supplier GetSupplier and the checkout's old Credit RPC handlers remain stubs; the
+suite does not certify a full deployed peer-service flow. Acceptance/pickup/delivery,
+listing/history UI and operator reconciliation endpoints are not implemented here.
+
+Credit contract source commit: 15bb4cde30de15822d2f4be3a06c85fc5f36edb5

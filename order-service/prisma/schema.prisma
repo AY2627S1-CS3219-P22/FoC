@@ -1,5 +1,5 @@
 // AI Assistance Disclosure:
-// Tool: ChatGPT (Codex), date: 2026-10-21.
+// Tool: ChatGPT (Codex), date: 2026-10-22.
 // Scope: Transcribed author-provided models/enums and added Prisma configuration.
 // Author review: Pending. See ../usage-log.md.
 
@@ -44,6 +44,8 @@ model Order {
   pickedUpAt         DateTime?           @db.Timestamptz(3)
   deliveredAt        DateTime?           @db.Timestamptz(3)
   cancelledAt        DateTime?           @db.Timestamptz(3)
+
+  editOperations OrderEditOperation[]
 
   @@index([status, expiryTime])
   @@index([requesterId, createdAt])
@@ -114,4 +116,30 @@ model CreditOperation {
 
   @@unique([orderId, type])
   @@index([state, nextRetryAt])
+}
+
+// Author-provided durable edit-operation representation (2026-10-22).
+enum EditOperationState {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  RECONCILIATION_REQUIRED
+}
+
+model OrderEditOperation {
+  id              String @id @default(uuid()) @db.Uuid
+  orderId         String @db.Uuid
+  order           Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  requesterId     String
+  state           EditOperationState @default(PENDING)
+  expectedVersion Int
+  targetCredits   Int
+  proposedChanges Json
+  attempts        Int @default(0)
+  nextRetryAt     DateTime @default(now()) @db.Timestamptz(3)
+  leaseExpiresAt  DateTime? @db.Timestamptz(3)
+  lastError       String?
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 }
