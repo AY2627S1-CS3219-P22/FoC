@@ -11,6 +11,8 @@ export default defineConfig({
       '/backend/users':     { target: 'http://localhost:3001', rewrite: (p) => p.replace(/^\/backend/, ''), cookiePathRewrite: { '/users': '/backend/users' } },
       '/backend/suppliers': { target: 'http://localhost:3002', rewrite: (p) => p.replace(/^\/backend/, '') },
       '/backend/supplier':  { target: 'http://localhost:3002', rewrite: (p) => p.replace(/^\/backend/, '') },
+      // start order-service with ORDER_HTTP_PORT=3003, its default clashes with supplier-service
+      '/backend/orders':    { target: 'http://localhost:3003', rewrite: (p) => p.replace(/^\/backend/, '') },
     },
   },
 })

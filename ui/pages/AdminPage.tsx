@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { Order, User, Page } from "../App"
 import StatusBadge from "../components/StatusBadge"
+import { getAllOrders, getOrder, type ApiOrder } from "../api/orders"
 
 type Section = "overview" | "orders" | "users" | "suppliers" | "logs"
 
@@ -38,26 +39,96 @@ const LOG_COLORS: Record<string, string> = {
   supplier: "bg-amber-50 text-amber-500",
 }
 
-interface Props {
-  orders: Order[]
-  user: User
-  onNavigate: (page: Page) => void
-  onDeleteOrder: (id: string) => void
+// order-service status -> the ones StatusBadge knows. An unassigned order past
+// its expiry never found a courier, so it shows as expired.
+function badgeStatus(o: ApiOrder): Order["status"] {
+  switch (o.status) {
+    case "UNASSIGNED": return new Date(o.expiryTime) < new Date() ? "expired" : "open"
+    case "ASSIGNED":   return "accepted"
+    case "PICKED_UP":  return "picked-up"
+    case "DELIVERED":  return "delivered"
+    case "CANCELLED":  return "cancelled"
+  }
 }
 
-export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: Props) {
+const formatTime = (iso: string) =>
+  new Date(iso).toLocaleString("en-SG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })
+
+const shortId = (id: string) => id.slice(0, 8)
+
+const STATUS_FILTERS: { value: "all" | Order["status"]; label: string }[] = [
+  { value: "all",       label: "All statuses" },
+  { value: "open",      label: "Open" },
+  { value: "accepted",  label: "Assigned" },
+  { value: "picked-up", label: "Picked up" },
+  { value: "delivered", label: "Delivered" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "expired",   label: "Expired" },
+]
+
+interface Props {
+  user: User
+  onNavigate: (page: Page) => void
+}
+
+export default function AdminPage({ user, onNavigate }: Props) {
   const [section, setSection]           = useState<Section>("overview")
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showAddSupplier, setShowAddSupplier] = useState(false)
   const [suppliers, setSuppliers]       = useState(MOCK_SUPPLIERS)
   const [newSupplier, setNewSupplier]   = useState({ name: "", location: "", type: "" })
 
+  const [orders, setOrders]             = useState<ApiOrder[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [error, setError]               = useState("")
+  const [statusFilter, setStatusFilter] = useState<"all" | Order["status"]>("all")
+  const [search, setSearch]             = useState("")
+
+  const [selectedId, setSelectedId]     = useState<string | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<ApiOrder | null>(null)
+  const [detailError, setDetailError]   = useState("")
+  const latestDetail = useRef<string | null>(null)
+
+  const loadOrders = () => {
+    setLoading(true)
+    setError("")
+    getAllOrders()
+      .then(setOrders)
+      .catch((err) => setError(err instanceof Error ? err.message : "Could not load orders."))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(loadOrders, [])
+
+  const openOrder = (id: string) => {
+    latestDetail.current = id
+    setSelectedId(id)
+    setSelectedOrder(null)
+    setDetailError("")
+    getOrder(id)
+      .then((o) => { if (latestDetail.current === id) setSelectedOrder(o) })
+      .catch((err) => { if (latestDetail.current === id) setDetailError(err instanceof Error ? err.message : "Could not load order.") })
+  }
+
+  const closeOrder = () => {
+    latestDetail.current = null
+    setSelectedId(null)
+    setSelectedOrder(null)
+  }
+
+  const count = (status: Order["status"]) => orders.filter((o) => badgeStatus(o) === status).length
+
   const stats = [
-    { label: "Active Orders",    value: orders.filter((o) => ["accepted", "picked-up"].includes(o.status)).length },
-    { label: "Open Requests",    value: orders.filter((o) => o.status === "open").length },
-    { label: "Completed Orders", value: orders.filter((o) => o.status === "completed").length },
-    { label: "Registered Users", value: MOCK_USERS.length },
+    { label: "Active Orders",    value: count("accepted") + count("picked-up") },
+    { label: "Open Requests",    value: count("open") },
+    { label: "Delivered Orders", value: count("delivered") },
+    { label: "Cancelled Orders", value: count("cancelled") },
   ]
+
+  const query = search.trim().toLowerCase()
+  const visibleOrders = orders.filter((o) =>
+    (statusFilter === "all" || badgeStatus(o) === statusFilter) &&
+    [o.id, o.requesterName, o.courierName ?? "", o.pickupStore, o.destination].some((v) => v.toLowerCase().includes(query))
+  )
 
   const NAV: { key: Section; label: string }[] = [
     { key: "overview",   label: "Overview" },
@@ -69,6 +140,23 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
 
   const thCls = "text-left px-4 py-3 text-[11px] font-semibold text-[#3F6B5A] uppercase tracking-wider whitespace-nowrap border-b border-[#E4E8E6]"
   const tdCls = "px-4 py-3 text-xs text-[#1B2522]"
+
+  // Loading / error / empty row for the order tables, or null once there's data to show
+  const ordersMessage = (colSpan: number, empty: boolean) => {
+    if (!loading && !error && !empty) return null
+    return (
+      <tr>
+        <td colSpan={colSpan} className="px-4 py-10 text-center text-xs text-[#3F6B5A]">
+          {loading ? "Loading orders…" : error ? (
+            <>
+              <p className="text-red-600 mb-2">{error}</p>
+              <button onClick={loadOrders} className="font-semibold text-[#1A4A36] underline">Try again</button>
+            </>
+          ) : orders.length === 0 ? "No orders yet." : "No orders match your filters."}
+        </td>
+      </tr>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#F7F9F8] flex">
@@ -144,36 +232,36 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {stats.map(({ label, value }) => (
                   <div key={label} className="bg-white border border-[#E4E8E6] rounded-xl p-5">
-                    <p className="text-2xl font-semibold text-[#162A46] mb-1">{value}</p>
+                    <p className="text-2xl font-semibold text-[#162A46] mb-1">{loading || error ? "—" : value}</p>
                     <p className="text-xs text-[#3F6B5A]">{label}</p>
                   </div>
                 ))}
               </div>
 
               <h3 className="text-sm font-semibold text-[#162A46] mb-4">Recent Orders</h3>
-              <div className="bg-white border border-[#E4E8E6] rounded-xl overflow-hidden">
+              <div className="bg-white border border-[#E4E8E6] rounded-xl overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr>
-                      {["Order ID", "Requester", "Courier", "Pickup", "Status", "Credits", "Time"].map((h) => (
+                      {["Order ID", "Requester", "Courier", "Pickup", "Status", "Credits", "Created"].map((h) => (
                         <th key={h} className={thCls}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.slice(0, 6).map((order, i) => (
+                    {ordersMessage(7, orders.length === 0) ?? orders.slice(0, 6).map((order, i, recent) => (
                       <tr
                         key={order.id}
-                        onClick={() => { setSelectedOrder(order); setSection("orders") }}
-                        className={`cursor-pointer hover:bg-[#F7F9F8] transition-colors ${i < orders.length - 1 ? "border-b border-[#E4E8E6]" : ""}`}
+                        onClick={() => { openOrder(order.id); setSection("orders") }}
+                        className={`cursor-pointer hover:bg-[#F7F9F8] transition-colors ${i < recent.length - 1 ? "border-b border-[#E4E8E6]" : ""}`}
                       >
-                        <td className={`${tdCls} font-mono text-[11px] text-[#3F6B5A]`}>#{order.id}</td>
+                        <td className={`${tdCls} font-mono text-[11px] text-[#3F6B5A]`}>#{shortId(order.id)}</td>
                         <td className={`${tdCls} font-medium`}>{order.requesterName}</td>
                         <td className={`${tdCls} text-[#3F6B5A]`}>{order.courierName || "—"}</td>
-                        <td className={tdCls}>{order.pickupLocation}</td>
-                        <td className={tdCls}><StatusBadge status={order.status} /></td>
+                        <td className={tdCls}>{order.pickupStore}</td>
+                        <td className={tdCls}><StatusBadge status={badgeStatus(order)} /></td>
                         <td className={`${tdCls} font-semibold text-[#162A46]`}>{order.credits}</td>
-                        <td className={`${tdCls} text-[#9CA3AF]`}>{order.createdAt}</td>
+                        <td className={`${tdCls} text-[#9CA3AF] whitespace-nowrap`}>{formatTime(order.createdAt)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -187,15 +275,19 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
             <div className="flex gap-5">
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-3 mb-5">
-                  <h2 className="text-sm font-semibold text-[#162A46] flex-1">Order Management</h2>
-                  <select className="border border-[#E4E8E6] rounded-lg text-xs px-3 py-2 bg-white text-[#1B2522] focus:outline-none focus:border-[#1A4A36]">
-                    <option>All statuses</option>
-                    <option>Open</option>
-                    <option>Accepted</option>
-                    <option>Completed</option>
-                    <option>Cancelled</option>
+                  <h2 className="text-sm font-semibold text-[#162A46] flex-1">Order History</h2>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                    className="border border-[#E4E8E6] rounded-lg text-xs px-3 py-2 bg-white text-[#1B2522] focus:outline-none focus:border-[#1A4A36]"
+                  >
+                    {STATUS_FILTERS.map(({ value, label }) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
                   </select>
                   <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search orders…"
                     className="border border-[#E4E8E6] rounded-lg text-xs px-3 py-2 bg-white text-[#1B2522] focus:outline-none focus:border-[#1A4A36] w-36"
                   />
@@ -204,42 +296,31 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
                   <table className="w-full">
                     <thead>
                       <tr>
-                        {["ID", "Requester", "Courier", "Route", "Status", "Credits", "Time", ""].map((h) => (
+                        {["ID", "Requester", "Courier", "Route", "Status", "Credits", "Created"].map((h) => (
                           <th key={h} className={thCls}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {orders.map((order, i) => (
+                      {ordersMessage(7, visibleOrders.length === 0) ?? visibleOrders.map((order, i) => (
                         <tr
                           key={order.id}
-                          onClick={() => setSelectedOrder(order)}
+                          onClick={() => openOrder(order.id)}
                           className={`cursor-pointer transition-colors ${
-                            selectedOrder?.id === order.id
+                            selectedId === order.id
                               ? "bg-[#E8F1ED]"
                               : "hover:bg-[#F7F9F8]"
-                          } ${i < orders.length - 1 ? "border-b border-[#E4E8E6]" : ""}`}
+                          } ${i < visibleOrders.length - 1 ? "border-b border-[#E4E8E6]" : ""}`}
                         >
-                          <td className={`${tdCls} font-mono text-[11px] text-[#3F6B5A]`}>#{order.id}</td>
+                          <td className={`${tdCls} font-mono text-[11px] text-[#3F6B5A]`}>#{shortId(order.id)}</td>
                           <td className={`${tdCls} font-medium`}>{order.requesterName}</td>
                           <td className={`${tdCls} text-[#3F6B5A]`}>{order.courierName || "—"}</td>
                           <td className={tdCls}>
-                            <span className="whitespace-nowrap">{order.pickupLocation} → {order.deliveryLocation}</span>
+                            <span className="whitespace-nowrap">{order.pickupStore} → {order.destination}</span>
                           </td>
-                          <td className={tdCls}><StatusBadge status={order.status} /></td>
+                          <td className={tdCls}><StatusBadge status={badgeStatus(order)} /></td>
                           <td className={`${tdCls} font-semibold text-[#162A46]`}>{order.credits}</td>
-                          <td className={`${tdCls} text-[#9CA3AF] whitespace-nowrap`}>{order.createdAt}</td>
-                          <td className={tdCls} onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => {
-                                onDeleteOrder(order.id)
-                                if (selectedOrder?.id === order.id) setSelectedOrder(null)
-                              }}
-                              className="text-red-400 hover:text-red-600 transition-colors text-xs font-medium"
-                            >
-                              Delete
-                            </button>
-                          </td>
+                          <td className={`${tdCls} text-[#9CA3AF] whitespace-nowrap`}>{formatTime(order.createdAt)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -248,16 +329,16 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
               </div>
 
               {/* Side panel */}
-              {selectedOrder && (
+              {selectedId && (
                 <div className="w-64 flex-shrink-0">
                   <div className="bg-white border border-[#E4E8E6] rounded-xl p-5 sticky top-20">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <p className="text-xs font-mono text-[#9CA3AF]">#{selectedOrder.id}</p>
+                        <p className="text-xs font-mono text-[#9CA3AF]">#{shortId(selectedId)}</p>
                         <h3 className="text-sm font-semibold text-[#162A46]">Order details</h3>
                       </div>
                       <button
-                        onClick={() => setSelectedOrder(null)}
+                        onClick={closeOrder}
                         className="text-[#9CA3AF] hover:text-[#1B2522] transition-colors"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -265,35 +346,39 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
                         </svg>
                       </button>
                     </div>
-                    <div className="mb-4">
-                      <StatusBadge status={selectedOrder.status} />
-                    </div>
-                    <div className="space-y-3 mb-5">
-                      {[
-                        { label: "Requester",  value: selectedOrder.requesterName },
-                        { label: "Courier",    value: selectedOrder.courierName || "Not assigned" },
-                        { label: "Pickup",     value: selectedOrder.pickupStore },
-                        { label: "Delivery",   value: selectedOrder.deliveryLocation },
-                        { label: "Details",    value: selectedOrder.description },
-                        { label: "Credits",    value: `${selectedOrder.credits}` },
-                        { label: "Deadline",   value: selectedOrder.deadline },
-                        { label: "Created",    value: selectedOrder.createdAt },
-                      ].map(({ label, value }) => (
-                        <div key={label}>
-                          <p className="text-[10px] text-[#3F6B5A] font-semibold uppercase tracking-wider mb-0.5">{label}</p>
-                          <p className="text-xs text-[#1B2522] leading-relaxed">{value}</p>
+                    {detailError ? (
+                      <p className="text-xs text-red-600">{detailError}</p>
+                    ) : !selectedOrder ? (
+                      <p className="text-xs text-[#3F6B5A]">Loading…</p>
+                    ) : (
+                      <>
+                        <div className="mb-4">
+                          <StatusBadge status={badgeStatus(selectedOrder)} />
                         </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => {
-                        onDeleteOrder(selectedOrder.id)
-                        setSelectedOrder(null)
-                      }}
-                      className="w-full py-2 border border-red-100 text-red-600 text-xs font-medium rounded-lg hover:bg-red-50 transition-colors"
-                    >
-                      Delete order
-                    </button>
+                        <div className="space-y-3">
+                          {[
+                            { label: "Requester",  value: selectedOrder.requesterName },
+                            { label: "Courier",    value: selectedOrder.courierName || "Not assigned" },
+                            { label: "Pickup",     value: `${selectedOrder.pickupStore}, ${selectedOrder.pickupLocation}` },
+                            { label: "Delivery",   value: selectedOrder.destination },
+                            { label: "Details",    value: selectedOrder.requestDetails },
+                            { label: "Credits",    value: `${selectedOrder.credits}` },
+                            { label: "Created",    value: formatTime(selectedOrder.createdAt) },
+                            { label: "Expires",    value: formatTime(selectedOrder.expiryTime) },
+                            { label: "Accepted",   value: selectedOrder.acceptedAt && formatTime(selectedOrder.acceptedAt) },
+                            { label: "Picked up",  value: selectedOrder.pickedUpAt && formatTime(selectedOrder.pickedUpAt) },
+                            { label: "Delivered",  value: selectedOrder.deliveredAt && formatTime(selectedOrder.deliveredAt) },
+                            { label: "Cancelled",  value: selectedOrder.cancelledAt && formatTime(selectedOrder.cancelledAt) },
+                            { label: "Reason",     value: selectedOrder.cancellationReason },
+                          ].filter(({ value }) => value).map(({ label, value }) => (
+                            <div key={label}>
+                              <p className="text-[10px] text-[#3F6B5A] font-semibold uppercase tracking-wider mb-0.5">{label}</p>
+                              <p className="text-xs text-[#1B2522] leading-relaxed">{value}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}

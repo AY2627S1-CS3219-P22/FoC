@@ -116,6 +116,14 @@ export default function Navbar({ user, currentPage, onNavigate }: NavbarProps) {
 
         {/* Right */}
         <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
+          {user.isAdmin && (
+            <button
+              onClick={() => onNavigate("admin")}
+              className="rounded-full border border-[#E4E8E6] px-2.5 py-1.5 text-xs font-semibold text-[#162A46] transition-colors hover:border-[#3F6B5A] sm:px-3"
+            >
+              Admin
+            </button>
+          )}
           <div className="flex items-center gap-1.5 rounded-full bg-[#E8F1ED] px-2 py-1.5 text-xs font-semibold whitespace-nowrap text-[#1A4A36] sm:px-3">
             <svg className="h-3 w-3 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm.75 14.25h-1.5v-5.5h1.5v5.5zm0-7h-1.5v-1.5h1.5v1.5z" />

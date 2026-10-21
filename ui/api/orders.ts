@@ -1,4 +1,5 @@
 import type { Order } from "../App"
+import { api } from "./client"
 
 // MOCK DATA: replace with real calls once order-service has REST endpoints.
 export const SEED_ORDERS: Order[] = [
@@ -87,3 +88,32 @@ export const SEED_ORDERS: Order[] = [
 ]
 
 export const getOrders = async (): Promise<Order[]> => SEED_ORDERS
+
+// Order as returned by order-service
+export type ApiOrder = {
+  id: string
+  requesterId: string
+  courierId: string | null
+  pickupStore: string
+  pickupLocation: string
+  requesterName: string
+  courierName: string | null
+  destination: string
+  requestDetails: string
+  credits: number
+  expiryTime: string
+  status: "UNASSIGNED" | "ASSIGNED" | "PICKED_UP" | "DELIVERED" | "CANCELLED"
+  cancellationReason: string | null
+  createdAt: string
+  acceptedAt: string | null
+  pickedUpAt: string | null
+  deliveredAt: string | null
+  cancelledAt: string | null
+}
+
+// Admin only: every order across all statuses, newest first
+export const getAllOrders = () =>
+  api<{ orders: ApiOrder[] }>("/orders?scope=all").then((r) => r.orders)
+
+export const getOrder = (id: string) =>
+  api<{ order: ApiOrder }>(`/orders/${id}`).then((r) => r.order)

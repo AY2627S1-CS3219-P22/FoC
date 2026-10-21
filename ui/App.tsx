@@ -53,6 +53,7 @@ export interface User {
   requestsCreated: number
   errandsCompleted: number
   creditsEarned: number
+  isAdmin: boolean
 }
 
 const CURRENT_USER: User = {
@@ -64,6 +65,7 @@ const CURRENT_USER: User = {
   requestsCreated: 2,
   errandsCompleted: 2,
   creditsEarned: 9,
+  isAdmin: false,
 }
 
 // Credits and stats aren't in user-service, so those still come from the mock user for now
@@ -73,6 +75,7 @@ const fromApiUser = (u: ApiUser): User => ({
   name: `${u.firstName} ${u.lastName}`,
   email: u.email,
   memberSince: new Date(u.createdAt).toLocaleDateString("en-SG", { month: "long", year: "numeric" }),
+  isAdmin: u.roles.includes("ADMINISTRATOR"),
 })
 
 function SuccessScreen({
@@ -210,15 +213,8 @@ export default function App() {
   }
 
   // Admin is a full-screen layout without the main Navbar
-  if (page === "admin") {
-    return (
-      <AdminPage
-        orders={orders}
-        user={user}
-        onNavigate={navigate}
-        onDeleteOrder={(id) => setOrders((prev) => prev.filter((o) => o.id !== id))}
-      />
-    )
+  if (page === "admin" && user.isAdmin) {
+    return <AdminPage user={user} onNavigate={navigate} />
   }
 
   const selectedOrder  = orders.find((o) => o.id === selectedOrderId)
