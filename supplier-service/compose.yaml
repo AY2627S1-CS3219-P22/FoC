@@ -50,8 +50,9 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
       USER_SERVICE_PUBLIC_KEY_PATH: /app/keys/public.pem
     volumes:
+      # Mount user-service's keys (generate them there with `npm run keys:generate`).
       # Mount the directory so a missing public.pem is not created as a folder.
-      - ./keys:/app/keys:ro
+      - ../user-service/keys:/app/keys:ro
     depends_on:
       db:
         condition: service_healthy
