@@ -3,8 +3,8 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 Scope: Documented human-specified credit rules, SQL migrations, authenticated gRPC, Docker configuration, verification, and approved JSON attribution.
 Human Reviewed.
-Changes from entries 007–025: Pending human review. The prior Human Reviewed marker does not validate these changes.
-Prompts and key responses: ai/usage-log.md, entries 003–025.
+Changes from entries 007–026: Pending human review. The prior Human Reviewed marker does not validate these changes.
+Prompts and key responses: ai/usage-log.md, entries 003–026.
 -->
 
 # Credit service
@@ -57,7 +57,7 @@ and a clean Docker install/build/start. The local Docker working directory is
   Matching saved successes replay; confirmed prior grants without saved results
   succeed without writes. An existing account lacking grant evidence fails with
   `ALREADY_EXISTS` and no changes.
-- `getBalance` returns total, reserved, and computed available credits. A missing
+- `getBalance` returns userId, total, reserved, and computed available credits. A missing
   account fails; reads never initialize an account.
 - `reserveCredits` creates a lifetime-unique reservation per order, holds credits,
   records `RESERVED`, and starts version at 1. Insufficient credits fail without
@@ -76,8 +76,8 @@ and a clean Docker install/build/start. The local Docker working directory is
   increases the courier's total, sets `SETTLED`/courier/version, and writes
   `TRANSFER_OUT` and `TRANSFER_IN`. Missing courier accounts and self-settlement
   fail without changes. Courier assignment is validated by Order Service.
-- `getReservation` reads the current reservation. The RPC returns exactly status,
-  amount, and version. Missing reservations fail with `NOT_FOUND`.
+- `getReservation` reads the current reservation. The RPC returns the full Reservation message: orderId, requesterId, amount,
+  status, optional courierId, reservationId, and version. Missing reservations fail with `NOT_FOUND`.
 
 Mutations own one READ COMMITTED transaction. Lock order is retry key, order
 resource (account resource for initialization), then account rows in ascending
@@ -88,7 +88,7 @@ reservation, history, and retry-result changes together.
 Saved successful retries replay before current-state checks. Mutation replies
 are snapshots of the state immediately after that operation. An identical reserve
 retry after an update can therefore return the original amount/version/status;
-call GetReservation to obtain the current status, amount, and version. Existing
+call GetReservation to obtain the full current reservation. Existing
 missing-result fallback rules above remain unchanged. The operation-scoped
 key is userId for initialization, orderId for reserve/release/settle, and
 JSON `[orderId, expectedVersion]` for updates. SHA-256 request hashes use the
@@ -110,6 +110,12 @@ a connected shared client and a supplied queue. RabbitMQ startup and User Servic
 publication belong to teammates and are not wired here. There is no InitCredits RPC.
 
 ## gRPC authentication and errors
+
+Following [exchange 026](ai/prompts/026-expanded-read-responses.md), Balance
+restores user_id at protobuf field 1 and GetReservation returns the same full
+Reservation message used by mutations. Shared TypeScript types and the client
+wrapper reflect these shapes; the old GetReservationResponse type is removed.
+REST balance still returns its existing userId and three credit values.
 
 The six order-only RPCs are GetBalance, ReserveCredits, UpdateReservation,
 ReleaseCredits, SettleCredits, and GetReservation. The caller supplies

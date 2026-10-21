@@ -3,7 +3,8 @@
 // Scope: Tested human-specified own-data REST authentication/serialization, errors, and strict paging bookmarks.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–025 (prior scopes retained).
+// Prompts and key responses: ../ai/usage-log.md, entries 005–026 (prior scopes retained).
+// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -45,7 +46,7 @@ test('matched REST routes authenticate before business logic and derive user sco
   const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const calls = [];
   const service = {
-    async getBalance(input) { calls.push(input); return { totalCredits: 10, reservedCredits: 2, availableCredits: 8 }; },
+    async getBalance(input) { calls.push(input); return { userId: input.userId, totalCredits: 10, reservedCredits: 2, availableCredits: 8 }; },
     async getUserCreditHistory(input) {
       calls.push(input);
       return { entries: [{ id: 'history-id', userId: input.userId, sequenceId: '9007199254740993', orderId: null, reservationId: null,

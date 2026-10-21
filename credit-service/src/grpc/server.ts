@@ -3,7 +3,8 @@
 // Scope: Implemented the human-finalized six order-only RPC handlers, service-token authorization, and business-error metadata.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–024 (prior scopes retained).
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–026 (prior scopes retained).
+// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
 
 import { CreditService as Contract, createServer, type CreditServiceHandlers } from '@foc/grpc';
 import { status, type handleUnaryCall } from '@grpc/grpc-js';
@@ -38,10 +39,7 @@ export function createGrpcServer(service: CreditService, tokens: Readonly<Record
     UpdateReservation: handler((request) => service.updateReservation(request)),
     ReleaseCredits: handler((request) => service.releaseCredits(request)),
     SettleCredits: handler((request) => service.settleCredits(request)),
-    GetReservation: handler(async (request) => {
-      const reservation = await service.getReservation(request);
-      return { status: reservation.status, amount: reservation.amount, version: reservation.version };
-    }),
+    GetReservation: handler((request) => service.getReservation(request)),
   };
   return createServer(Contract.service, handlers);
 }

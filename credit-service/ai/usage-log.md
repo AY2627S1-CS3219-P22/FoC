@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–025 below and the linked prompt archives.
+Prompts and key responses: Entries 001–026 below and the linked prompt archives.
 -->
 
 # AI usage log
@@ -1248,6 +1248,63 @@ starts with the exchange below; it does not establish earlier team AI history.
   decisions and repository code/tests; no new external sources or copied
   third-party implementation. Read root AGENTS.md and existing empty service
   AGENTS.md. No skill, delegation, commit, merge or deployment performed.
+- **Remaining integrations:** RabbitMQ startup/User Service publication remain
+  teammate-owned; automatic client retries and archival/restoration are unchanged.
+
+## 026 — Restore balance user IDs and return full reservations for lookups
+
+- **Timestamp:** Began 2026-10-21 12:07 SGT (UTC+08:00); implementation and
+  verification completed during this session.
+- **Tool/model and modes:** OpenAI Codex, GPT-6; implementation of the human's
+  explicit contract changes, regeneration boilerplate, regression verification,
+  documentation and disclosure maintenance.
+- **Exact prompt/key responses:** [Read-contract expansion request and key
+  implementation responses](prompts/026-expanded-read-responses.md).
+- **Human-defined change:** Restore string user_id = 1 in Balance and return
+  userId from CreditService.getBalance. GetReservation must return the same full
+  Reservation as mutations instead of the separate three-field response. No
+  additional schema/interface decision was selected by AI.
+- **Key output:** Restored balance field 1 and removed its user_id reservation;
+  timestamp reservations and credit field numbers remain. getBalance returns the
+  account's userId. GetReservation uses Reservation in the proto, generated
+  service/client types and wrapper. Its controller directly forwards the full
+  service result. Removed the obsolete GetReservationResponse message and
+  generated source/ignored compiled output. Existing courier optional-presence
+  behavior is retained. REST now forwards the service's four-field balance
+  directly. The internal initialization return and event callback use
+  Omit<Balance, 'userId'> at type level to preserve existing three-credit
+  initialization results and persisted replay responses; no stored result was
+  rewritten or initialization behavior changed. No SQL/migration change.
+- **Affected locations:** shared/grpc/proto/credit.proto; src/clients.ts;
+  src/generated/credit.ts, credit/{Balance,CreditService}.ts and retired
+  credit/GetReservationResponse.ts; test/credit-contract.test.cjs; shared README;
+  credit-service/src/services/CreditService.ts, src/grpc/server.ts,
+  src/rest/server.ts, src/events/userCreated.ts;
+  test/{core-credit,auth,rest}.test.cjs; credit-service README,
+  docs/user-decisions.md, this log and prompt archive 026; root README final
+  disclosure. Prior human-review markers remain, with entry-026 edits marked
+  pending human review.
+- **Agent verification:** Full workspace build passed after resolving the
+  compiler's duplicate userId warning by forwarding the service balance from
+  REST. All 74 credit checks passed with PostgreSQL and temporary API listeners,
+  zero failures/skips; eight shared wire/transport checks passed. Existing tests
+  were updated rather than adding redundant tests: real service balance reads
+  assert user identity across mutation/concurrency cases; controller and shared
+  wire tests assert the full reservation fields, including optional courier for
+  settlement and its absence for active holds; REST still returns its four
+  fields and applies JWT subject scope. Initial allocation/replay tests still
+  verify the existing internal result shape. Regenerated types, restored
+  attribution, and removed only the retired compiled response type. Docker
+  clean compilation/rebuild/start passed. Packaged server/client runtime checks
+  verify balance identity and full reservation serialization with isolated
+  in-memory fixtures; no application-data writes. Current attribution/log/docs
+  links, the final root README disclosure and tracked whitespace checked.
+  Earlier coverage numbers are historical; coverage was not rerun here.
+- **Human review/sources/instructions:** New edits await human review. Used the
+  human's exact contract and repository implementation/generation conventions;
+  no new external source or third-party implementation code. Read root AGENTS.md
+  and existing empty service AGENTS.md. No skill, agent delegation, commit,
+  merge or deployment performed.
 - **Remaining integrations:** RabbitMQ startup/User Service publication remain
   teammate-owned; automatic client retries and archival/restoration are unchanged.
 

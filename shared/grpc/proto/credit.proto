@@ -2,7 +2,8 @@
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Implemented the human-finalized six order-only credit RPCs; removed event-based initialization and REST-only history RPC/messages.
 // Author review: Pending human review.
-// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012, 014, 016, 021 and 025.
+// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012, 014, 016, 021 and 025 and 026.
+// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
 // AI-generated; human review pending.
 
 syntax = "proto3";
@@ -19,7 +20,7 @@ service CreditService {
   // Under the specified replay rule, a matching saved request returns its original response.
   // Mutation replies describe the state immediately after that operation, not necessarily now.
   // Matching retries replay the saved snapshot even after an update, release, or settlement.
-  // Call GetReservation for the current status, amount, and version.
+  // Call GetReservation for the full current reservation.
   // Mutations commit balance, reservation, history, and successful retry results atomically.
   // SettleCredits uses the existing "transfer" operation type in the database.
   rpc ReserveCredits(ReserveCreditsRequest) returns (Reservation);
@@ -28,8 +29,8 @@ service CreditService {
   rpc ReleaseCredits(ReleaseCreditsRequest) returns (Reservation);
   // Transfers the held amount from requester to courier.
   rpc SettleCredits(SettleCreditsRequest) returns (Reservation);
-  // Read-only current status, amount, and version.
-  rpc GetReservation(GetReservationRequest) returns (GetReservationResponse);
+  // Read-only full current reservation, using the same shape as mutation replies.
+  rpc GetReservation(GetReservationRequest) returns (Reservation);
 }
 
 message GetBalanceRequest {
@@ -47,8 +48,9 @@ message GetReservationRequest {
 }
 
 message Balance {
-  reserved 1, 5, 6;
-  reserved "user_id", "created_at", "updated_at";
+  string user_id = 1;
+  reserved 5, 6;
+  reserved "created_at", "updated_at";
   // Computed as total_credits - reserved_credits; not stored in the database.
   int32 available_credits = 2;
   int32 reserved_credits = 3;
@@ -95,10 +97,4 @@ message Reservation {
   int32 version = 7;
   reserved 8, 9;
   reserved "created_at", "updated_at";
-}
-
-message GetReservationResponse {
-  ReservationStatus status = 1;
-  int32 amount = 2;
-  int32 version = 3;
 }

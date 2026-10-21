@@ -3,7 +3,8 @@
 // Scope: Implemented the human-specified user.created callback using the existing initialization service signature and user-ID validation rules.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–025 (prior scopes retained).
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–026 (prior scopes retained).
+// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
 
 import type { Balance__Output as Balance } from '@foc/grpc/dist/generated/credit/Balance';
 import { assertUserId, ValidationError } from '../services/validation';
@@ -18,7 +19,7 @@ export interface UserCreatedEvent {
 // Compatible with the shared client's QueueHandler<UserCreatedEvent> argument.
 // CreditService owns transaction completion and verification of a prior grant.
 export function createUserCreatedHandler(
-  creditService: { initCredits(input: { userId: string }): Promise<Balance> },
+  creditService: { initCredits(input: { userId: string }): Promise<Omit<Balance, 'userId'>> },
 ): (message: { payload: UserCreatedEvent }) => Promise<void> {
   return async (message) => {
     const payload: unknown = message.payload;

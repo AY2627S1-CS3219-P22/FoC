@@ -3,7 +3,8 @@
 // Scope: Implemented human-specified core credit business rules, reads, and transaction ownership.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–025 (prior scopes retained).
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–026 (prior scopes retained).
+// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
 
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
@@ -13,6 +14,8 @@ import type { CreditRepository } from '../repos/CreditRepository';
 import type { CreditHistoryEntry, Reservation } from '../domains/types';
 import { assertIdentifier, assertOrderId, assertPositiveInteger, assertUserId, ValidationError } from './validation';
 import { decodeHistoryBookmark, encodeHistoryBookmark } from './historyBookmark';
+
+type InitialAllocationBalance = Omit<Balance, 'userId'>;
 
 export interface CreditHistoryPage {
   entries: CreditHistoryEntry[];
@@ -64,6 +67,7 @@ export class CreditService {
       const account = await repository.findAccount(userId);
       if (!account) throw new CreditOperationError('NOT_FOUND', 'Credit account not found', 'ACCOUNT_NOT_FOUND');
       return {
+        userId: account.userId,
         totalCredits: account.totalCredits,
         reservedCredits: account.reservedCredits,
         availableCredits: account.totalCredits - account.reservedCredits,
@@ -211,7 +215,7 @@ export class CreditService {
     );
   }
 
-  async initCredits({ userId }: { userId: string }): Promise<Balance> {
+  async initCredits({ userId }: { userId: string }): Promise<InitialAllocationBalance> {
     assertUserId(userId);
     const operation = 'init_credits';
     const requestHash = createHash('sha256')
@@ -225,8 +229,8 @@ export class CreditService {
       inTransaction = true;
       const repository = new SqlCreditRepository(client);
       await repository.lockKey(operation, userId);
-      const saved = await repository.findIdempotencyRecord<Balance>(operation, userId);
-      let result: Balance;
+      const saved = await repository.findIdempotencyRecord<InitialAllocationBalance>(operation, userId);
+      let result: InitialAllocationBalance;
       let confirmedExistingGrant = false;
 
       if (saved) {

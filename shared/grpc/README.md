@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 Scope: Documented the human-finalized six-RPC credit contract, service-token authentication, REST-only history, and generated-file attribution.
 Author review: Pending human review.
-Prompts and key responses: ../../credit-service/ai/usage-log.md, entries 007–012, 014, 016, 018, 021–022, 024 and 025.
+Prompts and key responses: ../../credit-service/ai/usage-log.md, entries 007–012, 014, 016, 018, 021–022, 024–026.
 -->
 
 # Shared gRPC contracts
@@ -30,13 +30,16 @@ user.created allocation callback; RabbitMQ startup belongs to teammates.
 Frontend balance and own-history reads use authenticated REST on port 3004.
 No gRPC history messages/client wrappers remain.
 
-- GetBalance takes user_id and returns exactly total_credits, reserved_credits,
-  and computed available_credits. Its response has no user ID or timestamps.
+- GetBalance takes user_id and returns user_id, total_credits, reserved_credits,
+  and computed available_credits. user_id is restored at field 1; timestamp fields
+  remain reserved.
 - ReserveCredits takes order_id/requester_id/amount; UpdateReservation takes
   order_id/amount/expected_version; ReleaseCredits takes order_id; SettleCredits
   takes order_id/courier_id. Each returns Reservation: order_id, requester_id,
   amount, status, optional courier_id, reservation_id, version.
-- GetReservation takes order_id and returns exactly status, amount, version.
+- GetReservation takes order_id and returns the same full Reservation message
+  as mutation calls, including order/requester/reservation IDs and optional courier.
+  The separate GetReservationResponse message/generated type is removed.
 - External amount maps to SQL credit_amount. Status values are RESERVED,
   RELEASED, SETTLED. Settle uses the existing transfer idempotency operation.
 - Credit computes its operation-scoped lookup keys and SHA-256 request hashes
@@ -45,7 +48,7 @@ No gRPC history messages/client wrappers remain.
   Mutation replies describe state immediately after their operation. A saved
   reserve retry after an update still returns the original snapshot; it can also
   describe RESERVED after a later release or settlement. Call GetReservation
-  for current status, amount, and version. Missing-result recovery fallbacks
+  for the full current reservation. Missing-result recovery fallbacks
   remain as specified in the credit-service documentation.
 - Existing retained field numbers and enum values are preserved, following the
   [Protobuf update guidance](https://protobuf.dev/programming-guides/proto3/#updating).

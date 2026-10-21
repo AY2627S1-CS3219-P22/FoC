@@ -3,7 +3,8 @@
 // Scope: Generated PostgreSQL behaviour/concurrency tests for the human-specified core credit operations.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–025 (prior scopes retained).
+// Prompts and key responses: ../ai/usage-log.md, entries 005–026 (prior scopes retained).
+// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -94,7 +95,7 @@ test('core credit operations implement the supplied state and transaction rules'
       const { requesterId } = await seedHold(3);
       const before = await state();
       assert.deepEqual(await service.getBalance({ userId: requesterId }), {
-        totalCredits: 10, reservedCredits: 3, availableCredits: 7,
+        userId: requesterId, totalCredits: 10, reservedCredits: 3, availableCredits: 7,
       });
       assert.deepEqual(await state(), before);
       await rejectsWithoutWrites(() => service.getBalance({ userId: 'not-initialized' }), 'NOT_FOUND');
@@ -120,13 +121,13 @@ test('core credit operations implement the supplied state and transaction rules'
       assert.equal(increased.amount, 6);
       assert.equal(increased.version, 2);
       assert.deepEqual(await service.getBalance({ userId: requesterId }), {
-        totalCredits: 10, reservedCredits: 6, availableCredits: 4,
+        userId: requesterId, totalCredits: 10, reservedCredits: 6, availableCredits: 4,
       });
       const decreased = await service.updateReservation({ orderId, amount: 1, expectedVersion: 2 });
       assert.equal(decreased.amount, 1);
       assert.equal(decreased.version, 3);
       assert.deepEqual(await service.getBalance({ userId: requesterId }), {
-        totalCredits: 10, reservedCredits: 1, availableCredits: 9,
+        userId: requesterId, totalCredits: 10, reservedCredits: 1, availableCredits: 9,
       });
       const history = (await client.query(
         'SELECT total_amount_change, total_reserved_change FROM credit_history WHERE order_id = $1 ORDER BY sequence_id', [orderId],
@@ -141,11 +142,11 @@ test('core credit operations implement the supplied state and transaction rules'
       const { orderId, requesterId } = await seedHold(8);
       await service.updateReservation({ orderId, amount: 10, expectedVersion: 1 });
       assert.deepEqual(await service.getBalance({ userId: requesterId }), {
-        totalCredits: 10, reservedCredits: 10, availableCredits: 0,
+        userId: requesterId, totalCredits: 10, reservedCredits: 10, availableCredits: 0,
       });
       await service.updateReservation({ orderId, amount: 1, expectedVersion: 2 });
       assert.deepEqual(await service.getBalance({ userId: requesterId }), {
-        totalCredits: 10, reservedCredits: 1, availableCredits: 9,
+        userId: requesterId, totalCredits: 10, reservedCredits: 1, availableCredits: 9,
       });
     });
 
@@ -234,7 +235,7 @@ test('core credit operations implement the supplied state and transaction rules'
       assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
       assert.equal(results.find((result) => result.status === 'rejected').reason.code, 'FAILED_PRECONDITION');
       assert.deepEqual(await service.getBalance({ userId: requesterId }), {
-        totalCredits: 10, reservedCredits: 8, availableCredits: 2,
+        userId: requesterId, totalCredits: 10, reservedCredits: 8, availableCredits: 2,
       });
       assert.deepEqual((await client.query(
         'SELECT credit_amount, version FROM reservations WHERE requester_id = $1 ORDER BY credit_amount', [requesterId],
@@ -271,7 +272,7 @@ test('core credit operations implement the supplied state and transaction rules'
         assert.equal(rejected.reason.reason, 'INSUFFICIENT_CREDITS');
       }
       assert.deepEqual(await service.getBalance({ userId: requesterId }), {
-        totalCredits: 10, reservedCredits: 9, availableCredits: 1,
+        userId: requesterId, totalCredits: 10, reservedCredits: 9, availableCredits: 1,
       });
       assert.equal((await client.query('SELECT count(*) FROM reservations WHERE requester_id = $1', [requesterId])).rows[0].count, '3');
     });
@@ -304,7 +305,7 @@ test('core credit operations implement the supplied state and transaction rules'
       const released = await service.releaseCredits({ orderId });
       assert.equal(released.status, 'RELEASED');
       assert.equal(released.version, 2);
-      assert.deepEqual(await service.getBalance({ userId: requesterId }), { totalCredits: 10, reservedCredits: 0, availableCredits: 10 });
+      assert.deepEqual(await service.getBalance({ userId: requesterId }), { userId: requesterId, totalCredits: 10, reservedCredits: 0, availableCredits: 10 });
       assert.deepEqual(await service.releaseCredits({ orderId }), released);
       await client.query("DELETE FROM idempotency_records WHERE operation_type = 'release' AND idempotency_key = $1", [orderId]);
       const before = await state();
@@ -323,8 +324,8 @@ test('core credit operations implement the supplied state and transaction rules'
       assert.equal(settled.status, 'SETTLED');
       assert.equal(settled.version, 2);
       assert.equal(settled.courierId, courierId);
-      assert.deepEqual(await service.getBalance({ userId: requesterId }), { totalCredits: 6, reservedCredits: 0, availableCredits: 6 });
-      assert.deepEqual(await service.getBalance({ userId: courierId }), { totalCredits: 14, reservedCredits: 0, availableCredits: 14 });
+      assert.deepEqual(await service.getBalance({ userId: requesterId }), { userId: requesterId, totalCredits: 6, reservedCredits: 0, availableCredits: 6 });
+      assert.deepEqual(await service.getBalance({ userId: courierId }), { userId: courierId, totalCredits: 14, reservedCredits: 0, availableCredits: 14 });
       const before = await state();
       assert.deepEqual(await service.settleCredits({ orderId, courierId }), settled);
       assert.deepEqual(await state(), before);
@@ -384,7 +385,7 @@ test('core credit operations implement the supplied state and transaction rules'
         service.settleCredits({ orderId: second, courierId: a }),
       ]);
       for (const userId of [a, b]) {
-        assert.deepEqual(await service.getBalance({ userId }), { totalCredits: 10, reservedCredits: 0, availableCredits: 10 });
+        assert.deepEqual(await service.getBalance({ userId }), { userId, totalCredits: 10, reservedCredits: 0, availableCredits: 10 });
       }
     });
 

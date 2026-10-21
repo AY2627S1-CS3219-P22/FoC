@@ -2,7 +2,8 @@
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Added human-finalized credit wrappers using existing deadline/metadata handling; removed initialization and both history wrappers.
 // Author review: Pending human review.
-// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 010–012, 016 and 021.
+// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 010–012, 016 and 021 and 026.
+// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
 // AI-generated additions; human review pending.
 
 import {
@@ -26,7 +27,6 @@ import type { ReleaseCreditsRequest } from './generated/credit/ReleaseCreditsReq
 import type { SettleCreditsRequest } from './generated/credit/SettleCreditsRequest';
 import type { UpdateReservationRequest } from './generated/credit/UpdateReservationRequest';
 import type { GetReservationRequest } from './generated/credit/GetReservationRequest';
-import type { GetReservationResponse__Output as GetReservationResponse } from './generated/credit/GetReservationResponse';
 import type { GetSupplierRequest } from './generated/supplier/GetSupplierRequest';
 import type { Supplier__Output as Supplier } from './generated/supplier/Supplier';
 import type { IsOpenRequest } from './generated/supplier/IsOpenRequest';
@@ -171,7 +171,7 @@ export function createCreditClient(target: string, config: ClientConfig = {}) {
         ),
       );
     },
-    getReservation(request: GetReservationRequest, options: RpcOptions = {}): Promise<GetReservationResponse> {
+    getReservation(request: GetReservationRequest, options: RpcOptions = {}): Promise<Reservation> {
       return unary((callback) =>
         client.getReservation(
           request,

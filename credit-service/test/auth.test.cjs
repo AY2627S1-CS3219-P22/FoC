@@ -3,7 +3,8 @@
 // Scope: Tested human-specified service/JWT authentication, gRPC authorization/error metadata, and TLS configuration.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–025 (prior scopes retained).
+// Prompts and key responses: ../ai/usage-log.md, entries 005–026 (prior scopes retained).
+// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -127,7 +128,7 @@ test('all six RPCs authenticate before business logic; known wrong service is fo
   assert.equal(calls, 0);
 });
 
-test('authorized calls preserve wire fields, project reservation reads, and return business reason trailers', async (t) => {
+test('authorized calls return user-scoped balances, full reservations, and business reason trailers', async (t) => {
   const reservation = {
     orderId: '9f27cd6c-06f0-4db7-9b45-0106dfcfc4ff', requesterId: 'requester', amount: 3,
     status: 'RESERVED', reservationId: 'c82c6bd3-bf5d-4734-bea4-4fed93906ba2', version: 1,
@@ -136,7 +137,7 @@ test('authorized calls preserve wire fields, project reservation reads, and retu
   const service = {
     async getBalance({ userId }) {
       if (userId === 'missing') throw new CreditOperationError('NOT_FOUND', 'Account missing', 'ACCOUNT_NOT_FOUND');
-      return { totalCredits: 10, reservedCredits: 3, availableCredits: 7 };
+      return { userId, totalCredits: 10, reservedCredits: 3, availableCredits: 7 };
     },
     ...Object.fromEntries(['reserveCredits', 'updateReservation', 'releaseCredits', 'settleCredits', 'getReservation']
       .map((method) => [method, async (request) => { methods.push([method, request]); return reservation; }])),
@@ -147,13 +148,13 @@ test('authorized calls preserve wire fields, project reservation reads, and retu
   t.after(async () => { client.close(); await stopServer(server, 100); });
   const metadata = new Metadata();
   metadata.set('x-credit-service-token', 'order-secret');
-  assert.deepEqual(await client.getBalance({ userId: 'requester' }, { metadata }), { totalCredits: 10, reservedCredits: 3, availableCredits: 7 });
+  assert.deepEqual(await client.getBalance({ userId: 'requester' }, { metadata }), { userId: 'requester', totalCredits: 10, reservedCredits: 3, availableCredits: 7 });
   for (const method of ['reserveCredits', 'updateReservation', 'releaseCredits', 'settleCredits']) {
     const result = await client[method]({ orderId: reservation.orderId, requesterId: 'requester', amount: 3, expectedVersion: 1, courierId: 'courier' }, { metadata });
     assert.equal(result.orderId, reservation.orderId);
     assert.equal(result.reservationId, reservation.reservationId);
   }
-  assert.deepEqual(await client.getReservation({ orderId: reservation.orderId }, { metadata }), { status: 'RESERVED', amount: 3, version: 1 });
+  assert.deepEqual(await client.getReservation({ orderId: reservation.orderId }, { metadata }), reservation);
   assert.equal(methods.length, 5);
   await assert.rejects(client.getBalance({ userId: 'missing' }, { metadata }), (error) => {
     assert.equal(error.code, status.NOT_FOUND);

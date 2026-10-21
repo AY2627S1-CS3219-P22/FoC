@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 Scope: Formatted the human's supplied requirements/design references and recorded unresolved details; no design decisions or rationales generated.
 Author review: Pending human review.
-Prompts and key responses: ../ai/usage-log.md, entries 003–012 and 014–025.
+Prompts and key responses: ../ai/usage-log.md, entries 003–012 and 014–026.
 -->
 
 # Human-supplied requirements and design
@@ -539,6 +539,24 @@ supersede the earlier spelling and TypeError/routing behavior:
 
 All 74 credit tests, eight shared checks, workspace build and local Docker
 rebuild/runtime checks pass. Historical prompts/logs retain the original typo.
+
+## Human-expanded read responses — exchange 026
+
+The [exact request](../ai/prompts/026-expanded-read-responses.md) supersedes earlier
+three-balance-only and three-field-reservation RPC response definitions.
+Balance restores string user_id at protobuf field 1, and CreditService.getBalance
+returns userId with totalCredits, reservedCredits and availableCredits.
+GetReservation returns the existing full Reservation message used by mutations:
+orderId, requesterId, amount, status, optional courierId, reservationId, version.
+The gRPC controller forwards the service result without the former projection;
+the separate GetReservationResponse message/generated type is removed. Current
+state is still read without writes, and saved mutation replies remain snapshots.
+
+Types/client wrappers were regenerated/updated. REST forwards the four-field
+balance returned by the service. Internal event-initialization result typing uses
+Omit<Balance, 'userId'> to preserve its existing three-credit result and stored
+allocation replies. No initialization payload, saved response, SQL schema or
+migration was changed by this read-contract update.
 
 ## Approved JSON attribution exception
 

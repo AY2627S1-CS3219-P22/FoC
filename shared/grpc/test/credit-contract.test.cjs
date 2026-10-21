@@ -1,8 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Generated credit wire tests and verified removal of initialization from the RPC service/client in favour of the human-decided event workflow.
 // Author review: Pending human review.
-// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012 and 016 and 021.
+// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012 and 016 and 021 and 026.
+// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
 // AI-generated; human review pending.
 
 const assert = require('node:assert/strict');
@@ -71,7 +72,7 @@ test('credit RPCs transport the finalized response shapes without caller idempot
     },
     GetReservation(call, callback) {
       assert.equal(call.request.orderId, common.orderId);
-      callback(null, { ...common, status: 'SETTLED' });
+      callback(null, { ...common, status: 'SETTLED', courierId: 'courier' });
     },
   });
   const port = await rpc.startServer(server, 0, '127.0.0.1');
@@ -82,7 +83,7 @@ test('credit RPCs transport the finalized response shapes without caller idempot
   });
 
   assert.deepEqual(await client.getBalance({ userId: 'requester' }), {
-    totalCredits: 10, reservedCredits: 3, availableCredits: 7,
+    userId: 'requester', totalCredits: 10, reservedCredits: 3, availableCredits: 7,
   });
   const reserved = await client.reserveCredits({
     orderId: common.orderId, requesterId: common.requesterId,
@@ -103,7 +104,10 @@ test('credit RPCs transport the finalized response shapes without caller idempot
   assert.equal(settled.courierId, 'courier');
   // proto-loader exposes a synthetic oneof presence marker for optional courierId.
   assert.deepEqual(Object.keys(settled).filter((key) => !key.startsWith('_')).sort(), ['amount', 'courierId', 'orderId', 'requesterId', 'reservationId', 'status', 'version']);
-  assert.deepEqual(await client.getReservation({ orderId: common.orderId }), {
+  const { _courierId, ...lookedUp } = await client.getReservation({ orderId: common.orderId });
+  assert.deepEqual(lookedUp, {
+    orderId: common.orderId, requesterId: common.requesterId,
+    reservationId: common.reservationId, courierId: 'courier',
     status: 'SETTLED', amount: 3, version: 1,
   });
 });

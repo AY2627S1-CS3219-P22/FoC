@@ -2,8 +2,9 @@
 // Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
 // Scope: Regenerated the human-finalized six-RPC credit contract after removing gRPC history.
 // Author review: Pending human review.
-// Prompts and key responses: ../../../../credit-service/ai/usage-log.md, entries 007, 009–012, 016 and 021.
+// Prompts and key responses: ../../../../credit-service/ai/usage-log.md, entries 007, 009–012, 016 and 021 and 026.
 // AI-influenced generated code; human review pending.
+// Changes in entry 026: Pending human review.
 
 import type * as grpc from '@grpc/grpc-js';
 import type { EnumTypeDefinition, MessageTypeDefinition } from '@grpc/proto-loader';
@@ -12,7 +13,6 @@ import type { Balance as _credit_Balance, Balance__Output as _credit_Balance__Ou
 import type { CreditServiceClient as _credit_CreditServiceClient, CreditServiceDefinition as _credit_CreditServiceDefinition } from './credit/CreditService';
 import type { GetBalanceRequest as _credit_GetBalanceRequest, GetBalanceRequest__Output as _credit_GetBalanceRequest__Output } from './credit/GetBalanceRequest';
 import type { GetReservationRequest as _credit_GetReservationRequest, GetReservationRequest__Output as _credit_GetReservationRequest__Output } from './credit/GetReservationRequest';
-import type { GetReservationResponse as _credit_GetReservationResponse, GetReservationResponse__Output as _credit_GetReservationResponse__Output } from './credit/GetReservationResponse';
 import type { ReleaseCreditsRequest as _credit_ReleaseCreditsRequest, ReleaseCreditsRequest__Output as _credit_ReleaseCreditsRequest__Output } from './credit/ReleaseCreditsRequest';
 import type { Reservation as _credit_Reservation, Reservation__Output as _credit_Reservation__Output } from './credit/Reservation';
 import type { ReserveCreditsRequest as _credit_ReserveCreditsRequest, ReserveCreditsRequest__Output as _credit_ReserveCreditsRequest__Output } from './credit/ReserveCreditsRequest';
@@ -29,7 +29,6 @@ export interface ProtoGrpcType {
     CreditService: SubtypeConstructor<typeof grpc.Client, _credit_CreditServiceClient> & { service: _credit_CreditServiceDefinition }
     GetBalanceRequest: MessageTypeDefinition<_credit_GetBalanceRequest, _credit_GetBalanceRequest__Output>
     GetReservationRequest: MessageTypeDefinition<_credit_GetReservationRequest, _credit_GetReservationRequest__Output>
-    GetReservationResponse: MessageTypeDefinition<_credit_GetReservationResponse, _credit_GetReservationResponse__Output>
     ReleaseCreditsRequest: MessageTypeDefinition<_credit_ReleaseCreditsRequest, _credit_ReleaseCreditsRequest__Output>
     Reservation: MessageTypeDefinition<_credit_Reservation, _credit_Reservation__Output>
     ReservationStatus: EnumTypeDefinition
@@ -38,4 +37,3 @@ export interface ProtoGrpcType {
     UpdateReservationRequest: MessageTypeDefinition<_credit_UpdateReservationRequest, _credit_UpdateReservationRequest__Output>
   }
 }
-

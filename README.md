@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Added and updated the final AI Use Summary section; existing project content was not generated in these exchanges.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: credit-service/ai/usage-log.md, entries 001–025.
+Prompts and key responses: credit-service/ai/usage-log.md, entries 001–026.
 -->
 
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
@@ -94,7 +94,8 @@ Earlier or other team usage has not yet been supplied for this summary.
   paging tests; the human-requested service-root workspace/source relocation;
   correction of the unshared migration's history spelling; explicit validation
   errors and generic logged internal errors; REST route matching/authentication
-  corrections and documented wrong-method behavior; corresponding docs and disclosures. RabbitMQ startup and User
+  corrections and documented wrong-method behavior; restored balance user IDs
+  and full-reservation lookup responses; corresponding docs and disclosures. RabbitMQ startup and User
   Service publication are assigned to teammates and not wired by this work.
   Client application retries are not yet implemented.
 - **Boundaries:** Requirements, schema, architecture, interfaces, access policies,
@@ -102,10 +103,9 @@ Earlier or other team usage has not yet been supplied for this summary.
   prioritization, backlog/sprint planning, architecture/design decisions, decision
   rationales, trade-off analyses, or risk justifications were generated.
 - **Prompts and key exchanges:** [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md)
-  links exact prompts and key outputs for entries 001–025. The latest exchange
-  records the corrected history spelling, dedicated validation errors, generic
-  internal errors/server logging, mutation snapshot documentation, and REST
-  route-matching/authentication behavior.
+  links exact prompts and key outputs for entries 001–026. The latest exchange
+  records the human-requested restoration of balance user IDs and full
+  Reservation lookup responses for Order Service integration.
   All credit-service AI records are under that service. Affected files carry
   attribution comments.
   The human approved the [service README attribution table](credit-service/README.md#attribution-for-json-files)

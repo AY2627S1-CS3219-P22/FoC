@@ -3,7 +3,8 @@
 // Scope: Implemented the human-finalized own-balance/history REST paths, query fields, JWT identity, and JSON shapes.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–025 (prior scopes retained).
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–026 (prior scopes retained).
+// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
 
 import { createServer, type ServerResponse } from 'node:http';
 import { status } from '@grpc/grpc-js';
@@ -34,7 +35,7 @@ export function createRestServer(service: CreditService, publicKeyPem: string) {
       }
       const userId = identify(request.headers.authorization);
       if (url.pathname === '/credits/me/balance') {
-        json(response, 200, { userId, ...await service.getBalance({ userId }) });
+        json(response, 200, await service.getBalance({ userId }));
       } else {
         const rawSize = optionalQuery(url.searchParams, 'pageSize');
         if (rawSize !== undefined && !/^[0-9]+$/.test(rawSize)) throw new ValidationError('Invalid pageSize');
