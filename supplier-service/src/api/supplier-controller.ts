@@ -121,7 +121,7 @@ export const updateSupplierHours = async(req:Request, res:Response, next:NextFun
 export const getNearbySuppliers = async(req:Request, res:Response, next:NextFunction) => {
     try {
         const locationQuery = supplierRadiusQuerySchema.parse(req.query);
-        const nearbySuppliers = await getNearbySuppliersService(locationQuery.latitude, locationQuery.longitude, locationQuery.radius,);
+        const nearbySuppliers = await getNearbySuppliersService({...locationQuery});
         handleResponse(res, 200, nearbySuppliers, `Nearby suppliers within ${req.query.radius} meters fetched successfully`);
     } catch (err) {
         next(err);
