@@ -1,3 +1,7 @@
+<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-21.
+Scope: Maintained the final AI Use Summary section. Team review pending.
+See order-service/usage-log.md. -->
+
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
 
 ## Friend on Campus (FoC)
@@ -64,3 +68,19 @@ internal port; host processes should use `localhost` and the published host
 port. Reserved REST ports prevent future collisions when APIs are added.
 
 ---
+
+
+## AI Use Summary
+
+Tool: ChatGPT (Codex), 2026-10-21. Modes: implementation, configuration and documentation generation.
+Used to install Express 5.2.1 and Prisma 6.19.3, transcribe and migrate the author-provided Order schema,
+and configure a local Order PostgreSQL container after the author selected
+PostgreSQL and Docker, following the existing User Service setup. Also generated the team-approved Express/gRPC startup, database-backed health,
+environment validation and application Docker setup.
+The Order schema and conditional-update acceptance strategy were supplied by
+the author. No missing schema definitions, interfaces or decision rationales were generated.
+
+Team review and validation remain pending. Prompts, key responses and verification
+results are recorded in [order-service/usage-log.md](order-service/usage-log.md). Add a link to this README
+to the submission slide deck. This entry covers this session only; the team must
+record other AI use and include applicable AGENTS.md/SKILLS.md files before submission.
