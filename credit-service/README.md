@@ -3,8 +3,8 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 Scope: Documented human-specified credit rules, SQL migrations, authenticated gRPC, Docker configuration, verification, and approved JSON attribution.
 Human Reviewed.
-Changes from entries 007–027: Pending human review. The prior Human Reviewed marker does not validate these changes.
-Prompts and key responses: ai/usage-log.md, entries 003–027.
+Changes from entries 007–028: Pending human review. The prior Human Reviewed marker does not validate these changes.
+Prompts and key responses: ai/usage-log.md, entries 003–028.
 -->
 
 # Credit service
@@ -75,7 +75,10 @@ and a clean Docker install/build/start. The local Docker working directory is
 - `settleCredits` atomically decreases the requester's total and reserved credits,
   increases the courier's total, sets `SETTLED`/courier/version, and writes
   `TRANSFER_OUT` and `TRANSFER_IN`. Missing courier accounts and self-settlement
-  fail without changes. Courier assignment is validated by Order Service.
+  fail without changes. Courier assignment is validated by Order Service. Without
+  a saved retry result, an already SETTLED reservation returns its current state
+  without writes when the courier matches; a different courier fails with
+  FAILED_PRECONDITION/REQUEST_CONFLICT. RELEASED reservations fail with INVALID_STATE.
 - `getReservation` reads the current reservation. The RPC returns the full Reservation message: orderId, requesterId, amount,
   status, optional courierId, reservationId, and version. Missing reservations fail with `NOT_FOUND`.
 

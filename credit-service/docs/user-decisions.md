@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 Scope: Formatted the human's supplied requirements/design references and recorded unresolved details; no design decisions or rationales generated.
 Author review: Pending human review.
-Prompts and key responses: ../ai/usage-log.md, entries 003–012 and 014–026.
+Prompts and key responses: ../ai/usage-log.md, entries 003–012, 014–026 and 028.
 -->
 
 # Human-supplied requirements and design
@@ -204,7 +204,7 @@ to the outstanding questions in the linked exchange.
 | Reserve | One reservation per order for its lifetime, enforced by UNIQUE(order_id). No re-reservation after release. A changed requester/amount fails; amount changes use Update. New reservation version is 1. |
 | Update | Amount replaces the total hold. Check saved result, existence, RESERVED status, expected version, changed amount, then available credits for an increase. Apply the difference to reserved credits. Unchanged amount is rejected without history or version change. |
 | Release | Missing reservation returns NOT_FOUND; SETTLED fails. RESERVED decreases reserved credits without changing total, sets RELEASED, and increments version. Already RELEASED without a saved result returns current reservation without changes. |
-| Settle | Missing reservation/account returns NOT_FOUND; missing courier account is named in the message. RELEASED fails. Courier must differ from requester and have an account. Order Service verifies assignment. Debit requester total and reserved equally, credit courier total, set courier and SETTLED, append both sides' history, and save result atomically. A different courier after settlement fails. |
+| Settle | Missing reservation/account returns NOT_FOUND; missing courier account is named in the message. RELEASED fails with INVALID_STATE. For RESERVED, courier must differ from requester and have an account; Order Service verifies assignment. Debit requester total and reserved equally, credit courier total, set courier and SETTLED, append both sides' history, and save result atomically. Saved results replay first. Without a saved result, SETTLED with the same courier returns the current reservation without writes or a replacement retry record; a different courier fails with FAILED_PRECONDITION/REQUEST_CONFLICT, as finalized in [exchange 028](../ai/prompts/028-settlement-retry-fallback.md). |
 | Reservation read | Missing reservation returns NOT_FOUND; no changes. |
 | History reads | Default page size 50, maximum 100. Invalid sizes/tokens return INVALID_ARGUMENT. Sort newest first by timestamp, then id. Unknown user returns empty entries/token. Later pages exclude entries added after page one. Exact cursor/snapshot mechanism remains unspecified. |
 

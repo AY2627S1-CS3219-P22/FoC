@@ -3,8 +3,9 @@
 // Scope: Implemented human-specified core credit business rules, reads, and transaction ownership.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–026 (prior scopes retained).
-// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–026 and 028 (prior scopes retained).
+// Changes in entries 026 and 028: Pending human review; prior review markers apply to earlier content.
+// Entry 028: AI-generated settled-reservation retry fallback; human review pending.
 
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
@@ -143,6 +144,12 @@ export class CreditService {
     return this.mutateReservation('transfer', orderId, orderId, ['SETTLE', orderId, courierId], async (repository) => {
       const reservation = await repository.findReservation(orderId);
       if (!reservation) throw new CreditOperationError('NOT_FOUND', 'Reservation not found', 'RESERVATION_NOT_FOUND');
+      if (reservation.status === 'SETTLED') {
+        if (reservation.courierId !== courierId) {
+          throw new CreditOperationError('FAILED_PRECONDITION', 'Reservation was settled with a different courier', 'REQUEST_CONFLICT');
+        }
+        return { reservation, changed: false };
+      }
       if (reservation.status !== 'RESERVED') {
         throw new CreditOperationError('FAILED_PRECONDITION', 'Reservation is not active', 'INVALID_STATE');
       }

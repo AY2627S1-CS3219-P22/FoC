@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–027 below and the linked prompt archives.
+Prompts and key responses: Entries 001–028 below and the linked prompt archives.
 -->
 
 # AI usage log
@@ -1352,6 +1352,42 @@ starts with the exchange below; it does not establish earlier team AI history.
   no external source, copied third-party code, new dependency, skill, delegation,
   commit, publication, or deployment. Prior PR-only drafting remains
   excluded from repository logs as explicitly requested by the human.
+
+## 028 — Settled-reservation retry fallback
+
+- **Timestamp:** 2026-10-21 18:47–18:49 SGT (UTC+08:00).
+- **Tool/model and modes:** OpenAI Codex, GPT-6; implementation of the human's
+  finalized settlement behavior, regression tests, documentation and disclosure.
+- **Exact prompt/key responses:** [Settlement fallback request and key
+  implementation response](prompts/028-settlement-retry-fallback.md).
+- **Human-defined change:** Without a saved result, SETTLED with the same courier
+  returns the current full reservation without writes, using the release branch's
+  return shape. SETTLED with a different courier fails with REQUEST_CONFLICT;
+  RELEASED remains INVALID_STATE; RESERVED continues normal settlement.
+- **Key output:** Added the SETTLED check before the active-state check. Same
+  courier returns `{ reservation, changed: false }`; a different courier throws
+  FAILED_PRECONDITION/REQUEST_CONFLICT. Saved-result replay/hash checks still run
+  first. No balance/history/version/replacement retry-record writes on either
+  settled fallback path. No schema, proto or shared retry-client changes.
+- **Affected locations:** credit-service/src/services/CreditService.ts;
+  test/core-credit.test.cjs; service README and docs/user-decisions.md;
+  this log and prompt archive 028; root README final AI Use Summary.
+- **Agent verification:** Observed both new PostgreSQL regressions fail before
+  the fix (same courier rejected and different courier returned INVALID_STATE).
+  Full workspace build then passed. All 77 credit checks and 51 shared checks
+  passed with PostgreSQL/temporary local listeners, zero failures/skips. New
+  cases delete the transfer retry record only inside an isolated test schema,
+  compare all four table snapshots across concurrent same-courier retries, and
+  verify the record stays absent. Different-courier conflicts include an
+  existing account, a missing account, and the requester ID. Existing coverage
+  still checks saved-result replay/conflict, RELEASED rejection and active
+  settlement. Test schemas are removed afterward; no application-data changes.
+  Diff whitespace checked.
+- **Human review/sources/instructions:** New changes await human review; prior
+  human-review markers are preserved and do not claim approval of these edits.
+  Read root AGENTS.md and the empty credit-service/AGENTS.md. Used the human's
+  explicit behavior and repository code; no external source, copied third-party
+  implementation, dependency, skill, delegation, commit, push or deployment.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the

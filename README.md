@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Added and updated the final AI Use Summary section; existing project content was not generated in these exchanges.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: credit-service/ai/usage-log.md, entries 001–027.
+Prompts and key responses: credit-service/ai/usage-log.md, entries 001–028.
 -->
 
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
@@ -96,7 +96,9 @@ Earlier or other team usage has not yet been supplied for this summary.
   errors and generic logged internal errors; REST route matching/authentication
   corrections and documented wrong-method behavior; restored balance user IDs
   and full-reservation lookup responses; bounded shared Credit client retries
-  with client/per-call settings and one overall deadline; corresponding docs and disclosures. RabbitMQ startup and User
+  with client/per-call settings and one overall deadline; no-write same-courier
+  settlement fallback and different-courier conflicts when retry records are absent;
+  corresponding docs and disclosures. RabbitMQ startup and User
   Service publication are assigned to teammates and not wired by this work.
   Credit retries use the human's three-attempt, 1,300 ms defaults and specified
   growing/capped/half-base jitter; other service clients retain their behavior.
@@ -105,15 +107,16 @@ Earlier or other team usage has not yet been supplied for this summary.
   prioritization, backlog/sprint planning, architecture/design decisions, decision
   rationales, trade-off analyses, or risk justifications were generated.
 - **Prompts and key exchanges:** [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md)
-  links exact prompts and key outputs for entries 001–027. The latest exchange
-  records the shared Credit retry request, finalized human settings and checks.
+  links exact prompts and key outputs for entries 001–028. The latest exchange
+  records the human-defined settled-reservation fallback and regression checks.
+  Entry 027 records the shared Credit retry settings and checks.
   Entry 026 records balance user IDs and full Reservation
   lookup responses for Order Service integration.
   All credit-service AI records are under that service. Affected files carry
   attribution comments.
   The human approved the [service README attribution table](credit-service/README.md#attribution-for-json-files)
   for comment-free package.json/package-lock.json changes.
-- **Verification and review:** Full workspace build, 74 credit tests against
+- **Verification and review:** Full workspace build, 77 credit tests against
   PostgreSQL/local listeners, and 51 shared contract/transport/retry tests passed,
   with zero failures/skips. A scoped Node report from exchange 022, before the
   layout relocation, for implemented credit core/API

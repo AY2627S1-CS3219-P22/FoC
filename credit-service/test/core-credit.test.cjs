@@ -3,8 +3,9 @@
 // Scope: Generated PostgreSQL behaviour/concurrency tests for the human-specified core credit operations.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–026 (prior scopes retained).
-// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–026 and 028 (prior scopes retained).
+// Changes in entries 026 and 028: Pending human review; prior review markers apply to earlier content.
+// Entry 028: AI-generated regression tests for settled-reservation retries without saved results.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -341,6 +342,45 @@ test('core credit operations implement the supplied state and transaction rules'
       const afterDelete = await state();
       assert.deepEqual(await service.reserveCredits({ orderId, requesterId, amount: 4 }), settled);
       assert.deepEqual(await state(), afterDelete);
+    });
+
+    await t.test('settled same-courier retries without a saved result return current reservation without writes', async () => {
+      const requesterId = await newAccount();
+      const courierId = await newAccount();
+      const orderId = randomUUID();
+      await service.reserveCredits({ orderId, requesterId, amount: 4 });
+      await service.settleCredits({ orderId, courierId });
+      await client.query("DELETE FROM idempotency_records WHERE operation_type = 'transfer' AND idempotency_key = $1", [orderId]);
+      const current = await service.getReservation({ orderId });
+      const before = await state();
+
+      const retries = await Promise.all(Array.from({ length: 6 }, () =>
+        service.settleCredits({ orderId, courierId })));
+      for (const result of retries) assert.deepEqual(result, current);
+      assert.equal(current.status, 'SETTLED');
+      assert.equal(current.version, 2);
+      assert.equal(current.courierId, courierId);
+      assert.deepEqual(await state(), before);
+      assert.equal((await client.query(
+        "SELECT count(*) FROM idempotency_records WHERE operation_type = 'transfer' AND idempotency_key = $1", [orderId],
+      )).rows[0].count, '0');
+    });
+
+    await t.test('settled different-courier retries without a saved result fail with REQUEST_CONFLICT and no writes', async () => {
+      const requesterId = await newAccount();
+      const courierId = await newAccount();
+      const otherCourierId = await newAccount();
+      const orderId = randomUUID();
+      await service.reserveCredits({ orderId, requesterId, amount: 4 });
+      await service.settleCredits({ orderId, courierId });
+      await client.query("DELETE FROM idempotency_records WHERE operation_type = 'transfer' AND idempotency_key = $1", [orderId]);
+
+      for (const differentCourierId of [otherCourierId, 'missing-courier', requesterId]) {
+        await rejectsWithoutWrites(
+          () => service.settleCredits({ orderId, courierId: differentCourierId }),
+          'FAILED_PRECONDITION', 'REQUEST_CONFLICT',
+        );
+      }
     });
 
     await t.test('missing courier, self settlement, and missing reservation fail with no writes', async () => {
