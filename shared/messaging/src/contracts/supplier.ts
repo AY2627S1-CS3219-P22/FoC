@@ -1,3 +1,5 @@
+//message producer
+
 export interface OpeningHoursDay {
   dayOfWeek: number;
   opensAt: string | null;

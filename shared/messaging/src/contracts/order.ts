@@ -1,6 +1,6 @@
-/*
-TODO: Add in order status
-*/
+
+//message producer for UI and Notifications
+
 export type OrderStatus =
   | "UNASSIGNED"
   | "ASSIGNED"

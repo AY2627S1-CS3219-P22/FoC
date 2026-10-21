@@ -12,15 +12,16 @@ export type RabbitMQConfig = {
   maxRetries?: number;
   /** Directory for broker.log and one file per queue. Default: logs/rabbitmq */
   logDir?: string;
+  prefetch: number; //max value of the queue length
 };
 
 export type QueueMessage<T = unknown> = {
   eventId: string;
   payload: T;
-  retryCount: number;
+  retryCount: number; 
 };
 
-
+const DEFAULT_PREFETCH = 10;
 /*
 Classic RabbitMQ singleton 
 
@@ -41,7 +42,7 @@ export class RabbitMQClient {
   private connection: ChannelModel | undefined;
   private channel: ConfirmChannel | undefined;
 
-  constructor(config: RabbitMQConfig = {}) {
+  constructor(config: RabbitMQConfig = {prefetch:100}) { 
     this.config = config;
     this.log = new QueueLogger(
       config.logDir ?? path.join(process.cwd(), 'logs', 'rabbitmq'),
@@ -91,7 +92,9 @@ export class RabbitMQClient {
   async consumeFromQueue<T = unknown>(queue: string, handler: QueueHandler<T>): Promise<boolean> {
     const channel = this.requireChannel();
     await this.assertQueueWithDeadLetter(queue);
+    await channel.prefetch(this.config.prefetch ?? DEFAULT_PREFETCH); //safety! do not move this up or down
     const maxRetries = this.config.maxRetries ?? MAX_RETRIES;
+    
 
     await channel.consume(
       queue,
@@ -173,22 +176,19 @@ export class RabbitMQClient {
   - Failure and retries exhausted → nack without requeue → DLQ
   */
 
-  private async handleDelivery<T>(
-    queue: string,
-    msg: ConsumeMessage | null,
-    handler: QueueHandler<T>,
-    maxRetries: number,
-  ): Promise<void> {
+  private async handleDelivery<T>(queue: string, msg: ConsumeMessage | null, handler: QueueHandler<T>, maxRetries: number,): Promise<void> {
+    
     if (!msg) return;
+
     const channel = this.requireChannel();
     const parsedRetry = Number(msg.properties.headers?.[RETRY_HEADER] ?? 0);
     const retryCount = Number.isFinite(parsedRetry) ? parsedRetry : maxRetries;
-
     const messageId = msg.properties.messageId ?? '';
 
     let payload: T;
     try {
       payload = JSON.parse(msg.content.toString()) as T;
+      if (payload === null) throw new Error('null payload'); //handle null case
     } catch {
       channel.nack(msg, false, false); //make sure no acknowledgement incites retry
       this.log.error('dead-letter', [queue, deadLetterQueue(queue)], {
@@ -204,31 +204,39 @@ export class RabbitMQClient {
         ? (payload as { eventId: string }).eventId
         : '');
 
+    let failure: Error | undefined
     try {
       await handler({ eventId, payload, retryCount });
       channel.ack(msg);
-      this.log.info('acked', queue, { eventId, retryCount });
+      //this.log.info('acked', queue, { eventId, retryCount });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (retryCount < maxRetries) {
-        const republished = await this.confirmSend(queue, msg.content, {
-          persistent: true,
-          messageId: msg.properties.messageId,
-          contentType: msg.properties.contentType ?? 'application/json',
-          headers: { ...msg.properties.headers, [RETRY_HEADER]: retryCount + 1 },
-        });
-        if (republished) {
-          channel.ack(msg);
-          this.log.info('retry', queue, { eventId, retryCount: retryCount + 1, message });
-        } else {
-          channel.nack(msg, false, true);
-          this.log.error('retry-blocked', queue, { eventId, retryCount, message });
-        }
-        return;
-      }
-      channel.nack(msg, false, false);
-      this.log.error('dead-letter', [queue, deadLetterQueue(queue)], { eventId, retryCount, message });
+      const failure = err instanceof Error ? err.message : String(err);
     }
+    if (!failure) {
+      channel.ack(msg);  // now outside the try haha so we dont have logging failing --> rabbitmq failing 
+      this.log.info('acked', queue, { eventId, retryCount });
+      return;
+    }
+
+    if (retryCount < maxRetries) {
+      const republished = await this.confirmSend(queue, msg.content, {
+        persistent: true,
+        messageId: msg.properties.messageId,
+        contentType: msg.properties.contentType ?? 'application/json',
+        headers: { ...msg.properties.headers, [RETRY_HEADER]: retryCount + 1 },
+      });
+      if (republished) {
+        channel.ack(msg);
+        this.log.info('retry', queue, { eventId, retryCount: retryCount + 1, message: failure.message });
+      } else {
+        channel.nack(msg, false, true);
+        this.log.error('retry-blocked', queue, { eventId, retryCount, message: failure.message });
+      }
+      return;
+    }
+    channel.nack(msg, false, false);
+    this.log.error('dead-letter', [queue, deadLetterQueue(queue)], { eventId, retryCount, message: failure.message });
+    
   }
 }
 
@@ -236,3 +244,4 @@ export * from './topology';
 export * from './contracts/credit';
 export * from './contracts/order';
 export * from './contracts/supplier';
+export * from './contracts/user';
