@@ -7,21 +7,19 @@ ALERT: AI assisted programming
 
 import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { ADMIN, USER, type Role } from '@/middleware/jwt-validation';
+import { ADMINISTATOR, USER, type Role } from '@/middleware/jwt-validation';
 
 type TokenOptions = {
   id?: string;
   roles?: Role[];
   //seconds; negative values produce an already-expired token
   expiresIn?: number;
-  roles?: string[];
 };
 
 export function signTestToken({
   id = 'test-user',
-  roles = [ADMIN],
+  roles = [ADMINISTATOR],
   expiresIn = 300,
-  roles = ['ADMINISTRATOR'],
 }: TokenOptions = {}): string {
   return jwt.sign({ roles }, process.env.TEST_JWT_PRIVATE_KEY as string, {
     algorithm: 'RS256',
@@ -30,13 +28,8 @@ export function signTestToken({
   });
 }
 
-<<<<<<< HEAD
-export const adminBearer = () => `Bearer ${signTestToken()}`;
-export const userBearer = () => `Bearer ${signTestToken({ roles: ['USER'] })}`;
-=======
-export const adminBearer = () => `Bearer ${signTestToken({ id: 'test-admin', roles: [ADMIN] })}`;
+export const adminBearer = () => `Bearer ${signTestToken({ id: 'test-admin', roles: [ADMINISTATOR] })}`;
 export const userBearer = () => `Bearer ${signTestToken({ id: 'test-user', roles: [USER] })}`;
->>>>>>> 9fd95d2 (Lost this data due to git rebase forced. Redid it with Claude)
 
 /*
 Correctly formed and signed, but by a key this service has no reason to trust.
@@ -49,7 +42,7 @@ export function foreignBearer(): string {
     publicKeyEncoding: { type: 'spki', format: 'pem' },
   });
 
-  const token = jwt.sign({ roles: [ADMIN] }, privateKey, {
+  const token = jwt.sign({ roles: [ADMINISTATOR] }, privateKey, {
     algorithm: 'RS256',
     subject: 'impostor',
     expiresIn: 300,

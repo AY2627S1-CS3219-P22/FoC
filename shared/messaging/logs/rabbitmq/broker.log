@@ -1,0 +1,6 @@
+{"time":"2026-10-19T14:19:37.278Z","level":"info","service":"order-service","queue":null,"action":"connected"}
+{"time":"2026-10-19T14:19:37.299Z","level":"info","service":"order-service","queue":"order.supplier-events","action":"published","eventId":"evt-log-demo"}
+{"time":"2026-10-19T14:19:37.301Z","level":"info","service":"order-service","queue":null,"action":"closed"}
+{"time":"2026-10-19T14:23:04.700Z","level":"info","service":"order-service","queue":null,"action":"connected"}
+{"time":"2026-10-19T14:23:04.712Z","level":"info","service":"order-service","queue":"order.supplier-events","action":"published","eventId":"evt-log-demo"}
+{"time":"2026-10-19T14:23:04.715Z","level":"info","service":"order-service","queue":null,"action":"closed"}
