@@ -120,3 +120,4 @@ export type SearchSupplier = PublicSupplier & {openingHours: PublicOpeningHours 
 export type CreateSupplierSchema = z.infer<typeof createSupplierSchema>;
 export type UpdateSupplierType = z.infer<typeof updateSupplierSchema>;
 export type SupplierCategory = z.infer<typeof SUPPLIER_CATEGORY>;
+export type LocationSupplier = z.infer<typeof supplierRadiusQuerySchema>;

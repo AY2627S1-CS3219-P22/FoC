@@ -23,9 +23,54 @@ model User {
   firstName    String
   lastName     String
   email        String   @unique
-  passwordHash String   // bcrypt hash
+  passwordHash String // bcrypt hash
   roles        Roles[]  @default([USER])
   isDeleted    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+}
+
+// One row per login session, for its whole life: rotation swaps the token on
+// this same row, so every change to a session serializes on one row lock.
+// The raw token only ever lives in the client's httpOnly cookie; we store its
+// SHA-256 hash, so a DB leak exposes no sessions.
+model RefreshToken {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash         String    @unique
+  previousTokenHash String?   @unique // the token just rotated away; lets logout still find the session
+  expiresAt         DateTime
+  revokedAt         DateTime? // set on logout; non-null = session ended
+  createdAt         DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Singleton row (id is always 1): exists once the first admin was created.
+// Bootstrap refuses to run again once it exists — even if admins are later
+// revoked — and the fixed id rejects a second concurrent insert.
+model SystemBootstrap {
+  id            Int      @id @default(1)
+  initializedAt DateTime @default(now())
+  adminUserId   String
+}
+
+enum AdminRoleAction {
+  GRANT
+  REVOKE
+}
+
+// Append-only audit of Administrator role changes. Plain ids, no FK to User:
+// the history must outlive the accounts it mentions.
+model AdminRoleChange {
+  id        String          @id @default(uuid())
+  actorId   String? // null = system bootstrap
+  targetId  String
+  action    AdminRoleAction
+  createdAt DateTime        @default(now())
+
+  @@index([targetId])
 }

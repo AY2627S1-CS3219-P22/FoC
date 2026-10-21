@@ -17,8 +17,8 @@ This starts three containers:
 | Service | What it is                              | Where                   |
 | ------- | --------------------------------------- | ----------------------- |
 | `db`    | Supabase Postgres 17, seeded at default | `127.0.0.1:54332`       |
-| `app`   | Express supplier service                | `http://localhost:3001` |
-| `grpc`  | supplier gRPC (`IsOpen` for order)      | `localhost:50054`       |
+| `app`   | Express supplier service                | `http://localhost:3002` |
+| `grpc`  | supplier gRPC (`IsOpen` for order)      | `localhost:50052`       |
 
 On its **first** start the `db` container applies everything in
 `supabase/migrations/` in timestamp order and then loads
@@ -28,7 +28,7 @@ soft-deleted, so it is excluded from list responses).
 Check it is up:
 
 ```bash
-curl localhost:3001/suppliers
+curl localhost:3002/suppliers
 ```
 
 
@@ -138,21 +138,35 @@ TODO: Set up docker secrets for seamless deployment across different devices
 `updatedAt` you received. The seed sets that to `2026-01-01T00:00:00.000Z`; any
 other value is a `409` and nothing is written.
 
-To start run `docker compose up -d --build` and the app should run on port `3001`.
+To start run `docker compose up -d --build` and the app should run on port `3002`.
 All seed data (3) are specified in `supplier-service/supabase/schemas/seed.sql`.
 
-Write routes need an RS256 Bearer token signed with `keys/private.pem`. From
-`supplier-service/` (after `yarn install`):
+Write routes need an RS256 Bearer token signed with `keys/private.pem`. The user
+service puts `roles` on the token as an **array** (`USER` or `ADMINISTRATOR`),
+not a single `role` string. From `supplier-service/` (after `yarn install`):
 
 ```bash
+# User token
 TOKEN=$(node --input-type=module -e "
 import jwt from 'jsonwebtoken';
 import fs from 'node:fs';
-const token = jwt.sign({}, fs.readFileSync('./keys/private.pem', 'utf8'), {
-  algorithm: 'RS256',
-  subject: 'demo-admin',
-  expiresIn: '15m',
-});
+const token = jwt.sign(
+  { roles: ['USER'] },
+  fs.readFileSync('./keys/private.pem', 'utf8'),
+  { algorithm: 'RS256', subject: 'demo-user', expiresIn: '15m' },
+);
+process.stdout.write(token);
+")
+
+# Admin token (use this for the write curls below)
+TOKEN=$(node --input-type=module -e "
+import jwt from 'jsonwebtoken';
+import fs from 'node:fs';
+const token = jwt.sign(
+  { roles: ['ADMIN'] },
+  fs.readFileSync('./keys/private.pem', 'utf8'),
+  { algorithm: 'RS256', subject: 'demo-admin', expiresIn: '15m' },
+);
 process.stdout.write(token);
 ")
 ```
@@ -160,22 +174,30 @@ process.stdout.write(token);
 
 | API endpoint                                | Sample curl command                                                                                                                                                                             |
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+<<<<<<< HEAD
+| `GET /suppliers`                            | `curl localhost:3002/suppliers`                                                                                                                                                                 |
+| `GET /suppliers/search?q=coffee`            | `curl "localhost:3002/suppliers/search?q=coffee"`                                                                                                                                               |
+| `GET /suppliers/search-radius`              | `curl "localhost:3002/suppliers/search-radius?latitude=1.294167&longitude=103.773611&radius=500"`                                                                                                |
+| `GET /suppliers/category?type=printing`     | `curl "localhost:3002/suppliers/category?type=printing"`                                                                                                                                        |
+| `GET /supplier/:id`                         | `curl localhost:3002/supplier/1`                                                                                                                                                                |
+=======
 | `GET /suppliers`                            | `curl localhost:3001/suppliers`                                                                                                                                                                 |
 | `GET /suppliers/search?q=coffee`            | `curl "localhost:3001/suppliers/search?q=coffee"`                                                                                                                                               |
 | `GET /suppliers/search-radius`              | `curl "localhost:3001/suppliers/search-radius?latitude=1.294167&longitude=103.773611&radius=500"`                                                                                                |
 | `GET /suppliers/category?type=printing`     | `curl "localhost:3001/suppliers/category?type=printing"`                                                                                                                                        |
 | `GET /supplier/:id`                         | `curl localhost:3001/supplier/1`                                                                                                                                                                |
+>>>>>>> a76812b (Add in the location post gis functionality)
 | `POST /supplier`                            | see the multi-line sample below; the body needs all seven days of `openingHours`                                                                                                                |
-| `PUT /supplier/:id`                         | `curl -X PUT localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'`       |
-| `DELETE /supplier/:id`                      | `curl -X DELETE localhost:3001/supplier/1 -H "Authorization: Bearer $TOKEN"`                                                                                                                    |
-| `PUT /supplier/:id/openingHours/:dayOfWeek` | `curl -X PUT localhost:3001/supplier/1/openingHours/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"opensAt":"08:30:00","closesAt":"18:00:00","isClosed":false}'` |
+| `PUT /supplier/:id`                         | `curl -X PUT localhost:3002/supplier/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'`       |
+| `DELETE /supplier/:id`                      | `curl -X DELETE localhost:3002/supplier/1 -H "Authorization: Bearer $TOKEN"`                                                                                                                    |
+| `PUT /supplier/:id/openingHours/:dayOfWeek` | `curl -X PUT localhost:3002/supplier/1/openingHours/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"opensAt":"08:30:00","closesAt":"18:00:00","isClosed":false}'` |
 
 
 ## gRPC sample commands
 
 co-written with grok and edited by @sunpterodactyl
 
-`docker compose up` starts gRPC on port `50054` against the compose database.
+`docker compose up` starts gRPC on port `50052` against the compose database.
 The client one-liners below still run from the **repo root**, because they import
 `@foc/grpc`.
 
@@ -193,14 +215,14 @@ DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres \
   npm run dev --workspace @foc/supplier-grpc
 ```
 
-That prints `supplier-service gRPC listening on 0.0.0.0:50054`. Client samples,
+That prints `supplier-service gRPC listening on 0.0.0.0:50052`. Client samples,
 from the repo root:
 
 ```bash
 # IsOpen: seed supplier 1, hours in Asia/Singapore. Prints { isOpen: true|false }
 node --input-type=module -e "
 import { createSupplierClient } from '@foc/grpc';
-const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+const supplier = createSupplierClient('localhost:50052', { timeoutMs: 3000 });
 try {
   console.log(await supplier.isOpen({ supplierId: '1' }));
 } finally {
@@ -215,7 +237,7 @@ try {
 # GetSupplier is still a stub: expect gRPC UNIMPLEMENTED, not a supplier payload
 node --input-type=module -e "
 import { createSupplierClient } from '@foc/grpc';
-const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+const supplier = createSupplierClient('localhost:50052', { timeoutMs: 3000 });
 try {
   await supplier.getSupplier({ supplierId: '1' });
 } catch (e) {
@@ -232,7 +254,7 @@ Failure cases for `IsOpen`:
 # INVALID_ARGUMENT: supplier_id must be a positive integer
 node --input-type=module -e "
 import { createSupplierClient } from '@foc/grpc';
-const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+const supplier = createSupplierClient('localhost:50052', { timeoutMs: 3000 });
 try { await supplier.isOpen({ supplierId: '0' }); }
 catch (e) { console.log(e.code, e.details); }
 finally { supplier.close(); }
@@ -241,7 +263,7 @@ finally { supplier.close(); }
 # NOT_FOUND: supplier 3 is soft-deleted in the seed
 node --input-type=module -e "
 import { createSupplierClient } from '@foc/grpc';
-const supplier = createSupplierClient('localhost:50054', { timeoutMs: 3000 });
+const supplier = createSupplierClient('localhost:50052', { timeoutMs: 3000 });
 try { await supplier.isOpen({ supplierId: '3' }); }
 catch (e) { console.log(e.code, e.details); }
 finally { supplier.close(); }
@@ -255,7 +277,7 @@ npm test --workspace @foc/grpc
 ```
 
 Order-service already has a peer client at `SUPPLIER_GRPC_ADDR` (default
-`localhost:50054`). After this process is up:
+`localhost:50052`). After this process is up:
 
 ```ts
 const { isOpen } = await clients.supplier.isOpen({ supplierId: String(id) });
@@ -269,7 +291,7 @@ unless `openingHours` has exactly seven entries with `dayOfWeek` 0 through 6, ea
 appearing once.
 
 ```bash
-curl -X POST localhost:3001/supplier \
+curl -X POST localhost:3002/supplier \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -301,16 +323,16 @@ All four return `400` and write nothing. The first three are caught by
 
 ```bash
 # 400: only six days, "Opening hours must span 7 days of the week"
-curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+curl -X POST localhost:3002/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"name":"Six Day Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000","openingHours":[{"dayOfWeek":0,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":1,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":2,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":3,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":4,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":5,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"}]}'
 
 # 400: seven entries but day 1 appears twice and day 2 is missing
-curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+curl -X POST localhost:3002/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"name":"Dup Day Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000","openingHours":[{"dayOfWeek":0,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":1,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":1,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":3,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":4,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":5,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":6,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"}]}'
 
 # 400: dayOfWeek 7. The refine() only counts seven distinct days, so the range is
 # restated on createOpeningHoursSchema; the error names openingHours.2.dayOfWeek
-curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+curl -X POST localhost:3002/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"name":"Day Seven Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000","openingHours":[{"dayOfWeek":0,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":1,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":7,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":3,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":4,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":5,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":6,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"}]}'
 ```
 
@@ -320,7 +342,7 @@ fields against each other. The table's agreement constraint rejects it and
 `PUT` reports for the same mistake:
 
 ```bash
-curl -X POST localhost:3001/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+curl -X POST localhost:3002/supplier -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"name":"Disagree Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000","openingHours":[{"dayOfWeek":0,"isClosed":true,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":1,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":2,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":3,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":4,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":5,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"},{"dayOfWeek":6,"isClosed":false,"opensAt":"09:00:00","closesAt":"17:00:00"}]}'
 ```
 
@@ -341,13 +363,13 @@ times are set. Times are `HH:MM:SS` without a timezone.
 
 ```bash
 # Monday 08:30 to 18:00
-curl -X PUT localhost:3001/supplier/1/openingHours/1 \
+curl -X PUT localhost:3002/supplier/1/openingHours/1 \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"opensAt":"08:30:00","closesAt":"18:00:00","isClosed":false}'
 
 # closed on Sunday
-curl -X PUT localhost:3001/supplier/1/openingHours/0 \
+curl -X PUT localhost:3002/supplier/1/openingHours/0 \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"opensAt":null,"closesAt":null,"isClosed":true}'
@@ -361,25 +383,25 @@ Failure cases worth trying:
 
 ```bash
 # 400: isClosed disagrees with the times
-curl -X PUT localhost:3001/supplier/1/openingHours/1 \
+curl -X PUT localhost:3002/supplier/1/openingHours/1 \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"opensAt":"09:00:00","closesAt":"17:00:00","isClosed":true}'
 
 # 400: dayOfWeek outside 0-6
-curl -X PUT localhost:3001/supplier/1/openingHours/9 \
+curl -X PUT localhost:3002/supplier/1/openingHours/9 \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"opensAt":"09:00:00","closesAt":"17:00:00","isClosed":false}'
 
 # 404: supplier 3 is soft deleted in the seed
-curl -X PUT localhost:3001/supplier/3/openingHours/1 \
+curl -X PUT localhost:3002/supplier/3/openingHours/1 \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"opensAt":"09:00:00","closesAt":"17:00:00","isClosed":false}'
 
 # 401: no token
-curl -X PUT localhost:3001/supplier/1/openingHours/1 \
+curl -X PUT localhost:3002/supplier/1/openingHours/1 \
   -H 'Content-Type: application/json' \
   -d '{"opensAt":"09:00:00","closesAt":"17:00:00","isClosed":false}'
 ```
@@ -406,15 +428,15 @@ A typical caller with no token is just curl without `-H Authorization`. Reads st
 ```bash
 # authenticate runs before validateRequest, so this 401s on the token alone and
 # the body is deliberately short: no openingHours needed to see the rejection
-curl -X POST localhost:3001/supplier \
+curl -X POST localhost:3002/supplier \
   -H 'Content-Type: application/json' \
   -d '{"name":"My Cafe","type":"food","buildingName":"COM1","locationDescription":"L1","floor":1,"latitude":"1.290000","longitude":"103.770000"}'
 
-curl -X PUT localhost:3001/supplier/1 \
+curl -X PUT localhost:3002/supplier/1 \
   -H 'Content-Type: application/json' \
   -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'
 
-curl -X DELETE localhost:3001/supplier/1
+curl -X DELETE localhost:3002/supplier/1
 ```
 
 Expected: GETs `200`, POST/PUT/DELETE `401 Unauthorized`. 

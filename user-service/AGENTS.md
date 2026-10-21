@@ -23,10 +23,15 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 - **No cross-service database access.** This service owns its own DB/schema; talk
   to other services over gRPC/REST only.
 - **Passwords are hashed (bcryptjs), never encrypted/decrypted.**
+- **All Administrator-role changes go through `adminService`:** one transaction
+  that calls `lockAdminSet` first and writes an `AdminRoleChange` row. Never
+  update an admin's `roles`/`isDeleted` directly (or via Prisma Studio). The lock
+  plus `ensureNotLastAdmin` is what guarantees at least one active admin under
+  concurrent requests — account deletion must call `ensureNotLastAdmin` too.
 - **`/health` must ping the database**, not just return 200.
 - Validate all input with zod (password rules: min 8 chars, ≥1 special, ≥1
   uppercase, ≥1 numeric — F1.1.2).
-- Ports: REST on `3001`, gRPC on `50052` (both configurable via `.env`).
+- Ports: REST on `3001`, gRPC on `50051` (both configurable via `.env`).
 
 ## Structure & conventions
 
@@ -41,8 +46,10 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 **Folder layout:**
 - `src/api/` = HTTP (REST) transport; `src/grpc/` = gRPC transport.
 - Shared building blocks (`env.ts`, `db.ts`) live at `src/` root.
-- Services live under their transport for now; extract to a shared
-  `src/services/` only when a second transport actually needs them.
+- Services live in `src/services/`, shared by both transports (moved out of
+  `src/api/` once gRPC needed them). Transports import services; services never
+  import transport code — except `import type` of DTO input shapes from
+  `api/dto/`, which is compile-time only and accepted to avoid duplicating them.
 
 **File naming — camelCase, resource-prefixed:** `userController.ts`,
 `userService.ts`, `userRoutes.ts`, `registerDto.ts`. Generic files with no

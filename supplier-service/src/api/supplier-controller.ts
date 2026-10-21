@@ -7,9 +7,20 @@ import {getSupplierByIdService,
     createSupplierService, 
     searchSuppliersService, 
     filterSuppliersByCategoryService,
+<<<<<<< HEAD
+<<<<<<< HEAD
     updateSupplierHoursByIdService,
     getNearbySuppliersService}  from '@/database/supplier-repository';
 import { SUPPLIER_CATEGORY, supplierRadiusQuerySchema, updateRequestSchema } from '@/data/schema';
+=======
+    updateSupplierHoursByIdService}  from '@/database/supplier-repository';
+import { SUPPLIER_CATEGORY, updateRequestSchema } from '@/data/schema';
+>>>>>>> 8e75931 (Update supplier hours schema, controller, repository and tests)
+=======
+    updateSupplierHoursByIdService,
+    getNearbySuppliersService}  from '@/database/supplier-repository';
+import { SUPPLIER_CATEGORY, supplierRadiusQuerySchema, updateRequestSchema } from '@/data/schema';
+>>>>>>> a76812b (Add in the location post gis functionality)
 
 const handleResponse = (res: Response, status: number, data: any, message: string) => {
     res.status(status).json({
@@ -116,14 +127,23 @@ export const updateSupplierHours = async(req:Request, res:Response, next:NextFun
     }
 }
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> a76812b (Add in the location post gis functionality)
 export const getNearbySuppliers = async(req:Request, res:Response, next:NextFunction) => {
     try {
-        const { latitude, longitude, radius } = supplierRadiusQuerySchema.parse(req.query);
-        const nearbySuppliers = await getNearbySuppliersService(latitude, longitude, radius);
-        handleResponse(res, 200, nearbySuppliers, `Nearby suppliers within ${radius} meters fetched successfully`);
+        const locationQuery = supplierRadiusQuerySchema.parse(req.query);
+        const nearbySuppliers = await getNearbySuppliersService(locationQuery);
+        handleResponse(res, 200, nearbySuppliers, `Nearby suppliers within ${req.query.radius} meters fetched successfully`);
     } catch (err) {
         next(err);
     }
 }
+<<<<<<< HEAD
+=======
+>>>>>>> 8e75931 (Update supplier hours schema, controller, repository and tests)
+=======
+>>>>>>> a76812b (Add in the location post gis functionality)
 // Idempotency: later, middleware on POST /supplier and PUT /supplier/:id
 // reads Idempotency-Key and replays the first response for the same key.

@@ -6,7 +6,7 @@
 import 'dotenv/config';
 import { app } from '@/app';
 
-const port = process.env.PORT || 3001; //local .env configuration
+const port = process.env.PORT || 3002; //local .env configuration
 
 //Server running
 app.listen(port, () => {

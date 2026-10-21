@@ -40,8 +40,8 @@ There are two ways to run this service. Choose based on what you're doing.
 ### Path A — Quick run ("just start it") 🚀
 
 Use this when you just want the service **up and running** (e.g. to try it, demo
-it, or work on another service that calls it). Everything runs in Docker; you
-don't need Node installed for this path.
+it, or work on another service that calls it). Everything runs in Docker; Node
+is only needed once, to generate the JWT keys.
 
 ```bash
 docker compose up --build
@@ -52,10 +52,18 @@ starts the service — which **automatically applies database migrations** befor
 booting. When it's ready you'll have:
 
 - REST API on <http://localhost:3001>
-- gRPC on `localhost:50052`
+- gRPC on `localhost:50051`
 
 Stop it with `Ctrl+C`, or wipe everything (including the database) with
 `docker compose down -v`.
+
+On a fresh database, create the first admin next — see
+[Administrator accounts](#administrator-accounts).
+
+> **Note:** the JWT keys are not baked into the image — compose mounts your local
+> `keys/` folder into the container (read-only). Run `npm run keys:generate`
+> first (see above), otherwise the container exits at boot with
+> "Cannot read JWT_PRIVATE_KEY_PATH".
 
 > **Note:** this path applies migrations that are already committed in
 > `prisma/migrations/`. It does **not** create new ones — that's a dev task
@@ -92,6 +100,9 @@ Leave `npm run dev` running; edit files and it restarts automatically. Stop with
 `Ctrl+C`. The Postgres container keeps running in the background — stop it with
 `docker compose stop postgres` when you're done for the day.
 
+On a fresh database, create the first admin next — see
+[Administrator accounts](#administrator-accounts).
+
 ---
 
 ## Verify it works
@@ -114,18 +125,31 @@ connection genuinely works — not just that the web server started.
 
 ## Authentication & Authorization
 
-Login issues a **stateless RS256 JWT** carrying the user's id (`sub`) and `roles`.
-Protected routes run two middlewares: `authenticate` (verifies the token → `401`
-if missing/invalid) then `requireRole(...)` (checks role claims → `403` if not
-allowed). Roles: `USER` (default) and `ADMINISTRATOR`.
+Login issues two tokens:
 
-| Method | Route              | Access                | Purpose                          |
-| ------ | ------------------ | --------------------- | -------------------------------- |
-| POST   | `/users/register`  | public                | Create an account (F1)           |
-| POST   | `/users/login`     | public                | Verify credentials → return JWT  |
-| GET    | `/users/me`        | any authenticated     | Own profile (F2.3)               |
-| GET    | `/users`           | `ADMINISTRATOR`       | List all users                   |
-| GET    | `/users/:id`       | `ADMINISTRATOR`       | View a specific user             |
+- **Access token** — a short-lived (15m) **stateless RS256 JWT** carrying the
+  user's id (`sub`) and `roles`. Returned in the response body; sent as
+  `Authorization: Bearer <token>` on every API call, to any service.
+- **Refresh token** — a long-lived (7d) opaque random string, set as an
+  **httpOnly cookie** (`refreshToken`, path `/users`). Only user-service ever
+  sees it; it is used solely to get a new access token or to log out.
+
+Protected routes run two middlewares: `authenticate` (verifies the access token →
+`401` if missing/invalid) then `requireRole(...)` (checks role claims → `403` if
+not allowed). Roles: `USER` (default) and `ADMINISTRATOR`.
+
+| Method | Route              | Access                | Purpose                                         |
+| ------ | ------------------ | --------------------- | ----------------------------------------------- |
+| POST   | `/users/register`  | public                | Create an account (F1)                          |
+| POST   | `/users/login`     | public                | Verify credentials → access token + refresh cookie |
+| POST   | `/users/refresh`   | refresh cookie        | Rotate refresh cookie → new access token        |
+| POST   | `/users/logout`    | refresh cookie        | End this browser's session (F2.2) → `204`       |
+| GET    | `/users/me`        | any authenticated     | Own profile (F2.3)                              |
+| PATCH  | `/users/me`        | any authenticated     | Update own first/last name, username (F2.4)     |
+| GET    | `/users`           | `ADMINISTRATOR`       | List all users                                  |
+| GET    | `/users/:id`       | `ADMINISTRATOR`       | View a specific user                            |
+| POST   | `/users/:id/admin` | `ADMINISTRATOR`       | Grant the Administrator role (F3.3)             |
+| DELETE | `/users/:id/admin` | `ADMINISTRATOR`       | Revoke the Administrator role (F3.3, F3.2)      |
 
 Quick demo (service running on `:3001`):
 
@@ -139,8 +163,126 @@ curl -i localhost:3001/users    -H "Authorization: Bearer $TOKEN"   # USER    �
 ```
 
 Responses only ever include public fields — `passwordHash` is never returned.
-(To get an admin, promote a user's `roles` to `["ADMINISTRATOR"]` via
-`npx prisma studio`, then log in again.)
+To get an admin account, see [Administrator accounts](#administrator-accounts).
+
+### Administrator accounts
+
+> **Upgrading from before F3?** Admins used to be created by setting `roles` in
+> Prisma Studio. Don't do this anymore, because it skips the last-admin check and the
+> audit record, and can leave accounts without the `USER` role. Reset your local database once
+> (see [Reset the database completely](#reset-the-database-completely)), then
+> create your admin with the command below.
+
+**Creating the first admin.** Run once per **database** (not per container or
+pod — they all share the same DB), from an interactive terminal:
+
+```bash
+npm run admin:create:dev                                        # Path B (local)
+docker compose exec user-service npm run admin:create           # Path A (container)
+kubectl exec -it deploy/user-service -- npm run admin:create    # Kubernetes
+```
+
+It prompts for email, username, name and password (hidden, typed twice), applies
+the same validation as `/users/register`, and creates an account with both
+`USER` and `ADMINISTRATOR`. Once that succeeds the system is **initialized**:
+re-running changes nothing, even if that admin is later revoked. The password is
+never accepted as an argument or env var. (The container must be built from a
+version that includes the script — rebuild with `docker compose up --build`.)
+
+**Granting and revoking.** Only an active admin can call these; both take the
+target user's id and no body, and both are idempotent (repeat → `200`, no change):
+
+| Request                   | Result                                                                   |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `POST /users/:id/admin`   | `200` + profile — adds `ADMINISTRATOR`; `USER` is kept                   |
+| `DELETE /users/:id/admin` | `200` + profile — removes `ADMINISTRATOR`; `USER` is kept                |
+| caller isn't an admin     | `403` — nothing changes                                                  |
+| unknown or deleted user   | `404`                                                                    |
+| would remove the last admin | `409` `Cannot revoke the last remaining active administrator.`         |
+
+```bash
+curl -i -X POST   localhost:3001/users/<userId>/admin -H "Authorization: Bearer $TOKEN"
+curl -i -X DELETE localhost:3001/users/<userId>/admin -H "Authorization: Bearer $TOKEN"
+```
+
+Rules worth knowing:
+
+- **There is always at least one active admin.** Admin changes run one at a
+  time (a database lock), so two admins revoking each other at once can't leave
+  zero. Admins may revoke themselves unless they are the last one.
+- **The caller is re-checked in the database**, not just from their token — a
+  just-demoted admin's token still says admin for up to 15m, but is refused here.
+- **The target's token updates on their next login or refresh** (≤15m).
+- **Every change is recorded** in the `AdminRoleChange` table (who, whom,
+  grant/revoke, when); the first admin's row has no actor.
+- **Never edit roles directly in the database / Prisma Studio** — that skips the
+  lock, the last-admin check and the audit record.
+
+### Sessions: refresh & logout
+
+Each login creates **one session row** (`RefreshToken` table, one per
+browser/device) that lives for the whole session. Only the SHA-256 **hash** of
+the refresh token is stored, so a database leak exposes no usable sessions.
+
+- **Refresh** (`POST /users/refresh`) — **rotates** the token: a new one is
+  issued on the same session row and the old one stops working, so each refresh
+  token works only once. The new access token carries the user's **current**
+  roles from the database. Each refresh extends the session by another 7 days
+  (sliding expiry). Fails with `401` if the token is missing, expired or revoked
+  (and clears the cookie) — or if another tab rotated it a moment ago (cookie
+  left alone, since the browser already holds the newer one).
+- **Logout** (`POST /users/logout`) — ends this browser's session and clears
+  the cookie. Always returns `204` (safe to call twice). Other devices stay
+  logged in. It also works with the token that was *just* rotated away, so a
+  logout racing a background refresh still ends the session.
+- **Cleanup:** each login first deletes that user's ended sessions (logged out
+  or expired), so the table doesn't grow without bound.
+- **Why one row per session:** refresh, logout and re-login all update that
+  single row, so Postgres's row lock makes concurrent requests on one session
+  run one after another — none can leave a live token behind.
+- **Logging in again** on a browser that still has a session revokes the old
+  session first.
+
+**Revocation trade-off:** an access token can't be revoked — other services
+verify it locally, with no call to user-service. After logout (or a role
+change), an existing access token stays valid until it expires (≤15m). Logout
+still ends the session immediately, since no new access tokens can be minted.
+Every access token carries a `jti` claim, so a denylist can be added later
+(e.g. behind an API gateway or shared Redis) without changing the token format.
+
+Try it with curl (`-c` saves cookies to a file, `-b` sends them, like a browser):
+
+```bash
+curl -i -c cookies.txt -X POST localhost:3001/users/login -H 'Content-Type: application/json' -d '{"email":"you@u.nus.edu","password":"YourPassw0rd!"}'
+curl -i -b cookies.txt -c cookies.txt -X POST localhost:3001/users/refresh   # 200, new token + rotated cookie
+curl -i -b cookies.txt -c cookies.txt -X POST localhost:3001/users/logout    # 204, cookie cleared
+curl -i -b cookies.txt -X POST localhost:3001/users/refresh                  # 401, session ended
+```
+
+(`cookies.txt` holds a live session — it's git-ignored; delete it when done.)
+
+### Frontend integration
+
+- Keep the access token **in memory** (not `localStorage`). The refresh cookie is
+  httpOnly — the browser stores and sends it automatically; JS never touches it.
+- Send `credentials: 'include'` (fetch) / `withCredentials: true` (axios) on
+  `/users/login`, `/users/refresh` and `/users/logout`, or the cookie won't be
+  stored/sent.
+- **On app start / page reload:** call `POST /users/refresh`. `200` → logged in
+  (store the new access token). `401` → show the login page.
+- **On any `401` from an API call:** call `/users/refresh` once, then retry the
+  original request with the new token. If refresh also fails → login page.
+- **If `/users/refresh` returns `401`, retry it once** before giving up. Two tabs
+  refreshing at the same moment race on the same token; the loser gets `401`,
+  but the browser already holds the winner's new cookie (the server deliberately
+  doesn't clear it in that case).
+- **Recommended:** share one in-flight refresh per tab ("single-flight") — if
+  several requests hit `401` at once, they all await the same `/users/refresh`
+  call instead of each starting their own.
+- **On logout:** call `POST /users/logout`, then drop the in-memory access token.
+- If the UI is served from a different origin than this API, user-service will
+  need CORS with `credentials: true` and an explicit allowed origin (not `*`).
+  Not configured yet — coordinate before deploying.
 
 ---
 
@@ -160,6 +302,8 @@ public key.
    - Algorithm: **RS256** (always pin it on verify)
    - Header: `Authorization: Bearer <token>`
    - Claims: `sub` = user id (string), `roles` = array of `"USER" | "ADMINISTRATOR"`
+   - Lifetime: 15 minutes. Refresh tokens are user-service-only — your service
+     never sees or handles them.
 
 **Verify snippet (Express + `jsonwebtoken`):**
 
@@ -203,6 +347,30 @@ curl -i -X POST localhost:3002/supplier -H "Authorization: Bearer $TOKEN"   # 40
 > **End-state:** once a second service consumes this, the verify logic + contract
 > types should move into a shared `@foc/auth` workspace package (single source of
 > truth, no drift). For now, copy the snippet above.
+
+### Fetching a user's public profile (gRPC)
+
+To show a user's name (e.g. on an errand), call `GetPublicProfile` instead of
+reading our database (F2.6). It returns **public fields only** — never email,
+roles or auth data.
+
+- **Address:** `localhost:50051` (plaintext for now — internal traffic only)
+- **Contract:** [`proto/user.proto`](./proto/user.proto) — copy it into your service
+- **RPC:** `user.UserService/GetPublicProfile`
+  - Request: `{ user_id }`
+  - Response: `{ user_id, username, first_name, last_name }`
+  - Errors: `INVALID_ARGUMENT` (empty `user_id`), `NOT_FOUND` (unknown or
+    deleted user), `INTERNAL` (unexpected failure)
+
+No JWT is needed — this is service-to-service, not called by end users.
+
+Try it with [`grpcurl`](https://github.com/fullstorydev/grpcurl) (`brew install grpcurl`):
+
+```bash
+grpcurl -plaintext -import-path proto -proto user.proto \
+  -d '{"user_id":"<user id>"}' \
+  localhost:50051 user.UserService/GetPublicProfile
+```
 
 ---
 
@@ -254,6 +422,8 @@ npm run prisma:migrate
 | `npm run prisma:migrate`  | Create & apply a migration (`migrate dev`)    |
 | `npm run prisma:generate` | Regenerate the Prisma client                  |
 | `npm run format`          | Format code with Prettier                     |
+| `npm run admin:create`    | Create the first admin (compiled; in the container) |
+| `npm run admin:create:dev`| Create the first admin (local, via `tsx`)     |
 
 ## Environment variables
 
@@ -263,10 +433,12 @@ Copy `.env.example` → `.env`. `.env` is gitignored — never commit real secre
 | -------------- | -------------------------------- | ------------------- |
 | `DATABASE_URL`         | Postgres connection string           | see `.env.example`   |
 | `PORT`                 | REST (Express) port                  | `3001`               |
-| `GRPC_PORT`            | gRPC port (internal profile RPC)     | `50052`              |
+| `GRPC_PORT`            | gRPC port (internal profile RPC)     | `50051`              |
 | `JWT_PRIVATE_KEY_PATH` | RS256 private key (signs tokens)     | `./keys/private.pem` |
 | `JWT_PUBLIC_KEY_PATH`  | RS256 public key (verifies tokens)   | `./keys/public.pem`  |
 | `JWT_EXPIRES_IN`       | Access-token lifetime                | `15m`                |
+| `REFRESH_TOKEN_TTL_DAYS` | Refresh-token (session) lifetime, days | `7`                |
+| `NODE_ENV`             | `production` marks the refresh cookie `Secure` (HTTPS-only) | `development` |
 
 ## Architecture
 
@@ -296,18 +468,19 @@ Request → routes → middleware → controller → service → Prisma → Post
 ```text
 user-service/
 ├── prisma/
-│   ├── schema.prisma      # User model + Roles enum
+│   ├── schema.prisma      # User, RefreshToken, SystemBootstrap, AdminRoleChange
 │   └── migrations/        # versioned schema history — commit these
 ├── proto/user.proto       # internal gRPC contract (F2.6)
 ├── src/
 │   ├── index.ts           # boots REST + gRPC
 │   ├── env.ts             # zod-validated config
 │   ├── db.ts              # Prisma client + DB ping
+│   ├── services/          # business logic shared by REST + gRPC (DB via Prisma)
+│   ├── scripts/           # operator commands (createAdmin.ts)
 │   ├── api/               # HTTP (REST) transport
 │   │   ├── app.ts         #   Express app + /health, mounts routers
 │   │   ├── routes/        #   path → handler wiring
 │   │   ├── controllers/   #   HTTP glue (read request, call service, send response)
-│   │   ├── services/      #   business logic (uniqueness, hashing, DB via Prisma)
 │   │   ├── middleware/    #   cross-cutting (e.g. zod validation)
 │   │   └── dto/           #   zod schemas: API input/output shapes
 │   └── grpc/server.ts     # gRPC transport

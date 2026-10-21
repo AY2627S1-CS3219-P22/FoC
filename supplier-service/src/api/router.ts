@@ -1,9 +1,11 @@
 import express from 'express';
+
 import { getAllSuppliers, getSupplierById, deleteSupplierById, createSupplier, updateSupplierById, searchSuppliers, filterSuppliersByCategory, updateSupplierHours, getNearbySuppliers} from '@/api/supplier-controller';
 import {validateRequest, ValidationSource} from '@/middleware/zod-validation';
 import {createSupplierSchema, updateRequestSchema, supplierIdParamSchema, supplierCategoryQuerySchema, supplierRadiusQuerySchema} from "@data/schema";
 import {openingHoursParamSchema, updateOpeningHoursBodySchema} from "@data/opening-hours-schema";
 import { authenticate, requireRole, ADMIN } from '@/middleware/jwt-validation';
+
   
 //User Routes for Supplier Service
 const supplierRouter = express.Router();
@@ -17,6 +19,7 @@ supplierRouter.delete('/supplier/:id', authenticate, requireRole(ADMIN), validat
 supplierRouter.put('/supplier/:id/openingHours/:dayOfWeek', authenticate, requireRole(ADMIN), validateRequest(openingHoursParamSchema, ValidationSource.PARAM), validateRequest(updateOpeningHoursBodySchema, ValidationSource.BODY), updateSupplierHours);
 
 
+
 //common user actions
 supplierRouter.get('/suppliers', getAllSuppliers);
 supplierRouter.get('/suppliers/search', searchSuppliers); 
@@ -26,4 +29,7 @@ supplierRouter.get('/suppliers/search-radius', validateRequest(supplierRadiusQue
 
 // get all open suppliers 
 //supplierRouter.get('/supplier/:id/opening-hours')
+
+//get all supppliers closest to me 
+//supplierRouter.get('/suppliers/search-radius', getNearbySuppliers);
 export default supplierRouter;

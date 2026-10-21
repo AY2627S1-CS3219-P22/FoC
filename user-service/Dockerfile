@@ -33,5 +33,5 @@ COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
 COPY proto ./proto
 
-EXPOSE 3001 50052
+EXPOSE 3001 50051
 CMD ["node", "dist/index.js"]

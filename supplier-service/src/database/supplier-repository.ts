@@ -6,7 +6,7 @@ AI Declaration: Migration to drizzle for createSupplierService and updateSupplie
 */ 
 
 import { db } from '@database/db'; //drizzle-orm
-import { CreateSupplierSchema, PublicSupplier, SearchSupplier, SupplierCategory, SupplierWithHours, UpdateSupplierType, supplier } from '@data/schema';
+import { CreateSupplierSchema, PublicSupplier, SupplierCategory, SupplierWithHours, UpdateSupplierType, supplier, LocationSupplier} from '@data/schema';
 import { UpdateOpeningHours, supplierOpeningHours} from '@data/opening-hours-schema';
 import { getTableColumns, isNull, eq, and, sql, desc} from 'drizzle-orm';
 import { BadRequestError, ConflictError, NotFoundError,  } from '@/middleware/errors';
@@ -233,20 +233,14 @@ export async function searchSuppliersService(text: string): Promise<PublicSuppli
   }
 
 
-export async function getNearbySuppliersService(latitude: number, longitude: number, radius: number): Promise<SupplierWithHours[]> {
-    
-    const suppliersNearby = await db.query.supplier.findMany({
-        columns: {deletedAt: false},
+export async function getNearbySuppliersService(latitude: number, longitude: number, radius: number): Promise<PublicSupplier[]> {
+    const origin = sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography`;
+    return db.query.supplier.findMany({
+        columns: { deletedAt: false },
         where: and(
             isNull(supplier.deletedAt),
-            sql`ST_DWithin(location, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326), ${radius})`
+            sql`ST_DWithin(location, ${origin}, ${radius})`,
         ),
-        with: {
-            openingHours: {
-                columns: { dayOfWeek: true, opensAt: true, closesAt: true, isClosed: true},
-                orderBy: (h, { asc }) => [asc(h.dayOfWeek)]
-            }
-        }
-    })
-    return suppliersNearby;
+        orderBy: sql`ST_Distance(location, ${origin})`,
+    });
 }
