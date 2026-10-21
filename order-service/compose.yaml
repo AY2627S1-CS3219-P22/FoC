@@ -1,0 +1,53 @@
+name: foc-order
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: order_service
+      POSTGRES_PASSWORD: order_service
+      POSTGRES_DB: order_service
+    ports:
+      - "127.0.0.1:${ORDER_DATABASE_PORT:-5433}:5432"
+    volumes:
+      - order_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U order_service -d order_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  order-service:
+    build:
+      context: ..
+      dockerfile: order-service/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://order_service:order_service@postgres:5432/order_service?schema=public
+      PORT: "3002"
+      AUTH_PROVIDER: local
+      USER_SERVICE_PUBLIC_KEY_PATH: /app/keys/user-public.pem
+    ports:
+      - "127.0.0.1:${ORDER_HTTP_PORT:-3002}:3002"
+    volumes:
+      - type: bind
+        source: ${ORDER_PUBLIC_KEY_PATH:-../user-service/keys/public.pem}
+        target: /app/keys/user-public.pem
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3002/health').then(r => { if (!r.ok) process.exit(1); }).catch(() => process.exit(1));"
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+
+volumes:
+  order_pgdata:
