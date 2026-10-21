@@ -1,7 +1,6 @@
 import React, { useState } from "react"
 import type { Page } from "../App"
 import { login } from "../api/users"
-import { isServiceDown } from "../api/client"
 
 interface Props {
   onLogin: () => void
@@ -24,12 +23,7 @@ export default function LoginPage({ onLogin, onNavigate }: Props) {
       localStorage.setItem("token", token)
       onLogin()
     } catch (err) {
-      if (isServiceDown(err)) {
-        // user-service not running: continue with mock login so the UI can still be demoed
-        onLogin()
-      } else {
-        setError(err instanceof Error ? err.message : "Login failed.")
-      }
+      setError(err instanceof Error ? err.message : "Login failed.")
     } finally {
       setLoading(false)
     }

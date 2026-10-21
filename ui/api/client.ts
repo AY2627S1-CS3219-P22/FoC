@@ -68,7 +68,3 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   if (!res.ok) throw new ApiError(errorMessage(body, res.status), res.status)
   return body as T
 }
-
-// True when the backend isn't running (so the UI can fall back to mock data)
-export const isServiceDown = (err: unknown) =>
-  !(err instanceof ApiError) || err.status === 0 || err.status >= 500

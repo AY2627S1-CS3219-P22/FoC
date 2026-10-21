@@ -1,7 +1,6 @@
 import React, { useState } from "react"
 import type { Page } from "../App"
-import { register } from "../api/users"
-import { isServiceDown } from "../api/client"
+import { login, register } from "../api/users"
 
 interface Props {
   onLogin: () => void
@@ -35,13 +34,12 @@ export default function SignupPage({ onLogin, onNavigate }: Props) {
     try {
       const { confirm: _confirm, ...data } = form
       await register(data)
-      onNavigate("login") // account created, now log in
+      // log straight in with the new account instead of making them type it again
+      const { token } = await login(data.email, data.password)
+      localStorage.setItem("token", token)
+      onLogin()
     } catch (err) {
-      if (isServiceDown(err)) {
-        onLogin() // user-service not running: continue with mock flow
-      } else {
-        setError(err instanceof Error ? err.message : "Sign up failed.")
-      }
+      setError(err instanceof Error ? err.message : "Sign up failed.")
     } finally {
       setLoading(false)
     }
