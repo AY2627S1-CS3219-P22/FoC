@@ -1,38 +1,67 @@
 # Run from inside user-service/:  docker compose up
 #
 # Common patterns:
-#   docker compose up -d postgres   # just the DB; run the app on host via `npm run dev`
+#   docker compose up -d user-db    # just the DB; run the app on host via `npm run dev`
 #   docker compose up               # DB + service together
+#
+# Ports are not published here because this file is included by the root Compose,
+# where services communicate over the internal Docker network.
+# compose.override.yaml publishes ports only for standalone development.
 
 services:
-  postgres:
+  user-db:
     image: postgres:16
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: user_service
-      POSTGRES_PASSWORD: user_service
-      POSTGRES_DB: user_service
-    ports:
-      - '5432:5432'
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
     volumes:
       - user_service_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U user_service']
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER}']
       interval: 5s
       timeout: 5s
       retries: 5
+    networks: [internal]
 
-  user-service:
-    # Context is the repo root so Docker can COPY shared/messaging.
-    # Run this file from user-service/:  docker compose up --build
+  user-migrate:
     build:
       context: ..
       dockerfile: user-service/Dockerfile
+      target: migrate
     depends_on:
-      postgres:
+      user-db:
         condition: service_healthy
     environment:
+      DATABASE_URL: 'postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@user-db:5432/${POSTGRES_DB}?schema=public'
+    networks: [internal]
+
+  user-service:
+    # Context is the repo root so Docker can COPY shared/messaging.
+    build:
+      context: ..
+      dockerfile: user-service/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      user-migrate:
+        condition: service_completed_successfully
+    # /health pings the DB
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3001/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
       # In-network the DB host is the service name, not localhost.
-      DATABASE_URL: 'postgresql://user_service:user_service@postgres:5432/user_service?schema=public'
+      DATABASE_URL: 'postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@user-db:5432/${POSTGRES_DB}?schema=public'
       PORT: '3001'
       GRPC_PORT: '50051'
       # Keys are mounted at runtime (see volumes), never baked into the image.
@@ -40,15 +69,15 @@ services:
       JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
       # Host RabbitMQ from shared/messaging. Sign-up still succeeds if this is down.
       RABBITMQ_URL: amqp://guest:guest@host.docker.internal:5672
-    ports:
-      - '3001:3001'
-      - '50051:50051'
     volumes:
       # Run `npm run keys:generate` first, or the service exits at boot.
       - ./keys:/app/keys:ro
-    # Apply migrations, then start. `migrate deploy` runs committed migrations
-    # (safe for non-dev); use `npm run prisma:migrate` locally to create them.
-    command: sh -c "npx prisma migrate deploy && node dist/index.js"
+    networks: [internal]
+
+# Private network for service-to-service traffic. Every service's compose file
+# declares the same `internal`, the root compose merges them into one network.
+networks:
+  internal:
 
 volumes:
   user_service_pgdata:

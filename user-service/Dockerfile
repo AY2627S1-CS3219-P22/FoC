@@ -1,21 +1,16 @@
 # Must be built with context = repo root (FoC/), not this folder.
-# compose.yaml sets: context: ..  dockerfile: user-service/Dockerfile
 
 # Shared messaging is an npm workspace: use its repository lockfile.
-FROM node:20-slim AS messaging-deps
+FROM node:22-slim AS messaging-deps
 WORKDIR /repo
 
 COPY package*.json ./
 COPY shared/messaging/package.json ./shared/messaging/
 COPY shared/grpc/package.json ./shared/grpc/
 
-#ignore the following for now, since package.json is deleted
 COPY order-service/grpc/package.json ./order-service/grpc/
-#ignore this for now, since package.json is deleted
 COPY credit-service/grpc/package.json ./credit-service/grpc/ 
-#ignore this for now, since package.json is deleted
 COPY supplier-service/grpc/package.json ./supplier-service/grpc/
-#ignore this for now, since package.json is deleted
 
 RUN npm ci --workspace @foc/messaging --include-workspace-root=false
 
@@ -37,7 +32,7 @@ COPY shared/messaging/src /repo/shared/messaging/src
 COPY user-service/src ./src
 COPY user-service/tsconfig.json ./
 COPY user-service/proto ./proto
-#copies all files from user-service workdir
+
 # prebuild compiles messaging; build generates Prisma and compiles this service.
 RUN npm run build
 
@@ -45,8 +40,15 @@ RUN npm run build
 FROM messaging-deps AS messaging-production
 RUN npm ci --omit=dev --workspace @foc/messaging --include-workspace-root=false
 
+# --- Migrate stage (one-off job) ---
+# Reuses the build stage, which has the pinned Prisma CLI (a devDependency)
+# plus the schema and migrations.
+FROM build AS migrate
+USER node
+CMD ["npx", "prisma", "migrate", "deploy"]
+
 # --- Runtime stage ---
-FROM node:20-slim AS runtime
+FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -75,4 +77,9 @@ COPY user-service/proto ./proto
 RUN node -e "require('@foc/messaging'); require('@prisma/client')"
 
 EXPOSE 3001 50051
+
+# The messaging logger writes to /app/logs at startup. Give the non-root user
+# that one folder; the rest of /app stays read-only to it.
+RUN mkdir -p logs && chown node:node logs
+USER node
 CMD ["node", "dist/index.js"]
