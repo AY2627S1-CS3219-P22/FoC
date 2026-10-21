@@ -29,8 +29,8 @@ function readPublicKey(): string {
 
 // Same claim values the user service puts on RS256 tokens
 export const USER = 'USER';
-export const ADMINISTATOR = 'ADMINISTATOR';
-export type Role = typeof USER | typeof ADMINISTATOR;
+export const ADMINISTRATOR = 'ADMINISTRATOR';
+export type Role = typeof USER | typeof ADMINISTRATOR;
 
 declare global {
     namespace Express {

@@ -5,12 +5,11 @@ Express app, and the gRPC server all run in containers.
 
 This stack is local only. `compose.yaml` does **not** load `.env`. It hardcodes
 `DATABASE_URL` to the compose `db` service. Do not point a production `.env` at
-this folder while you work here.
+this folder while you work here. `yarn` is the package installer and a dependency for supplier service. README.md updated to include yarn running from INSIDE docker container. 
 
 ```bash
 cd supplier-service
-yarn keys:generate   # once: writes keys/public.pem for JWT on write routes
-docker compose up -d --build
+docker run --rm -v $(pwd):/app -w /app node:alpine yarn keys:generate
 ```
 
 This starts three containers:

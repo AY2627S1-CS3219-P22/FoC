@@ -7,7 +7,7 @@ ALERT: AI assisted programming
 
 import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { ADMINISTATOR, USER, type Role } from '@/middleware/jwt-validation';
+import { ADMINISTRATOR, USER, type Role } from '@/middleware/jwt-validation';
 
 type TokenOptions = {
   id?: string;
@@ -18,7 +18,7 @@ type TokenOptions = {
 
 export function signTestToken({
   id = 'test-user',
-  roles = [ADMINISTATOR],
+  roles = [ADMINISTRATOR],
   expiresIn = 300,
 }: TokenOptions = {}): string {
   return jwt.sign({ roles }, process.env.TEST_JWT_PRIVATE_KEY as string, {
@@ -28,7 +28,7 @@ export function signTestToken({
   });
 }
 
-export const adminBearer = () => `Bearer ${signTestToken({ id: 'test-admin', roles: [ADMINISTATOR] })}`;
+export const adminBearer = () => `Bearer ${signTestToken({ id: 'test-admin', roles: [ADMINISTRATOR] })}`;
 export const userBearer = () => `Bearer ${signTestToken({ id: 'test-user', roles: [USER] })}`;
 
 /*
@@ -42,7 +42,7 @@ export function foreignBearer(): string {
     publicKeyEncoding: { type: 'spki', format: 'pem' },
   });
 
-  const token = jwt.sign({ roles: [ADMINISTATOR] }, privateKey, {
+  const token = jwt.sign({ roles: [ADMINISTRATOR] }, privateKey, {
     algorithm: 'RS256',
     subject: 'impostor',
     expiresIn: 300,
