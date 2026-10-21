@@ -3,28 +3,13 @@ syntax = "proto3";
 package credit;
 
 service CreditService {
-  // Initialisation always uses user_id as its internal retry key.
-  rpc InitCredits(InitCreditsRequest) returns (Balance);
   rpc GetBalance(GetBalanceRequest) returns (Balance);
-  rpc GetCreditHistory(GetCreditHistoryRequest) returns (CreditHistory);
-  // Mutations commit balances, history, and retry results atomically.
-  // Retry identities are internal: reserve/release/settle use order_id;
-  // updates use (order_id, expected_version). Repeat the original request to retry.
-  // Successful retries return the ORIGINAL response, even after later changes.
-  // Conflicting parameters or invalid transitions fail with FAILED_PRECONDITION.
+  // Mutations must be atomic and idempotent by order_id when implemented.
+  // Repeating an identical operation returns the existing reservation;
+  // conflicting amounts/users or invalid transitions fail with FAILED_PRECONDITION.
   rpc ReserveCredits(ReserveCreditsRequest) returns (Reservation);
-  rpc UpdateReservation(UpdateReservationRequest) returns (Reservation);
   rpc ReleaseCredits(ReleaseCreditsRequest) returns (Reservation);
   rpc SettleCredits(SettleCreditsRequest) returns (Reservation);
-  // Current reservation state and version for reconciliation; never a retry result.
-  rpc GetReservation(GetReservationRequest) returns (Reservation);
-}
-
-message InitCreditsRequest {
-  string user_id = 1;
-  // Retired caller-supplied key; never reuse its field number or name.
-  reserved 2;
-  reserved "idempotency_key";
 }
 
 message GetBalanceRequest {
@@ -35,7 +20,6 @@ message Balance {
   string user_id = 1;
   int32 available_credits = 2;
   int32 reserved_credits = 3;
-  int32 total_credits = 4;
 }
 
 message ReserveCreditsRequest {
@@ -43,35 +27,15 @@ message ReserveCreditsRequest {
   string requester_id = 2;
   // Positive whole credits. Insufficient available balance: FAILED_PRECONDITION.
   int32 amount = 3;
-  reserved 4;
-  reserved "idempotency_key";
-}
-
-message UpdateReservationRequest {
-  string order_id = 1;
-  int32 amount = 2;
-  // Use the version returned by the previous reservation mutation.
-  // Repeat the same version and amount on retry, even if the first response was lost.
-  uint32 expected_version = 3;
-  reserved 4;
-  reserved "idempotency_key";
 }
 
 message ReleaseCreditsRequest {
   string order_id = 1;
-  reserved 2;
-  reserved "idempotency_key";
 }
 
 message SettleCreditsRequest {
   string order_id = 1;
   string courier_id = 2;
-  reserved 3;
-  reserved "idempotency_key";
-}
-
-message GetReservationRequest {
-  string order_id = 1;
 }
 
 enum ReservationStatus {
@@ -88,30 +52,4 @@ message Reservation {
   ReservationStatus status = 4;
   // Empty until settlement.
   string courier_id = 5;
-  string reservation_id = 6;
-  uint32 version = 7;
-}
-
-message GetCreditHistoryRequest {
-  string user_id = 1;
-  // Default 50, maximum 100.
-  uint32 page_size = 2;
-  string page_token = 3;
-}
-
-message CreditHistoryEntry {
-  string id = 1;
-  string user_id = 2;
-  string type = 3;
-  int32 total_delta = 4;
-  int32 reserved_delta = 5;
-  string order_id = 6;
-  string reservation_id = 7;
-  // UTC ISO 8601 timestamp.
-  string created_at = 8;
-}
-
-message CreditHistory {
-  repeated CreditHistoryEntry entries = 1;
-  string next_page_token = 2;
 }

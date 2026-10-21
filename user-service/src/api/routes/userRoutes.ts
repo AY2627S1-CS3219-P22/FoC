@@ -32,3 +32,9 @@ userRouter.get('/', authenticate, requireRole('ADMINISTRATOR'), userController.l
 
 // GET /users/:id
 userRouter.get('/:id', authenticate, requireRole('ADMINISTRATOR'), userController.getUserById);
+
+// POST /users/:id/admin
+userRouter.post('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userController.grantAdmin);
+
+// DELETE /users/:id/admin
+userRouter.delete('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userController.revokeAdmin);
