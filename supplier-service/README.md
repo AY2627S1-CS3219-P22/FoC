@@ -226,14 +226,13 @@ try {
 `supplierId` is a `uint64`, so it is a **string** on the wire (`'1'`, not `1`).
 
 ```bash
-# GetSupplier is still a stub: expect gRPC UNIMPLEMENTED, not a supplier payload
+# GetSupplier: name, latitude, longitude for seed supplier 1
 node --input-type=module -e "
 import { createSupplierClient } from '@foc/grpc';
 const supplier = createSupplierClient('localhost:50052', { timeoutMs: 3000 });
 try {
-  await supplier.getSupplier({ supplierId: '1' });
-} catch (e) {
-  console.log(e.code, e.details);
+  const { name, latitude, longitude } = await supplier.getSupplier({ supplierId: '1' });
+  console.log({ name, latitude, longitude });
 } finally {
   supplier.close();
 }
@@ -273,6 +272,9 @@ Order-service already has a peer client at `SUPPLIER_GRPC_ADDR` (default
 
 ```ts
 const { isOpen } = await clients.supplier.isOpen({ supplierId: String(id) });
+const { name, latitude, longitude } = await clients.supplier.getSupplier({
+  supplierId: String(id),
+});
 ```
 
 ## Creating a supplier

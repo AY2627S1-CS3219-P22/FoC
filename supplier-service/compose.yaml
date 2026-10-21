@@ -51,8 +51,8 @@ services:
       USER_SERVICE_PUBLIC_KEY_PATH: /app/keys/public.pem
     volumes:
       # Mount user-service's keys (generate them there with `npm run keys:generate`).
-      # Mount the directory so a missing public.pem is not created as a folder.
-      - ../user-service/keys:/app/keys:ro
+      # Mount the directory so a missing public.pem is not created as a folder. Make sure to only mount public.pem
+      - ../user-service/keys:/app/keys/public.pem:ro
     depends_on:
       db:
         condition: service_healthy
