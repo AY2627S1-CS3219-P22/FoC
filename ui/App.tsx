@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Navbar from "./components/Navbar"
 import LoginPage from "./pages/LoginPage"
 import SignupPage from "./pages/SignupPage"
@@ -11,6 +11,8 @@ import ProfilePage from "./pages/ProfilePage"
 import AdminPage from "./pages/AdminPage"
 import SuppliersPage from "./pages/SuppliersPage"
 import { SEED_ORDERS } from "./api/orders"
+import { getMe, logout, type ApiUser } from "./api/users"
+import { refreshToken } from "./api/client"
 
 export type Page =
   | "login"
@@ -64,6 +66,15 @@ const CURRENT_USER: User = {
   creditsEarned: 9,
 }
 
+// Credits and stats aren't in user-service, so those still come from the mock user for now
+const fromApiUser = (u: ApiUser): User => ({
+  ...CURRENT_USER,
+  id: u.id,
+  name: `${u.firstName} ${u.lastName}`,
+  email: u.email,
+  memberSince: new Date(u.createdAt).toLocaleDateString("en-SG", { month: "long", year: "numeric" }),
+})
+
 function SuccessScreen({
   title,
   subtitle,
@@ -116,6 +127,7 @@ function SuccessScreen({
 export default function App() {
   const [page, setPage]           = useState<Page>("login")
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [user, setUser]           = useState<User>(CURRENT_USER)
   const [orders, setOrders]       = useState<Order[]>(SEED_ORDERS)
   const [selectedOrderId, setSelectedOrderId] = useState<string>("o1")
@@ -130,12 +142,31 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "instant" })
   }
 
+  // keeps the mock user if user-service isn't running
+  const loadUser = () => getMe().then((u) => setUser(fromApiUser(u))).catch(() => {})
+
+  // Stay logged in across reloads if the refresh cookie is still valid
+  useEffect(() => {
+    refreshToken()
+      .then((token) => {
+        if (!token) return
+        setIsLoggedIn(true)
+        setPage("orders")
+        loadUser()
+      })
+      .finally(() => setCheckingSession(false))
+  }, [])
+
   const handleLogin = () => {
     setIsLoggedIn(true)
+    loadUser()
     navigate("orders")
   }
 
   const handleLogout = () => {
+    logout().catch(() => {})
+    localStorage.removeItem("token")
+    setUser(CURRENT_USER)
     setIsLoggedIn(false)
     navigate("login")
   }
@@ -169,6 +200,8 @@ export default function App() {
     acceptedOrderId
       ? (orders.find((o) => o.id === acceptedOrderId)?.credits ?? 4)
       : 4
+
+  if (checkingSession) return null
 
   // Unauthenticated
   if (!isLoggedIn) {
