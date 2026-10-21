@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–026 below and the linked prompt archives.
+Prompts and key responses: Entries 001–027 below and the linked prompt archives.
 -->
 
 # AI usage log
@@ -1307,6 +1307,51 @@ starts with the exchange below; it does not establish earlier team AI history.
   merge or deployment performed.
 - **Remaining integrations:** RabbitMQ startup/User Service publication remain
   teammate-owned; automatic client retries and archival/restoration are unchanged.
+
+## 027 — Shared Credit client retry request
+
+- **Timestamp:** 2026-10-21 16:28 SGT (UTC+08:00).
+- **Completion timestamp:** 2026-10-21 16:50 SGT (UTC+08:00).
+- **Tool/model and modes:** OpenAI Codex, GPT-6; bounded requirements
+  interpretation, implementation after human finalization, regression testing,
+  documentation and disclosure maintenance.
+- **Exact prompt/key responses:** [Retry request, exact human answers and
+  implementation/check results](prompts/027-shared-credit-retries.md).
+- **Human-defined behavior:** Cover all six Credit RPCs using an application
+  loop, at most three total attempts, short growing/capped/jittered backoff,
+  one deadline covering attempts and delays, no retry after the client's deadline,
+  no retry when its delay consumes the remaining budget, and return the last
+  error unchanged. Earlier retryable codes remain UNAVAILABLE, ABORTED and
+  DEADLINE_EXCEEDED. The human then finalized a 1,300 ms budget; 50 ms initial
+  delay, growth factor 2, 500 ms cap, half-base plus random-half jitter; each
+  attempt uses the remaining time; defaults allow optional client and per-call
+  overrides. No separate per-attempt cap was introduced.
+- **Key output:** All six shared Credit wrappers use the application loop and
+  one absolute deadline. Client/per-call fields are maxAttempts, initialDelayMs,
+  backoffMultiplier, maxDelayMs, plus the existing timeoutMs/deadline. Overrides
+  merge individually. Retryable codes only are retried. Delay >= remaining time
+  skips the wait/retry; late timers cannot start an expired attempt. The original
+  last error is thrown unchanged. Already expired upstream calls reject with
+  DEADLINE_EXCEEDED without a transport attempt. Other service clients retain
+  their behavior. Existing explicit timeoutMs, including createPeerClients
+  configuration, overrides the new Credit default. No proto/schema change.
+- **Affected locations:** shared/grpc/src/clients.ts and
+  test/credit-retries.test.cjs; shared and credit-service READMEs; this log,
+  prompt archive 027, and the root README final disclosure.
+- **Agent verification:** Full workspace build, 51 shared checks (43 new retry
+  checks), and all 74 credit checks against PostgreSQL/local listeners passed,
+  zero failures/skips in the completed runs. Coverage includes all six methods,
+  status selection, exact error identity/trailers, configuration precedence,
+  jitter bounds/capping, whole-call and upstream deadlines, skipped delays,
+  late timers, and real wire metadata/request/error preservation. The initial
+  sandbox-only listener check failed with EPERM; authorized local-listener
+  rerun passed. Diff whitespace checked. No Order retry implementation was found
+  in this checkout; no teammate branches were inspected.
+- **Human review/sources/instructions:** Human review pending. Read root
+  AGENTS.md and the empty credit-service/AGENTS.md. Used repository sources;
+  no external source, copied third-party code, new dependency, skill, delegation,
+  commit, publication, or deployment. Prior PR-only drafting remains
+  excluded from repository logs as explicitly requested by the human.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the

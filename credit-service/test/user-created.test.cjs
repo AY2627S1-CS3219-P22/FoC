@@ -79,3 +79,17 @@ test('invalid event type or user identity fails before initialization', async ()
   }
   assert.equal(calls, 0);
 });
+
+test('eventId and occurredAt are optional but must be strings when present', async () => {
+  const seen = [];
+  const handler = createUserCreatedHandler({
+    async initCredits(input) { seen.push(input.userId); return balance; },
+  });
+  await handler({ payload: { type: 'user.created', userId: 'new-user' } });
+  await handler({ payload: event({ eventId: undefined, occurredAt: undefined }) });
+  assert.deepEqual(seen, ['new-user', 'new-user']);
+  for (const payload of [event({ eventId: 42 }), event({ occurredAt: 123 })]) {
+    await assert.rejects(handler({ payload }), ValidationError);
+  }
+  assert.equal(seen.length, 2);
+});

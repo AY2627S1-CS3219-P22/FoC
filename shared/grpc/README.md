@@ -1,9 +1,9 @@
 <!--
 AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-Scope: Documented the human-finalized six-RPC credit contract, service-token authentication, REST-only history, and generated-file attribution.
+Scope: Documented the human-finalized six-RPC credit contract, authentication, REST-only history, generated-file attribution, and bounded Credit client retries.
 Author review: Pending human review.
-Prompts and key responses: ../../credit-service/ai/usage-log.md, entries 007–012, 014, 016, 018, 021–022, 024–026.
+Prompts and key responses: ../../credit-service/ai/usage-log.md, entries 007–012, 014, 016, 018, 021–022, 024–027.
 -->
 
 # Shared gRPC contracts
@@ -61,7 +61,7 @@ For local plaintext development, with the same configured secret on both service
 import { Metadata } from '@grpc/grpc-js';
 import { createCreditClient } from '@foc/grpc';
 
-const credit = createCreditClient('localhost:50054', { timeoutMs: 3000 });
+const credit = createCreditClient('localhost:50054'); // 1,300 ms overall budget.
 const metadata = new Metadata();
 metadata.set('x-credit-service-token', process.env.CREDIT_ORDER_SERVICE_TOKEN!);
 try {
@@ -83,9 +83,62 @@ errors such as ordinary TypeError return generic INTERNAL details and are logged
 server-side. Existing business/authentication/transient mappings are preserved.
 
 Per-call options accept metadata, timeoutMs, and an upstream deadline. The client
-preserves error codes/details/trailers and uses the earlier deadline. Automatic
-application retries are not implemented. See [gRPC deadlines](https://grpc.io/docs/guides/deadlines/)
-and [credit-service setup](../../credit-service/README.md).
+preserves error codes/details/trailers and uses the earlier deadline. See
+[gRPC deadlines](https://grpc.io/docs/guides/deadlines/) and
+[credit-service setup](../../credit-service/README.md).
+
+### Credit client retries
+
+All six Credit RPC wrappers use an application retry loop. Only UNAVAILABLE,
+ABORTED, and DEADLINE_EXCEEDED are retried. The built-in settings are:
+
+| Client/per-call option | Default | Meaning |
+| --- | ---: | --- |
+| timeoutMs | 1300 | Overall budget, including attempts and backoff |
+| maxAttempts | 3 | Total attempts, including the initial call |
+| initialDelayMs | 50 | Base delay before the first retry |
+| backoffMultiplier | 2 | Growth factor for each later base delay |
+| maxDelayMs | 500 | Cap on the base delay before jitter |
+
+For each retry, the delay is `base / 2 + Math.random() * base / 2`. The base starts
+at `min(initialDelayMs, maxDelayMs)` and grows up to maxDelayMs. Default retry
+delays therefore fall between 25–50 ms and 50–100 ms.
+
+Client config overrides the defaults; per-call options override individual client
+settings. Set maxAttempts to 1 to disable application retries for that call/client.
+Attempts must be positive safe integers. Delay settings accept integer milliseconds
+from 0 through 2147483647; backoffMultiplier must be finite and at least 1.
+
+```typescript
+const credit = createCreditClient('localhost:50054', {
+  timeoutMs: 1300,
+  maxAttempts: 3,
+  initialDelayMs: 50,
+  backoffMultiplier: 2,
+  maxDelayMs: 500,
+});
+
+const reservation = await credit.getReservation(
+  { orderId },
+  { metadata, deadline: incomingDeadline, maxAttempts: 1 },
+);
+```
+
+One absolute deadline is calculated when the call starts. Every attempt uses all
+remaining time under that deadline; there is no separate per-attempt cap. An earlier
+upstream deadline wins. A server's early DEADLINE_EXCEEDED can retry only if time
+remains after the delay. A timeout that consumes the entire budget cannot retry.
+If the delay consumes the remaining budget, no wait or retry begins. The deadline
+is checked again after waiting to account for late timers. When attempts or time
+run out, the last error object is thrown unchanged, preserving its code, details,
+and metadata. If the upstream deadline is already expired before any attempt,
+the wrapper rejects with DEADLINE_EXCEEDED without invoking the transport.
+
+Requests and supplied metadata are reused across attempts. Mutation retries replay
+saved operation snapshots; use GetReservation for current state. Other service
+clients retain their existing single-attempt behavior and 3,000 ms default timeout.
+An explicit timeoutMs, including one passed through createPeerClients from a
+service's GRPC_TIMEOUT_MS configuration, overrides Credit's 1,300 ms default.
 
 ## Build and verify
 
@@ -98,8 +151,9 @@ npm run build
 npm test
 ```
 
-The eight shared tests passed after the contract removal and controller changes.
-Credit's PostgreSQL/REST/authentication tests run separately in its workspace.
+The 51 shared checks passed after adding Credit retries, including deterministic
+deadline/backoff/error checks and real gRPC transport coverage. Credit's
+PostgreSQL/REST/authentication tests run separately in its workspace.
 Credit source lives under credit-service/src/{domains,repos,services,grpc,rest,events},
 with env.ts/index.ts in src and its package/test/scripts at the service root. The
 existing @foc/credit-grpc package identifier is retained.

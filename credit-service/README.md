@@ -3,8 +3,8 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 Scope: Documented human-specified credit rules, SQL migrations, authenticated gRPC, Docker configuration, verification, and approved JSON attribution.
 Human Reviewed.
-Changes from entries 007–026: Pending human review. The prior Human Reviewed marker does not validate these changes.
-Prompts and key responses: ai/usage-log.md, entries 003–026.
+Changes from entries 007–027: Pending human review. The prior Human Reviewed marker does not validate these changes.
+Prompts and key responses: ai/usage-log.md, entries 003–027.
 -->
 
 # Credit service
@@ -140,8 +140,18 @@ Only the dedicated ValidationError maps to INVALID_ARGUMENT (or REST 400).
 Unexpected errors, including ordinary TypeError, return generic INTERNAL/500
 messages and are logged with the original error on the server. Known business,
 authentication and transient error mappings are preserved, as confirmed by the
-human in exchange 025. The shared client preserves codes/trailers and deadlines;
-automatic retries are not yet implemented.
+human in exchange 025. The shared Credit client preserves codes/trailers and
+retries only UNAVAILABLE, ABORTED and DEADLINE_EXCEEDED using an application loop.
+The defaults are three total attempts within one 1,300 ms budget; the backoff base
+starts at 50 ms, doubles, caps at 500 ms, and each wait is half the base plus a
+random amount up to half the base. Every attempt uses the remaining budget.
+Earlier upstream deadlines apply; delays that consume the remaining time are
+skipped, and no retry starts after expiration. The last error is returned unchanged.
+Client/per-call overrides are documented in the
+[shared client reference](../shared/grpc/README.md#credit-client-retries), including
+the existing timeoutMs override and maxAttempts/initialDelayMs/backoffMultiplier/
+maxDelayMs. Existing createPeerClients callers supplying GRPC_TIMEOUT_MS override
+the 1,300 ms default. Other service client behavior is unchanged.
 
 ## Frontend REST and user history
 
