@@ -78,7 +78,8 @@ and configure a local Order PostgreSQL container after the author selected
 PostgreSQL and Docker, following the existing User Service setup. Also generated the team-approved Express/gRPC startup, database-backed health,
 environment validation and application Docker setup.
 Also implemented author-specified creation, credit-edit recovery, cancellation
-and expiry, with tests and a durable OrderEditOperation migration. The author
+and expiry, with tests and a durable OrderEditOperation migration. Added the
+author-approved administrator-only GET /orders listing with authorization tests. The author
 supplied the schema, contracts, retry schedule and final first-lock-wins rule.
 Human decisions and superseded requirements are recorded in the service usage log;
 no decision rationales were drafted.
