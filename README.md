@@ -1,4 +1,4 @@
-<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-21.
+<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-21–2026-10-22.
 Scope: Maintained the final AI Use Summary section. Team review pending.
 See order-service/usage-log.md. -->
 
@@ -72,13 +72,16 @@ port. Reserved REST ports prevent future collisions when APIs are added.
 
 ## AI Use Summary
 
-Tool: ChatGPT (Codex), 2026-10-21. Modes: implementation, configuration and documentation generation.
+Tool: ChatGPT (Codex), 2026-10-21–2026-10-22. Modes: implementation, configuration and documentation generation.
 Used to install Express 5.2.1 and Prisma 6.19.3, transcribe and migrate the author-provided Order schema,
 and configure a local Order PostgreSQL container after the author selected
 PostgreSQL and Docker, following the existing User Service setup. Also generated the team-approved Express/gRPC startup, database-backed health,
 environment validation and application Docker setup.
-The Order schema and conditional-update acceptance strategy were supplied by
-the author. No missing schema definitions, interfaces or decision rationales were generated.
+Also implemented author-specified creation, credit-edit recovery, cancellation
+and expiry, with tests and a durable OrderEditOperation migration. The author
+supplied the schema, contracts, retry schedule and final first-lock-wins rule.
+Human decisions and superseded requirements are recorded in the service usage log;
+no decision rationales were drafted.
 
 Team review and validation remain pending. Prompts, key responses and verification
 results are recorded in [order-service/usage-log.md](order-service/usage-log.md). Add a link to this README
