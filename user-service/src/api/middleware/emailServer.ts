@@ -6,8 +6,8 @@ Using Nodemailer
 const nodemailer = require('nodemailer')
 
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST ?? 'localhost',
-    port: Number(process.env.SMTP_PORT ?? 1025),
+    host: process.env.SMTP_HOST ?? 'localhost', //TODO: Fill in with real smtp host
+    port: Number(process.env.SMTP_PORT ?? 1025), //TODO: Fill in with real smtp port
     secure: false
 })
 
@@ -21,7 +21,7 @@ interface EmailOptions {
 export const sendEmail = async ({ to, subject, text, html }: EmailOptions): Promise<void> => {
     try {
       const info = await transporter.sendMail({
-        from: '"Your Name" <your-email@example.com>',
+        from: '"Your Name" <your-email@example.com>', //TODO: Fill in with real email
         to,
         subject,
         ...(text ? { text } : {}),
