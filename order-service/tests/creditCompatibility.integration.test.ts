@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
 import { before, after, test } from 'node:test';
 import { Metadata } from '@grpc/grpc-js';
 import { createCreditClient, startServer, stopServer } from '@foc/grpc';
@@ -19,14 +20,49 @@ if (!orderUrl || !/^\/order_service_test(?:_[a-z0-9]+)?$/.test(new URL(orderUrl)
   throw new Error('Dedicated TEST_DATABASE_URL required');
 if (!creditUrl || new URL(creditUrl).pathname !== '/credit_test')
   throw new Error('Dedicated CREDIT_TEST_DATABASE_URL named credit_test required');
-const { createPool, CreditDatabase } = require('../../credit-service/dist/database/database');
-const { migrate } = require('../../credit-service/dist/database/migrate');
-const { CreditService } = require('../../credit-service/dist/services/credit-service');
-const { createGrpcServer } = require('../../credit-service/dist/grpc/server');
-const pool = createPool(creditUrl);
-const server = createGrpcServer(new CreditService(new CreditDatabase(pool)), {
-  serviceTokens: { 'order-service': 'o'.repeat(64), 'user-service': 'u'.repeat(64) }, audit() {},
-});
+// Optional external checkout/export: test the unmerged Credit implementation
+// without copying its source or replacing this branch's Credit service.
+const featureRoot = process.env.CREDIT_IMPLEMENTATION_ROOT;
+let pool: any;
+let server: ReturnType<typeof import('@foc/grpc').createServer>;
+let initialize: (userId: string) => Promise<unknown>;
+let migrateCredit: () => Promise<void>;
+let cleanupCredit: () => Promise<void> = async () => {};
+if (featureRoot) {
+  const root = path.resolve(featureRoot);
+  const { Pool } = require('pg');
+  const { CreditService } = require(path.join(root, 'dist/services/CreditService'));
+  const { createGrpcServer } = require(path.join(root, 'dist/grpc/server'));
+  const { createUserCreatedHandler } = require(path.join(root, 'dist/events/userCreated'));
+  // Every run has a private schema inside the explicitly selected test DB.
+  const schema = `order_credit_${randomUUID().replaceAll('-', '')}`;
+  pool = new Pool({ connectionString: creditUrl, options: `-c search_path=${schema}` });
+  const service = new CreditService(pool);
+  server = createGrpcServer(service, { 'order-service': 'o'.repeat(64) });
+  const onCreated = createUserCreatedHandler(service);
+  initialize = userId => onCreated({ payload: {
+    type: 'user.created', userId, eventId: randomUUID(), occurredAt: new Date().toISOString(),
+  } });
+  migrateCredit = async () => {
+    await pool.query(`CREATE SCHEMA "${schema}"`);
+    const directory = path.join(root, 'migrations');
+    for (const file of readdirSync(directory).filter(name => /^00[1-6]_.*\.sql$/.test(name)).sort()) {
+      await pool.query(readFileSync(path.join(directory, file), 'utf8'));
+    }
+  };
+  cleanupCredit = async () => { await pool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`); };
+} else {
+  const { createPool, CreditDatabase } = require('../../credit-service/dist/database/database');
+  const { migrate } = require('../../credit-service/dist/database/migrate');
+  const { CreditService } = require('../../credit-service/dist/services/credit-service');
+  const { createGrpcServer } = require('../../credit-service/dist/grpc/server');
+  pool = createPool(creditUrl);
+  server = createGrpcServer(new CreditService(new CreditDatabase(pool)), {
+    serviceTokens: { 'order-service': 'o'.repeat(64), 'user-service': 'u'.repeat(64) }, audit() {},
+  });
+  migrateCredit = () => migrate(pool);
+  initialize = userId => client.initCredits({ userId }, metadata('u'.repeat(64)));
+}
 const db = new PrismaClient({ datasources: { db: { url: orderUrl } } });
 const requester = identity(randomUUID()), courier = identity(randomUUID());
 let connection: ReturnType<typeof configuredCreditGateway>;
@@ -49,14 +85,14 @@ before(async () => {
   execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
     cwd: path.resolve(__dirname, '..'), env: { ...process.env, DATABASE_URL: orderUrl }, stdio: 'pipe',
   });
-  await migrate(pool);
+  await migrateCredit();
   const port = await startServer(server, 0, '127.0.0.1');
   client = createCreditClient(`127.0.0.1:${port}`);
   connection = configuredCreditGateway({ CREDIT_GRPC_ADDR: `127.0.0.1:${port}`,
     CREDIT_ORDER_SERVICE_TOKEN: 'o'.repeat(64), CREDIT_RPC_TIMEOUT_MS: 3000 });
   commands = createOrderCommands(db, { ...fakeDependencies().dependencies, credits: connection!.gateway });
   for (const userId of [requester.id, courier.id])
-    await client.initCredits({ userId }, metadata('u'.repeat(64)));
+    await initialize(userId);
 });
 after(async () => {
   connection?.close(); client?.close(); await stopServer(server, 100);
@@ -64,7 +100,7 @@ after(async () => {
     await db.creditOperation.deleteMany({ where: { orderId: { in: ids } } });
     await db.order.deleteMany({ where: { id: { in: ids } } });
     await db.orderCreation.deleteMany({ where: { requesterId: requester.id } });
-  } finally { await db.$disconnect(); await pool.end(); }
+  } finally { await db.$disconnect(); try { await cleanupCredit(); } finally { await pool.end(); } }
 });
 test('real credit contract reserves, publishes, settles once and preserves total balances', async () => {
   const order = await create();
@@ -99,4 +135,14 @@ test('real picked-up expiry refunds and historical reserve replay differs from c
   assert.equal((await client.reserveCredits({ orderId: order.id, requesterId: requester.id, amount: 2 }, orderOptions)).status, 'RESERVED');
   assert.equal((await client.getReservation({ orderId: order.id }, orderOptions)).status, 'RELEASED');
   assert.equal((await client.getBalance({ userId: requester.id }, orderOptions)).reservedCredits, 0);
+});
+
+test('missing Credit account remains unavailable until user.created initializes it once', async () => {
+  const userId = randomUUID();
+  const missing = await connection!.gateway.getBalance(userId);
+  assert.equal(missing.kind, 'unavailable');
+  await initialize(userId);
+  await initialize(userId);
+  const balance = await connection!.gateway.getBalance(userId);
+  assert.deepEqual(balance, { kind: 'confirmed', value: { availableCredits: 10 } });
 });

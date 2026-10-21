@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { retryCreditRpc } from '../src/dependencies/retryCreditRpc';
 import { configuredCreditGateway } from '../src/dependencies/configuredCreditGateway';
 import { createCreditGateway, type CreditClient } from '../src/dependencies/creditGateway';
 
@@ -86,5 +87,38 @@ test('configured adapter sends service metadata and decodes current receipts ove
   } finally {
     connection.close();
     await stopServer(server, 100);
+  }
+});
+
+
+test('configured adapter retries transient failures with the same payload and metadata', async () => {
+  const { createServer, CreditService, startServer, stopServer } = await import('@foc/grpc');
+  let attempts = 0;
+  const server = createServer(CreditService.service, {
+    ReserveCredits(call: any, callback: any) {
+      assert.equal(call.metadata.get('x-credit-service-token')[0], 'test-only');
+      assert.deepEqual(call.request, { orderId: 'order', requesterId: 'user', amount: 4 });
+      attempts++;
+      if (attempts < 3) return callback({ code: attempts === 1 ? 14 : 10, details: 'transient' });
+      callback(null, { ...receipt, reservationId: 'reservation', version: 1 });
+    },
+  });
+  const port = await startServer(server, 0, '127.0.0.1');
+  const connection = configuredCreditGateway({ CREDIT_GRPC_ADDR: `127.0.0.1:${port}`,
+    CREDIT_ORDER_SERVICE_TOKEN: 'test-only', CREDIT_RPC_TIMEOUT_MS: 2000 })!;
+  try {
+    assert.equal((await connection.gateway.reserve({ ...receipt, operationId: 'local' })).kind, 'confirmed');
+    assert.equal(attempts, 3);
+  } finally { connection.close(); await stopServer(server, 100); }
+});
+
+test('Credit retries stop on permanent errors, exhaustion and overall deadline', async () => {
+  for (const [code, budget, expected] of [[3, 2000, 1], [5, 2000, 1], [7, 2000, 1],
+    [9, 2000, 1], [16, 2000, 1], [14, 2000, 3], [4, 2000, 3], [14, 1, 1]]) {
+    let attempts = 0;
+    const error = { code };
+    await assert.rejects(retryCreditRpc(async () => { attempts++; throw error; },
+      { deadline: Date.now() + budget }), value => value === error);
+    assert.equal(attempts, expected);
   }
 });

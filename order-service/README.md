@@ -278,7 +278,7 @@ TEST_DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:55435/order
   npm run test:order:integration
 ```
 
-Expected: **21 auth/HTTP/domain/adapter tests and 24 database integration tests pass**. The
+Expected: **23 auth/HTTP/domain/adapter tests and 24 database integration tests pass**. The
 integration runner applies committed migrations and executes both read and core
 command suites sequentially. It creates test users/supplier snapshots and a
 test-only idempotent credit ledger inside the test process. No real User,
@@ -412,3 +412,59 @@ Order's UserDirectory adapter is still absent. Existing signed access JWTs remai
 compatible. Supplier's GetSupplier RPC remains a stub; IsOpen alone cannot provide
 Order's pickup snapshot. The separate pending-intent race policy is still not wired
 to the REST row-lock implementation; no queue priority or reward editing is claimed.
+
+
+## Compatibility with unmerged feat/credit-implementation
+
+Order now owns up to three identical RPC attempts, with 100ms/200ms backoff,
+for UNAVAILABLE, ABORTED and DEADLINE_EXCEEDED only. All attempts share one
+CREDIT_RPC_TIMEOUT_MS deadline. Shared-client retries are disabled to prevent
+nested retries. Exhausted or ambiguous mutations remain pending; current
+GetReservation state is still checked before order publication. The camelCase
+RPC fields and x-credit-service-token credential match this branch.
+
+The new Credit implementation initializes accounts through user.created, not
+InitCredits RPC. Order does not create accounts. Until the User/broker integration
+is connected, creation requires a separately initialized Credit account. Missing
+accounts stay unavailable/recoverable. Local plaintext requires CREDIT_LOCAL_MODE=true
+on that Credit server; production/non-loopback Order connections still require a CA.
+The default Order Compose stack does not configure a Credit connection.
+
+To test against this unmerged branch without switching branches or merging:
+
+```sh
+npm ci
+npm run build --workspace @foc/grpc --workspace @foc/order-service
+
+# New temporary container; do not reuse normal service databases.
+docker run --detach --name foc-order-credit-handoff-tests \
+  --publish 127.0.0.1:55436:5432 \
+  --env POSTGRES_USER=order_service \
+  --env POSTGRES_PASSWORD=order_service \
+  --env POSTGRES_DB=order_service_test postgres:17-alpine
+
+docker exec foc-order-credit-handoff-tests pg_isready -U order_service -d order_service_test
+# Once accepting connections; create this database once:
+docker exec foc-order-credit-handoff-tests createdb -U order_service credit_test
+
+TEST_DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:55436/order_service_test \
+CREDIT_TEST_DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:55436/credit_test \
+  node order-service/scripts/testCreditFeature.cjs
+```
+
+The script exports the locally available origin/feat/credit-implementation ref
+into a temporary directory, builds its own shared contract and Credit service,
+and removes the export afterwards. An optional first argument selects another
+local Git ref. Fetch the branch first if your remote-tracking ref is outdated.
+Credit migrations 001–006 run once in a unique temporary schema inside credit_test;
+that schema is removed afterwards. Order migrations target only order_service_test.
+The four tests use real Order persistence and real Credit gRPC/transactions for
+publication/settlement, cancellation, picked-up expiry/historical receipts, and
+missing-account/duplicate user.created allocation. User/Supplier snapshots are
+still test doubles; no running RabbitMQ or full UI flow is certified.
+
+Remove only this disposable test container when finished:
+
+```sh
+docker rm --force --volumes foc-order-credit-handoff-tests
+```
