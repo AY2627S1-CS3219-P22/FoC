@@ -22,3 +22,5 @@ Thumbs.db
 node_modules/
 
 supabase/.temp/start-secrets/supabase_edge_runtime_FoC/env/
+
+shared/messaging/logs/
