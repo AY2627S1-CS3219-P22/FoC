@@ -1,5 +1,5 @@
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
-// Scope: Implemented author-approved cancellation, expiry, refund recovery and first-lock-wins.
+// Scope: Implemented author-approved cancellation, expiry, delivery and durable credit recovery.
 // Author review: Pending; see ../../usage-log.md.
 import type { PrismaClient, Prisma } from '../generated/prisma';
 import type { createCreditClient } from '../dependencies/creditClient';
@@ -41,6 +41,73 @@ export function createOrderLifecycle(db: PrismaClient, credit: ReturnType<typeof
       // failed receipt write must not turn this durable result into HTTP 500.
       return { order: result.order };
     }
+  }
+
+  async function deliver(orderId: string, courierId: string) {
+    const result = await db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId}::uuid FOR UPDATE`;
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) return { error: 'not-found' as const, status: 404 };
+      if (order.courierId !== courierId || order.requesterId === courierId) return { error: 'forbidden' as const, status: 403 };
+      if (order.status === 'DELIVERED' && ['SETTLED', 'SETTLEMENT_PENDING'].includes(order.creditState)) return { order };
+      if (order.status !== 'PICKED_UP' || order.creditState !== 'RESERVED') return { error: 'invalid-transition' as const, status: 409 };
+      const now = await databaseTime(tx);
+      if (order.expiryTime <= now) return { error: 'expired' as const, status: 409 };
+      const updated = await tx.order.update({ where: { id: orderId }, data: {
+        status: 'DELIVERED', deliveredAt: now, creditState: 'SETTLEMENT_PENDING',
+      } });
+      await tx.creditOperation.create({ data: { orderId, type: 'SETTLE', payload: { courierId }, nextRetryAt: now } });
+      return { order: updated };
+    });
+    if ('error' in result) return result;
+    try {
+      if (result.order.creditState === 'SETTLEMENT_PENDING') await settlementBatch(1, orderId);
+      return { order: await db.order.findUniqueOrThrow({ where: { id: orderId } }) };
+    } catch { return { order: result.order }; }
+  }
+
+  async function settlementBatch(limit = 100, orderId?: string) {
+    const now = await databaseTime(db);
+    await db.creditOperation.updateMany({ where: { type: 'SETTLE', attempts: { gte: MAX_ATTEMPTS }, state: 'PROCESSING', leaseExpiresAt: { lte: now } },
+      data: { state: 'PERMANENTLY_FAILED', leaseExpiresAt: null, lastError: 'retry-exhausted' } });
+    const rows = await db.creditOperation.findMany({ where: {
+      type: 'SETTLE', ...(orderId ? { orderId } : {}), attempts: { lt: MAX_ATTEMPTS },
+      creation: { order: { is: { status: 'DELIVERED', creditState: 'SETTLEMENT_PENDING' } } },
+      OR: [{ state: 'PENDING', nextRetryAt: { lte: now } }, { state: 'PROCESSING', leaseExpiresAt: { lte: now } }],
+    }, orderBy: { nextRetryAt: 'asc' }, take: limit });
+    let claimed = 0;
+    for (const row of rows) {
+      const lease = new Date((await databaseTime(db)).getTime() + 30_000);
+      const claim = await db.creditOperation.updateMany({ where: { id: row.id, state: row.state, attempts: row.attempts, leaseExpiresAt: row.leaseExpiresAt },
+        data: { state: 'PROCESSING', attempts: { increment: 1 }, leaseExpiresAt: lease } });
+      if (!claim.count) continue;
+      claimed++;
+      const attempts = row.attempts + 1;
+      let confirmed = false, permanent = false;
+      try {
+        const order = await db.order.findUniqueOrThrow({ where: { id: row.orderId } });
+        const matches = (receipt: Awaited<ReturnType<typeof credit.getReservation>>) =>
+          receipt.orderId === order.id && receipt.requesterId === order.requesterId && receipt.amount === order.credits;
+        let receipt = await credit.getReservation({ orderId: order.id });
+        if (!matches(receipt) || !order.courierId) throw new Error('Reservation mismatch');
+        if (receipt.status === 'RESERVED') {
+          await credit.settleCredits({ orderId: order.id, courierId: order.courierId });
+          receipt = await credit.getReservation({ orderId: order.id });
+        }
+        confirmed = matches(receipt) && receipt.status === 'SETTLED' && receipt.courierId === order.courierId;
+        if (!confirmed) throw new Error('Settlement not confirmed');
+      } catch (error) { permanent = classifyCreditError(error) === 'rejected'; }
+      await db.$transaction(async tx => {
+        const time = await databaseTime(tx), exhausted = attempts >= MAX_ATTEMPTS;
+        const saved = await tx.creditOperation.updateMany({ where: { id: row.id, state: 'PROCESSING', attempts, leaseExpiresAt: lease }, data: {
+          state: confirmed ? 'SUCCEEDED' : permanent || exhausted ? 'PERMANENTLY_FAILED' : 'PENDING', leaseExpiresAt: null,
+          nextRetryAt: new Date(time.getTime() + delays[Math.min(attempts - 1, 4)] * 1000),
+          lastError: confirmed ? null : permanent ? 'dependency-rejected' : exhausted ? 'retry-exhausted' : 'outcome-uncertain',
+        } });
+        if (saved.count && confirmed) await tx.order.updateMany({ where: { id: row.orderId, status: 'DELIVERED', creditState: 'SETTLEMENT_PENDING' }, data: { creditState: 'SETTLED' } });
+      });
+    }
+    return claimed;
   }
 
   async function expireBatch(limit = 100) {
@@ -126,12 +193,12 @@ export function createOrderLifecycle(db: PrismaClient, credit: ReturnType<typeof
   function startWorker() {
     if (running || timer || stopping) return;
     const tick = () => {
-      running = (async () => { for (const task of additionalWork) await task(); await expireBatch(); await refundBatch(); })()
+      running = (async () => { for (const task of additionalWork) await task(); await expireBatch(); await refundBatch(); await settlementBatch(); })()
         .catch(() => { console.error('Order recovery batch failed'); })
         .finally(() => { running = undefined; if (!stopping) timer = setTimeout(() => { timer = undefined; tick(); }, 1000); });
     };
     tick();
   }
   async function stopWorker() { stopping = true; if (timer) clearTimeout(timer); await running; }
-  return { cancel, expireBatch, refundBatch, startWorker, stopWorker };
+  return { cancel, deliver, expireBatch, refundBatch, settlementBatch, startWorker, stopWorker };
 }

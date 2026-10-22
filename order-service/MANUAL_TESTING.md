@@ -272,8 +272,8 @@ curl -i http://localhost:3003/orders -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 
 Expected: 200 with `{orders:[...]}`, including the cancelled order. The ordinary
-TOKEN gets 403 on this admin endpoint. Student list/detail and courier pickup/delivery endpoints are not implemented
-on this branch. Acceptance is available in the separate check below.
+TOKEN gets 403 on this admin endpoint. Scoped student listings and delivery are implemented; courier pickup and
+order-detail endpoints are not implemented on this branch. Acceptance is available in the separate check below.
 
 ## 8. Accept a separate order as another user
 
@@ -415,3 +415,28 @@ status, destination and credits. An empty result is `orders: []`.
 Check an invalid scope (`?scope=unknown`) returns 400, missing token returns 401,
 and unscoped `/orders` with a USER-only token returns 403. The administrator
 continues using unscoped `/orders` to retrieve all persisted orders.
+
+## Delivery and settlement
+
+Prerequisite: an existing unexpired PICKED_UP order assigned to COURIER_TOKEN's
+subject. Pickup is not yet exposed by this branch, so the normal create/accept
+walkthrough alone cannot reach this step. The dedicated integration suite
+creates isolated PICKED_UP fixtures for testing.
+
+```sh
+export DELIVERY_ORDER_ID='picked-up-order-id'
+curl -i -X POST "http://localhost:3003/orders/$DELIVERY_ORDER_ID/deliver" \
+  -H "Authorization: Bearer $COURIER_TOKEN"
+```
+
+Expect 200 with DELIVERED/SETTLED, or 202 with DELIVERED/SETTLEMENT_PENDING when
+Credit confirmation is pending. Compare real Credit balances/history: the held
+amount transfers from requester to the assigned courier, exactly once. Repeating
+delivery must not transfer again. A requester/another courier gets 403; an
+ASSIGNED order that has not been picked up gets 409.
+
+With Credit temporarily unavailable, expect durable 202, then automatic backend
+reconciliation after recovery (within the bounded retry window). Inspect the
+order via requested/assigned listing: creditState changes to SETTLED only after
+confirmation. After retries are exhausted it remains SETTLEMENT_PENDING for
+manual reconciliation. Do not treat DELIVERED alone as payment confirmation.
