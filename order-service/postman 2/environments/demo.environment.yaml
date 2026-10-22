@@ -1,0 +1,67 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "Order live demo - local",
+  "values": [
+    {
+      "key": "userBaseUrl",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "supplierBaseUrl",
+      "value": "http://localhost:3002"
+    },
+    {
+      "key": "creditBaseUrl",
+      "value": "http://localhost:3004"
+    },
+    {
+      "key": "orderBaseUrl",
+      "value": "http://localhost:33003"
+    },
+    {
+      "key": "demoPassword",
+      "value": "DemoPass1!"
+    },
+    {
+      "key": "supplierId",
+      "value": ""
+    },
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "expiryTime",
+      "value": ""
+    },
+    {
+      "key": "AToken",
+      "value": ""
+    },
+    {
+      "key": "BToken",
+      "value": ""
+    },
+    {
+      "key": "AId",
+      "value": ""
+    },
+    {
+      "key": "BId",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "cancelOrderId",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    }
+  ]
+}

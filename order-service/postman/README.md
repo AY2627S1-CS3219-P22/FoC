@@ -86,3 +86,40 @@ with a top attribution comment; no PyYAML dependency is required.
 
 Generated shape and script syntax are checked locally. These requests have not
 been executed against the deployed services or verified by the Postman runner.
+
+## Postman Web import
+
+Import these two files from `web-import/` using Postman Web's **Import** button:
+
+- `Order-Live-Demo.postman_collection.json`
+- `Order-Live-Demo.postman_environment.json`
+
+Select **Order Live Demo - local** as the active environment. Install/start the
+Postman Desktop Agent and select it for localhost requests. Keep Docker running.
+Run folders 01–06 in order, pausing in folder 02 for account initialization and
+to set a currently open `supplierId`. Folder 07 needs your administrator token.
+Use synthetic accounts in the web workspace, which can synchronize cloud data.
+Never share populated tokens or export them into the repository.
+
+The JSON templates contain no login tokens. Both JSON files are AI-assisted
+(ChatGPT/Codex, 2026-10-23 Asia/Singapore); human review pending. The human
+approved attribution in the collection description and this README/usage log
+because JSON cannot carry header comments. Exact prompt: ../usage-log.md.
+
+Regenerate **only the web templates** (does not read saved environment tokens):
+
+```sh
+python3 order-service/postman/export-web.py
+```
+
+The exporter preserves all 33 requests and converts beforeRequest/afterResponse
+scripts into v2.1 prerequest/test events. Scripts are syntax-checked with Node;
+no Postman Web import or live API run has been performed by the agent.
+
+Authentication troubleshooting update (2026-10-23): regenerated Web collections
+check referenced student JWTs through User /users/me before protected calls.
+With a known synthetic account email/password they login again when needed.
+Missing setup reports an explicit error; intentional unauthenticated tests are
+unchanged. Import the updated collection to obtain this pre-request check.
+Use folder 01 to register/login A and B in a fresh environment. Credit Service
+requires its database migrations even when its container is running.

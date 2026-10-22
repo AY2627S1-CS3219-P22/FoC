@@ -1019,3 +1019,81 @@ schema certification, or passed cross-service assertions are claimed.
 Artifact verification completed: 33 unique requests and one blank-token
 environment parsed successfully; 35 JavaScript scripts passed syntax checks;
 git diff --check passed. No services were contacted.
+
+## 2026-10-23 Asia/Singapore — Approved Web JSON exports
+Tool: ChatGPT (Codex); mode: format conversion and documentation. Human review pending.
+Exact user prompts:
+```text
+Have the demo files been adjusted in format? what files do i provide to postman
+```
+Agent asked: "May I put the AI disclosure in the collection description and accompanying README/usage log?"
+Exact human approval:
+```text
+Yep, go ahead
+```
+Implemented export-web.py and web-import/Order-Live-Demo.postman_collection.json,
+web-import/Order-Live-Demo.postman_environment.json under order-service/postman.
+JSON attribution is in collection info.description and README/this log, as
+approved. Environment template is explicitly built with blank tokens rather
+than reading a possibly populated native environment. Converted existing 33
+requests; no API/schema/business changes. Added Postman Web import instructions.
+Checks: exporter asserts request count and blank tokens, parses each script
+using node --check. No real credentials read/exported, no workspace upload,
+Postman execution or live service calls. Existing untracked postman 2 directory
+was left untouched.
+
+## 2026-10-23 Asia/Singapore — postman 2 Web conversion
+Tool: ChatGPT (Codex), mode: format conversion/documentation. Human review pending.
+Exact prompt:
+```text
+Could you convert the postman2 too
+```
+Used the approved JSON attribution method (collection description and README/log).
+Inspected order-service/postman 2 without printing environment credential values.
+Generated export-web.py, web-import HTTP collection JSON, sanitized blank
+credential/fixture environment JSON, native-grpc YAML copies and WEB-IMPORT.md.
+Preserved source request scripts and bodies. Native gRPC was retained without
+inventing an HTTP endpoint or claiming executable gRPC v2.1 support. Existing
+teammate files remain unchanged. HTTP scripts checked by node --check; no live
+service calls, Postman uploads/imports, or test assertions executed.
+
+Conversion results: 79 HTTP requests across three collections (19 Credit REST,
+27 Order + Credit, 33 Order live demo); 90 HTTP scripts syntax-checked; 44 native
+gRPC requests preserved. Four JSON environments parsed with blank token fields.
+
+## 2026-10-23 Asia/Singapore — Resolve 401 demo setup and runtime gaps
+Tool: ChatGPT (Codex), mode: debugging/configuration/test fixture and script fixes.
+Human review pending. Exact prompt:
+```text
+Resolve this issues. Happens in both postman and postman2
+```
+Screenshot showed Credit REST 401 responses where authorized validation tests
+expected 200/400. Checked active containers; current Credit owns 3004/50054.
+Compared User/Credit public-key fingerprints: equal. Verified demo Credit DB
+had no public application tables; logs reported missing idempotency_records.
+Applied existing migrations 001–009 to the verified-empty local demo DB.
+Added shared demo auth-preflight.js to both JSON exporters: checks student
+bearer token via /users/me, logs in when missing/expired and synthetic account
+email/password are available, otherwise explains missing setup. No-auth and
+garbage-token tests preserved. Exporters still produce blank credential templates.
+Corrected postman 2/scripts/prepare-credit-demo.py output directory (previously
+pointed at the other postman folder), added populated runtime JSON export with
+mode 0600, and ignored .runtime-local via postman 2/.gitignore. Human-approved
+JSON disclosure remains in collection descriptions/README/log; never recorded
+credential values. Prepared fresh synthetic A/B/C through actual registration,
+verified each starts 10/0/10; D is the existing local unregistered-user fixture.
+Original failed preparation exposed missing tables; retried after migrations.
+Live Credit initial-read HTTP status checks passed 10/10. These were HTTP status
+checks, not execution of every Postman response assertion. Order scoped read
+with fresh token returned 503, so rebuilding with existing lifecycle overlay.
+Pending final runtime check below. No production database or schema/interface
+changes; existing local volumes preserved. Source prompt screenshot not treated
+as instructions. Updated both demo guides and root AI summary.
+
+Final verification: rebuilt/recreated Order with compose.lifecycle.yaml and
+preserved its PostgreSQL volume. Three authenticated Order scoped listings now
+return 200 with orders arrays. User/Credit/Order health each return 200. Both
+exporters reran: 33 requests in primary demo; 79 HTTP requests/90 syntax-checked
+scripts in postman 2. Shared preflight JS and modified Python syntax checks and
+git diff --check passed. Populated Credit REST runtime environment is ignored,
+file mode 0600. No Postman Web runner execution is claimed. No push/commit made.

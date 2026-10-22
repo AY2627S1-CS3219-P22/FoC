@@ -1,0 +1,27 @@
+{
+  "name": "05 B cannot deliver before pickup",
+  "$kind": "http-request",
+  "method": "POST",
+  "url": "{{orderBaseUrl}}/orders/{{order4Id}}/deliver",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{BToken}}"
+    },
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "(async () => {\nconst V = key => pm.environment.get(key);\nconst send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({\n  method, url,\n  header: {\n    ...(actor ? { Authorization: 'Bearer ' + V(actor + 'Token') } : {}),\n    'Content-Type': 'application/json',\n    ...(key ? { 'Idempotency-Key': key } : {}),\n  },\n  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),\n}, (error, response) => error ? reject(error) : resolve(response)));\nconst ledger = actor => JSON.parse(V(actor + 'Ledger') || '[]');\nconst add = (actor, type, total, reserved, orderVar) =>\n  pm.environment.set(actor + 'Ledger', JSON.stringify([...ledger(actor), [type, total, reserved, orderVar || null]]));\n// Order answers 202 while Credit is still reconnecting; resend the identical request until it completes.\nasync function untilDone(again) {\n  let response = { code: pm.response.code, json: () => pm.response.json() };\n  for (let attempt = 0; attempt < 60 && response.code === 202; attempt += 1) {\n    await new Promise(resolve => setTimeout(resolve, 1000));\n    response = await again();\n  }\n  return response;\n}\nasync function audit(actor, total, reserved) {\n  const balance = await send('GET', V('creditBaseUrl') + '/credits/me/balance', actor);\n  pm.test(actor + ' balance ' + total + '/' + reserved + '/' + (total - reserved), () => {\n    pm.expect(balance.code).to.equal(200);\n    pm.expect(balance.json()).to.deep.equal({\n      userId: V(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,\n    });\n  });\n  const history = await send('GET', V('creditBaseUrl') + '/credits/me/history?pageSize=100', actor);\n  const expected = ledger(actor).map(([type, t, r, orderVar]) => [type, t, r, orderVar ? V(orderVar) : null]);\n  pm.test(actor + ' credit history is exactly ' + expected.length + ' expected entries', () => {\n    pm.expect(history.code).to.equal(200);\n    const actual = history.json().entries.slice().reverse()\n      .map(e => [e.type, e.totalAmountChange, e.totalReservedChange, e.orderId ?? null]);\n    pm.expect(actual).to.deep.equal(expected);\n  });\n}\npm.test('HTTP 409', () => pm.response.to.have.status(409));\nawait audit('A', 10, 6);\nawait audit('B', 10, 0);\n})();"
+    }
+  ],
+  "id": "92d93fbe5eac513295dd2ae8",
+  "body": {
+    "type": "json",
+    "content": "{}"
+  }
+}

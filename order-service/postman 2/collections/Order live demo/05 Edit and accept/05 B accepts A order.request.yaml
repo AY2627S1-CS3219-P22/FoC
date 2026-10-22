@@ -1,0 +1,29 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "05 B accepts A order",
+  "$kind": "http-request",
+  "method": "POST",
+  "url": "{{orderBaseUrl}}/orders/{{orderId}}/accept",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{BToken}}"
+    },
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));\npm.test('Assigned to B',()=>{const o=pm.response.json().order;pm.expect(o.status).to.eql('ASSIGNED');pm.expect(o.courierId).to.eql(pm.environment.get('BId'));});"
+    }
+  ],
+  "id": "8a694e6dec3c5148baabf53a",
+  "body": {
+    "type": "json",
+    "content": "{}"
+  }
+}

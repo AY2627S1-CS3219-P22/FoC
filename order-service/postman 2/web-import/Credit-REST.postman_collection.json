@@ -1,0 +1,1580 @@
+{
+  "info": {
+    "name": "Credit REST (postman 2)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23. Format conversion only; teammate requests/assertions retained. Human review pending. See order-service/postman 2/WEB-IMPORT.md and order-service/usage-log.md. No live execution claimed. Separate environments and manual stop/start pauses required."
+  },
+  "item": [
+    {
+      "name": "01 Initial reads",
+      "item": [
+        {
+          "name": "01 Public Credit health",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/health",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(200);",
+                  "pm.test('Database is up and listener startup is reported', () => { const body = pm.response.json(); pm.expect(Object.keys(body).sort()).to.deep.equal(['db', 'listener', 'status']); pm.expect(body.status).to.equal('ok'); pm.expect(body.db).to.equal('up'); pm.expect(body.listener).to.be.oneOf(['up', 'down']); });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "02 D balance is uninitialized",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/balance",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(404);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "03 D history is empty",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(200);",
+                  "pm.test('Empty page', () => pm.expect(pm.response.json()).to.deep.equal({ entries: [], nextPageToken: null }));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "04 No token - balance",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/balance",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(401);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "05 Garbage token - balance",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/balance",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer not-a-jwt"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(401);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "06 No token - history",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(401);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "07 Garbage token - history",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer not-a-jwt"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(401);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "08 Unknown path without token",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/not-a-route",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(404);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "09 A initial balance",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/balance",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(200);",
+                  "balance('A', 10, 0);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "10 A initial history",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(200);",
+                  "",
+                  "const page = pm.response.json();",
+                  "historyShape(page.entries, 'A');",
+                  "pm.test('One initial grant and no next page', () => {",
+                  "  pm.expect(page).to.deep.equal(stored('ABaselineHistory'));",
+                  "  pm.expect(page.entries).to.have.length(1);",
+                  "  pm.expect(page.entries[0].type).to.equal('INITIAL_GRANT');",
+                  "  pm.expect(page.entries[0].totalAmountChange).to.equal(10);",
+                  "  pm.expect(page.entries[0].totalReservedChange).to.equal(0);",
+                  "  pm.expect(page.entries[0].orderId).to.equal(null);",
+                  "  pm.expect(page.entries[0].reservationId).to.equal(null);",
+                  "  pm.expect(page.nextPageToken).to.equal(null);",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 After reseeding A",
+      "item": [
+        {
+          "name": "01 A balance after duplicate seed",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/balance",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(200);",
+                  "",
+                  "pm.test('Reseed step was run', () => pm.expect(V('duplicateSeedVerified')).to.equal('true'));",
+                  "balance('A', 10, 0);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "02 A history after duplicate seed",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(200);",
+                  "pm.test('No extra grant or history writes', () => pm.expect(pm.response.json()).to.deep.equal(stored('ABaselineHistory')));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 Paging and validation",
+      "item": [
+        {
+          "name": "01 Walk every page of size 1",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history?pageSize=1",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "if (V('pagingPrepared') !== 'true') throw new Error('Complete paging preparation first');",
+                  "if (V('pagingInProgress') !== 'true') {",
+                  "  record('pagingSeenIds', []);",
+                  "  pm.environment.unset('pagingNextToken');",
+                  "  pm.environment.set('pagingInProgress', 'true');",
+                  "}",
+                  "pm.request.url.query.remove('pageToken');",
+                  "if (V('pagingNextToken')) pm.request.url.query.upsert({ key: 'pageToken', value: V('pagingNextToken') });",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(200);",
+                  "",
+                  "const expectedIds = stored('pagingExpectedIds');",
+                  "const page = pm.response.json();",
+                  "const seen = stored('pagingSeenIds');",
+                  "historyShape(page.entries, 'A');",
+                  "pm.test('Page contains exactly the next expected row', () => {",
+                  "  pm.expect(page.entries).to.have.length(1);",
+                  "  pm.expect(page.entries[0].id).to.equal(expectedIds[seen.length]);",
+                  "});",
+                  "if (seen.length === 0) {",
+                  "  pm.test('First page has a next token', () => pm.expect(page.nextPageToken).to.be.a('string'));",
+                  "  pm.environment.set('APageToken', page.nextPageToken);",
+                  "}",
+                  "seen.push(...page.entries.map(row => row.id));",
+                  "record('pagingSeenIds', seen);",
+                  "if (page.nextPageToken !== null) {",
+                  "  if (seen.length >= expectedIds.length || page.nextPageToken === V('pagingNextToken')) throw new Error('Pagination did not advance or terminate');",
+                  "  pm.environment.set('pagingNextToken', page.nextPageToken);",
+                  "  pm.execution.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  pm.environment.set('pagingInProgress', 'false');",
+                  "  pm.environment.unset('pagingNextToken');",
+                  "  pm.test('No repeated rows and none missed', () => {",
+                  "    pm.expect(new Set(seen).size).to.equal(seen.length);",
+                  "    pm.expect(seen).to.deep.equal(expectedIds);",
+                  "  });",
+                  "}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "02 Omitted pageSize defaults to 50",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(200);",
+                  "",
+                  "const page = pm.response.json();",
+                  "historyShape(page.entries, 'A');",
+                  "pm.test('Exactly 50 of the 53 rows returned', () => {",
+                  "  pm.expect(page.entries).to.have.length(50);",
+                  "  pm.expect(page.entries.map(row => row.id)).to.deep.equal(stored('pagingExpectedIds').slice(0, 50));",
+                  "  pm.expect(page.nextPageToken).to.be.a('string');",
+                  "});",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "03 Zero page size",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history?pageSize=0",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(400);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "04 Page size above maximum",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history?pageSize=101",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(400);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "05 Non-number page size",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history?pageSize=abc",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(400);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "06 Garbage page token",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history?pageToken=garbage",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(400);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "07 B cannot use A pagination bookmark",
+          "request": {
+            "method": "GET",
+            "url": "{{creditBaseUrl}}/credits/me/history?pageToken={{APageToken}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{BToken}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "required('APageToken');",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(async () => {",
+                  "const V = key => pm.environment.get(key);",
+                  "const required = key => {",
+                  "  const value = V(key);",
+                  "  if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');",
+                  "  return value;",
+                  "};",
+                  "const record = (key, value) => pm.environment.set(key, JSON.stringify(value));",
+                  "const stored = key => JSON.parse(required(key));",
+                  "function status(expected) {",
+                  "  pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));",
+                  "  if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');",
+                  "}",
+                  "const balanceShape = (actor, total, reserved) => ({",
+                  "  userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,",
+                  "});",
+                  "function balance(actor, total, reserved) {",
+                  "  pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>",
+                  "    pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));",
+                  "}",
+                  "function historyShape(entries, actor) {",
+                  "  pm.test(actor + ' public history fields and scope', () => {",
+                  "    for (const row of entries) {",
+                  "      pm.expect(Object.keys(row).sort()).to.deep.equal([",
+                  "        'id', 'userId', 'orderId', 'reservationId', 'type',",
+                  "        'totalAmountChange', 'totalReservedChange', 'createdAt',",
+                  "      ].sort());",
+                  "      pm.expect(row.userId).to.equal(required(actor + 'Id'));",
+                  "      pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);",
+                  "      pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);",
+                  "      pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);",
+                  "    }",
+                  "  });",
+                  "}",
+                  "const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({",
+                  "  method, url,",
+                  "  header: {",
+                  "    ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),",
+                  "    'Content-Type': 'application/json',",
+                  "    ...(key ? { 'Idempotency-Key': key } : {}),",
+                  "  },",
+                  "  ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),",
+                  "}, (error, response) => error ? reject(error) : resolve(response)));",
+                  "status(400);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23 Asia/Singapore.",
+          "// Scope: Demo token setup diagnostics and login refresh for supplied synthetic accounts.",
+          "// Human review pending; prompt/checks: ../usage-log.md.",
+          "(async () => {",
+          "  const header = pm.request.headers.get('Authorization') || '';",
+          "  const match = header.match(/^Bearer\\s+\\{\\{([A-Z]|admin)Token\\}\\}$/);",
+          "  if (!match) return; // Preserve intentional no-token and garbage-token tests.",
+          "  const actor = match[1];",
+          "  const key = actor + 'Token';",
+          "  const base = pm.environment.get('userBaseUrl');",
+          "  let token = pm.environment.get(key);",
+          "  const email = pm.environment.get(actor + 'Email') ||",
+          "    ((actor === 'A' || actor === 'B') && pm.environment.get('runId')",
+          "      ? actor.toLowerCase() + '-' + pm.environment.get('runId') + '@u.nus.edu' : '');",
+          "  // D intentionally has no User account; admin credentials are supplied manually.",
+          "  if (actor === 'D' || actor === 'admin') {",
+          "    if (!token) throw new Error('Missing ' + key + ': prepare the matching environment or supply a fresh administrator token.');",
+          "    return;",
+          "  }",
+          "  if (token) {",
+          "    const check = await pm.sendRequest({url:base + '/users/me',method:'GET',header:{Authorization:'Bearer '+token}});",
+          "    if (check.code === 200) return;",
+          "    if (check.code !== 401) throw new Error('User token check returned HTTP '+check.code+'; check User Service.');",
+          "  }",
+          "  const password = pm.environment.get('demoPassword');",
+          "  if (!email || !password) throw new Error('Missing/expired '+key+'. Select the matching prepared environment, or run its registration/login setup first. Blank Web templates do not contain accounts or tokens.');",
+          "  const login = await pm.sendRequest({url:base+'/users/login',method:'POST',header:{'Content-Type':'application/json'},body:{mode:'raw',raw:JSON.stringify({email,password})}});",
+          "  if (login.code !== 200 || !login.json().token) throw new Error('Demo login failed (HTTP '+login.code+'); rerun the matching account setup.');",
+          "  pm.environment.set(key,login.json().token);",
+          "})();"
+        ]
+      }
+    }
+  ]
+}

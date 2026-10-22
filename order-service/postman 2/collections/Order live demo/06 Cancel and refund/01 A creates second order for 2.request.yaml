@@ -1,0 +1,33 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "01 A creates second order for 2",
+  "$kind": "http-request",
+  "method": "POST",
+  "url": "{{orderBaseUrl}}/orders",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{AToken}}"
+    },
+    {
+      "key": "Idempotency-Key",
+      "value": "{{runId}}-cancel-create"
+    },
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));\nif(pm.response.json().order) pm.environment.set('cancelOrderId',pm.response.json().order.id);\npm.test('UNASSIGNED',()=>pm.expect(pm.response.json().order.status).to.eql('UNASSIGNED'));"
+    }
+  ],
+  "id": "dd91449000c35411b23223ac",
+  "body": {
+    "type": "json",
+    "content": "{\"supplierId\": \"{{supplierId}}\", \"destination\": \"Central Library\", \"requestDetails\": \"Cancellation demo\", \"credits\": 2, \"expiryTime\": \"{{expiryTime}}\"}"
+  }
+}

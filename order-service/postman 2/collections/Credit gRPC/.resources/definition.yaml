@@ -1,0 +1,10 @@
+# AI Assistance Disclosure:
+# Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-21–2026-10-22 (Asia/Singapore).
+# Scope: Generated demo requests/assertions for the human-finalized scenarios.
+# Author review: Pending human review.
+# Prompts and key responses: credit-service/ai/usage-log.md, entries 030–031 and 038 (repository-relative).
+# AI-generated; human review pending. Regenerate with postman/scripts/build-demo.py.
+$kind: collection
+name: 02 Credit gRPC
+description: 'Local synthetic demo. Follow postman/README.md; fresh independent accounts per suite. AI: OpenAI Codex
+  GPT-6, usage-log entries 030–031 and 038.'

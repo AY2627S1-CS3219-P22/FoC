@@ -1,0 +1,29 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "04 A cannot accept own order",
+  "$kind": "http-request",
+  "method": "POST",
+  "url": "{{orderBaseUrl}}/orders/{{orderId}}/accept",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{AToken}}"
+    },
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));\n"
+    }
+  ],
+  "id": "8c7359f215d15f5a8914d1a8",
+  "body": {
+    "type": "json",
+    "content": "{}"
+  }
+}

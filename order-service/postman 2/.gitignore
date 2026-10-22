@@ -1,0 +1,4 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Scope: Exclude live demo credentials; human review pending; see ../usage-log.md.
+.runtime-local/
+__pycache__/

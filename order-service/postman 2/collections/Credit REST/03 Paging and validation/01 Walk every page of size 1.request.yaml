@@ -1,0 +1,143 @@
+# AI Assistance Disclosure:
+# Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-21–2026-10-22 (Asia/Singapore).
+# Scope: Generated demo requests/assertions for the human-finalized scenarios.
+# Author review: Pending human review.
+# Prompts and key responses: credit-service/ai/usage-log.md, entries 030–031 and 038 (repository-relative).
+# AI-generated; human review pending. Regenerate with postman/scripts/build-demo.py.
+name: 01 Walk every page of size 1
+$kind: http-request
+method: GET
+url: '{{creditBaseUrl}}/credits/me/history?pageSize=1'
+headers:
+- key: Authorization
+  value: Bearer {{AToken}}
+scripts:
+- type: beforeRequest
+  code: |-
+    (async () => {
+    const V = key => pm.environment.get(key);
+    const required = key => {
+      const value = V(key);
+      if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');
+      return value;
+    };
+    const record = (key, value) => pm.environment.set(key, JSON.stringify(value));
+    const stored = key => JSON.parse(required(key));
+    function status(expected) {
+      pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));
+      if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');
+    }
+    const balanceShape = (actor, total, reserved) => ({
+      userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,
+    });
+    function balance(actor, total, reserved) {
+      pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>
+        pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));
+    }
+    function historyShape(entries, actor) {
+      pm.test(actor + ' public history fields and scope', () => {
+        for (const row of entries) {
+          pm.expect(Object.keys(row).sort()).to.deep.equal([
+            'id', 'userId', 'orderId', 'reservationId', 'type',
+            'totalAmountChange', 'totalReservedChange', 'createdAt',
+          ].sort());
+          pm.expect(row.userId).to.equal(required(actor + 'Id'));
+          pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);
+          pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);
+          pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);
+        }
+      });
+    }
+    const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({
+      method, url,
+      header: {
+        ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),
+        'Content-Type': 'application/json',
+        ...(key ? { 'Idempotency-Key': key } : {}),
+      },
+      ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),
+    }, (error, response) => error ? reject(error) : resolve(response)));
+    if (V('pagingPrepared') !== 'true') throw new Error('Complete paging preparation first');
+    if (V('pagingInProgress') !== 'true') {
+      record('pagingSeenIds', []);
+      pm.environment.unset('pagingNextToken');
+      pm.environment.set('pagingInProgress', 'true');
+    }
+    pm.request.url.query.remove('pageToken');
+    if (V('pagingNextToken')) pm.request.url.query.upsert({ key: 'pageToken', value: V('pagingNextToken') });
+    })();
+- type: afterResponse
+  code: |-
+    (async () => {
+    const V = key => pm.environment.get(key);
+    const required = key => {
+      const value = V(key);
+      if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');
+      return value;
+    };
+    const record = (key, value) => pm.environment.set(key, JSON.stringify(value));
+    const stored = key => JSON.parse(required(key));
+    function status(expected) {
+      pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));
+      if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');
+    }
+    const balanceShape = (actor, total, reserved) => ({
+      userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,
+    });
+    function balance(actor, total, reserved) {
+      pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>
+        pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));
+    }
+    function historyShape(entries, actor) {
+      pm.test(actor + ' public history fields and scope', () => {
+        for (const row of entries) {
+          pm.expect(Object.keys(row).sort()).to.deep.equal([
+            'id', 'userId', 'orderId', 'reservationId', 'type',
+            'totalAmountChange', 'totalReservedChange', 'createdAt',
+          ].sort());
+          pm.expect(row.userId).to.equal(required(actor + 'Id'));
+          pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);
+          pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);
+          pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);
+        }
+      });
+    }
+    const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({
+      method, url,
+      header: {
+        ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),
+        'Content-Type': 'application/json',
+        ...(key ? { 'Idempotency-Key': key } : {}),
+      },
+      ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),
+    }, (error, response) => error ? reject(error) : resolve(response)));
+    status(200);
+
+    const expectedIds = stored('pagingExpectedIds');
+    const page = pm.response.json();
+    const seen = stored('pagingSeenIds');
+    historyShape(page.entries, 'A');
+    pm.test('Page contains exactly the next expected row', () => {
+      pm.expect(page.entries).to.have.length(1);
+      pm.expect(page.entries[0].id).to.equal(expectedIds[seen.length]);
+    });
+    if (seen.length === 0) {
+      pm.test('First page has a next token', () => pm.expect(page.nextPageToken).to.be.a('string'));
+      pm.environment.set('APageToken', page.nextPageToken);
+    }
+    seen.push(...page.entries.map(row => row.id));
+    record('pagingSeenIds', seen);
+    if (page.nextPageToken !== null) {
+      if (seen.length >= expectedIds.length || page.nextPageToken === V('pagingNextToken')) throw new Error('Pagination did not advance or terminate');
+      pm.environment.set('pagingNextToken', page.nextPageToken);
+      pm.execution.setNextRequest(pm.info.requestName);
+    } else {
+      pm.environment.set('pagingInProgress', 'false');
+      pm.environment.unset('pagingNextToken');
+      pm.test('No repeated rows and none missed', () => {
+        pm.expect(new Set(seen).size).to.equal(seen.length);
+        pm.expect(seen).to.deep.equal(expectedIds);
+      });
+    }
+    })();
+id: f47de247dcb15e448b989bb1

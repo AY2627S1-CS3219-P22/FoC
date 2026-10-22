@@ -1,0 +1,33 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "04 Invalid credits",
+  "$kind": "http-request",
+  "method": "POST",
+  "url": "{{orderBaseUrl}}/orders",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{AToken}}"
+    },
+    {
+      "key": "Idempotency-Key",
+      "value": "{{runId}}-invalid"
+    },
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));\n"
+    }
+  ],
+  "id": "fb60286d7be65e40a047a094",
+  "body": {
+    "type": "json",
+    "content": "{\"supplierId\": \"{{supplierId}}\", \"destination\": \"Central Library\", \"requestDetails\": \"Live demo coffee collection\", \"credits\": 0, \"expiryTime\": \"{{expiryTime}}\"}"
+  }
+}

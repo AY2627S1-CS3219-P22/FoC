@@ -1,0 +1,21 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "03 A balance - 4 reserved",
+  "$kind": "http-request",
+  "method": "GET",
+  "url": "{{creditBaseUrl}}/credits/me/balance",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{AToken}}"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));\npm.test('Credit balance matches holds',()=>{const b=pm.response.json();pm.expect(b.totalCredits).to.eql(10);pm.expect(b.reservedCredits).to.eql(4);pm.expect(b.availableCredits).to.eql(6);});"
+    }
+  ],
+  "id": "c3ec0dce6fc850e19384da5d"
+}

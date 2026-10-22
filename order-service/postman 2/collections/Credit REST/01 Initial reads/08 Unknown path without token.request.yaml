@@ -1,0 +1,60 @@
+# AI Assistance Disclosure:
+# Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-21–2026-10-22 (Asia/Singapore).
+# Scope: Generated demo requests/assertions for the human-finalized scenarios.
+# Author review: Pending human review.
+# Prompts and key responses: credit-service/ai/usage-log.md, entries 030–031 and 038 (repository-relative).
+# AI-generated; human review pending. Regenerate with postman/scripts/build-demo.py.
+name: 08 Unknown path without token
+$kind: http-request
+method: GET
+url: '{{creditBaseUrl}}/credits/not-a-route'
+headers: []
+scripts:
+- type: afterResponse
+  code: |-
+    (async () => {
+    const V = key => pm.environment.get(key);
+    const required = key => {
+      const value = V(key);
+      if (value === undefined || value === '') throw new Error('Missing demo variable: ' + key + '; run prepare-credit-demo.py');
+      return value;
+    };
+    const record = (key, value) => pm.environment.set(key, JSON.stringify(value));
+    const stored = key => JSON.parse(required(key));
+    function status(expected) {
+      pm.test('HTTP ' + expected, () => pm.expect(pm.response.code).to.equal(expected));
+      if (pm.response.code !== expected) throw new Error('Unexpected HTTP status; check setup before continuing');
+    }
+    const balanceShape = (actor, total, reserved) => ({
+      userId: required(actor + 'Id'), totalCredits: total, reservedCredits: reserved, availableCredits: total - reserved,
+    });
+    function balance(actor, total, reserved) {
+      pm.test(actor + ' balance: total ' + total + ', reserved ' + reserved, () =>
+        pm.expect(pm.response.json()).to.deep.equal(balanceShape(actor, total, reserved)));
+    }
+    function historyShape(entries, actor) {
+      pm.test(actor + ' public history fields and scope', () => {
+        for (const row of entries) {
+          pm.expect(Object.keys(row).sort()).to.deep.equal([
+            'id', 'userId', 'orderId', 'reservationId', 'type',
+            'totalAmountChange', 'totalReservedChange', 'createdAt',
+          ].sort());
+          pm.expect(row.userId).to.equal(required(actor + 'Id'));
+          pm.expect(Number.isInteger(row.totalAmountChange)).to.equal(true);
+          pm.expect(Number.isInteger(row.totalReservedChange)).to.equal(true);
+          pm.expect(new Date(row.createdAt).toISOString()).to.equal(row.createdAt);
+        }
+      });
+    }
+    const send = (method, url, actor, body, key) => new Promise((resolve, reject) => pm.sendRequest({
+      method, url,
+      header: {
+        ...(actor ? { Authorization: 'Bearer ' + required(actor + 'Token') } : {}),
+        'Content-Type': 'application/json',
+        ...(key ? { 'Idempotency-Key': key } : {}),
+      },
+      ...(body === undefined ? {} : { body: { mode: 'raw', raw: JSON.stringify(body) } }),
+    }, (error, response) => error ? reject(error) : resolve(response)));
+    status(404);
+    })();
+id: d5b8069636515ba797c3062a

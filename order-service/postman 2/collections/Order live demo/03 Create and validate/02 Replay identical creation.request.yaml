@@ -1,0 +1,33 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "02 Replay identical creation",
+  "$kind": "http-request",
+  "method": "POST",
+  "url": "{{orderBaseUrl}}/orders",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{AToken}}"
+    },
+    {
+      "key": "Idempotency-Key",
+      "value": "{{runId}}-create"
+    },
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));\npm.test('Same order',()=>pm.expect(pm.response.json().order.id).to.eql(pm.environment.get('orderId')));"
+    }
+  ],
+  "id": "b98571422f505b2cbb0a0e4a",
+  "body": {
+    "type": "json",
+    "content": "{\"supplierId\": \"{{supplierId}}\", \"destination\": \"Central Library\", \"requestDetails\": \"Live demo coffee collection\", \"credits\": 3, \"expiryTime\": \"{{expiryTime}}\"}"
+  }
+}

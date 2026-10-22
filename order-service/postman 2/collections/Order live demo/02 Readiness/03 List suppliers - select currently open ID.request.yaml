@@ -1,0 +1,16 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "03 List suppliers - select currently open ID",
+  "$kind": "http-request",
+  "method": "GET",
+  "url": "{{supplierBaseUrl}}/suppliers",
+  "headers": [],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));\n"
+    }
+  ],
+  "id": "d65f3924ca1e5c5abda92b68"
+}

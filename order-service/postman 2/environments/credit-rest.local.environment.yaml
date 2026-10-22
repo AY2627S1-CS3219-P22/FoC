@@ -1,0 +1,110 @@
+{
+  "name": "order-service: Credit REST demo",
+  "values": [
+    {
+      "key": "userBaseUrl",
+      "value": "http://localhost:3001",
+      "enabled": true
+    },
+    {
+      "key": "creditBaseUrl",
+      "value": "http://localhost:3004",
+      "enabled": true
+    },
+    {
+      "key": "creditGrpcUrl",
+      "value": "localhost:50054",
+      "enabled": true
+    },
+    {
+      "key": "creditServiceToken",
+      "value": "local_order_credit_token",
+      "enabled": true
+    },
+    {
+      "key": "demoPassword",
+      "value": "CreditDemo!2026",
+      "enabled": true
+    },
+    {
+      "key": "AId",
+      "value": "d1300f54-fa18-440e-98df-143e16580033",
+      "enabled": true
+    },
+    {
+      "key": "AToken",
+      "value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJVU0VSIl0sImlhdCI6MTc5MjY4OTQxNSwiZXhwIjoxNzkyNjkwMzE1LCJzdWIiOiJkMTMwMGY1NC1mYTE4LTQ0MGUtOThkZi0xNDNlMTY1ODAwMzMiLCJqdGkiOiJmNzEwYjZhZi1lODI0LTQyMWItYjczNS02NjIwZTVjNTFmYzEifQ.NodPlou-VpXSHwJeMHegeHd9-1wFC-nqURFoMIPndqDbwjMgDjlxG_TLhZS-0vbq4W5-afyhR6QEcMes5PMJP3UpwgcXQN7dknEyAp6uYY3lChHaS7tXtu9p6DAGLvJO6ltv9R5Mpb3l3ipg0YFeqtRq2wsNNGKpLDmNNMzHEvN2_5VqUzQ5lZ9Nn7uJwB6L9P_AQzIuKof9qfUSkQqNdbBmr5h3tJITwWRk4Jbq-2EUW8c5YZeuBm1nYSGrK1H3KkGm1ZcvvwKLZ1iiDHed_sKrSLpGeb4yaFQan1QRCY5NsjVBt5UxOB74VEO-FFSEkkDtAgP4TjU7rrX-HAYb_Q",
+      "enabled": true
+    },
+    {
+      "key": "AEmail",
+      "value": "credit-demo-df04811928d1-a@u.nus.edu",
+      "enabled": true
+    },
+    {
+      "key": "BId",
+      "value": "1dc676b2-2f58-4186-bb18-77f2df476bd3",
+      "enabled": true
+    },
+    {
+      "key": "BToken",
+      "value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJVU0VSIl0sImlhdCI6MTc5MjY4OTQxNiwiZXhwIjoxNzkyNjkwMzE2LCJzdWIiOiIxZGM2NzZiMi0yZjU4LTQxODYtYmIxOC03N2YyZGY0NzZiZDMiLCJqdGkiOiJlYTFlNTExOS05YjEyLTQ2YzgtOTllNy1jOWQ5YTA4NzYyY2IifQ.PHfoN-BxK-J7ePyFu-QaWZiXlY84--Vn2f2Je7uonTvceJI-yxPUwaofH2xb2tXZsxpjQ6eOKpbpqn2JmJHZUn86uy3dT-MHMe1jXWjE50V-_I-6JAUmPxJVpLJzKXlDk1rRSTTQ_X3ZsUhCWjHdCmv2oqfsAhH2c5BOfOZU1QYhf0IFfN_hoz0FziEqA0ykpHMkma_OWPkpQoRSTvH-_sP0vI8dRv-dc1V7ch94065ueLglpkN0DqxpqlTGs-hKpLqywqVw86cR5Cdws9dQDlzkFYcdKclJ6UxtCIoCQpT5Hb7_z8vzhjk3G57SMKRpQohtqw55nFT3DtELy7DgEA",
+      "enabled": true
+    },
+    {
+      "key": "BEmail",
+      "value": "credit-demo-df04811928d1-b@u.nus.edu",
+      "enabled": true
+    },
+    {
+      "key": "CId",
+      "value": "29f595ed-b271-4152-905b-92dad190c56c",
+      "enabled": true
+    },
+    {
+      "key": "CToken",
+      "value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJVU0VSIl0sImlhdCI6MTc5MjY4OTQxNiwiZXhwIjoxNzkyNjkwMzE2LCJzdWIiOiIyOWY1OTVlZC1iMjcxLTQxNTItOTA1Yi05MmRhZDE5MGM1NmMiLCJqdGkiOiJkZmJiMzBkMy01ODZiLTRiZTMtOTY0Zi1hZWYxMjBhZDJkOGYifQ.RL5SVTH3_epl8p0IVQ-6B9AIouK1idm1WhlFvUQ03cGY8K3JIhONfiVjsxen5WmEMvjl0MHJyybYYsMwbJQ3XJVIRAmuBAZ9pFbXvMZoT9L1NA_ZutrAXFigGEteRU824gvvSGc9JMa_ru7q7O8WHzykv3S0agTT1VW3gYjDYKSdBJXO-4eZRd93HFcK74cCyzfy3KEhyY2LhtLjpYdaQhbMLddH2BDpwxzXuMCF94wf5Iovuco7I0SDZuxc5GbLjPRMHCjyhA_eZDkA_hEtaZ5bVH5SWkPQRTO6j770_2EnOYcZ9O39YNQ-tgheXxzfy6-aiiZ874MWmka-Cfz0uA",
+      "enabled": true
+    },
+    {
+      "key": "CEmail",
+      "value": "credit-demo-df04811928d1-c@u.nus.edu",
+      "enabled": true
+    },
+    {
+      "key": "DId",
+      "value": "7c91da07-0636-420c-b577-3e98a56dbc7f",
+      "enabled": true
+    },
+    {
+      "key": "DToken",
+      "value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3YzkxZGEwNy0wNjM2LTQyMGMtYjU3Ny0zZTk4YTU2ZGJjN2YiLCJyb2xlcyI6WyJVU0VSIl0sImlhdCI6MTc5MjY4OTQxNiwiZXhwIjoxNzkyNzc1ODE2fQ.SGhy6IJxJ3HdkJwTVKyWv1--PoDzMO39dQFDzzI7Y0jclTTzmJdXpQPmLhkfjGNDK0zUdUnVgkNV-bPDYzUHACE5hNbccJJfR6dN1W_s-oVhcUbLS-YcjuKNi5TJ1pIzbYUNkdmS5q6l6RvaD25agemkafWpsIm6QFRbpO3QblC_wStwCBGqlfYSPG4Exto7c7-BsE9XBiHH9m1WLf8U-T9eq8bckDW58f83rX9B7XlvgcoABspKQfO9d_pQYjJfvSxdJIt9zACkagB52JNrENaETpOhvKdXOTYuZKQ1h2WbJZ6JLPdNUhl-x3AZZ6lL9aOctjmDsVv89ywfiPRCEg",
+      "enabled": true
+    },
+    {
+      "key": "ABaselineHistory",
+      "value": "{\"entries\":[{\"id\":\"f0a61618-20ea-4475-8b87-097035f6edb2\",\"userId\":\"d1300f54-fa18-440e-98df-143e16580033\",\"orderId\":null,\"reservationId\":null,\"type\":\"INITIAL_GRANT\",\"totalAmountChange\":10,\"totalReservedChange\":0,\"createdAt\":\"2026-10-22T17:02:37.609Z\"}],\"nextPageToken\":null}",
+      "enabled": true
+    },
+    {
+      "key": "grpcOrder",
+      "value": "a6198f81-2b7b-4e71-b9d1-a1bd39ac4212",
+      "enabled": true
+    },
+    {
+      "key": "grpcSettleOrder",
+      "value": "7db83f73-1c6e-4a22-bcaf-0e3d46409f80",
+      "enabled": true
+    },
+    {
+      "key": "unknownOrder",
+      "value": "432aeb9f-0062-41ae-9fb5-e7cd41728fbf",
+      "enabled": true
+    },
+    {
+      "key": "missingAccount",
+      "value": "7960b103-4c71-43ce-8200-a73a94a904d4",
+      "enabled": true
+    }
+  ]
+}

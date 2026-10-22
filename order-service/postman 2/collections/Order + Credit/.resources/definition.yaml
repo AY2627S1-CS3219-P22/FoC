@@ -1,0 +1,3 @@
+$kind: collection
+name: Order + Credit
+description: Order flows with Credit balance and history audited after every step.

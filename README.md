@@ -179,3 +179,19 @@ Live demonstration artifacts: ChatGPT (Codex), 2026-10-23, generated native
 Postman YAML requests, a blank environment, generator and instructions under
 order-service/postman. Exact prompt and verification scope: Order usage log.
 Human review pending; no live API execution is claimed.
+
+Postman Web conversion: ChatGPT (Codex), 2026-10-23, generated v2.1 collection
+and blank environment JSON under order-service/postman/web-import with the
+human-approved description/README/log attribution method. Prompt and checks:
+Order usage log. Human review pending; no Web import or live execution claimed.
+
+Teammate Postman conversion, ChatGPT (Codex), 2026-10-23: exported HTTP collections
+and sanitized environments under order-service/postman 2/web-import, preserving
+native gRPC separately. Approved attribution is in collection descriptions,
+WEB-IMPORT.md and Order usage log. Human review pending; no live execution claimed.
+
+Demo authentication debugging, ChatGPT (Codex), 2026-10-23: added Web demo token
+setup/refresh checks, corrected ignored runtime fixture exports, and applied
+existing Credit migrations to the empty local demo database. Actual validation
+and Order runtime startup results are recorded in Order usage log. Human review
+pending; populated credential files stay ignored and are not included here.
