@@ -31,10 +31,18 @@ AI has suggested the following additions that were accepted by @sunpterodactyl
 - Generic queuehandler added in: 
 - close() function added in
 - uuid for eventId using the event broker it was initially a string
+- citation: https://gist.github.com/carlhoerberg/006b01ac17a0a94859ba
+- Declaration: wrapping handle delivery registerConsumer was AI suggested, and approved by me 
+- This helps with cleaner retry logic and re-registering the consumer to a crashed broker. 
 
 */
 
 export type QueueHandler<T = unknown> = (message: QueueMessage<T>) => Promise<void>;
+
+type ConsumerRegistration = {
+  queue: string;
+  register: (channel: ConfirmChannel) => Promise<void>;
+};
 
 //Singleton 
 export class RabbitMQClient {
@@ -42,6 +50,11 @@ export class RabbitMQClient {
   private readonly log: QueueLogger;
   private connection: ChannelModel | undefined;
   private channel: ConfirmChannel | undefined;
+  private readonly consumers: ConsumerRegistration[] = [];
+  private connectionPromise: Promise<void> | undefined;
+  private reconnectTimer: NodeJS.Timeout | undefined;
+  private reconnectAttempts = 0;
+  private closing = false;
 
   constructor(config: RabbitMQConfig = {prefetch:100}) { 
     this.config = config;
@@ -51,24 +64,111 @@ export class RabbitMQClient {
     );
   }
 
+  // Manages connection and consumer recovery.
   async connect(): Promise<void> {
-    const url = this.config.url || 'amqp://guest:guest@localhost:5672';
-    this.connection = await amqp.connect(url);
-    this.channel = await this.connection.createConfirmChannel();
-    this.log.info('connected');
+    this.closing = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+    await this.connectOnce();
+  }
 
-    if (this.config.queues) {
-      for (const queue of this.config.queues) {
-        await this.assertQueueWithDeadLetter(queue); //add in dlq
+  private async connectOnce(): Promise<void> {
+    if (this.connection && this.channel) return;
+    if (this.connectionPromise) return this.connectionPromise;
+
+    const attempt = this.openConnection();
+    this.connectionPromise = attempt;
+    try {
+      await attempt;
+    } finally {
+      if (this.connectionPromise === attempt) this.connectionPromise = undefined;
+    }
+  }
+
+  private async openConnection(): Promise<void> {
+    const url = this.config.url || 'amqp://guest:guest@localhost:5672';
+    const connection = this.connection = await amqp.connect(url);
+    
+    connection.on("error", (err: Error) => {
+        if (err.message !== "Connection closing") {
+          this.log.error('connection-error', undefined, { message: err.message });
+        }
+      });
+
+    connection.on("close", () => {
+      if (this.connection !== connection) return;
+      this.connection = undefined;
+      this.channel = undefined;
+      if (!this.closing) {
+        this.log.error('connection-closed', undefined, {
+          message: 'Reconnecting and restoring consumers',
+        });
+        this.scheduleReconnect();
       }
+      })
+
+
+    let channel: ConfirmChannel | undefined;
+    try {
+      channel = this.channel = await connection.createConfirmChannel();
+      channel.on('close', () => {
+        if (this.channel !== channel) return;
+        this.channel = undefined;
+        if (this.connection === connection) {
+          this.connection = undefined;
+          void connection.close().catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : String(err);
+            this.log.error('connection-close-failure', undefined, { message });
+          });
+        }
+        if (!this.closing) this.scheduleReconnect();
+      });
+
+      for (const queue of this.config.queues ?? []) {
+        await this.assertQueueWithDeadLetterOnChannel(channel, queue);
+      }
+      for (const consumer of this.consumers) {
+        await this.assertQueueWithDeadLetterOnChannel(channel, consumer.queue);
+        await consumer.register(channel);
+      }
+      this.reconnectAttempts = 0;
+      this.log.info('connected');
+    } catch (err) {
+      if (this.channel === channel) this.channel = undefined;
+      if (this.connection === connection) this.connection = undefined;
+      try {
+        await channel?.close();
+      } catch (closeError) {
+        const message = closeError instanceof Error ? closeError.message : String(closeError);
+        this.log.error('channel-close-failure', undefined, { message });
+      }
+      try {
+        await connection.close();
+      } catch (closeError) {
+        const message = closeError instanceof Error ? closeError.message : String(closeError);
+        this.log.error('connection-close-failure', undefined, { message });
+      }
+      throw err;
     }
   }
 
   async close(): Promise<void> {
-    await this.channel?.close();
-    await this.connection?.close();
+    this.closing = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+    const channel = this.channel;
+    const connection = this.connection;
     this.channel = undefined;
     this.connection = undefined;
+    try {
+      await channel?.close();
+    } finally {
+      await connection?.close();
+    }
     this.log.info('closed');
   }
 
@@ -85,7 +185,7 @@ export class RabbitMQClient {
       persistent: true,
       messageId: id,
       contentType: 'application/json',
-    });
+    }); //correctly specifies content type
     this.log.info(sent ? 'published' : 'publish-rejected', queue, { eventId: id });
     return sent;
   }
@@ -93,26 +193,29 @@ export class RabbitMQClient {
   async consumeFromQueue<T = unknown>(queue: string, handler: QueueHandler<T>): Promise<boolean> {
     const channel = this.requireChannel();
     await this.assertQueueWithDeadLetter(queue);
-    await channel.prefetch(this.config.prefetch ?? DEFAULT_PREFETCH); //safety! do not move this up or down
     const maxRetries = this.config.maxRetries ?? MAX_RETRIES;
-    
-
-    await channel.consume(
+    const registration: ConsumerRegistration = {
       queue,
-      (msg: ConsumeMessage | null) => {
-        this.handleDelivery(queue, msg, handler, maxRetries).catch((err: unknown) => {
-          const message = err instanceof Error ? err.message : String(err);
-          this.log.error('delivery-failure', queue, { message });
-        });
-      },
-      { noAck: false },
-    );
+      register: (consumerChannel) =>
+        this.registerConsumer(consumerChannel, queue, handler, maxRetries),
+    };
+    this.consumers.push(registration);
+    try {
+      await registration.register(channel);
+    } catch (err) {
+      this.consumers.splice(this.consumers.indexOf(registration), 1);
+      throw err;
+    }
     this.log.info('consuming', queue);
     return true;
   }
 
   async assertQueueWithDeadLetter(queue: string): Promise<void> {
     const channel = this.requireChannel();
+    await this.assertQueueWithDeadLetterOnChannel(channel, queue);
+  }
+
+  private async assertQueueWithDeadLetterOnChannel(channel: ConfirmChannel, queue: string): Promise<void> {
     const dlx = deadLetterExchange(queue);
     const dlq = deadLetterQueue(queue);
 
@@ -124,6 +227,41 @@ export class RabbitMQClient {
       deadLetterExchange: dlx,
       deadLetterRoutingKey: queue,
     });
+  }
+
+  private scheduleReconnect(): void {
+    if (this.closing || this.reconnectTimer) return;
+
+    const delayMs = Math.min(1000 * 2 ** this.reconnectAttempts, 30_000);
+    this.reconnectAttempts += 1;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      if (this.closing) return;
+      void this.connectOnce().catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        this.log.error('reconnect-failure', undefined, { message, retryInMs: delayMs });
+        this.scheduleReconnect();
+      });
+    }, delayMs);
+  }
+
+  private async registerConsumer<T>(
+    channel: ConfirmChannel,
+    queue: string,
+    handler: QueueHandler<T>,
+    maxRetries: number,
+  ): Promise<void> {
+    await channel.prefetch(this.config.prefetch ?? DEFAULT_PREFETCH);
+    await channel.consume(
+      queue,
+      (msg: ConsumeMessage | null) => {
+        this.handleDelivery(queue, msg, handler, maxRetries, channel).catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          this.log.error('delivery-failure', queue, { message });
+        });
+      },
+      { noAck: false },
+    );
   }
 
   /*
@@ -177,11 +315,10 @@ export class RabbitMQClient {
   - Failure and retries exhausted → nack without requeue → DLQ
   */
 
-  private async handleDelivery<T>(queue: string, msg: ConsumeMessage | null, handler: QueueHandler<T>, maxRetries: number,): Promise<void> {
+  private async handleDelivery<T>(queue: string, msg: ConsumeMessage | null, handler: QueueHandler<T>, maxRetries: number, channel: ConfirmChannel): Promise<void> {
     
     if (!msg) return;
 
-    const channel = this.requireChannel();
     const parsedRetry = Number(msg.properties.headers?.[RETRY_HEADER] ?? 0);
     const retryCount = Number.isFinite(parsedRetry) ? parsedRetry : maxRetries;
     const messageId = msg.properties.messageId ?? '';

@@ -6,9 +6,9 @@
 import 'dotenv/config';
 import { app } from '@/app';
 
-const port = process.env.PORT || 3002; //local .env configuration
+const port = Number(process.env.PORT || 3002);
+const host = process.env.HOST || '0.0.0.0';
 
-//Server running
-app.listen(port, () => {
-    console.log(`Supplier Service is running locally on port ${port}`)
+app.listen(port, host, () => {
+    console.log(`Supplier Service is running on ${host}:${port}`)
 })
