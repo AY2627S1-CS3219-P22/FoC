@@ -47,9 +47,10 @@ RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci --omit=dev -w @foc/order-grpc -
 COPY --from=build /repo/shared/grpc/dist ./shared/grpc/dist
 COPY --from=build /repo/order-service/grpc/dist ./order-service/grpc/dist
 
-# shared/grpc loads these proto files at runtime by relative path.
+# shared/grpc and order's credit client load these proto files at runtime by relative path.
 COPY shared/grpc/proto ./shared/grpc/proto
 COPY user-service/proto ./user-service/proto
+COPY order-service/grpc/proto ./order-service/grpc/proto
 
 WORKDIR /repo/order-service/grpc
 
