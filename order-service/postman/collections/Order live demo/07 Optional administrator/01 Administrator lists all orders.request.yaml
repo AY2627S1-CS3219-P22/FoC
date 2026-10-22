@@ -1,0 +1,21 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "01 Administrator lists all orders",
+  "$kind": "http-request",
+  "method": "GET",
+  "url": "{{orderBaseUrl}}/orders",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{adminToken}}"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));\npm.test('Orders returned',()=>pm.expect(pm.response.json().orders).to.be.an('array'));"
+    }
+  ],
+  "id": "715b8a8a9f99546d8ed18f37"
+}

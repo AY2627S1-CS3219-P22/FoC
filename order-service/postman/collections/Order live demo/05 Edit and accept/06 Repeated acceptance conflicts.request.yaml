@@ -1,0 +1,29 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "06 Repeated acceptance conflicts",
+  "$kind": "http-request",
+  "method": "POST",
+  "url": "{{orderBaseUrl}}/orders/{{orderId}}/accept",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{BToken}}"
+    },
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));\n"
+    }
+  ],
+  "id": "b98708dc755954e38043cd8c",
+  "body": {
+    "type": "json",
+    "content": "{}"
+  }
+}

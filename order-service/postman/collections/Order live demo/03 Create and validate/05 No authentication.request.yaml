@@ -1,0 +1,16 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "05 No authentication",
+  "$kind": "http-request",
+  "method": "GET",
+  "url": "{{orderBaseUrl}}/orders?scope=open",
+  "headers": [],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));\n"
+    }
+  ],
+  "id": "18ced90185aa504390c5bdb2"
+}

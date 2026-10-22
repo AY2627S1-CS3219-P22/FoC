@@ -1,0 +1,33 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "07 A cannot edit assigned order",
+  "$kind": "http-request",
+  "method": "PATCH",
+  "url": "{{orderBaseUrl}}/orders/{{orderId}}",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{AToken}}"
+    },
+    {
+      "key": "Idempotency-Key",
+      "value": "{{runId}}-assigned-edit"
+    },
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));\n"
+    }
+  ],
+  "id": "39afd482436756a4abc381d5",
+  "body": {
+    "type": "json",
+    "content": "{\"credits\": 5}"
+  }
+}

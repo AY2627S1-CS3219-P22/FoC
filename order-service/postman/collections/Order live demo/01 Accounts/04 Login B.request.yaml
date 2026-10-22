@@ -1,0 +1,25 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "04 Login B",
+  "$kind": "http-request",
+  "method": "POST",
+  "url": "{{userBaseUrl}}/users/login",
+  "headers": [
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));\nif(pm.response.code===200) pm.environment.set('BToken',pm.response.json().token);"
+    }
+  ],
+  "id": "e420a7366d235c879adcb96b",
+  "body": {
+    "type": "json",
+    "content": "{\"email\": \"b-{{runId}}@u.nus.edu\", \"password\": \"{{demoPassword}}\"}"
+  }
+}

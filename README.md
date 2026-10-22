@@ -174,3 +174,8 @@ verification scope are recorded in Order usage log and Credit entry
 Order Docker context correction, ChatGPT (Codex), 2026-10-22: corrected the
 manifest allowlist for the merged workspace layout. Prompt and actual Docker
 verification are in Order usage-log.md. Human review pending.
+
+Live demonstration artifacts: ChatGPT (Codex), 2026-10-23, generated native
+Postman YAML requests, a blank environment, generator and instructions under
+order-service/postman. Exact prompt and verification scope: Order usage log.
+Human review pending; no live API execution is claimed.

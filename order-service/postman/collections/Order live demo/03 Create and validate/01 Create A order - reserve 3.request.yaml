@@ -1,0 +1,33 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+# Generated demo requests; human review pending; see order-service/usage-log.md.
+{
+  "name": "01 Create A order - reserve 3",
+  "$kind": "http-request",
+  "method": "POST",
+  "url": "{{orderBaseUrl}}/orders",
+  "headers": [
+    {
+      "key": "Authorization",
+      "value": "Bearer {{AToken}}"
+    },
+    {
+      "key": "Idempotency-Key",
+      "value": "{{runId}}-create"
+    },
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "scripts": [
+    {
+      "type": "afterResponse",
+      "code": "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));\nif(pm.response.json().order) pm.environment.set('orderId',pm.response.json().order.id);\npm.test('UNASSIGNED',()=>pm.expect(pm.response.json().order.status).to.eql('UNASSIGNED'));"
+    }
+  ],
+  "id": "655b1165b7025c7dba2b36bf",
+  "body": {
+    "type": "json",
+    "content": "{\"supplierId\": \"{{supplierId}}\", \"destination\": \"Central Library\", \"requestDetails\": \"Live demo coffee collection\", \"credits\": 3, \"expiryTime\": \"{{expiryTime}}\"}"
+  }
+}

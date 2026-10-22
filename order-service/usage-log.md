@@ -996,3 +996,26 @@ Docker verification: docker build -f order-service/Dockerfile -t
 foc-order-demo-build-check . succeeded, including npm ci, shared gRPC build,
 Prisma generation and Order TypeScript compilation. Existing containers were
 not restarted. Changes remain uncommitted for human review.
+
+
+## 2026-10-23 Asia/Singapore — Native Postman live demonstration files
+Tool: ChatGPT (Codex), mode: implementation/test-script/documentation generation.
+Human review pending. Exact prompt:
+```text
+Could you make me a suitable set of postman files for the live demonstration then please!!!!!!
+```
+Key response: generated order-service/postman/generate.py, numbered native YAML
+HTTP requests and blank environment with file-header attribution, plus README.
+Uses implemented endpoints only: User register/login, Supplier listing, Credit
+balance, Order creation/edit/accept/cancel/scoped listings and optional admin
+listing. No pickup/details endpoint invented. No database seeding/reset or real
+credentials included. Fresh accounts, stable retry bodies/keys and credit
+assertions support the approved workflow. Manual supplier choice and async
+initialization/pending response instructions included.
+Checks: generator parses all generated scripts with node --check; artifact
+shape and counts checked separately. No live service calls, Postman execution,
+schema certification, or passed cross-service assertions are claimed.
+
+Artifact verification completed: 33 unique requests and one blank-token
+environment parsed successfully; 35 JavaScript scripts passed syntax checks;
+git diff --check passed. No services were contacted.
