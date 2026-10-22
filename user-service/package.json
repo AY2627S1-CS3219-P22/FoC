@@ -17,6 +17,7 @@
     "admin:create": "node dist/scripts/createAdmin.js",
     "admin:create:dev": "tsx src/scripts/createAdmin.ts",
     "events:publish": "tsx src/events/userCreated.ts",
+    "pretest": "npm run build --prefix ../shared/messaging",
     "test": "tsx --test test/**/*.test.ts"
   },
   "dependencies": {
