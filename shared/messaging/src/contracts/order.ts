@@ -1,48 +1,59 @@
 
 //message producer for UI and Notifications
 
-export type OrderStatus =
-  | "UNASSIGNED"
-  | "ASSIGNED"
-  | "PICKED_UP"
-  | "DELIVERED"
-  | "CANCELLED";
+import { z } from 'zod';
+
+export const orderStatusSchema = z.enum([
+  'UNASSIGNED', 'ASSIGNED', 'PICKED_UP', 'DELIVERED', 'CANCELLED',
+]);
+export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
 /*
 TODO: Verify the order event base --order event owner to change
 */
-interface OrderEventBase {
-  eventId: string;
-  occurredAt: string;
-  orderId: string;
-  requesterId: string;
-  courierId?: string;
-  supplierId: string;
-  deliveryLocation: string;
-  instructions: string;
-  credits: number;
-  status: OrderStatus;
-  deadline?: string;
-}
+const orderEventBaseSchema = z.object({
+  eventId: z.string(),
+  occurredAt: z.string(),
+  orderId: z.string(),
+  requesterId: z.string(),
+  courierId: z.string().optional(),
+  supplierId: z.string(),
+  deliveryLocation: z.string(),
+  instructions: z.string(),
+  credits: z.number(),
+  status: orderStatusSchema,
+  deadline: z.string().optional(),
+});
 
 /** Fulfillment notifications published when an order is created or edited. */
-export interface OrderCreated extends OrderEventBase {
-  type: 'order.created';
-}
+export const orderCreatedSchema = orderEventBaseSchema.extend({
+  type: z.literal('order.created'),
+});
 
-export interface OrderUpdated extends OrderEventBase {
-  type: 'order.updated';
-}
+export const orderUpdatedSchema = orderEventBaseSchema.extend({
+  type: z.literal('order.updated'),
+});
 
 /** Triggers a credit release / refund. */
-export interface OrderCancelled extends OrderEventBase {
-  type: 'order.cancelled';
-  reason?: string;
-}
+export const orderCancelledSchema = orderEventBaseSchema.extend({
+  type: z.literal('order.cancelled'),
+  reason: z.string().optional(),
+});
 
-export interface OrderCreditsEdited extends OrderEventBase {
-  type: 'order.credits_edited';
-  previousCredits: number;
-}
+export const orderCreditsEditedSchema = orderEventBaseSchema.extend({
+  type: z.literal('order.credits_edited'),
+  previousCredits: z.number(),
+});
 
-export type OrderEvent = OrderCreated | OrderUpdated | OrderCancelled | OrderCreditsEdited;
+export const orderEventSchema = z.discriminatedUnion('type', [
+  orderCreatedSchema,
+  orderUpdatedSchema,
+  orderCancelledSchema,
+  orderCreditsEditedSchema,
+]);
+
+export type OrderCreated = z.infer<typeof orderCreatedSchema>;
+export type OrderUpdated = z.infer<typeof orderUpdatedSchema>;
+export type OrderCancelled = z.infer<typeof orderCancelledSchema>;
+export type OrderCreditsEdited = z.infer<typeof orderCreditsEditedSchema>;
+export type OrderEvent = z.infer<typeof orderEventSchema>;

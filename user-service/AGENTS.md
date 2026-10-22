@@ -22,6 +22,12 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 - **Schema changes go through `prisma migrate dev`, never `db push`.**
 - **No cross-service database access.** This service owns its own DB/schema; talk
   to other services over gRPC/REST only.
+- **`user.created` is published through the transactional outbox, never from the
+  HTTP/gRPC handler.** `register` / `bootstrapAdmin` insert `User` and a
+  `user_outbox` row in one `prisma.$transaction`. Only the background dispatcher
+  calls `RabbitMQClient.publishToQueue`, and only to `CREDIT_USER_QUEUE`. A
+  broker outage must not fail sign-up. Delivery is at-least-once: the same
+  `eventId` is retried until `published_at` is set.
 - **Passwords are hashed (bcryptjs), never encrypted/decrypted.**
 - **All Administrator-role changes go through `adminService`:** one transaction
   that calls `lockAdminSet` first and writes an `AdminRoleChange` row. Never
