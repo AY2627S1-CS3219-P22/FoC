@@ -1,11 +1,10 @@
-type Status = "open" | "accepted" | "picked-up" | "delivered" | "completed" | "cancelled" | "expired"
+type Status = "open" | "accepted" | "picked-up" | "delivered" | "cancelled" | "expired"
 
 const CONFIG: Record<Status, { label: string; cls: string }> = {
   open:        { label: "OPEN",       cls: "bg-[#E8F1ED] text-[#1A4A36]" },
   accepted:    { label: "ACCEPTED",   cls: "bg-blue-50 text-blue-700" },
   "picked-up": { label: "PICKED UP",  cls: "bg-amber-50 text-amber-700" },
   delivered:   { label: "DELIVERED",  cls: "bg-purple-50 text-purple-700" },
-  completed:   { label: "COMPLETED",  cls: "bg-[#E8F1ED] text-[#3F6B5A]" },
   cancelled:   { label: "CANCELLED",  cls: "bg-gray-100 text-gray-500" },
   expired:     { label: "EXPIRED",    cls: "bg-red-50 text-red-600" },
 }

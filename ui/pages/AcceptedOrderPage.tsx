@@ -1,25 +1,32 @@
+// AI-assisted (Claude), reviewed and tested by Maliha
 import type { Order } from "../App"
 import StatusBadge from "../components/StatusBadge"
+import { useOrder } from "../hooks/useOrder"
 
 interface Props {
-  order: Order
-  onMarkPickedUp: (id: string) => void
-  onMarkDelivered: (id: string) => void
+  initialOrder: Order
+  onDelivered: (order: Order) => void
   onBack: () => void
 }
 
-const STEPS = ["Accepted", "Picked Up", "Delivered", "Completed"] as const
+// delivered is the last step, there's no separate requester confirm
+const STEPS = ["Accepted", "Picked Up", "Delivered"] as const
 
 function stepIndex(status: Order["status"]): number {
-  if (status === "accepted")  return 0
   if (status === "picked-up") return 1
   if (status === "delivered") return 2
-  if (status === "completed") return 3
   return 0
 }
 
-export default function AcceptedOrderPage({ order, onMarkPickedUp, onMarkDelivered, onBack }: Props) {
+export default function AcceptedOrderPage({ initialOrder, onDelivered, onBack }: Props) {
+  const { order, actionError, busy, run } = useOrder(initialOrder)
+
   const current = stepIndex(order.status)
+
+  const deliver = async () => {
+    const updated = await run("deliver")
+    if (updated) onDelivered(updated)
+  }
 
   return (
     <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6 sm:py-8">
@@ -101,11 +108,16 @@ export default function AcceptedOrderPage({ order, onMarkPickedUp, onMarkDeliver
         </div>
       </div>
 
+      {actionError && (
+        <p role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-center text-xs text-red-600">{actionError}</p>
+      )}
+
       {/* Contextual action */}
       {order.status === "accepted" && (
         <button
-          onClick={() => onMarkPickedUp(order.id)}
-          className="w-full py-3 bg-[#1A4A36] text-white text-sm font-medium rounded-xl hover:bg-[#163D2C] transition-colors"
+          onClick={() => run("pickup")}
+          disabled={busy}
+          className="w-full py-3 bg-[#1A4A36] text-white text-sm font-medium rounded-xl hover:bg-[#163D2C] disabled:opacity-50 transition-colors"
         >
           Mark as Picked Up
         </button>
@@ -116,14 +128,15 @@ export default function AcceptedOrderPage({ order, onMarkPickedUp, onMarkDeliver
             Item has been picked up. Head to {order.deliveryLocation}.
           </div>
           <button
-            onClick={() => onMarkDelivered(order.id)}
-            className="w-full py-3 bg-[#1A4A36] text-white text-sm font-medium rounded-xl hover:bg-[#163D2C] transition-colors"
+            onClick={deliver}
+            disabled={busy}
+            className="w-full py-3 bg-[#1A4A36] text-white text-sm font-medium rounded-xl hover:bg-[#163D2C] disabled:opacity-50 transition-colors"
           >
             Mark as Delivered
           </button>
         </div>
       )}
-      {order.status === "completed" && (
+      {order.status === "delivered" && (
         <div className="bg-[#E8F1ED] border border-[#1A4A36]/10 rounded-xl px-5 py-4 text-center">
           <p className="text-sm font-semibold text-[#1A4A36] mb-0.5">Errand completed</p>
           <p className="text-xs text-[#3F6B5A]">+{order.credits} credits added to your balance</p>

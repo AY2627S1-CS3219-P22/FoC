@@ -1,30 +1,42 @@
+// AI-assisted (Claude), reviewed and tested by Maliha
 import { useState } from "react"
 import type { Order } from "../App"
 import StatusBadge from "../components/StatusBadge"
+import { useOrder } from "../hooks/useOrder"
 
 interface Props {
-  order: Order
+  initialOrder: Order
   currentUserId: string
   onBack: () => void
-  onAccept: (orderId: string) => void
-  onDelete?: () => void
-  onMarkPickedUp?: () => void
-  onMarkDelivered?: () => void
-  onConfirm?: () => void
-  onReleaseCredits?: () => void
+  onAccepted: (order: Order) => void
+  onDelivered: (order: Order) => void
 }
 
-export default function OrderDetailsPage({
-  order, currentUserId, onBack, onAccept,
-  onDelete, onMarkPickedUp, onMarkDelivered, onConfirm, onReleaseCredits,
-}: Props) {
+export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, onAccepted, onDelivered }: Props) {
+  const { order, actionError, busy, run } = useOrder(initialOrder)
   const [showAcceptModal, setShowAcceptModal] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
 
   const isRequester = order.requesterId === currentUserId
   const isCourier   = order.courierId   === currentUserId
   const isOpen      = order.status === "open"
   const canAccept   = !isRequester && !isCourier && isOpen
+
+  const accept = async () => {
+    setShowAcceptModal(false)
+    const updated = await run("accept")
+    if (updated) onAccepted(updated)
+  }
+
+  const deliver = async () => {
+    const updated = await run("deliver")
+    if (updated) onDelivered(updated)
+  }
+
+  const cancel = async () => {
+    setShowCancelModal(false)
+    if (await run("cancel")) onBack()
+  }
 
   return (
     <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6 sm:py-8">
@@ -122,7 +134,7 @@ export default function OrderDetailsPage({
       )}
       {!isOpen && !isRequester && !isCourier && (
         <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 mb-4 text-center">
-          <p className="text-xs text-amber-700 font-medium">This request has already been accepted.</p>
+          <p className="text-xs text-amber-700 font-medium">This request is no longer open.</p>
         </div>
       )}
       {isCourier && order.status === "accepted" && (
@@ -134,6 +146,10 @@ export default function OrderDetailsPage({
         <div className="bg-[#E8F1ED] border border-[#1A4A36]/10 rounded-lg px-4 py-3 mb-4 text-center">
           <p className="text-xs text-[#1A4A36] font-medium">Item picked up — deliver to {order.deliveryLocation}.</p>
         </div>
+      )}
+
+      {actionError && (
+        <p role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-center text-xs text-red-600">{actionError}</p>
       )}
 
       {/* ── ACTION AREA ── */}
@@ -149,7 +165,8 @@ export default function OrderDetailsPage({
           </button>
           <button
             onClick={() => setShowAcceptModal(true)}
-            className="flex-1 py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] transition-colors"
+            disabled={busy}
+            className="flex-1 py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-50 transition-colors"
           >
             Accept Request
           </button>
@@ -159,18 +176,20 @@ export default function OrderDetailsPage({
       {/* Courier actions */}
       {isCourier && (
         <div className="space-y-3">
-          {onMarkPickedUp && (
+          {order.status === "accepted" && (
             <button
-              onClick={onMarkPickedUp}
-              className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] transition-colors"
+              onClick={() => run("pickup")}
+              disabled={busy}
+              className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-50 transition-colors"
             >
               Mark as Picked Up
             </button>
           )}
-          {onMarkDelivered && (
+          {order.status === "picked-up" && (
             <button
-              onClick={onMarkDelivered}
-              className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] transition-colors"
+              onClick={deliver}
+              disabled={busy}
+              className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-50 transition-colors"
             >
               Mark as Delivered
             </button>
@@ -187,31 +206,7 @@ export default function OrderDetailsPage({
       {/* Requester actions */}
       {isRequester && (
         <div className="space-y-3">
-          {/* In-progress: confirm + release credits */}
-          {(onConfirm || onReleaseCredits) && (
-            <div className="flex gap-3">
-              {onConfirm && (
-                <button
-                  onClick={onConfirm}
-                  className="flex-1 py-2.5 bg-[#162A46] text-white text-sm font-medium rounded-lg hover:bg-[#0f1e33] transition-colors"
-                >
-                  Confirm Receipt
-                </button>
-              )}
-              {onReleaseCredits && (
-                <button
-                  onClick={onReleaseCredits}
-                  className="flex-1 py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm1 14.93V18h-2v-1.07A4.002 4.002 0 018 13h2a2 2 0 104 0 4.002 4.002 0 01-3-3.858V8h2v1.07A4.002 4.002 0 0116 13a4.002 4.002 0 01-3 3.93z" />
-                  </svg>
-                  Release Credits
-                </button>
-              )}
-            </div>
-          )}
-          {/* Open: delete */}
+          {/* Open: cancel */}
           <div className="flex gap-3">
             <button
               onClick={onBack}
@@ -219,12 +214,13 @@ export default function OrderDetailsPage({
             >
               Back
             </button>
-            {onDelete && (
+            {isOpen && (
               <button
-                onClick={() => setShowDeleteModal(true)}
-                className="flex-1 py-2.5 border border-red-100 text-red-500 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors"
+                onClick={() => setShowCancelModal(true)}
+                disabled={busy}
+                className="flex-1 py-2.5 border border-red-100 text-red-500 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
               >
-                Delete Request
+                Cancel Request
               </button>
             )}
           </div>
@@ -269,7 +265,7 @@ export default function OrderDetailsPage({
                 Cancel
               </button>
               <button
-                onClick={() => { setShowAcceptModal(false); onAccept(order.id) }}
+                onClick={accept}
                 className="flex-1 py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] transition-colors"
               >
                 Accept Errand
@@ -279,32 +275,32 @@ export default function OrderDetailsPage({
         </div>
       )}
 
-      {/* Delete modal */}
-      {showDeleteModal && (
+      {/* Cancel modal */}
+      {showCancelModal && (
         <div
           className="fixed inset-0 bg-black/30 flex items-end sm:items-center justify-center z-50 p-4"
-          onClick={() => setShowDeleteModal(false)}
+          onClick={() => setShowCancelModal(false)}
         >
           <div
             className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-base font-semibold text-[#162A46] mb-2">Delete this request?</h3>
+            <h3 className="text-base font-semibold text-[#162A46] mb-2">Cancel this request?</h3>
             <p className="text-sm text-[#3F6B5A] mb-6 leading-relaxed">
               Your reserved credits will be returned to your balance.
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowDeleteModal(false)}
+                onClick={() => setShowCancelModal(false)}
                 className="flex-1 py-2.5 border border-[#E4E8E6] text-[#1B2522] text-sm font-medium rounded-lg hover:bg-[#F7F9F8] transition-colors"
               >
-                Cancel
+                Keep it
               </button>
               <button
-                onClick={() => { setShowDeleteModal(false); onDelete?.(); onBack() }}
+                onClick={cancel}
                 className="flex-1 py-2.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
               >
-                Delete Request
+                Cancel Request
               </button>
             </div>
           </div>

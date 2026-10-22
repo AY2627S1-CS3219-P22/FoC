@@ -1,6 +1,9 @@
-import { SUPPLIERS } from "../data/suppliers"
+// AI-assisted (Claude), reviewed and tested by Maliha
 import { useEffect, useState } from "react"
-import type { User, Order, Page } from "../App"
+import type { User, Page } from "../App"
+import { CATEGORIES, categoryLabel, supplierLocation, type Category } from "../api/suppliers"
+import { createOrder, orderError, type NewOrder } from "../api/orders"
+import { useSuppliers } from "../hooks/useSuppliers"
 
 const DELIVERY_LOCATIONS = [
   "PGP", "PGPR Block A", "PGPR Block B", "PGPR Block E",
@@ -24,13 +27,13 @@ const DELIVERY_TIMES = Array.from({ length: 96 }, (_, index) => {
 interface Props {
   user: User
   onNavigate: (page: Page) => void
-  onSubmit: (order: Order) => void
+  onCreated: (pending: boolean) => void
 }
 
 const inputCls =
   "w-full px-3.5 py-2.5 border border-[#E4E8E6] rounded-lg text-sm text-[#1B2522] bg-white focus:outline-none focus:border-[#1A4A36] focus:ring-1 focus:ring-[#1A4A36] transition-colors placeholder-[#9CA3AF]"
 
-export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props) {
+export default function CreateRequestPage({ user, onNavigate, onCreated }: Props) {
   const [step, setStep] = useState(1)
   const [now, setNow] = useState(() => Date.now())
   const [deliveryDate, setDeliveryDate] = useState(() => localDateValue(new Date()))
@@ -68,14 +71,12 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
     setDeadlineError("")
     return true
   }
-  const [supplierSearch, setSupplierSearch] = useState("")
-  const [supplierType, setSupplierType] = useState("All")
-  const visibleSuppliers = SUPPLIERS.filter((supplier) =>
-    (supplierType === "All" || supplier.type === supplierType) &&
-    `${supplier.name} ${supplier.location}`.toLowerCase().includes(supplierSearch.trim().toLowerCase())
-  )
+  // order-service needs the real supplier id, so suppliers have to come from supplier-service
+  const { suppliers, error: suppliersError, query, category, search, filter, retry } = useSuppliers()
+
   const [form, setForm] = useState({
     pickupLocation: "",
+    supplierId: "",
     supplier: "",
     deliveryLocation: "",
     description: "",
@@ -83,24 +84,38 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
   })
 
   const set = (k: keyof typeof form, v: string | number) => setForm((f) => ({ ...f, [k]: v }))
-  const creditsAfter = user.credits - form.credits
+  // if the balance didn't load, let order-service decide whether there are enough credits
+  const creditsAfter = user.credits === null ? null : user.credits - form.credits
+  const notEnough = creditsAfter !== null && creditsAfter < 0
 
-  const handleSubmit = () => {
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState("")
+  // reuse the key if the exact same request is retried, so it can't get created twice
+  const [lastAttempt, setLastAttempt] = useState<{ body: string; key: string } | null>(null)
+
+  const handleSubmit = async () => {
     if (!validateDeadline()) { setStep(2); return }
-    const order: Order = {
-      id: `o${Date.now()}`,
-      pickupLocation: form.pickupLocation,
-      pickupStore: form.supplier,
-      deliveryLocation: form.deliveryLocation,
-      description: form.description,
+    const order: NewOrder = {
+      supplierId: form.supplierId,
+      destination: form.deliveryLocation,
+      requestDetails: form.description.trim(),
       credits: form.credits,
-      deadline: deadlineLabel,
-      status: "open",
-      requesterId: user.id,
-      requesterName: user.name,
-      createdAt: new Date().toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" }),
+      expiryTime: new Date(deadlineTimestamp).toISOString(),
     }
-    onSubmit(order)
+    const body = JSON.stringify(order)
+    const key = lastAttempt?.body === body ? lastAttempt.key : crypto.randomUUID()
+    setLastAttempt({ body, key })
+
+    setSubmitting(true)
+    setSubmitError("")
+    try {
+      const { pending } = await createOrder(order, key)
+      onCreated(pending)
+    } catch (err) {
+      setSubmitError(orderError(err))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const step1Valid = !!form.pickupLocation && !!form.supplier
@@ -147,24 +162,18 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
             <input
               id="supplier-search"
               type="search"
-              value={supplierSearch}
-              onChange={(e) => setSupplierSearch(e.target.value)}
+              value={query}
+              onChange={(e) => search(e.target.value)}
               placeholder="Search by name or campus location…"
               className={inputCls}
             />
           </div>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Supplier category">
-            {["All", "F&B", "Convenience", "Services", "Retail"].map((type) => (
-              <button
-                key={type}
-                type="button"
-                aria-pressed={supplierType === type}
-                onClick={() => setSupplierType(type)}
-                className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${supplierType === type ? "border-[#1A4A36] bg-[#1A4A36] text-white" : "border-[#E4E8E6] bg-white text-[#3F6B5A] hover:border-[#3F6B5A]"}`}
-              >
-                {type}
-              </button>
-            ))}
+          <div>
+            <label htmlFor="supplier-category" className="block text-xs font-medium text-[#1B2522] mb-1.5">Category</label>
+            <select id="supplier-category" value={category} onChange={(e) => filter(e.target.value as Category | "")} className={inputCls}>
+              <option value="">All categories</option>
+              {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
           </div>
           {form.supplier && (
             <div className="rounded-lg border border-[#1A4A36]/20 bg-[#E8F1ED] px-4 py-3" role="status">
@@ -173,34 +182,41 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
             </div>
           )}
           <fieldset className="min-w-0">
-            <legend className="mb-3 text-xs font-medium text-[#3F6B5A]">Choose a supplier · {visibleSuppliers.length} found</legend>
+            <legend className="mb-3 text-xs font-medium text-[#3F6B5A]">Choose a supplier{suppliers && !suppliersError ? ` · ${suppliers.length} found` : ""}</legend>
             <div className="grid max-h-80 grid-cols-1 gap-3 overflow-y-auto px-1 py-2 [scrollbar-gutter:stable]">
-              {visibleSuppliers.map((supplier) => {
-                const label = `${supplier.name} @ ${supplier.location}`
-                const selected = form.supplier === label
+              {!suppliersError && suppliers?.map((supplier) => {
+                const id = String(supplier.supplierId)
+                const location = supplierLocation(supplier)
+                const label = `${supplier.name} @ ${location}`
+                const selected = form.supplierId === id
                 return (
-                  <label key={supplier.id} className={`flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border px-4 py-4 sm:px-5 transition-colors ${selected ? "border-[#1A4A36] bg-[#E8F1ED]" : "border-[#E4E8E6] bg-white hover:border-[#3F6B5A]"}`}>
+                  <label key={id} className={`flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border px-4 py-4 sm:px-5 transition-colors ${selected ? "border-[#1A4A36] bg-[#E8F1ED]" : "border-[#E4E8E6] bg-white hover:border-[#3F6B5A]"}`}>
                     <input
                       type="radio"
                       name="supplier"
-                      value={supplier.id}
+                      value={id}
                       checked={selected}
-                      onChange={() => setForm((previous) => ({ ...previous, supplier: label, pickupLocation: supplier.location }))}
+                      onChange={() => setForm((previous) => ({ ...previous, supplierId: id, supplier: label, pickupLocation: location }))}
                       className="h-4 w-4 shrink-0 accent-[#1A4A36]"
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-[#162A46]">{supplier.name}</span>
-                      <span className="mt-1 block text-xs text-[#3F6B5A]">{supplier.location} · {supplier.type}</span>
-                      {supplier.hours && <span className="mt-1 block text-xs text-[#3F6B5A]">{supplier.hours}</span>}
+                      <span className="mt-1 block text-xs text-[#3F6B5A]">{location} · {categoryLabel(supplier.type)}</span>
                     </span>
                   </label>
                 )
               })}
-              {visibleSuppliers.length === 0 && (
+              {(!suppliers || suppliersError) && (
+                <div className="rounded-xl border border-[#E4E8E6] bg-white p-6 text-center">
+                  <p className="text-xs text-[#3F6B5A]">{suppliersError || "Loading suppliers…"}</p>
+                  {suppliersError && <button type="button" onClick={retry} className="mt-3 text-xs font-semibold text-[#1A4A36] underline">Try again</button>}
+                </div>
+              )}
+              {suppliers && !suppliersError && suppliers.length === 0 && (
                 <div className="rounded-xl border border-[#E4E8E6] bg-white p-6 text-center">
                   <p className="text-sm font-medium text-[#162A46]">No suppliers found</p>
                   <p className="mt-1 text-xs text-[#3F6B5A]">Try another name, location, or category.</p>
-                  <button type="button" onClick={() => { setSupplierSearch(""); setSupplierType("All") }} className="mt-3 text-xs font-semibold text-[#1A4A36] underline">Clear filters</button>
+                  <button type="button" onClick={() => filter("")} className="mt-3 text-xs font-semibold text-[#1A4A36] underline">Clear filters</button>
                 </div>
               )}
             </div>
@@ -296,19 +312,22 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
                 <span className="text-sm text-[#3F6B5A] ml-1.5">credits</span>
               </div>
               <button
-                onClick={() => set("credits", Math.min(user.credits, form.credits + 1))}
+                onClick={() => set("credits", user.credits === null ? form.credits + 1 : Math.min(user.credits, form.credits + 1))}
                 className="w-10 h-10 border border-[#E4E8E6] rounded-lg flex items-center justify-center hover:bg-[#F7F9F8] text-xl text-[#1B2522] transition-colors"
               >
                 +
               </button>
             </div>
             <div className="flex justify-between mt-3 text-xs text-[#3F6B5A]">
-              <span>Available: <strong className="text-[#162A46]">{user.credits}</strong> credits</span>
-              <span className={creditsAfter < 0 ? "text-red-500 font-medium" : ""}>
-                Remaining: <strong>{creditsAfter}</strong> credits
+              <span>Available: <strong className="text-[#162A46]">{user.credits ?? "–"}</strong> credits</span>
+              <span className={notEnough ? "text-red-500 font-medium" : ""}>
+                Remaining: <strong>{creditsAfter ?? "–"}</strong> credits
               </span>
             </div>
-            {creditsAfter < 0 && (
+            {user.credits === null && (
+              <p className="text-xs text-[#3F6B5A] mt-1.5">Couldn't load your balance right now.</p>
+            )}
+            {notEnough && (
               <p className="text-xs text-red-500 mt-1.5">Insufficient credits.</p>
             )}
           </div>
@@ -342,12 +361,13 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
           </p>
 
           {!deadlineValid && <p role="alert" className="text-xs text-red-600">Your delivery time has passed. Go back to choose a later date and time.</p>}
+          {submitError && <p role="alert" className="text-xs text-red-600">{submitError}</p>}
           <button
             onClick={handleSubmit}
-            disabled={creditsAfter < 0 || !deadlineValid}
+            disabled={notEnough || !deadlineValid || submitting}
             className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            Place Request
+            {submitting ? "Placing request…" : "Place Request"}
           </button>
         </div>
       )}

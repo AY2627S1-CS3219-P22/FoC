@@ -2,29 +2,26 @@ import type { Order } from "../App"
 import StatusBadge from "../components/StatusBadge"
 
 interface CardActions {
-  onDelete?: () => void
+  onCancel?: () => void
   onMarkPickedUp?: () => void
   onMarkDelivered?: () => void
-  onConfirm?: () => void
-  onReleaseCredits?: () => void
 }
 
-export default function RequestCard({ order, onClick, actions = {} }: { order: Order; onClick: () => void; actions?: CardActions }) {
-  const { onDelete, onMarkPickedUp, onMarkDelivered, onConfirm, onReleaseCredits } = actions
+export default function RequestCard({ order, onClick, actions = {}, busy = false }: { order: Order; onClick: () => void; actions?: CardActions; busy?: boolean }) {
+  const { onCancel, onMarkPickedUp, onMarkDelivered } = actions
   const hasDeliveryAction = onMarkPickedUp || onMarkDelivered
-  const hasRequesterActions = onConfirm || onReleaseCredits
 
-  const btn = (label: string, handler: () => void, variant: "green" | "navy" | "red" | "outline" = "outline") => {
+  const btn = (label: string, handler: () => void, variant: "green" | "red" | "outline" = "outline") => {
     const cls = {
       green:   "text-white bg-[#1A4A36] border border-[#1A4A36] hover:bg-[#163D2C]",
-      navy:    "text-white bg-[#162A46] border border-[#162A46] hover:bg-[#0f1e33]",
       red:     "text-red-500 border border-red-100 hover:bg-red-50 hover:text-red-600",
       outline: "text-[#1A4A36] border border-[#E4E8E6] hover:bg-[#E8F1ED]",
     }[variant]
     return (
       <button
         onClick={(e) => { e.stopPropagation(); handler() }}
-        className={`text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${cls}`}
+        disabled={busy}
+        className={`text-xs font-medium px-2.5 py-1 rounded-md transition-colors disabled:opacity-50 ${cls}`}
       >
         {label}
       </button>
@@ -69,22 +66,17 @@ export default function RequestCard({ order, onClick, actions = {} }: { order: O
           {onMarkPickedUp && btn("Mark Picked Up", onMarkPickedUp, "green")}
           {onMarkDelivered && btn("Mark Delivered", onMarkDelivered, "green")}
 
-          {/* Requester actions (my-requests tab, in-progress orders) */}
-          {onConfirm && btn("Confirm", onConfirm, "navy")}
-          {onReleaseCredits && btn("Release Credits", onReleaseCredits, "green")}
-
           {/* Default: view details when no primary action */}
-          {!hasDeliveryAction && !hasRequesterActions && (
+          {!hasDeliveryAction && (
             <span className="text-xs font-medium text-[#1A4A36] border border-[#E4E8E6] px-2.5 py-1 rounded-md hover:bg-[#E8F1ED] transition-colors">
               View Details
             </span>
           )}
 
-          {/* Delete (my-requests) */}
-          {onDelete && btn("Delete", onDelete, "red")}
+          {/* Cancel (my-requests, still open) */}
+          {onCancel && btn("Cancel", onCancel, "red")}
         </div>
       </div>
     </article>
   )
 }
-
