@@ -4,10 +4,14 @@ import { login, register } from "../api/users"
 
 interface Props {
   onLogin: () => void
+  onRegistered: () => void
   onNavigate: (page: Page) => void
 }
 
-export default function SignupPage({ onLogin, onNavigate }: Props) {
+// same rule as user-service's registerDto
+const NUS_EMAIL = /@(u\.nus\.edu|nus\.edu\.sg)$/i
+
+export default function SignupPage({ onLogin, onRegistered, onNavigate }: Props) {
   const [form, setForm] = useState({ firstName: "", lastName: "", username: "", email: "", password: "", confirm: "" })
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }))
   const [error, setError] = useState("")
@@ -16,7 +20,7 @@ export default function SignupPage({ onLogin, onNavigate }: Props) {
   // Same rules as user-service, so users see problems before submitting
   const validate = () => {
     if (!form.firstName || !form.lastName || !form.username) return "Please fill in your name and username."
-    if (!/@(u\.)?nus\.edu$/i.test(form.email)) return "Use your NUS email (@u.nus.edu or @nus.edu)."
+    if (!NUS_EMAIL.test(form.email)) return "Use your NUS email (@u.nus.edu or @nus.edu.sg)."
     if (form.password.length < 8) return "Password must be at least 8 characters."
     if (!/[A-Z]/.test(form.password)) return "Password needs an uppercase letter."
     if (!/[0-9]/.test(form.password)) return "Password needs a number."
@@ -31,15 +35,22 @@ export default function SignupPage({ onLogin, onNavigate }: Props) {
     if (problem) { setError(problem); return }
     setError("")
     setLoading(true)
+    const { confirm: _confirm, ...data } = form
     try {
-      const { confirm: _confirm, ...data } = form
       await register(data)
-      // log straight in with the new account instead of making them type it again
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign up failed.")
+      setLoading(false)
+      return
+    }
+    // log straight in with the new account instead of making them type it again.
+    // If that fails the account still exists, so send them to log in normally
+    try {
       const { token } = await login(data.email, data.password)
       localStorage.setItem("token", token)
       onLogin()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign up failed.")
+    } catch {
+      onRegistered()
     } finally {
       setLoading(false)
     }

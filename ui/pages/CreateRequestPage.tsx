@@ -1,10 +1,9 @@
 // AI-assisted (Claude), reviewed and tested by Maliha
 import { useEffect, useState } from "react"
 import type { User, Page } from "../App"
-import { getSuppliers } from "../api/suppliers"
+import { CATEGORIES, categoryLabel, supplierLocation, type Category } from "../api/suppliers"
 import { createOrder, orderError, type NewOrder } from "../api/orders"
-
-type SupplierOption = { id: string; name: string; location: string; type: string }
+import { useSuppliers } from "../hooks/useSuppliers"
 
 const DELIVERY_LOCATIONS = [
   "PGP", "PGPR Block A", "PGPR Block B", "PGPR Block E",
@@ -73,28 +72,8 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
     return true
   }
   // order-service needs the real supplier id, so suppliers have to come from supplier-service
-  const [suppliers, setSuppliers] = useState<SupplierOption[] | null>(null)
-  const [suppliersError, setSuppliersError] = useState("")
-  const loadSuppliers = () => {
-    setSuppliersError("")
-    getSuppliers()
-      .then((data) => setSuppliers(data.map((s) => ({
-        id: String(s.supplierId),
-        name: s.name,
-        location: `${s.buildingName}, Level ${s.floor}`,
-        type: s.type,
-      }))))
-      .catch(() => setSuppliersError("Couldn't load suppliers. Is supplier-service running?"))
-  }
-  useEffect(loadSuppliers, [])
+  const { suppliers, error: suppliersError, query, category, search, filter, retry } = useSuppliers()
 
-  const [supplierSearch, setSupplierSearch] = useState("")
-  const [supplierType, setSupplierType] = useState("All")
-  const supplierTypes = ["All", ...new Set((suppliers ?? []).map((s) => s.type))]
-  const visibleSuppliers = (suppliers ?? []).filter((supplier) =>
-    (supplierType === "All" || supplier.type === supplierType) &&
-    `${supplier.name} ${supplier.location}`.toLowerCase().includes(supplierSearch.trim().toLowerCase())
-  )
   const [form, setForm] = useState({
     pickupLocation: "",
     supplierId: "",
@@ -183,24 +162,18 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
             <input
               id="supplier-search"
               type="search"
-              value={supplierSearch}
-              onChange={(e) => setSupplierSearch(e.target.value)}
+              value={query}
+              onChange={(e) => search(e.target.value)}
               placeholder="Search by name or campus location…"
               className={inputCls}
             />
           </div>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Supplier category">
-            {supplierTypes.map((type) => (
-              <button
-                key={type}
-                type="button"
-                aria-pressed={supplierType === type}
-                onClick={() => setSupplierType(type)}
-                className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${supplierType === type ? "border-[#1A4A36] bg-[#1A4A36] text-white" : "border-[#E4E8E6] bg-white text-[#3F6B5A] hover:border-[#3F6B5A]"}`}
-              >
-                {type}
-              </button>
-            ))}
+          <div>
+            <label htmlFor="supplier-category" className="block text-xs font-medium text-[#1B2522] mb-1.5">Category</label>
+            <select id="supplier-category" value={category} onChange={(e) => filter(e.target.value as Category | "")} className={inputCls}>
+              <option value="">All categories</option>
+              {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
           </div>
           {form.supplier && (
             <div className="rounded-lg border border-[#1A4A36]/20 bg-[#E8F1ED] px-4 py-3" role="status">
@@ -209,39 +182,41 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
             </div>
           )}
           <fieldset className="min-w-0">
-            <legend className="mb-3 text-xs font-medium text-[#3F6B5A]">Choose a supplier · {visibleSuppliers.length} found</legend>
+            <legend className="mb-3 text-xs font-medium text-[#3F6B5A]">Choose a supplier{suppliers && !suppliersError ? ` · ${suppliers.length} found` : ""}</legend>
             <div className="grid max-h-80 grid-cols-1 gap-3 overflow-y-auto px-1 py-2 [scrollbar-gutter:stable]">
-              {visibleSuppliers.map((supplier) => {
-                const label = `${supplier.name} @ ${supplier.location}`
-                const selected = form.supplier === label
+              {!suppliersError && suppliers?.map((supplier) => {
+                const id = String(supplier.supplierId)
+                const location = supplierLocation(supplier)
+                const label = `${supplier.name} @ ${location}`
+                const selected = form.supplierId === id
                 return (
-                  <label key={supplier.id} className={`flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border px-4 py-4 sm:px-5 transition-colors ${selected ? "border-[#1A4A36] bg-[#E8F1ED]" : "border-[#E4E8E6] bg-white hover:border-[#3F6B5A]"}`}>
+                  <label key={id} className={`flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border px-4 py-4 sm:px-5 transition-colors ${selected ? "border-[#1A4A36] bg-[#E8F1ED]" : "border-[#E4E8E6] bg-white hover:border-[#3F6B5A]"}`}>
                     <input
                       type="radio"
                       name="supplier"
-                      value={supplier.id}
+                      value={id}
                       checked={selected}
-                      onChange={() => setForm((previous) => ({ ...previous, supplierId: supplier.id, supplier: label, pickupLocation: supplier.location }))}
+                      onChange={() => setForm((previous) => ({ ...previous, supplierId: id, supplier: label, pickupLocation: location }))}
                       className="h-4 w-4 shrink-0 accent-[#1A4A36]"
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-[#162A46]">{supplier.name}</span>
-                      <span className="mt-1 block text-xs text-[#3F6B5A]">{supplier.location} · {supplier.type}</span>
+                      <span className="mt-1 block text-xs text-[#3F6B5A]">{location} · {categoryLabel(supplier.type)}</span>
                     </span>
                   </label>
                 )
               })}
-              {!suppliers && (
+              {(!suppliers || suppliersError) && (
                 <div className="rounded-xl border border-[#E4E8E6] bg-white p-6 text-center">
                   <p className="text-xs text-[#3F6B5A]">{suppliersError || "Loading suppliers…"}</p>
-                  {suppliersError && <button type="button" onClick={loadSuppliers} className="mt-3 text-xs font-semibold text-[#1A4A36] underline">Try again</button>}
+                  {suppliersError && <button type="button" onClick={retry} className="mt-3 text-xs font-semibold text-[#1A4A36] underline">Try again</button>}
                 </div>
               )}
-              {suppliers && visibleSuppliers.length === 0 && (
+              {suppliers && !suppliersError && suppliers.length === 0 && (
                 <div className="rounded-xl border border-[#E4E8E6] bg-white p-6 text-center">
                   <p className="text-sm font-medium text-[#162A46]">No suppliers found</p>
                   <p className="mt-1 text-xs text-[#3F6B5A]">Try another name, location, or category.</p>
-                  <button type="button" onClick={() => { setSupplierSearch(""); setSupplierType("All") }} className="mt-3 text-xs font-semibold text-[#1A4A36] underline">Clear filters</button>
+                  <button type="button" onClick={() => filter("")} className="mt-3 text-xs font-semibold text-[#1A4A36] underline">Clear filters</button>
                 </div>
               )}
             </div>

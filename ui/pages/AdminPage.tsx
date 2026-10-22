@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { Order, User, Page } from "../App"
+import type { User, Page } from "../App"
 import StatusBadge from "../components/StatusBadge"
 import { getAllOrders, getOrder, orderStatus as badgeStatus, type ApiOrder } from "../api/orders"
 
@@ -44,16 +44,6 @@ const formatTime = (iso: string) =>
 
 const shortId = (id: string) => id.slice(0, 8)
 
-const STATUS_FILTERS: { value: "all" | Order["status"]; label: string }[] = [
-  { value: "all",       label: "All statuses" },
-  { value: "open",      label: "Open" },
-  { value: "accepted",  label: "Assigned" },
-  { value: "picked-up", label: "Picked up" },
-  { value: "delivered", label: "Delivered" },
-  { value: "cancelled", label: "Cancelled" },
-  { value: "expired",   label: "Expired" },
-]
-
 interface Props {
   user: User
   onNavigate: (page: Page) => void
@@ -68,8 +58,6 @@ export default function AdminPage({ user, onNavigate }: Props) {
   const [orders, setOrders]             = useState<ApiOrder[]>([])
   const [loading, setLoading]           = useState(true)
   const [error, setError]               = useState("")
-  const [statusFilter, setStatusFilter] = useState<"all" | Order["status"]>("all")
-  const [search, setSearch]             = useState("")
 
   const [selectedId, setSelectedId]     = useState<string | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<ApiOrder | null>(null)
@@ -102,21 +90,6 @@ export default function AdminPage({ user, onNavigate }: Props) {
     setSelectedId(null)
     setSelectedOrder(null)
   }
-
-  const count = (status: Order["status"]) => orders.filter((o) => badgeStatus(o) === status).length
-
-  const stats = [
-    { label: "Active Orders",    value: count("accepted") + count("picked-up") },
-    { label: "Open Requests",    value: count("open") },
-    { label: "Delivered Orders", value: count("delivered") },
-    { label: "Cancelled Orders", value: count("cancelled") },
-  ]
-
-  const query = search.trim().toLowerCase()
-  const visibleOrders = orders.filter((o) =>
-    (statusFilter === "all" || badgeStatus(o) === statusFilter) &&
-    [o.id, o.requesterName, o.courierName ?? "", o.pickupStore, o.destination].some((v) => v.toLowerCase().includes(query))
-  )
 
   const NAV: { key: Section; label: string }[] = [
     { key: "overview",   label: "Overview" },
@@ -217,15 +190,6 @@ export default function AdminPage({ user, onNavigate }: Props) {
           {/* ── OVERVIEW ── */}
           {section === "overview" && (
             <div>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                {stats.map(({ label, value }) => (
-                  <div key={label} className="bg-white border border-[#E4E8E6] rounded-xl p-5">
-                    <p className="text-2xl font-semibold text-[#162A46] mb-1">{loading || error ? "—" : value}</p>
-                    <p className="text-xs text-[#3F6B5A]">{label}</p>
-                  </div>
-                ))}
-              </div>
-
               <h3 className="text-sm font-semibold text-[#162A46] mb-4">Recent Orders</h3>
               <div className="bg-white border border-[#E4E8E6] rounded-xl overflow-x-auto">
                 <table className="w-full">
@@ -264,21 +228,6 @@ export default function AdminPage({ user, onNavigate }: Props) {
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-3 mb-5">
                   <h2 className="text-sm font-semibold text-[#162A46] flex-1">Order History</h2>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                    className="border border-[#E4E8E6] rounded-lg text-xs px-3 py-2 bg-white text-[#1B2522] focus:outline-none focus:border-[#1A4A36]"
-                  >
-                    {STATUS_FILTERS.map(({ value, label }) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search orders…"
-                    className="border border-[#E4E8E6] rounded-lg text-xs px-3 py-2 bg-white text-[#1B2522] focus:outline-none focus:border-[#1A4A36] w-36"
-                  />
                 </div>
                 <div className="bg-white border border-[#E4E8E6] rounded-xl overflow-x-auto">
                   <table className="w-full">
@@ -290,7 +239,7 @@ export default function AdminPage({ user, onNavigate }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {ordersMessage(7, visibleOrders.length === 0) ?? visibleOrders.map((order, i) => (
+                      {ordersMessage(7, orders.length === 0) ?? orders.map((order, i) => (
                         <tr
                           key={order.id}
                           onClick={() => openOrder(order.id)}
@@ -298,7 +247,7 @@ export default function AdminPage({ user, onNavigate }: Props) {
                             selectedId === order.id
                               ? "bg-[#E8F1ED]"
                               : "hover:bg-[#F7F9F8]"
-                          } ${i < visibleOrders.length - 1 ? "border-b border-[#E4E8E6]" : ""}`}
+                          } ${i < orders.length - 1 ? "border-b border-[#E4E8E6]" : ""}`}
                         >
                           <td className={`${tdCls} font-mono text-[11px] text-[#3F6B5A]`}>#{shortId(order.id)}</td>
                           <td className={`${tdCls} font-medium`}>{order.requesterName}</td>

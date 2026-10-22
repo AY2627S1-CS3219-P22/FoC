@@ -3,11 +3,12 @@ import type { Page } from "../App"
 import { login } from "../api/users"
 
 interface Props {
+  notice?: string  // e.g. after signing up
   onLogin: () => void
   onNavigate: (page: Page) => void
 }
 
-export default function LoginPage({ onLogin, onNavigate }: Props) {
+export default function LoginPage({ notice, onLogin, onNavigate }: Props) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [remember, setRemember] = useState(false)
@@ -122,6 +123,9 @@ export default function LoginPage({ onLogin, onNavigate }: Props) {
                 />
                 <span className="text-xs text-[#1B2522]">Remember me</span>
               </label>
+              {notice && !error && (
+                <p className="rounded-lg bg-[#E8F1ED] px-3 py-2 text-xs text-[#1A4A36]">{notice}</p>
+              )}
               {error && (
                 <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
               )}

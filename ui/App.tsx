@@ -128,6 +128,7 @@ export default function App() {
   const [selectedOrderId, setSelectedOrderId] = useState("")
   const [earnedCredits, setEarnedCredits] = useState(0)
   const [createPending, setCreatePending] = useState(false)
+  const [loginNotice, setLoginNotice] = useState("")
 
   const [orderReturnPage, setOrderReturnPage] = useState<"orders" | "my-orders">("orders")
 
@@ -188,8 +189,16 @@ export default function App() {
 
   // Unauthenticated
   if (!isLoggedIn) {
-    if (page === "signup") return <SignupPage onLogin={handleLogin} onNavigate={navigate} />
-    return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
+    if (page === "signup") {
+      return (
+        <SignupPage
+          onLogin={handleLogin}
+          onRegistered={() => { setLoginNotice("Account created! Log in to continue."); navigate("login") }}
+          onNavigate={navigate}
+        />
+      )
+    }
+    return <LoginPage notice={loginNotice} onLogin={handleLogin} onNavigate={navigate} />
   }
 
   // Admin is a full-screen layout without the main Navbar
