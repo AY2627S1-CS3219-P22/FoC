@@ -4,7 +4,6 @@
 */
 
 import type {
-  CreditReleaseCommand,
   OrderCreated,
   OrderCreditsEdited,
   OrderUpdated,
@@ -19,9 +18,6 @@ export class OrderMessagingProducer {
     throw new Error('OrderMessagingProducer.publishOrderUpdated is not implemented yet');
   }
 
-  async publishCreditRefund(_command: CreditReleaseCommand): Promise<void> {
-    throw new Error('OrderMessagingProducer.publishCreditRefund is not implemented yet');
-  }
 
   async publishCreditsEdited(_event: OrderCreditsEdited): Promise<void> {
     throw new Error('OrderMessagingProducer.publishCreditsEdited is not implemented yet');

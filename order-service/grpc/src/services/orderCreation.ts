@@ -47,7 +47,7 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
           error: rpcCode(error) === rpcStatus.NOT_FOUND || rpcCode(error) === rpcStatus.INVALID_ARGUMENT ? 'dependency-rejected' : 'dependency-unavailable' };
       }
       if (profile.userId !== requesterId || supplier.supplierId !== input.supplierId || !opening.isOpen
-        || !supplier.name.trim() || !supplier.locationDescription.trim()) return { status: 409, error: 'dependency-rejected' };
+        || !supplier.name.trim()) return { status: 409, error: 'dependency-rejected' };
       const requesterName = [profile.firstName, profile.lastName].filter((s) => s.trim()).join(' ') || profile.username;
       if (!requesterName.trim()) return { status: 409, error: 'dependency-rejected' };
       try {
