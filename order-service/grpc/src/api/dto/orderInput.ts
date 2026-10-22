@@ -2,6 +2,7 @@
 // Scope: Implemented author-approved Order validation/authentication/RPC integration.
 // Author review: Pending; see ../../../../usage-log.md.
 import { z } from 'zod';
+import { isOpenResponseSchema, grpcsupplierSchema} from '@foc/grpc';
 
 const nonblank = z.string().refine((value) => value.trim().length > 0, 'Must not be blank');
 const supplierId = z.string().regex(/^[1-9][0-9]*$/).refine(
@@ -9,7 +10,7 @@ const supplierId = z.string().regex(/^[1-9][0-9]*$/).refine(
 );
 export const createOrderSchema = z.object({
   supplierId,
-  destination: nonblank,
+  destination: grpcsupplierSchema.pick({ buildingName: true, floor: true, latitude: true, longitude: true }),
   requestDetails: nonblank,
   credits: z.number().int().positive().max(2147483647),
   expiryTime: z.iso.datetime({ offset: true }).transform((value) => new Date(value)),
