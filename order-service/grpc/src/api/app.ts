@@ -2,7 +2,8 @@
 // Scope: Generated setup implementation following approved User Service conventions.
 // Author review: Pending; see ../../../usage-log.md.
 import express, { type Express } from 'express';
-import { pingDatabase } from '../db';
+import { pingDatabase, prisma } from '../db';
+import { createOrderAcceptance } from '../services/orderAcceptance';
 import { createOrderRouter } from './routes/orderRoutes';
 import type { createOrderCreation } from '../services/orderCreation';
 import type { createOrderEdits } from '../services/orderEdits';
@@ -18,7 +19,7 @@ export function createApp(publicKey?: string, lifecycle?: ReturnType<typeof crea
       db: dbUp ? 'up' : 'down',
     });
   });
-  app.use('/orders', createOrderRouter(publicKey, lifecycle, creation, edits));
+  app.use('/orders', createOrderRouter(publicKey, lifecycle, creation, edits, createOrderAcceptance(prisma)));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const badJson = error instanceof SyntaxError && 'status' in error && error.status === 400;
     res.status(badJson ? 400 : 500).json({ error: badJson ? 'invalid-input' : 'internal-error' });

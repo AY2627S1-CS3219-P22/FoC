@@ -81,7 +81,8 @@ Also implemented author-specified creation, credit-edit recovery, cancellation
 and expiry, with tests and a durable OrderEditOperation migration. Added the
 author-approved administrator-only GET /orders listing with authorization tests.
 Verified cancellation/expiry failure recovery and applied the team's plaintext
-Order-to-Credit transport decision on order-functionality. The author
+Order-to-Credit transport decision on order-functionality. Implemented the
+author-requested authenticated courier acceptance endpoint and concurrency tests. The author
 supplied the schema, contracts, retry schedule and final first-lock-wins rule.
 Human decisions and superseded requirements are recorded in the service usage log;
 no decision rationales were drafted.

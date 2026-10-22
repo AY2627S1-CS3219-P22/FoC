@@ -272,10 +272,51 @@ curl -i http://localhost:3003/orders -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 
 Expected: 200 with `{orders:[...]}`, including the cancelled order. The ordinary
-TOKEN gets 403 on this admin endpoint. Student list/detail and courier
-accept/pickup/delivery endpoints are not implemented on this branch.
+TOKEN gets 403 on this admin endpoint. Student list/detail and courier pickup/delivery endpoints are not implemented
+on this branch. Acceptance is available in the separate check below.
 
-## 8. Negative and recovery checks
+## 8. Accept a separate order as another user
+
+Use a fresh UNASSIGNED order, separate from the cancellation example. Repeat
+step 5 with a new creation key/body and save its ID as ACCEPT_ORDER_ID. Register
+and log in a second USER through User Service (step 3 in a separate terminal),
+then copy that login token into COURIER_TOKEN. This user must not be the requester.
+
+```sh
+export ACCEPT_ORDER_ID='the-fresh-unassigned-order-id'
+export COURIER_TOKEN='token-from-the-other-user-login'
+curl -i -X POST "http://localhost:3003/orders/$ACCEPT_ORDER_ID/accept" \
+  -H "Authorization: Bearer $COURIER_TOKEN"
+```
+
+Expected: HTTP 200, status ASSIGNED, courierId equal to the second user's ID and
+acceptedAt set. Credit balances are unchanged by acceptance. The requester token
+cannot accept its own order (403); a subsequent acceptance on the assigned order
+returns 409 for either courier. The requester can no longer edit or cancel it.
+The worker still expires/refunds assigned orders when their deadline passes.
+
+To manually check concurrency, use two different non-requester USER tokens and
+another fresh unassigned order:
+
+```sh
+export RACE_ORDER_ID='another-fresh-unassigned-order-id'
+export SECOND_COURIER_TOKEN='a-third-user-login-token'
+curl -sS -o "$MANUAL_DIR/accept-a.json" -w 'Courier A HTTP %{http_code}\n' \
+  -X POST "http://localhost:3003/orders/$RACE_ORDER_ID/accept" \
+  -H "Authorization: Bearer $COURIER_TOKEN" &
+curl -sS -o "$MANUAL_DIR/accept-b.json" -w 'Courier B HTTP %{http_code}\n' \
+  -X POST "http://localhost:3003/orders/$RACE_ORDER_ID/accept" \
+  -H "Authorization: Bearer $SECOND_COURIER_TOKEN" &
+wait
+cat "$MANUAL_DIR/accept-a.json" "$MANUAL_DIR/accept-b.json"
+```
+
+Exactly one response should be 200 and the other 409; the winning response's
+courierId is the persisted assignment (also visible through the admin list).
+Keep the worker running through expiry to release the accepted test order's hold;
+pickup/delivery is not part of this branch yet.
+
+## 9. Negative and recovery checks
 
 Use separate keys for independent cases. Keep a key/body unchanged when retrying
 that same uncertain attempt.
@@ -317,7 +358,7 @@ You can similarly stop Credit before cancelling a fresh active order: expect
 202/CANCELLED/REFUND_PENDING. After restarting Credit, retry cancellation or let
 the worker recover. Confirm only one release in Credit history.
 
-## 9. Expiry check
+## 10. Expiry check
 
 Real API expiry must be at least one hour away; a seconds-long deadline should
 be rejected. For a live expiry test, create a separate 1-credit order with expiry
@@ -331,7 +372,7 @@ Credit outage, expect REFUND_PENDING until recovery. Automated integration tests
 exercise accelerated expiry, including PICKED_UP, without waiting an hour or
 manually changing normal service database rows.
 
-## 10. Troubleshooting and shutdown
+## 11. Troubleshooting and shutdown
 
 ```sh
 docker compose -f order-service/compose.yaml -f order-service/compose.lifecycle.yaml \

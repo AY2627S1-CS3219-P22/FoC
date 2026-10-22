@@ -526,3 +526,61 @@ Added README link; human author review pending.
 
 Documentation validation: all 20 shell command blocks passed bash -n syntax
 checks; git diff --check passed. Commands were not executed against live peers.
+
+## 2026-10-22: courier acceptance
+
+Tool: ChatGPT (Codex). Modes: implementation, unit/concurrency/HTTP testing, documentation.
+Human author review remains pending.
+
+### Exact user prompt
+
+```text
+Lets work on this issue now
+### Description
+Implement errand acceptance according to the agreed Order Service lifecycle, ensuring that an unassigned errand can only be accepted by one eligible courier.
+
+### Tasks
+- [ ] Implement the Accept Errand API endpoint.
+- [ ] Verify that the user is authenticated and eligible to accept the errand.
+- [ ] Prevent requesters from accepting their own errands.
+- [ ] Verify that the errand is currently `Unassigned`.
+- [ ] Ensure concurrent acceptance attempts cannot assign multiple couriers.
+- [ ] Persist the assigned courier and update the order status to `Assigned`.
+- [ ] Handle unsuccessful acceptance attempts.
+- [ ] Add unit and concurrency tests.
+
+### Acceptance Criteria
+- [ ] Eligible couriers can accept available errands.
+- [ ] Requesters cannot accept their own errands.
+- [ ] Already assigned errands cannot be accepted again.
+- [ ] Only one courier can successfully accept an errand, including during concurrent requests.
+- [ ] Successful acceptance persists the correct courier and status.
+```
+
+### Key response and output
+
+Found the checkout on supplier-containerisation with only leftover ignored
+Prisma artifacts. Switched the otherwise clean checkout back to order-functionality;
+Supplier source was unchanged. Used the author's previously confirmed first-lock-wins
+rule and existing /orders/:id/action convention. Implemented POST /orders/:id/accept
+with USER JWT identity, self-acceptance rejection, current state/credit/expiry and
+active-edit checks under the Order row lock. Persists courier ID, ASSIGNED and
+acceptedAt in one transaction. No additional Credit call; courierName remains null.
+Existing creation/edit/refund/expiry behavior retained.
+
+Affected files: grpc/src/services/orderAcceptance.ts, grpc/src/api/app.ts,
+grpc/src/api/controllers/orderController.ts, grpc/src/api/routes/orderRoutes.ts,
+grpc/tests/acceptance.test.cjs, grpc/tests/lifecycle.integration.cjs,
+Order README, MANUAL_TESTING.md, root README and this log.
+No schema, dependency, shared contract or teammate-source changes.
+
+Verification: shared gRPC/Order builds passed; all 13 unit/authentication/gRPC tests
+and 38 dedicated PostgreSQL/HTTP/gRPC tests passed (51 total). Twelve simultaneous
+couriers produced one successful command and one persisted courier. Tested
+cancellation races, pending edits, expiry after lock wait, replay rejection,
+role/ownership/UUID/body failures and JWT-derived assignment without Credit
+configuration. Manual guide updated; live peer setup was not executed.
+
+Docker build/startup passed and both normal containers report healthy. Removed
+only the disposable acceptance test database. Manual shell snippets passed bash -n;
+git diff --check passed. Changes remain uncommitted on order-functionality.

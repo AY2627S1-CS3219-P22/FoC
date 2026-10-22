@@ -62,7 +62,7 @@ and are ignored by Git.
 
 PostgreSQL row locks implement the author's confirmed first-lock-wins rule for
 Order mutations. CreditOperation and OrderEditOperation persist recovery work.
-Acceptance/pickup/delivery endpoints remain outside this change.
+Acceptance is implemented below; pickup/delivery remain outside this change.
 
 ## Application structure
 
@@ -217,6 +217,7 @@ comes from the signed subject. ADMINISTRATOR alone does not grant permission.
 | POST /orders | Create after confirmed credit reservation | 201, 200 replay, 202 pending |
 | PATCH /orders/:id | Requester edits an unassigned, unexpired order | 200, 202 pending |
 | POST /orders/:id/cancel | Requester cancels an unassigned, unexpired order; retains history | 200, 202 pending refund |
+| POST /orders/:id/accept | Another USER accepts an eligible unassigned order | 200 |
 
 Creation and editing require a nonblank Idempotency-Key header. Creation requires
 supplierId (positive bigint decimal string), destination, requestDetails, credits
@@ -273,8 +274,8 @@ An expired unpublished creation is compensated rather than published.
 Mutations lock Order rows. Active durable edits exclude other edits/cancellation;
 expiry may still cancel and release the reservation. No courier-priority guarantee
 is implemented: the author's latest decision is first-lock-wins. Courier
-acceptance endpoints still need implementation and must observe active edit
-operations when acquiring that same row lock. There is no separate DELETE route
+acceptance acquires that same row lock and rejects active edit operations until
+their reconciliation completes. There is no separate DELETE route
 and no physical deletion of order history. Listing/history UI is outside this change.
 
 ### Lifecycle tests
@@ -373,8 +374,42 @@ previous creation/edit/admin tests and the following cancellation/expiry checks:
   before cancellation commits is still an error.
 
 Live peer-service integration still requires the implemented Credit service and
-configured token; tests use separate test-only peer services. These checks do
-not add the separate courier acceptance/pickup/delivery endpoints previously
-identified on feature/order-create, or a student order-list/detail endpoint.
+configured token; tests use separate test-only peer services. These checks did
+not add pickup/delivery or student order-list/detail endpoints. Acceptance was
+implemented subsequently, as documented below.
 
 For the real User/Supplier/Credit walkthrough, see [Manual integration testing](MANUAL_TESTING.md), including current peer-service blockers and expected responses.
+
+### Errand acceptance
+
+`POST /orders/:id/accept` requires a USER bearer JWT and accepts no request fields
+(an empty body or `{}` is allowed). The authenticated subject becomes courierId;
+clients cannot supply a courier ID. ADMINISTRATOR alone is insufficient.
+
+```sh
+curl -i -X POST "http://localhost:3003/orders/$ORDER_ID/accept" \
+  -H "Authorization: Bearer $COURIER_TOKEN"
+```
+
+Successful acceptance returns HTTP 200 `{order: {...}}`, with ASSIGNED,
+courierId and a database-generated acceptedAt. The optional courierName remains
+null; this change does not fetch a courier-name snapshot. The existing credit
+reservation stays RESERVED; acceptance makes no additional Credit mutation and
+can run without configured Credit peers for an already published reserved order.
+
+Requester self-acceptance and missing USER role return 403; missing/invalid JWT
+returns 401; invalid UUID/body returns 400; an unknown order returns 404. Already
+assigned/terminal orders, expired orders, non-reserved financial state or a
+pending/reconciliation-required edit return 409. Repeating even the winning
+courier's acceptance returns 409 rather than assigning again.
+
+The transaction locks the Order row, checks current state and active edits,
+samples database time after acquiring the lock and persists courier/status/time
+atomically. Concurrent couriers use the agreed first-lock-wins rule; no courier
+priority over cancellation is claimed.
+
+Verified 2026-10-22: all 13 unit/authentication/gRPC tests and 38 dedicated
+PostgreSQL/HTTP/gRPC integration tests passed (51 total). Acceptance coverage
+includes 12 concurrent couriers with exactly one winner, requester/role denial,
+already assigned/expired orders, expiry while waiting for the row lock,
+cancellation races, pending credit edits and HTTP JWT-derived identity.

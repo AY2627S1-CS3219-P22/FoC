@@ -9,6 +9,7 @@ const {PrismaClient}=require('../dist/generated/prisma');const db=new PrismaClie
 const {createOrderCreation}=require('../dist/services/orderCreation');const {createOrderEdits}=require('../dist/services/orderEdits');
 const {createOrderLifecycle}=require('../dist/services/orderLifecycle');const {createOrderSchema,editOrderSchema}=require('../dist/api/dto/orderInput');
 const {createApp}=require('../dist/api/app');
+const {createOrderAcceptance}=require('../dist/services/orderAcceptance');
 const prefix='lifecycle-'+randomUUID();let userCounter=0;
 before(()=>db.$connect());
 after(async()=>{
@@ -251,4 +252,45 @@ test('automatic expiry worker ignores future and delivered orders and refunds ov
  await db.order.update({where:{id:overdue.id},data:{status:'PICKED_UP',expiryTime:new Date(Date.now()-1000)}});
  f.lifecycle.startWorker();try{const deadline=Date.now()+5000;while(Date.now()<deadline){if((await db.order.findUniqueOrThrow({where:{id:overdue.id}})).creditState==='REFUNDED')break;await new Promise(r=>setTimeout(r,50))}}finally{await f.lifecycle.stopWorker()}
  assert.equal((await db.order.findUniqueOrThrow({where:{id:future.id}})).status,'UNASSIGNED');assert.equal((await db.order.findUniqueOrThrow({where:{id:delivered.id}})).status,'DELIVERED');const row=await db.order.findUniqueOrThrow({where:{id:overdue.id}});assert.equal(row.cancellationReason,'EXPIRY');assert.equal(row.creditState,'REFUNDED');
+});
+
+test('acceptance persists courier identity, timestamp and ASSIGNED without new credit mutations',async()=>{
+ const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db);const actor={id:'courier-'+randomUUID(),roles:['USER']};
+ const response=await acceptance.accept(order.id,actor);assert.equal(response.status,200);assert.equal(response.order.status,'ASSIGNED');assert.equal(response.order.courierId,actor.id);assert.ok(response.order.acceptedAt instanceof Date);assert.ok(response.order.acceptedAt>=response.order.createdAt);assert.equal(response.order.creditState,'RESERVED');
+ const stored=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(stored.courierId,actor.id);assert.equal(stored.status,'ASSIGNED');assert.equal(f.calls,1);assert.equal(f.updates,0);assert.equal(f.releases,0);
+ assert.equal((await acceptance.accept(order.id,actor)).status,409);assert.equal((await acceptance.accept(order.id,{id:'another',roles:['USER']})).status,409);
+});
+test('twelve concurrent couriers yield exactly one successful acceptance and one persisted winner',async()=>{
+ const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db);const actors=Array.from({length:12},(_,i)=>({id:'courier-'+i+'-'+randomUUID(),roles:['USER']}));
+ const results=await Promise.all(actors.map(actor=>acceptance.accept(order.id,actor)));assert.equal(results.filter(r=>r.status===200).length,1);assert.equal(results.filter(r=>r.status===409).length,11);
+ const winner=results.findIndex(r=>r.status===200);const stored=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(stored.courierId,actors[winner].id);assert.equal(stored.status,'ASSIGNED');assert.equal(f.calls,1);
+});
+test('acceptance and cancellation races commit only one eligible transition',async()=>{
+ const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db);
+ const [accepted,cancelled]=await Promise.all([acceptance.accept(order.id,{id:'courier',roles:['USER']}),f.lifecycle.cancel(order.id,f.user)]);
+ const stored=await db.order.findUniqueOrThrow({where:{id:order.id}});
+ if(accepted.status===200){assert.equal(cancelled.status,409);assert.equal(stored.status,'ASSIGNED');assert.equal(stored.courierId,'courier');assert.equal(f.releases,0)}
+ else{assert.equal(accepted.status,409);assert.equal(cancelled.order.status,'CANCELLED');assert.equal(stored.courierId,null);assert.equal(stored.creditState,'REFUNDED');assert.equal(f.releases,1)}
+});
+test('pending durable edit blocks acceptance until credit reconciliation completes',async()=>{
+ const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db);const actor={id:'courier',roles:['USER']};f.updateMode='after';assert.equal((await f.edits.edit(order.id,f.user,'accept-edit',{credits:6})).status,202);
+ const blocked=await acceptance.accept(order.id,actor);assert.equal(blocked.status,409);assert.equal(blocked.error,'conflict');await editDue(order.id);await f.edits.recoverBatch();
+ const accepted=await acceptance.accept(order.id,actor);assert.equal(accepted.status,200);assert.equal(accepted.order.credits,6);
+});
+test('acceptance rechecks database expiry after waiting for the row lock',async()=>{
+ const f=fixture(),order=await create(f);let locked;const ready=new Promise(r=>locked=r);let release;const gate=new Promise(r=>release=r);
+ const blocker=db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM "Order" WHERE id=${order.id}::uuid FOR UPDATE`;await tx.order.update({where:{id:order.id},data:{expiryTime:new Date(Date.now()+100)}});locked();await gate});
+ await ready;const pending=createOrderAcceptance(db).accept(order.id,{id:'courier',roles:['USER']});await new Promise(r=>setTimeout(r,150));release();await blocker;
+ const result=await pending;assert.equal(result.status,409);assert.equal(result.error,'expired');assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).courierId,null);
+ await f.lifecycle.expireBatch();await f.lifecycle.refundBatch();
+});
+test('acceptance HTTP derives courier from JWT and enforces eligibility without Credit configuration',async t=>{
+ const f=fixture(),order=await create(f);const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});const app=createApp(publicKey.export({type:'spki',format:'pem'}));
+ const server=app.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(r=>server.close(r)));const base='http://127.0.0.1:'+server.address().port+'/orders';
+ const actor='courier-'+randomUUID();const headers=(id=actor,roles=['USER'])=>({Authorization:'Bearer '+jwt.sign({roles},privateKey,{algorithm:'RS256',subject:id,expiresIn:60}),'Content-Type':'application/json'});
+ const accept=(id,h=headers(),body='{}')=>fetch(base+'/'+id+'/accept',{method:'POST',headers:h,body});
+ assert.equal((await accept(order.id,{'Content-Type':'application/json'})).status,401);assert.equal((await accept(order.id,headers(f.user))).status,403);assert.equal((await accept(order.id,headers(actor,['ADMINISTRATOR']))).status,403);
+ assert.equal((await accept('invalid-uuid')).status,400);assert.equal((await accept(randomUUID())).status,404);assert.equal((await accept(order.id,headers(),JSON.stringify({courierId:'forged'}))).status,400);
+ const response=await accept(order.id,headers(actor,['USER','ADMINISTRATOR']));assert.equal(response.status,200);const result=await response.json();assert.equal(result.order.courierId,actor);assert.equal(result.order.status,'ASSIGNED');assert.equal(result.order.supplierId,'1');assert.ok(result.order.acceptedAt.endsWith('Z'));
+ assert.equal((await accept(order.id)).status,409);assert.equal(f.calls,1);assert.equal(f.releases,0);
 });
