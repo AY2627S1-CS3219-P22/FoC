@@ -10,3 +10,6 @@ services:
     ports:
       - '50054:50054'
       - '3004:3004'
+    environment:
+      # Standalone: the broker runs separately and publishes 5672 on the host.
+      RABBITMQ_URL: ${DOCKER_RABBITMQ_URL:?set DOCKER_RABBITMQ_URL in .env}

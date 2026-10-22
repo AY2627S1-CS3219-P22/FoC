@@ -86,8 +86,8 @@ services:
       GRPC_PORT: '50054'
       HTTP_PORT: '3004'
       CREDIT_ORDER_SERVICE_TOKEN: ${CREDIT_ORDER_SERVICE_TOKEN:?set CREDIT_ORDER_SERVICE_TOKEN in .env}
-      # The container can't reach the broker via localhost, so it uses its own URL.
-      RABBITMQ_URL: ${DOCKER_RABBITMQ_URL:?set DOCKER_RABBITMQ_URL in .env}
+      # Broker by service name on the internal network (full stack).
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
       CREDIT_JWT_PUBLIC_KEY_PATH: /run/credit/user-service-public.pem
     volumes:
       # Fails at start if user-service's public key is missing
