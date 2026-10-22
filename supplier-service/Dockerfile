@@ -25,6 +25,17 @@ COPY supplier-service ./supplier-service
 WORKDIR /repo/supplier-service
 RUN npm run build
 
+# --- Migrate stage (one-off job) ---
+# Reuses the build stage, which has the pinned Supabase CLI (a devDependency)
+# plus supabase/migrations and the seed.
+FROM build AS migrate
+
+# The CLI writes to supabase/.temp, so the node user needs that folder.
+RUN chown -R node:node supabase
+
+USER node
+CMD ["sh", "-c", "npx supabase db push --db-url \"$DATABASE_URL\" --include-seed --yes"]
+
 # --- Runtime stage ---
 FROM base AS runtime
 ENV NODE_ENV=production
