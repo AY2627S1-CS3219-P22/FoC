@@ -1,33 +1,50 @@
 # Local setup quickstart
 
-Requires Docker Desktop. Nothing else needs to be installed: the database, the
-Express app, and the gRPC server all run in containers.
+Requires Docker Desktop. The database, migrations and the service (REST + gRPC
+in one process) all run in containers.
 
-This stack is local only. `compose.yaml` does **not** load `.env`. It hardcodes
-`DATABASE_URL` to the compose `db` service. Do not point a production `.env` at
-this folder while you work here.
+supplier-service is a root npm workspace member, so install from the repo root
+(`npm install`), not from this folder.
 
-```bash
-cd supplier-service
-docker compose up -d --build
-```
+1. JWTs are verified with user-service's public key, which compose mounts from
+   `../user-service/keys/public.pem`. Generate it once if it doesn't exist:
+
+   ```bash
+   cd user-service && npm run keys:generate
+   ```
+
+2. Copy `.env.example` to `.env`. Compose reads only `POSTGRES_DB` and
+   `POSTGRES_PASSWORD` from it and builds the container's `DATABASE_URL` itself,
+   so a production URL in `.env` is never used by the containers.
+
+3. Start the stack from `supplier-service/`:
+
+   ```bash
+   docker compose up -d --build
+   ```
 
 This starts three containers:
 
-| Service | What it is                              | Where                   |
-| ------- | --------------------------------------- | ----------------------- |
-| `db`    | Supabase Postgres 17, seeded at default | `127.0.0.1:54332`       |
-| `app`   | Express supplier service                | `http://localhost:3002` |
-| `grpc`  | supplier gRPC (`IsOpen` for order)      | `localhost:50052`       |
+| Service            | What it is                                        | Where (standalone dev)                        |
+| ------------------ | ------------------------------------------------- | --------------------------------------------- |
+| `supplier-db`      | Supabase Postgres 17                              | `127.0.0.1:54332`                             |
+| `supplier-migrate` | One-off job: applies migrations + seed, then exits | —                                            |
+| `supplier-service` | Express REST + gRPC (`IsOpen` for order)          | `http://localhost:3002`, `localhost:50052`    |
 
-On its **first** start the `db` container applies everything in
-`supabase/migrations/` in timestamp order and then loads
-`supabase/schemas/seed.sql`, which inserts three sample suppliers (one of them
-soft-deleted, so it is excluded from list responses).
+On every `up`, `supplier-migrate` runs `supabase db push --include-seed`: it
+applies any new file in `supabase/migrations/` and loads
+`supabase/schemas/seed.sql` (three sample suppliers, one soft-deleted, so it is
+excluded from list responses). Applied migrations and the seed are tracked, so
+nothing runs twice. `supplier-service` starts only after the job succeeds.
+
+Ports are published by `compose.override.yaml`, which Compose loads only when
+you run from this folder. The root compose does not load it, so nothing is
+exposed there.
 
 Check it is up:
 
 ```bash
+curl localhost:3002/health      # {"status":"ok","db":"up"}
 curl localhost:3002/suppliers
 ```
 
@@ -35,20 +52,18 @@ curl localhost:3002/suppliers
 
 ### Reseeding
 
-Init scripts only run when the data volume is empty, so a plain restart will not
-reload the seed. Wipe the volume to start clean:
+The seed is recorded as applied, so a plain restart will not reload it. Wipe the
+volume to start clean:
 
 ```bash
 docker compose down -v
 docker compose up -d --build
 ```
 
-After changing anything in `src/`, rebuild the app image. After changing
-`grpc/` or `shared/grpc`, rebuild the gRPC image:
+After changing anything in `src/`, `grpc/` or `shared/`, rebuild the image:
 
 ```bash
-docker compose up -d --build app
-docker compose up -d --build grpc
+docker compose up -d --build supplier-service
 ```
 
 
@@ -56,7 +71,7 @@ docker compose up -d --build grpc
 ### Inspecting the database
 
 ```bash
-docker compose exec db psql -U postgres -d postgres -c 'select id, "Name" from public."Supplier_Database";'
+docker compose exec supplier-db psql -U postgres -d postgres -c 'select id, "Name" from public."Supplier_Database";'
 ```
 
 
@@ -72,20 +87,20 @@ docker compose down -v   # also delete the data
 
 # Testing
 
-Tests do not use the Compose stack above. `yarn test` starts its own throwaway
+Tests do not use the Compose stack above. `npm test` starts its own throwaway
 Supabase Postgres through Testcontainers, applies the same migrations and
-`supabase/schemas/seed.sql` that `compose.yaml` mounts, and stops the container
+`supabase/schemas/seed.sql` that `supplier-migrate` uses, and stops the container
 when the run finishes. You do not run `docker compose` for this.
 
 Docker Desktop has to be running, because Testcontainers talks to the Docker
-daemon. From `supplier-service/`:
+daemon. Install from the repo root, then run from `supplier-service/`:
 
 ```bash
-yarn install
-yarn test
+npm install          # from the repo root
+npm test             # from supplier-service/
 ```
 
-`yarn test` runs `tests/api`. The first run pulls
+`npm test` runs `tests/api`. The first run pulls
 `public.ecr.aws/supabase/postgres:17.6.1.167`, which can take a couple of
 minutes; later runs reuse the image. The container gets a random host port, so
 it never collides with the Compose database on `54332`.
@@ -94,7 +109,7 @@ The scalability run is separate, because it measures throughput rather than
 correctness and takes about ten seconds:
 
 ```bash
-yarn test:perf
+npm run test:perf
 ```
 
 That starts the Express app on a free port and drives `GET /suppliers` and
@@ -106,15 +121,16 @@ Tech Stack = Express.js, Node, Supabase, Drizzle, JWT(in-progress)
 
 ## Database Connection
 
-`src/database/db.ts` builds a single `pg` pool from `DATABASE_URL`. Compose sets
-that to `postgresql://postgres:postgres@db:5432/postgres` (container DNS). A
-process on the host that talks to the same database must use port **54332**:
+`src/database/db.ts` builds a single `pg` pool from `DATABASE_URL`. Compose builds
+that from `.env` as `postgresql://postgres:<POSTGRES_PASSWORD>@supplier-db:5432/<POSTGRES_DB>`
+(container DNS). A process on the host that talks to the same database must use
+port **54332** (see the commented line in `.env.example`):
 
 ```bash
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres
 ```
 
-Do not use a production pooler URL for local compose, `yarn test`, or host
+Do not use a production pooler URL for local compose, `npm test`, or host
 `npm run dev`.
 
 TODO: Set up docker secrets for seamless deployment across different devices
@@ -143,7 +159,7 @@ All seed data (3) are specified in `supplier-service/supabase/schemas/seed.sql`.
 
 Write routes need an RS256 Bearer token signed with `keys/private.pem`. The user
 service puts `roles` on the token as an **array** (`USER` or `ADMINISTRATOR`),
-not a single `role` string. From `supplier-service/` (after `yarn install`):
+not a single `role` string. From `supplier-service/` (after `npm install` at the repo root):
 
 ```bash
 # User token
@@ -174,19 +190,11 @@ process.stdout.write(token);
 
 | API endpoint                                | Sample curl command                                                                                                                                                                             |
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-<<<<<<< HEAD
 | `GET /suppliers`                            | `curl localhost:3002/suppliers`                                                                                                                                                                 |
 | `GET /suppliers/search?q=coffee`            | `curl "localhost:3002/suppliers/search?q=coffee"`                                                                                                                                               |
 | `GET /suppliers/search-radius`              | `curl "localhost:3002/suppliers/search-radius?latitude=1.294167&longitude=103.773611&radius=500"`                                                                                                |
 | `GET /suppliers/category?type=printing`     | `curl "localhost:3002/suppliers/category?type=printing"`                                                                                                                                        |
 | `GET /supplier/:id`                         | `curl localhost:3002/supplier/1`                                                                                                                                                                |
-=======
-| `GET /suppliers`                            | `curl localhost:3001/suppliers`                                                                                                                                                                 |
-| `GET /suppliers/search?q=coffee`            | `curl "localhost:3001/suppliers/search?q=coffee"`                                                                                                                                               |
-| `GET /suppliers/search-radius`              | `curl "localhost:3001/suppliers/search-radius?latitude=1.294167&longitude=103.773611&radius=500"`                                                                                                |
-| `GET /suppliers/category?type=printing`     | `curl "localhost:3001/suppliers/category?type=printing"`                                                                                                                                        |
-| `GET /supplier/:id`                         | `curl localhost:3001/supplier/1`                                                                                                                                                                |
->>>>>>> a76812b (Add in the location post gis functionality)
 | `POST /supplier`                            | see the multi-line sample below; the body needs all seven days of `openingHours`                                                                                                                |
 | `PUT /supplier/:id`                         | `curl -X PUT localhost:3002/supplier/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'`       |
 | `DELETE /supplier/:id`                      | `curl -X DELETE localhost:3002/supplier/1 -H "Authorization: Bearer $TOKEN"`                                                                                                                    |
@@ -197,7 +205,8 @@ process.stdout.write(token);
 
 co-written with grok and edited by @sunpterodactyl
 
-`docker compose up` starts gRPC on port `50052` against the compose database.
+`docker compose up` starts gRPC on port `50052` (inside `supplier-service`)
+against the compose database.
 The client one-liners below still run from the **repo root**, because they import
 `@foc/grpc`.
 
@@ -207,12 +216,12 @@ npm install
 npm run build --workspace @foc/grpc
 ```
 
-If you run the server on the host instead of the compose `grpc` service, point
-it at the published Postgres port (not a production URL):
+If you run the server on the host instead of in Docker, point it at the
+published Postgres port (not a production URL):
 
 ```bash
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres \
-  npm run dev --workspace @foc/supplier-grpc
+  npm run dev:grpc --workspace supplier-service
 ```
 
 That prints `supplier-service gRPC listening on 0.0.0.0:50052`. Client samples,
@@ -234,14 +243,13 @@ try {
 `supplierId` is a `uint64`, so it is a **string** on the wire (`'1'`, not `1`).
 
 ```bash
-# GetSupplier is still a stub: expect gRPC UNIMPLEMENTED, not a supplier payload
+# GetSupplier: name, latitude, longitude for seed supplier 1
 node --input-type=module -e "
 import { createSupplierClient } from '@foc/grpc';
 const supplier = createSupplierClient('localhost:50052', { timeoutMs: 3000 });
 try {
-  await supplier.getSupplier({ supplierId: '1' });
-} catch (e) {
-  console.log(e.code, e.details);
+  const { name, latitude, longitude } = await supplier.getSupplier({ supplierId: '1' });
+  console.log({ name, latitude, longitude });
 } finally {
   supplier.close();
 }
@@ -281,6 +289,9 @@ Order-service already has a peer client at `SUPPLIER_GRPC_ADDR` (default
 
 ```ts
 const { isOpen } = await clients.supplier.isOpen({ supplierId: String(id) });
+const { name, latitude, longitude } = await clients.supplier.getSupplier({
+  supplierId: String(id),
+});
 ```
 
 ## Creating a supplier
@@ -409,7 +420,7 @@ curl -X PUT localhost:3002/supplier/1/openingHours/1 \
 Inspect the result straight from the database:
 
 ```bash
-docker compose exec db psql -U postgres -d postgres \
+docker compose exec supplier-db psql -U postgres -d postgres \
   -c 'select day_of_week, opens_at, closes_at, is_closed from public.supplier_opening_hours where supplier_id = 1 order by day_of_week;'
 ```
 
