@@ -13,6 +13,10 @@ const schema = z.object({
   JWT_PUBLIC_KEY_PATH: z.string().min(1),
   JWT_EXPIRES_IN: z.string().default('15m'),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
+
+  RABBITMQ_URL: z.string().default('amqp://guest:guest@localhost:5672'),
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
+  OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().default(50),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -28,7 +32,9 @@ function readKey(filePath: string, label: string): string {
   try {
     return fs.readFileSync(filePath, 'utf8');
   } catch {
-    console.error(`Cannot read ${label} at "${filePath}". Generate the keypair (see README) or fix the path.`);
+    console.error(
+      `Cannot read ${label} at "${filePath}". Generate the keypair (see README) or fix the path.`,
+    );
     process.exit(1);
   }
 }

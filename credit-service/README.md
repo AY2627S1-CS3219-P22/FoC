@@ -226,7 +226,8 @@ available if consumer startup fails. No token is required.
 curl -i http://localhost:3004/health
 ```
 
-Compose has a PostgreSQL healthcheck; it does not configure one for Credit itself.
+Compose healthchecks both `credit-db` (`pg_isready`) and `credit-service` (this
+`/health` endpoint, which must return 200).
 
 ## Frontend REST and user history
 
@@ -250,9 +251,9 @@ service failures return 503; internal failures return 500. Unknown users have
 empty history, entries [] and nextPageToken null.
 
 The REST listener runs on port 3004. Set CREDIT_JWT_PUBLIC_KEY_PATH to the User
-Service public PEM. Local Compose mounts CREDIT_JWT_PUBLIC_KEY_FILE read-only
-at /run/credit/user-service-public.pem, defaulting to ../user-service/keys/public.pem
-relative to the Compose file. Supply that public file before starting; no private
+Service public PEM. Local Compose mounts that same file read-only at
+/run/credit/user-service-public.pem, defaulting to ../user-service/keys/public.pem
+relative to credit-service/. Supply that public file before starting; no private
 User Service key is read, mounted, or packaged.
 
 Both history RPCs, their messages/types, and client wrappers have been removed.
@@ -279,82 +280,91 @@ resolved boundary. Sequence values and the existing ordering/index stay internal
 
 ## Setup and configuration
 
-Run commands from the repository root. Supply User Service's public PEM before
-starting Credit. Host execution reads `CREDIT_JWT_PUBLIC_KEY_PATH`; Compose mounts
-`CREDIT_JWT_PUBLIC_KEY_FILE` read-only. No private User Service key is needed.
+Copy [.env.example](.env.example) to the ignored `credit-service/.env`. Both
+Docker Compose and host development read it. Supply User Service's public PEM
+before starting Credit (`npm run keys:generate` in user-service). No private User
+Service key is needed.
 
-| Configuration | Host default / requirement |
+| Configuration | Default / requirement |
 | --- | --- |
 | CREDIT_ORDER_SERVICE_TOKEN | Required; match Order Service's configured secret |
-| CREDIT_JWT_PUBLIC_KEY_PATH | `../user-service/keys/public.pem`, relative to Credit's working directory |
-| RABBITMQ_URL | `amqp://guest:guest@localhost:5672` |
-| HTTP_HOST / HTTP_PORT | `0.0.0.0` / `3004` |
-| GRPC_HOST / GRPC_PORT | `0.0.0.0` / `50054` |
-| PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE | Set for the chosen PostgreSQL database |
+| CREDIT_JWT_PUBLIC_KEY_PATH | `../user-service/keys/public.pem`, relative to credit-service/ |
+| RABBITMQ_URL | Host runs: `amqp://guest:guest@localhost:5672` |
+| DOCKER_RABBITMQ_URL | Compose: the broker as seen from the container (`host.docker.internal`) |
+| HTTP_PORT / GRPC_PORT | `3004` / `50054` |
+| PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE | Compose creates `credit-db` from PGUSER/PGPASSWORD/PGDATABASE and publishes it on PGPORT; host runs connect through PGHOST:PGPORT |
 
-For host development, populate the ignored `credit-service/.env` from
-[.env.example](.env.example), then run:
+### Docker (from credit-service/)
+
+Provide a reachable RabbitMQ broker separately; this Compose file starts the
+database, the migration job and Credit:
 
 ```sh
-npm ci
+docker compose up -d --build
+```
+
+| Service | What it is | Where (standalone dev) |
+| --- | --- | --- |
+| `credit-db` | PostgreSQL 17, data in the credit_service_pgdata volume | `127.0.0.1:${PGPORT}` (5433) |
+| `credit-migrate` | One-off job: applies new migrations, then exits | — |
+| `credit-service` | gRPC + REST | `localhost:50054`, `http://localhost:3004` |
+
+Inside Docker, Credit reaches the database at `credit-db:5432`. Ports are
+published by `compose.override.yaml`, which Compose loads only when run from this
+folder; the root compose does not load it, so nothing is exposed there.
+
+After source changes, rebuild the image; a previous image does not pick up source
+edits automatically:
+
+```sh
+docker compose up -d --build credit-service
+```
+
+To open psql, stop the stack keeping the data, or reset it:
+
+```sh
+docker compose exec credit-db psql -U credit_service -d credit_service
+docker compose down       # keep the data
+docker compose down -v    # also delete the data
+```
+
+### Host development
+
+```sh
+npm install                              # from the repository root
 npm run dev --workspace @foc/credit-grpc
 ```
 
-The predev script builds both shared packages. For Docker, provide a reachable
-RabbitMQ broker separately; this Compose file starts PostgreSQL and Credit only:
-
-```sh
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml up -d --build
-```
-
-The example uses local development credentials. For personal configuration, pass
-your selected ignored env file consistently. The Docker example connects to
-RabbitMQ through `host.docker.internal`. PostgreSQL uses database/user
-`credit_service`, host port 5433 (override CREDIT_POSTGRES_PORT), and internal
-address `postgres:5432`. Data persists in the named credit_service_pgdata volume.
-Compose waits for PostgreSQL's healthcheck. Migrations are applied explicitly below.
-
-After source changes, rebuild the running container using the same selected
-configuration; a previous image does not pick up source edits automatically:
-
-```sh
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml up -d --build --no-deps credit-service
-```
-
-To open psql or stop the stack while retaining the database volume:
-
-```sh
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec postgres psql -U credit_service -d credit_service
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml down
-```
+The predev script builds both shared packages.
 
 ## SQL migrations
 
 The current tables are credit_accounts, reservations, credit_history and
 idempotency_records.
 
-Apply each SQL file once, in order, using the transactional CLI at
-`migrations/apply-migration.cjs` (invoked by `npm run db:migrate`). It has no migration
-ledger or automatic skipping. Apply only missing files on an existing database;
-the commands below list the full sequence for a fresh database. Migration 009
-requires the updated service queries that omit account/reservation timestamps.
-The last recorded local application completed migrations 001–009; that does not
-establish which migrations a teammate's database has applied.
+In Docker, the `credit-migrate` job runs `migrations/run-migrations.cjs` on every
+`docker compose up`, before `credit-service` starts. It applies every
+`migrations/*.sql` in filename order, each in its own transaction, and records
+each file in the `credit_migrations` table (filename, applied_at, success).
+Files already recorded as successful are skipped; on a failure the file is rolled
+back, recorded as unsuccessful, and the run stops. A PostgreSQL advisory lock
+prevents two runs from applying migrations at the same time. Databases migrated
+by hand before this job existed have no records, so reset them once with
+`docker compose down -v`.
+
+To run the same runner from the host against the published database:
 
 ```sh
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/001_initial.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/002_align_credit_contract.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/003_uppercase_reservation_status.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/004_reservation_invariants.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/005_initial_grant_history_type.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/006_history_types_and_paging.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/007_credit_delta_constraints.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/008_history_links_and_uniqueness.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/009_remove_account_reservation_timestamps.sql
+set -a; . ./.env; set +a                 # from credit-service/: export the PG* values
+node migrations/run-migrations.cjs
 ```
 
-The CLI uses PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE; PGDATABASE must be explicit.
-It uses one connection and transaction, following [node-postgres](https://node-postgres.com/features/transactions).
+`migrations/apply-migration.cjs` (`npm run db:migrate -- <file.sql>`) still applies
+a single file in one transaction, without recording it. Both use
+PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE; PGDATABASE must be explicit. Each
+migration runs in one transaction, following [node-postgres](https://node-postgres.com/features/transactions).
+Migration 009 requires the updated service queries that omit account/reservation
+timestamps.
 Migration 004 enforces unique order_id, settled iff courier is set, and distinct
 participants. Migration 005 changes the initial label. Migration 006 converts all
 remaining legacy labels, adds sequence paging and initial-grant uniqueness, and
