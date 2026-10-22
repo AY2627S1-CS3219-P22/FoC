@@ -1,6 +1,9 @@
-import { useState } from "react"
-import type { Order, User } from "../App"
+// AI-assisted (Claude), reviewed and tested by Maliha
+import { useEffect, useState } from "react"
+import type { Order } from "../App"
 import RequestCard from "../components/RequestCard"
+import LoadMessage from "../components/LoadMessage"
+import { listOrders, orderError, updateOrder, type OrderAction } from "../api/orders"
 import type { ComponentProps } from "react"
 type CardActions = NonNullable<ComponentProps<typeof RequestCard>["actions"]>
 
@@ -11,50 +14,57 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "my-deliveries", label: "My Deliveries" },
 ]
 
+const isActive = (o: Order) => ["open", "accepted", "picked-up"].includes(o.status)
 
 interface Props {
-  orders: Order[]
-  user: User
-  onSelectOrder: (id: string) => void
-  onDeleteOrder: (id: string) => void
-  onMarkPickedUp: (id: string) => void
-  onMarkDelivered: (id: string) => void
-  onConfirmDelivery: (id: string) => void
-  onReleaseCredits: (id: string) => void
+  onSelectOrder: (order: Order) => void
 }
 
-export default function MyOrdersPage({
-  orders, user, onSelectOrder,
-  onDeleteOrder, onMarkPickedUp, onMarkDelivered,
-  onConfirmDelivery, onReleaseCredits,
-}: Props) {
+export default function MyOrdersPage({ onSelectOrder }: Props) {
   const [tab, setTab] = useState<Tab>("my-requests")
+  const [requests, setRequests] = useState<Order[] | null>(null)
+  const [deliveries, setDeliveries] = useState<Order[] | null>(null)
+  const [error, setError] = useState("")
+  const [actionError, setActionError] = useState("")
+  const [busyId, setBusyId] = useState<string | null>(null)
 
-  const filtered = orders.filter((o) => {
-    if (tab === "my-requests")   return o.requesterId === user.id
-    if (tab === "my-deliveries") return o.courierId === user.id
-    return true
-  })
+  const load = () => {
+    setError("")
+    Promise.all([listOrders("requested"), listOrders("assigned")])
+      .then(([req, del]) => { setRequests(req); setDeliveries(del) })
+      .catch((err) => setError(orderError(err)))
+  }
 
-  const activeRequests   = orders.filter((o) => o.requesterId === user.id && o.status !== "completed" && o.status !== "cancelled").length
-  const activeDeliveries = orders.filter((o) => o.courierId === user.id && o.status !== "completed").length
+  useEffect(load, [])
+
+  // swap the updated order into whichever list it came from
+  const act = (order: Order, action: OrderAction) => {
+    setBusyId(order.id)
+    setActionError("")
+    updateOrder(order.id, action)
+      .then((updated) => {
+        const swap = (list: Order[] | null) => list?.map((o) => (o.id === updated.id ? updated : o)) ?? null
+        setRequests(swap)
+        setDeliveries(swap)
+      })
+      .catch((err) => setActionError(orderError(err)))
+      .finally(() => setBusyId(null))
+  }
+
+  const filtered = (tab === "my-requests" ? requests : deliveries) ?? []
+  const activeRequests   = (requests ?? []).filter(isActive).length
+  const activeDeliveries = (deliveries ?? []).filter(isActive).length
 
   function getActions(order: Order): CardActions {
-    if (tab === "my-deliveries" && order.courierId === user.id) {
+    if (tab === "my-deliveries") {
       return {
-        onMarkPickedUp:  order.status === "accepted"  ? () => onMarkPickedUp(order.id)  : undefined,
-        onMarkDelivered: order.status === "picked-up" ? () => onMarkDelivered(order.id) : undefined,
+        onMarkPickedUp:  order.status === "accepted"  ? () => act(order, "pickup")  : undefined,
+        onMarkDelivered: order.status === "picked-up" ? () => act(order, "deliver") : undefined,
       }
     }
-    if (tab === "my-requests" && order.requesterId === user.id) {
-      const inProgress = ["accepted", "picked-up", "delivered"].includes(order.status)
-      return {
-        onConfirm:       inProgress ? () => onConfirmDelivery(order.id) : undefined,
-        onReleaseCredits: inProgress ? () => onReleaseCredits(order.id) : undefined,
-        onDelete: order.status === "open" ? () => onDeleteOrder(order.id) : undefined,
-      }
+    return {
+      onCancel: order.status === "open" ? () => act(order, "cancel") : undefined,
     }
-    return {}
   }
 
   return (
@@ -97,8 +107,14 @@ export default function MyOrdersPage({
         ))}
       </div>
 
+      {actionError && (
+        <p role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-xs text-red-600">{actionError}</p>
+      )}
+
       {/* List or empty state */}
-      {filtered.length === 0 ? (
+      {!requests || !deliveries ? (
+        <LoadMessage error={error} onRetry={load} />
+      ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-12 h-12 bg-[#E8F1ED] rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-5 h-5 text-[#3F6B5A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -114,8 +130,9 @@ export default function MyOrdersPage({
             <RequestCard
               key={order.id}
               order={order}
-              onClick={() => onSelectOrder(order.id)}
+              onClick={() => onSelectOrder(order)}
               actions={getActions(order)}
+              busy={busyId === order.id}
             />
           ))}
         </div>

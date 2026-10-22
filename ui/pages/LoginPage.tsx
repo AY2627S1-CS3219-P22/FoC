@@ -1,15 +1,34 @@
-import { useState } from "react"
+import React, { useState } from "react"
 import type { Page } from "../App"
+import { login } from "../api/users"
 
 interface Props {
+  notice?: string  // e.g. after signing up
   onLogin: () => void
   onNavigate: (page: Page) => void
 }
 
-export default function LoginPage({ onLogin, onNavigate }: Props) {
+export default function LoginPage({ notice, onLogin, onNavigate }: Props) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [remember, setRemember] = useState(false)
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+    try {
+      const { token } = await login(email, password)
+      localStorage.setItem("token", token)
+      onLogin()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const inputCls =
     "w-full px-3.5 py-2.5 border border-[#E4E8E6] rounded-lg text-sm text-[#1B2522] placeholder-[#9CA3AF] bg-white focus:outline-none focus:border-[#1A4A36] focus:ring-1 focus:ring-[#1A4A36] transition-colors"
@@ -67,7 +86,7 @@ export default function LoginPage({ onLogin, onNavigate }: Props) {
             <p className="text-sm text-[#3F6B5A] mb-7">Sign in to your student account</p>
 
             <form
-              onSubmit={(e) => { e.preventDefault(); onLogin() }}
+              onSubmit={handleSubmit}
               className="space-y-4"
             >
               <div>
@@ -104,11 +123,18 @@ export default function LoginPage({ onLogin, onNavigate }: Props) {
                 />
                 <span className="text-xs text-[#1B2522]">Remember me</span>
               </label>
+              {notice && !error && (
+                <p className="rounded-lg bg-[#E8F1ED] px-3 py-2 text-xs text-[#1A4A36]">{notice}</p>
+              )}
+              {error && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
+              )}
               <button
                 type="submit"
-                className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] active:scale-[.99] transition-all"
+                disabled={loading}
+                className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] active:scale-[.99] transition-all disabled:opacity-60"
               >
-                Log in
+                {loading ? "Logging in…" : "Log in"}
               </button>
             </form>
 
