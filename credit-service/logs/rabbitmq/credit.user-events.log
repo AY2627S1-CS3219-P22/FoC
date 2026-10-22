@@ -1,3 +1,0 @@
-{"time":"2026-10-22T02:04:58.478Z","level":"info","service":"credit-service","queue":"credit.user-events","action":"consuming"}
-{"time":"2026-10-22T02:05:01.216Z","level":"info","service":"credit-service","queue":"credit.user-events","action":"acked","eventId":"2345b98d-4c10-4e57-93d4-68a989ef674f","retryCount":0}
-{"time":"2026-10-22T02:05:55.231Z","level":"info","service":"credit-service","queue":"credit.user-events","action":"consuming"}
