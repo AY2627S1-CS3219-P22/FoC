@@ -11,6 +11,18 @@ New changes await human review; see credit-service/ai/usage-log.md, entry 031 (r
 Entry 033: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Checked README against current health/API/schema/event code and clarified setup and verification.
 New documentation changes await human review; see ai/usage-log.md, entry 033.
+Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Relocated the human-selected migration runner and updated references while making scripts/docs local-only.
+Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 034 (repository-relative).
+Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
+Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
+Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Documented the human-updated event helpers, broker URL and nonfatal consumer startup/shutdown.
+Changes await human review; see ai/usage-log.md, entry 036.
+Entry 037: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Integrated the human-authorized upstream messaging package, documented its ownership and actual listener verification.
+Changes await human review; prompts/key responses: ai/usage-log.md, entry 037.
 -->
 
 # Credit service
@@ -30,13 +42,12 @@ credit-service/
     domains/       existing account, reservation, history and idempotency types
     repos/         repository contract, PostgreSQL implementation and lock encoder
     services/      credit rules, validation and history bookmarks
-    grpc/          gRPC handlers, service-token authentication, TLS and error mapping
+    grpc/          plaintext gRPC handlers, service-token authentication and error mapping
     rest/          REST handlers and user-token authentication
     events/        user.created callback and registration helper
     env.ts
     index.ts
   test/
-  scripts/
   migrations/
   package.json
   tsconfig.json
@@ -46,8 +57,9 @@ credit-service/
 There is one Node workspace at credit-service/. Its existing package name remains
 @foc/credit-grpc, so npm workspace commands stay the same. TypeScript outputs to
 credit-service/dist/. Both transports start from src/index.ts. Package files,
-tests and migration tooling now live directly under credit-service rather than
-an outer grpc directory. Existing personal env files were not overwritten.
+tests now live directly under credit-service rather than an outer grpc
+directory. The tracked migration runner is migrations/apply-migration.cjs;
+scripts/ and docs/ are local-only folders. Existing personal env files were not overwritten.
 For host startup, merge the needed values from credit-service/.env.example into
 the ignored service-root .env; relative public-key paths resolve from that root.
 
@@ -112,14 +124,36 @@ release at transaction end.
 ## Initial-allocation implementation
 
 The [user.created callback and registration helper](src/events/userCreated.ts)
-receive a delivery object with a payload containing `type: "user.created"` and
-`userId`. Payload `eventId` and `occurredAt` are optional; when present they must
-be strings. The delivery may also include eventId and retryCount for failure
-logging. Allocation uniqueness is determined by userId. The callback awaits
-committed allocation or confirmation of an existing grant; failures propagate to
-the shared messaging client's bounded retry/dead-letter path. Registration takes
-a connected shared client and a supplied queue. RabbitMQ startup and User Service
-publication belong to teammates and are not wired here. There is no InitCredits RPC.
+validate deliveries with the shared `userEventSchema`, verify matching delivery
+and payload event IDs, and allocate through `initCredits({ userId })`. Allocation
+uniqueness remains per userId. The human-updated handler marks malformed events,
+unsupported lifecycle types and inconsistent prior allocations as NonRetryableError;
+other failures propagate to the shared client's retry/dead-letter handling.
+
+The [consumer startup helper](src/events/broker.ts) connects a RabbitMQClient for
+CREDIT_USER_QUEUE using serviceName credit-service and prefetch 10. It closes its
+client if connection/consumer setup throws. Configure RABBITMQ_URL: host execution
+defaults to `amqp://guest:guest@localhost:5672`; the Docker example reaches a broker
+published on the Docker host. Supply a URL reachable from your chosen deployment.
+After both API listeners start, `index.ts` attempts consumer startup in the
+background with the same CreditService instance. A failed connection,
+registration or package load is logged; the REST and gRPC APIs keep running.
+This is one startup attempt: after a failure, restart Credit once the package
+and broker are available. No consumer reconnect loop is added here. SIGINT/SIGTERM
+close both API listeners, wait for any pending consumer startup, close the broker
+if connected, then end the database pool. A broker close failure is logged and
+does not skip database cleanup.
+
+`@foc/messaging` is now included as a local workspace and Credit dependency;
+root builds, Credit predev and the Docker image build it before Credit. The
+package was copied from `origin/events/data-validation` at
+`0b48f5f85be01d148176a6410c9ca22c2b8e672e`. **Broker implementation and contracts
+are authored by @sunpterodactyl and the shared messaging contributors.** This PR
+includes their code for integration/testing and does not claim its authorship.
+All 11 imported source/config files match that commit byte for byte; only the
+[package README](../shared/messaging/README.md) adds provenance. Their existing AI
+declarations are retained. Credit-specific work is consumer wiring and tests.
+User Service publication remains owned by its implementer. There is no InitCredits RPC.
 
 ## gRPC authentication and errors
 
@@ -137,9 +171,12 @@ multiple tokens yield `UNAUTHENTICATED`; a known unauthorized service yields
 `PERMISSION_DENIED`. Only the order-service secret is configured at startup.
 
 Set `CREDIT_ORDER_SERVICE_TOKEN` to the same secret on Credit and Order Service.
-Outside explicit `CREDIT_LOCAL_MODE=true`, set both `CREDIT_TLS_CERT_PATH` and
-`CREDIT_TLS_KEY_PATH` to readable TLS files. Deployments must mount/provide these
-files; the local Compose example uses explicit local plaintext mode.
+Credit gRPC always uses plaintext on port 50054 (or the configured GRPC_PORT).
+There is no TLS/local-mode switch. CREDIT_LOCAL_MODE, CREDIT_TLS_CERT_PATH and
+CREDIT_TLS_KEY_PATH have been removed from the service configuration and examples;
+leftover values are ignored. Order should use the shared client's default
+plaintext credentials and continue sending its x-credit-service-token.
+CREDIT_JWT_PUBLIC_KEY_PATH is still required for REST user-token verification.
 
 Business errors preserve gRPC codes and the `x-credit-error-reason` trailer:
 ACCOUNT_NOT_FOUND, RESERVATION_NOT_FOUND, INSUFFICIENT_CREDITS, VERSION_CONFLICT,
@@ -257,7 +294,8 @@ The down command keeps the database volume.
 
 ## SQL migrations
 
-Apply each file once, in order, using the transactional CLI. It has no migration
+Apply each SQL file once, in order, using the transactional CLI at
+`migrations/apply-migration.cjs` (invoked by `npm run db:migrate`). It has no migration
 ledger or automatic skipping. The local development database has migrations
 001–007 applied. Other databases must apply migration 007 explicitly.
 Migrations 001–005 were preserved. The human confirmed migration 006 has not
@@ -301,8 +339,32 @@ npm test
 PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_local PGDATABASE=credit_service npm test --workspace @foc/credit-grpc
 ```
 
-The latest recorded run passed 84 credit checks and 51 shared gRPC checks,
-with no failures/skips (exchange 031). This README review did not rerun tests.
+The latest recorded run passed all 94 Credit checks and 51 shared gRPC checks,
+with zero failures/skips. The full workspace build and Credit Docker build pass
+with the real messaging package. A separate live listener check passed six
+scenarios (seven Node test results including its parent): initial allocation via
+actual Credit startup and authenticated REST, duplicate events, transient retry,
+invalid delivery dead-lettering, inconsistent-account dead-lettering and restart.
+The test uses a temporary PostgreSQL schema and an empty dedicated RabbitMQ
+instance, and removes its database rows, child processes and temporary logs.
+
+To repeat the live listener check, first build and start a disposable broker
+that no other service is using:
+
+```sh
+npm run build
+docker run -d --name credit-listener-test -p 127.0.0.1:5674:5672 rabbitmq:3-management
+docker exec credit-listener-test rabbitmq-diagnostics -q ping
+PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_local PGDATABASE=credit_service RABBITMQ_TEST_URL=amqp://guest:guest@127.0.0.1:5674 node --test credit-service/test/listener.integration.cjs
+docker rm -f -v credit-listener-test
+```
+
+Wait for the broker ping to succeed before running the test. This integration
+file is separate from the default test glob; it requires PGDATABASE and
+RABBITMQ_TEST_URL and refuses to proceed if the Credit queue is already in use.
+It never purges an existing queue. Failure/retry injection is confined to the
+test child process. Existing application databases and running services stay intact.
+
 Regressions cover public `/health` responses for database up/down, positive
 reservation amount/version checks, exact per-operation history deltas, and REST
 pagination compared against database sequence order while omitting sequenceId
@@ -310,7 +372,7 @@ from entries. Credit tests also cover migration/default/FK constraints, initial 
 and order concurrency, duplicate replay, no overspend, competing settle/release,
 opposing settlements, full rollback after injected failures, history sequence
 precision, writes during paging, late commits, service authorization, RS256
-validation, TLS configuration, and reason trailers. Added regressions verify
+validation, plaintext transport configuration, and reason trailers. Added regressions verify
 ordinary service TypeError becomes a generic INTERNAL/500 and the actual error
 is logged, unknown unauthenticated paths return 404, known unauthenticated GET
 routes return 401, wrong methods retain the documented 404, and reserve retries
@@ -330,9 +392,10 @@ The human approved this attribution method for comment-free JSON in
 
 | File | Tool, date, and scope | Author review |
 | --- | --- | --- |
-| credit-service/package.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: pg, migration/test scripts, @types/pg, jsonwebtoken and @types/jsonwebtoken; relocated the existing workspace manifest to the service root in exchange 024. | Pending human review. |
-| Root package-lock.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: corresponding dependencies/transitive packages and relocated credit workspace/link metadata; earlier npm also normalized existing flags. | Pending human review. |
-| Root package.json | OpenAI Codex (GPT-6), 2026-10-21: changed only the credit workspace path from credit-service/grpc to credit-service, using the recorded comment-free JSON attribution method. | Pending human review. |
+| credit-service/package.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: pg, migration/test scripts, @types/pg, jsonwebtoken and @types/jsonwebtoken; relocated the existing workspace manifest to the service root in exchange 024; updated db:migrate to the relocated migrations/apply-migration.cjs in exchange 034 (2026-10-22); added @foc/messaging dependency and predev build in exchange 037. | Pending human review. |
+| Root package-lock.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: corresponding dependencies/transitive packages and relocated credit workspace/link metadata; earlier npm also normalized existing flags; exchange 037 adds messaging/amqplib workspace entries and resolves the shared Zod range to 4.6.7. | Pending human review. |
+| Root package.json | OpenAI Codex (GPT-6), 2026-10-21: changed only the credit workspace path from credit-service/grpc to credit-service, using the recorded comment-free JSON attribution method; exchange 037 adds the shared/messaging workspace and prerequisite build. | Pending human review. |
+| shared/messaging/package.json and tsconfig.json | Original files by @sunpterodactyl/shared messaging contributors, copied byte-for-byte from 0b48f5f in exchange 037; no AI-generated source/config changes. Provenance is in shared/messaging/README.md. | Upstream authorship preserved; integration review pending. |
 
 Exact prompts/key exchanges and actual checks are archived under
 [credit-service/ai/](ai/usage-log.md). The human authors remain responsible for

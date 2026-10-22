@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Added and updated the final AI Use Summary section; existing project content was not generated in these exchanges.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: credit-service/ai/usage-log.md, entries 001–033.
+Prompts and key responses: credit-service/ai/usage-log.md, entries 001–037.
 Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Updated the consolidated disclosure for constraints, health, history replies and internal reference removal.
 New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
@@ -11,6 +11,15 @@ Entry 032: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Recorded local Git exclusions; human review pending.
 Entry 033: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Corrected Credit REST port status and recorded README verification; human review pending.
+Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded local scripts/docs and approved migration-runner relocation; human review pending.
+Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
+Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
+Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded RabbitMQ configuration and confirmed nonfatal entrypoint lifecycle wiring; human review pending.
+Entry 037: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded imported broker authorship, integration and real listener verification; human review pending.
 -->
 
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
@@ -96,7 +105,7 @@ Earlier or other team usage has not yet been supplied for this summary.
   balance/reservation reads, reserve/update/release/settle transactions; specified
   SHA-256 request and advisory-lock encoding; history label/identity/index changes;
   order-history RPC removal; strict user-history sequence bookmarks; order-only
-  authenticated gRPC with reason trailers/TLS configuration; own-balance/history
+  authenticated plaintext gRPC with reason trailers; own-balance/history
   REST with RS256 subject authentication; concurrency/rollback/authentication/
   paging tests; the human-requested service-root workspace/source relocation;
   correction of the unshared migration's history spelling; explicit validation
@@ -107,8 +116,9 @@ Earlier or other team usage has not yet been supplied for this summary.
   settlement fallback and different-courier conflicts when retry records are absent;
   local Postman REST/gRPC demos and tests-first Order/Credit/concurrent-acceptance
   collections, temporary-script exclusion and demo preparation instructions;
-  corresponding docs and disclosures. RabbitMQ startup and User
-  Service publication are assigned to teammates and not wired by this work.
+  corresponding docs and disclosures. Credit consumer startup/shutdown is wired;
+  the shared messaging package is imported from the broker contributors with
+  attribution, and User Service publication remains with its implementer.
   Credit retries use the human's three-attempt, 1,300 ms defaults and specified
   growing/capped/half-base jitter; other service clients retain their behavior.
 - **Boundaries:** Requirements, schema, architecture, interfaces, access policies,
@@ -116,7 +126,15 @@ Earlier or other team usage has not yet been supplied for this summary.
   prioritization, backlog/sprint planning, architecture/design decisions, decision
   rationales, trade-off analyses, or risk justifications were generated.
 - **Prompts and key exchanges:** [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md)
-  links exact prompts and key outputs for entries 001–033. Exchange 033 checks
+  links exact prompts and key outputs for entries 001–037. Exchange 037 imports
+  @sunpterodactyl/shared messaging contributors' package from events/data-validation
+  at 0b48f5f, preserves source/AI declarations and validates the real listener.
+  Exchange 036 adds
+  broker URL configuration and nonfatal consumer startup/shutdown, using the
+  human-confirmed keep-APIs-running behavior.
+  Exchange 035 implements
+  the human-approved plaintext-only Credit gRPC transport. Exchange 034 makes
+  scripts/docs local-only and relocates the required migration runner. Exchange 033 checks
   the service README against current health/API/schema/event code. Exchange 032 moves
   personal exclusions into local Git metadata. Exchange 031 records positive database checks, internal-only history sequence IDs, public
   database health and untracking internal references. History CHECKs enforce the
@@ -132,9 +150,14 @@ Earlier or other team usage has not yet been supplied for this summary.
   attribution comments.
   The human approved the [service README attribution table](credit-service/README.md#attribution-for-json-files)
   for comment-free package.json/package-lock.json changes.
-- **Verification and review:** Latest workspace build, 84 credit tests against
-  PostgreSQL/local listeners, and 51 shared contract/transport/retry tests passed,
-  with zero failures/skips. New checks cover migration rollback, direct SQL
+- **Verification and review:** Latest full workspace build, 94 Credit checks
+  against PostgreSQL/local listeners and 51 shared gRPC/retry checks passed with
+  zero failures/skips. The Credit Docker build/runtime package check also passed.
+  Six live listener scenarios passed with real RabbitMQ/PostgreSQL and actual
+  Credit startup: initial grant, duplicates, retry, two dead-letter cases and
+  restart. The earlier missing-package build block is resolved. Temporary broker,
+  schemas, child processes and logs were cleaned up; existing services were kept.
+  Checks cover migration rollback, direct SQL
   amount/version rejections, public health and REST paging against database order.
   Migration 007 is applied to the local Credit database. A scoped Node report
   from exchange 022, before the
@@ -149,7 +172,12 @@ Earlier or other team usage has not yet been supplied for this summary.
   and concurrency await Order's existing User/Supplier integrations and were
   not verified live. Human review and validation are pending; agent checks do
   not establish author approval.
-- **Sources/licensing:** Consulted official [PostgreSQL 17](https://www.postgresql.org/docs/17/index.html),
+- **Sources/licensing:** Shared broker implementation/contracts are credited to
+  @sunpterodactyl and the shared messaging contributors, copied from local
+  events/data-validation commit 0b48f5f85be01d148176a6410c9ca22c2b8e672e;
+  [package provenance](shared/messaging/README.md) preserves their authorship and
+  existing AI declarations. Integration AI assistance does not claim that code.
+  Consulted official [PostgreSQL 17](https://www.postgresql.org/docs/17/index.html),
   [PostgreSQL Docker image](https://github.com/docker-library/docs/blob/master/postgres/README.md),
   [Compose startup](https://docs.docker.com/compose/how-tos/startup-order/),
   [node-postgres](https://node-postgres.com/features/transactions),

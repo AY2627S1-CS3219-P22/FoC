@@ -5,10 +5,16 @@
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../ai/usage-log.md, entries 005–026 (prior scopes retained).
 // Changes in entry 026: Pending human review; prior review markers apply to earlier content.
+// Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { generateKeyPairSync } = require('node:crypto');
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
+const { join } = require('node:path');
 const jwt = require('jsonwebtoken');
 const { Metadata, status } = require('@grpc/grpc-js');
 require('tsx/cjs');
@@ -16,7 +22,6 @@ const { ValidationError } = require('../src/services/validation.ts');
 const { serviceIdentityVerifier, AuthenticationError } = require('../src/grpc/auth.ts');
 const { userTokenVerifier, AuthenticationError: UserAuthenticationError } = require('../src/rest/auth.ts');
 const { grpcError } = require('../src/grpc/errors.ts');
-const { grpcCredentials } = require('../src/grpc/tls.ts');
 const { CreditOperationError, CreditService } = require('../src/services/CreditService.ts');
 const { createGrpcServer } = require('../src/grpc/server.ts');
 const { startServer, stopServer, createCreditClient } = require('@foc/grpc');
@@ -101,11 +106,23 @@ test('an ordinary service TypeError returns generic INTERNAL and is logged; vali
   assert.equal(logged[0][1], failure);
 });
 
-test('plaintext gRPC requires explicit local mode, and partial TLS configuration is rejected', async () => {
-  await grpcCredentials(true);
-  await assert.rejects(grpcCredentials(false), /TLS/);
-  await assert.rejects(grpcCredentials(true, 'certificate-only'), /TLS/);
-  await assert.rejects(grpcCredentials(true, undefined, 'key-only'), /TLS/);
+test('Credit configuration needs no local/TLS settings and ignores obsolete transport variables', async () => {
+  const source = `
+    const assert = require('node:assert/strict');
+    const { env } = require(${JSON.stringify(join(__dirname, '../src/env.ts'))});
+    assert.equal(env.GRPC_PORT, 50054);
+    assert.equal(env.CREDIT_ORDER_SERVICE_TOKEN, 'test-order-token');
+    for (const name of ['CREDIT_LOCAL_MODE', 'CREDIT_TLS_CERT_PATH', 'CREDIT_TLS_KEY_PATH']) {
+      assert.equal(Object.hasOwn(env, name), false);
+    }
+  `;
+  const base = { ...process.env, DOTENV_CONFIG_PATH: join(__dirname, 'not-an-env-file'), CREDIT_ORDER_SERVICE_TOKEN: 'test-order-token', GRPC_PORT: '50054' };
+  for (const key of ['CREDIT_LOCAL_MODE', 'CREDIT_TLS_CERT_PATH', 'CREDIT_TLS_KEY_PATH']) delete base[key];
+  const execute = promisify(execFile);
+  await execute(process.execPath, ['-r', 'tsx/cjs', '-e', source], { env: base });
+  await execute(process.execPath, ['-r', 'tsx/cjs', '-e', source], { env: {
+    ...base, CREDIT_LOCAL_MODE: 'obsolete-invalid-value', CREDIT_TLS_CERT_PATH: '/missing/cert', CREDIT_TLS_KEY_PATH: '/missing/key',
+  } });
 });
 
 test('all six RPCs authenticate before business logic; known wrong service is forbidden', async (t) => {

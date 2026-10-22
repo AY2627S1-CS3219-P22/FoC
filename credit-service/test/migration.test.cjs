@@ -4,6 +4,9 @@
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../ai/usage-log.md, entries 005–024 (prior scopes retained).
+// Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Relocated the human-selected migration runner and updated references while making scripts/docs local-only.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 034 (repository-relative).
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -16,7 +19,7 @@ const { randomUUID } = require('node:crypto');
 const { Client } = require('pg');
 
 const execute = promisify(execFile);
-const script = join(__dirname, '../scripts/apply-migration.cjs');
+const script = join(__dirname, '../migrations/apply-migration.cjs');
 const fixtureHeader = [
   '-- AI Assistance Disclosure:',
   '-- Tool: OpenAI Codex (GPT-6), date: 2026-10-20 (Asia/Singapore).',

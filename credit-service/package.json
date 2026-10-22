@@ -5,11 +5,11 @@
   "type": "commonjs",
   "main": "dist/index.js",
   "scripts": {
-    "predev": "npm run build --workspace @foc/grpc",
+    "predev": "npm run build --workspace @foc/grpc --workspace @foc/messaging",
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "db:migrate": "node scripts/apply-migration.cjs",
+    "db:migrate": "node migrations/apply-migration.cjs",
     "test": "node --test test/*.test.cjs"
   },
   "dependencies": {
@@ -18,7 +18,8 @@
     "dotenv": "^18.0.3",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.23.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "@foc/messaging": "0.1.0"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",

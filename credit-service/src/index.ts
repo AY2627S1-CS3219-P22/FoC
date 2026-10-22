@@ -7,18 +7,23 @@
 // Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 // Connected REST health to a PostgreSQL SELECT 1 probe.
 // New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
+// Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
+// Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Wired nonfatal user-event consumer startup and broker cleanup using the human's helpers.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 036.
 
 import { startServer, stopServer } from '@foc/grpc';
 import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
+import { ServerCredentials } from '@grpc/grpc-js';
 import { env } from './env';
 import { createGrpcServer } from './grpc/server';
 import { CreditService } from './services/CreditService';
-import { grpcCredentials } from './grpc/tls';
 import { createRestServer } from './rest/server';
 
 async function main(): Promise<void> {
-  const credentials = await grpcCredentials(env.CREDIT_LOCAL_MODE === 'true', env.CREDIT_TLS_CERT_PATH, env.CREDIT_TLS_KEY_PATH);
   const publicKeyPem = await readFile(env.CREDIT_JWT_PUBLIC_KEY_PATH, 'utf8');
   const pool = new Pool({ connectionTimeoutMillis: 5000 });
   pool.on('error', () => console.error('Credit database idle connection error'));
@@ -34,7 +39,7 @@ async function main(): Promise<void> {
   });
   let port: number;
   try {
-    port = await startServer(server, env.GRPC_PORT, env.GRPC_HOST, credentials);
+    port = await startServer(server, env.GRPC_PORT, env.GRPC_HOST, ServerCredentials.createInsecure());
     await new Promise<void>((resolve, reject) => {
       rest.once('error', reject);
       rest.listen(env.HTTP_PORT, env.HTTP_HOST, () => { rest.off('error', reject); resolve(); });
@@ -48,17 +53,37 @@ async function main(): Promise<void> {
   console.log('credit-service REST listening on ' + env.HTTP_HOST + ':' + env.HTTP_PORT);
 
   let shuttingDown = false;
+  let broker: Awaited<ReturnType<typeof import('./events/broker').startUserEventConsumer>> | undefined;
+  let consumerStartup: Promise<void>;
   const shutdown = async (): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
-    await Promise.all([
+    const results = await Promise.allSettled([
       stopServer(server),
       new Promise<void>((resolve) => { rest.close(() => resolve()); }),
+      (async () => { await consumerStartup; await broker?.close(); })(),
     ]);
+    for (const result of results) {
+      if (result.status === 'rejected') console.error('Credit transport shutdown failed', result.reason);
+    }
     await pool.end();
   };
-  process.on('SIGINT', () => void shutdown());
-  process.on('SIGTERM', () => void shutdown());
+  const onSignal = () => void shutdown().catch((error: unknown) => {
+    console.error('Credit shutdown failed', error);
+    process.exitCode = 1;
+  });
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
+
+  consumerStartup = (async () => {
+    try {
+      // Package loading is part of the nonfatal consumer startup attempt.
+      const { startUserEventConsumer } = require('./events/broker') as typeof import('./events/broker');
+      broker = await startUserEventConsumer(service, env.RABBITMQ_URL);
+    } catch (error) {
+      console.error('Credit user-event consumer unavailable; APIs remain running', error);
+    }
+  })();
 }
 
 main().catch((error: unknown) => {

@@ -4,11 +4,15 @@
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../ai/usage-log.md, entries 005–025 (prior scopes retained).
+// Entry 037: OpenAI Codex (GPT-6), 2026-10-22 Asia/Singapore.
+// Scope: Aligned tests with the human-edited handler and imported shared contract.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 037.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 require('tsx/cjs');
-const { ValidationError } = require('../src/services/validation.ts');
+const { NonRetryableError } = require('@foc/messaging');
+const { InitialAllocationError } = require('../src/services/CreditService.ts');
 const { createUserCreatedHandler } = require('../src/events/userCreated.ts');
 
 const balance = { totalCredits: 10, reservedCredits: 0, availableCredits: 10 };
@@ -75,21 +79,35 @@ test('invalid event type or user identity fails before initialization', async ()
     ...['', ' user', 'user ', 'user\nname', 'user\u0085name', 'x'.repeat(129), null, 42]
       .map((userId) => event({ userId })),
   ]) {
-    await assert.rejects(handler({ payload }), ValidationError);
+    await assert.rejects(handler({ payload }), NonRetryableError);
   }
   assert.equal(calls, 0);
 });
 
-test('eventId and occurredAt are optional but must be strings when present', async () => {
-  const seen = [];
-  const handler = createUserCreatedHandler({
-    async initCredits(input) { seen.push(input.userId); return balance; },
-  });
-  await handler({ payload: { type: 'user.created', userId: 'new-user' } });
-  await handler({ payload: event({ eventId: undefined, occurredAt: undefined }) });
-  assert.deepEqual(seen, ['new-user', 'new-user']);
-  for (const payload of [event({ eventId: 42 }), event({ occurredAt: 123 })]) {
-    await assert.rejects(handler({ payload }), ValidationError);
-  }
-  assert.equal(seen.length, 2);
+test('eventId and occurredAt follow the required string fields in the shared schema', async () => {
+  let calls = 0;
+  const handler = createUserCreatedHandler({ async initCredits() { calls += 1; return balance; } });
+  for (const payload of [
+    { type: 'user.created', userId: 'new-user' },
+    event({ eventId: undefined }), event({ occurredAt: undefined }),
+    event({ eventId: 42 }), event({ occurredAt: 123 }),
+  ]) await assert.rejects(handler({ payload }), NonRetryableError);
+  assert.equal(calls, 0);
+  await handler({ payload: event() });
+  assert.equal(calls, 1);
+});
+
+test('delivery eventId must match the payload when supplied', async () => {
+  let calls = 0;
+  const handler = createUserCreatedHandler({ async initCredits() { calls += 1; return balance; } });
+  await assert.rejects(handler({ eventId: 'other-event', retryCount: 0, payload: event() }), NonRetryableError);
+  assert.equal(calls, 0);
+  await handler({ eventId: 'first-event', retryCount: 0, payload: event() });
+  assert.equal(calls, 1);
+});
+
+test('known inconsistent initial allocations are non-retryable and preserve the original cause', async () => {
+  const failure = new InitialAllocationError('ALREADY_EXISTS', 'Account has no confirmed initial grant');
+  const handler = createUserCreatedHandler({ async initCredits() { throw failure; } });
+  await assert.rejects(handler({ payload: event() }), error => error instanceof NonRetryableError && error.cause === failure);
 });

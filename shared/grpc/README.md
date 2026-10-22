@@ -7,6 +7,9 @@ Prompts and key responses: ../../credit-service/ai/usage-log.md, entries 007–0
 Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Replaced the untracked internal reference link with the retained AI prompt log.
 New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
+Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
+Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
 -->
 
 # Shared gRPC contracts
@@ -58,7 +61,7 @@ No gRPC history messages/client wrappers remain.
 
 ## Calling Credit from Order Service
 
-For local plaintext development, with the same configured secret on both services:
+Credit uses plaintext gRPC, with the same configured secret on both services:
 
 ```typescript
 import { Metadata } from '@grpc/grpc-js';
@@ -75,9 +78,10 @@ try {
 }
 ```
 
-Reuse clients across requests and close them at shutdown. Outside local use,
-configure client TLS credentials through ClientConfig.credentials, and configure
-Credit's TLS certificate/key. Credit requires TLS unless explicitly in local mode.
+Reuse clients across requests and close them at shutdown. Credit accepts only
+plaintext gRPC. The shared Credit client's default credentials already use
+plaintext; callers should not supply TLS credentials for Credit. The generic
+ClientConfig.credentials option remains available for other service connections.
 Missing or unknown secrets return UNAUTHENTICATED; known unauthorized service
 identities return PERMISSION_DENIED. Identity comes from the matched secret.
 Business error reasons are returned in x-credit-error-reason trailing metadata.

@@ -4,6 +4,9 @@
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../ai/usage-log.md, entries 005–024 (prior scopes retained).
+// Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Relocated the human-selected migration runner and updated references while making scripts/docs local-only.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 034 (repository-relative).
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -17,7 +20,7 @@ const execute = promisify(execFile);
 const migration = join(__dirname, '../migrations/001_initial.sql');
 const alignment = join(__dirname, '../migrations/002_align_credit_contract.sql');
 const uppercaseStatus = join(__dirname, '../migrations/003_uppercase_reservation_status.sql');
-const runner = join(__dirname, '../scripts/apply-migration.cjs');
+const runner = join(__dirname, '../migrations/apply-migration.cjs');
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 test('SQL migrations implement the supplied schema', {

@@ -1,80 +1,59 @@
-// AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Implemented the human-specified user.created callback using the existing initialization service signature and user-ID validation rules.
-// Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED] I changed eventId and occurredAt fields to be optional, and made consumeUserCreated async, changed envelope to body and added a try loop for the await.
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–026 (prior scopes retained).
+import {
+  NonRetryableError,
+  userEventSchema,
+  type QueueHandler,
+  type RabbitMQClient,
+} from '@foc/messaging';
+import type { CreditService } from '../services/CreditService';
+import { InitialAllocationError } from '../services/CreditService';
+import { assertUserId } from '../services/validation';
 
-import type { Balance__Output as Balance } from '@foc/grpc/dist/generated/credit/Balance';
-import { assertUserId, ValidationError } from '../services/validation';
+type Initializer = Pick<CreditService, 'initCredits'>;
 
-export interface UserCreatedEvent {
-  type: 'user.created';
-  userId: string;
-  eventId?: string;
-  occurredAt?: string;
-}
-
-export interface UserCreatedDelivery {
-  payload: unknown;
-  eventId?: string;
-  retryCount?: number;
-}
-
-// Compatible with the shared client's QueueHandler<UserCreatedEvent> argument.
-// CreditService owns transaction completion and verification of a prior grant.
-export function createUserCreatedHandler(
-  creditService: { initCredits(input: { userId: string }): Promise<Omit<Balance, 'userId'>> },
-): (message: UserCreatedDelivery) => Promise<void> {
-  return async (message) => {
-    const { payload, eventId, retryCount } = message;
-    if (payload === null || typeof payload !== 'object'
-      || (payload as { type?: unknown }).type !== 'user.created') {
-      throw new ValidationError('Expected a user.created event');
-    }
-
-    const body = payload as { eventId?: unknown; occurredAt?: unknown };
-    if (body.eventId !== undefined && typeof body.eventId !== 'string') {
-      throw new ValidationError('user.created eventId must be a string when present');
-    }
-    if (body.occurredAt !== undefined && typeof body.occurredAt !== 'string') {
-      throw new ValidationError('user.created occurredAt must be a string when present');
-    }
-
-    const userId = (payload as { userId?: unknown }).userId;
-    assertUserId(userId);
-
-    // eventId/occurredAt are envelope fields, not grant-uniqueness identifiers.
-    // Resolve only after committed allocation or confirmed prior grant.
-    // Propagate failures unchanged so they cannot become a successful delivery.
+// One handler for the user-event queue. Add lifecycle cases as they are implemented.
+export function createUserCreatedHandler(service: Initializer): QueueHandler<unknown> {
+  return async ({ payload, eventId, retryCount }) => {
+    console.info('credit user-event received', { eventId, retryCount });
     try {
-      await creditService.initCredits({ userId });
+      const parsed = userEventSchema.safeParse(payload);
+      if (!parsed.success) {
+        throw new NonRetryableError('Invalid user event', { cause: parsed.error });
+      }
+      const event = parsed.data;
+      if (eventId && eventId !== event.eventId) {
+        throw new NonRetryableError('Delivery eventId does not match payload');
+      }
+      try {
+        assertUserId(event.userId);
+      } catch (cause) {
+        throw new NonRetryableError('Invalid userId', { cause });
+      }
+      if (event.type !== 'user.created') {
+        throw new NonRetryableError(`Credit handler not implemented for ${event.type}`);
+      }
+      // initCredits commits a single initial grant, or verifies a previous grant.
+      const balance = await service.initCredits({ userId: event.userId });
+      console.info('credit user.created processed', {
+        eventId: event.eventId, userId: event.userId, ...balance,
+      });
     } catch (error) {
-      console.error('user.created handling failed', {
-        userId,
-        eventId,
-        retryCount,
+      console.error('credit user-event failed', {
+        eventId, retryCount,
         error: error instanceof Error ? error.message : String(error),
       });
+      if (error instanceof InitialAllocationError) {
+        throw new NonRetryableError(error.message, { cause: error });
+      }
       throw error;
     }
   };
 }
 
-// Supply the connected shared RabbitMQClient and the agreed queue at integration.
-// No local queue name or replacement messaging client is selected here.
 export async function consumeUserCreated(
-  broker: {
-    consumeFromQueue<T>(
-      queue: string,
-      handler: (message: { payload: T }) => Promise<void>,
-    ): Promise<boolean>;
-  },
+  broker: Pick<RabbitMQClient, 'consumeFromQueue'>,
   queue: string,
-  creditService: Parameters<typeof createUserCreatedHandler>[0],
+  service: Initializer,
 ): Promise<boolean> {
-  if (typeof queue !== 'string' || queue.trim().length === 0) {
-    throw new ValidationError('The user.created queue must be supplied');
-  }
-  return broker.consumeFromQueue<UserCreatedEvent>(queue, createUserCreatedHandler(creditService));
+  if (!queue.trim()) throw new Error('The user-event queue must be supplied');
+  return broker.consumeFromQueue<unknown>(queue, createUserCreatedHandler(service));
 }

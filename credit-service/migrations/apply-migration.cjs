@@ -4,6 +4,9 @@
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../ai/usage-log.md, entries 005–024 (prior scopes retained).
+// Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Relocated the human-selected migration runner and updated references while making scripts/docs local-only.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 034 (repository-relative).
 
 const { readFile } = require('node:fs/promises');
 const { extname, resolve, basename } = require('node:path');

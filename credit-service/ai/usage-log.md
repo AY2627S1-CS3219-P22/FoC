@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–033 below and the linked prompt archives.
+Prompts and key responses: Entries 001–037 below and the linked prompt archives.
 Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Recorded the latest implementation request, changes and actual verification.
 New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
@@ -11,6 +11,15 @@ Entry 032: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Recorded the human-requested move to local Git exclusions; review pending.
 Entry 033: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Recorded source-based README verification and documentation corrections; review pending.
+Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded whole-folder local exclusions and the approved migration-runner relocation; review pending.
+Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
+Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
+Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded event-startup integration request, pending lifecycle/package decisions and independent configuration work; review pending.
+Entry 037: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded authorized upstream messaging import, broker authorship and actual integration checks; human review pending.
 -->
 
 # AI usage log
@@ -1575,6 +1584,154 @@ submission files; retained disclosure content is under this ai directory.
   84 Credit/51 shared results belong to exchange 031, not this documentation task.
 - **Review/sources:** Human review pending; root AGENTS.md and existing repository
   files only. No external source, skill, delegation, dependency, commit or push.
+
+## 034 — Local scripts/docs with the migration runner retained
+
+- **Date/timezone:** 2026-10-22, Asia/Singapore (UTC+08:00).
+- **Tool/model/mode:** OpenAI Codex, GPT-6; repository housekeeping, bounded
+  clarification, approved file relocation, tests and documentation.
+- **Exact prompts/key responses:** [Folder request and relocation approval](prompts/034-local-scripts-docs.md).
+- **Changes:** Human requested whole scripts/docs folders untracked and chose
+  migrations/apply-migration.cjs for the required CLI. Moved the existing runner,
+  changed db:migrate, removed Docker scripts COPY instructions, updated CLI/schema
+  test paths, service README source layout/migration instructions and its approved
+  JSON attribution. Broadened local .git/info/exclude rules to both folders and
+  removed redundant per-file rules; .gitignore untouched. Kept the local seed and
+  reference documents. No migration behavior or application-data changes.
+- **Affected paths:** credit-service/{Dockerfile,package.json,README.md};
+  migrations/apply-migration.cjs (moved from scripts); test/{migration,schema}.test.cjs;
+  local Git index/info exclusions; root README disclosure; this log/archive 034.
+  JSON attribution uses the human-approved service README/log exception.
+- **Checks:** All 10 affected CLI/schema tests passed against isolated PostgreSQL
+  schemas, with zero failures/skips. npm db:migrate resolves the moved CLI and
+  correctly rejects missing arguments. Local Docker build passed; a one-shot
+  runtime inspection confirmed the runner/pg are present and scripts absent.
+  Git reports the runner as a staged rename, no tracked files in scripts/docs,
+  and folder-wide exclusions from .git/info/exclude; local seed/docs remain.
+  Scoped whitespace and absence of active old-path references checked. No full
+  application suite rerun; Docker build compiled the Credit/shared workspaces.
+- **Review/provenance:** Human review pending. Used root AGENTS.md and existing
+  code; no external sources, skills, delegation or new dependencies. Initial
+  cached-removal action was auto-rejected for occurring before the newly approved
+  relocation; corrected the sequence and succeeded. No commits/pushes or service
+  deployment; new runner retained for version control, both target folders local-only.
+
+## 035 — Human-decided plaintext-only Credit gRPC
+
+- **Date/timezone:** 2026-10-22, Asia/Singapore (UTC+08:00).
+- **Tool/model/mode:** OpenAI Codex, GPT-6; implementation/test/config/docs updates
+  following the human's finalized transport decision.
+- **Exact prompt/key responses:** [Plaintext-only request and outcomes](prompts/035-plaintext-grpc.md).
+- **Changes:** Explicit insecure server credentials; removed TLS helper and
+  local-mode/certificate/key env schema, Compose and example entries; retained
+  service-token authentication and REST JWT verification/public-key path. Shared
+  Credit client defaults already match; no client/retry implementation changes.
+  Old TLS-gate test replaced with removed-config/obsolete-setting regressions.
+  Service/shared/root READMEs and disclosure updated; earlier prompts kept intact.
+- **Affected paths:** src/index.ts, src/env.ts, deleted src/grpc/tls.ts;
+  test/auth.test.cjs; compose.yaml; .env.example and .env.docker.example;
+  credit-service/README.md; shared/grpc/README.md; root README final summary;
+  this log and archive 035. Unrelated event-consumer edits and prior work retained.
+- **Checks:** 15 auth/REST tests pass with no failures/skips; scoped TypeScript
+  check of index and transitive imports passes. Real source startup on temporary
+  ports confirms plaintext gRPC/service-token auth, REST 401 without JWT, and
+  health SELECT 1 (200 ok/up). Old invalid transport env values are ignored.
+  Child and temporary public-key directory cleaned up; no data writes or running
+  service replacement. Compose/example auth/transport checks, local links and
+  scoped whitespace pass.
+- **Full-build limitation:** npm run build fails on the current unedited
+  events/broker.ts and events/userCreated.ts imports of unresolved @foc/messaging
+  and resulting implicit-any errors. Ongoing teammate integration was preserved.
+  Full suite and Docker rebuild not run for this change; prior 84/51 figures are
+  historical. Scoped compile/tests and actual startup provide the stated checks.
+- **Instructions/review/provenance:** Root AGENTS.md, empty service instructions
+  and existing repository implementations; no external source or copied code,
+  dependency, skill, agent, commit, push or deployment. Human owns the transport
+  decision; no rationale/trade-off analysis generated. Human review pending.
+
+## 036 — Nonfatal event consumer startup and shutdown
+
+- **Date/timezone:** 2026-10-22, Asia/Singapore (UTC+08:00).
+- **Tool/model/mode:** OpenAI Codex, GPT-6; configuration/entrypoint implementation,
+  lifecycle tests and documentation following bounded human clarification.
+- **Exact prompt/answers/key responses:** [Entrypoint request and confirmed choices](prompts/036-event-startup-wiring.md).
+- **Human choices:** Keep APIs running if consumer startup fails. Leave messaging
+  package integration pending while the human works out the details. No package,
+  branch, dependency or lockfile was merged/installed/changed.
+- **Implementation:** RABBITMQ_URL follows the existing shared/User convention;
+  host default is localhost:5672 and Docker example explicitly uses a host-reachable
+  broker URL. After API readiness, the entrypoint loads/calls the existing helper
+  in a nonfatal background attempt using the same CreditService. Package loading,
+  connection and registration failures are logged without closing APIs. There is
+  one startup attempt, no new reconnect/retry policy. Duplicate signals clean up
+  once; shutdown stops APIs, awaits pending consumer startup, closes a connected
+  broker, then ends the pool. Broker close rejection is logged without skipping
+  pool cleanup. Human-edited broker/handler files were preserved.
+- **Affected paths:** src/index.ts, src/env.ts; .env.example/.env.docker.example;
+  compose.yaml; test/startup.test.cjs; service/root README; this log/archive 036.
+  Tests were prepared temporarily before the human answers, then restored into
+  the repository after confirmed behavior was implemented.
+- **Agent checks:** All 23 affected API/lifecycle tests passed with zero failures/
+  skips (15 auth/REST plus eight entrypoint tests). Isolated child-process lifecycle
+  checks mock broker/database/transports and cover success, slow/failed consumer,
+  missing package, duplicate signals, shutdown during pending connection, broker
+  close failure and API bind failure. Real source startup on temporary ports with
+  the actual missing messaging package confirms logged consumer failure while
+  plaintext gRPC authentication, REST 401 and health 200/ok/up remain available.
+  Child/key directory cleaned up; only SELECT 1, no data writes or real broker
+  traffic. Compose/example checks, scoped whitespace and local links passed.
+- **Build/integration limitation:** Credit build was attempted and still fails
+  only in the human-edited event files on unresolved @foc/messaging and consequent
+  implicit-any errors. Package integration remains explicitly deferred. No full
+  suite, live event delivery or Docker rebuild pass is claimed for this exchange.
+- **Inspection/sources/instructions:** Root AGENTS.md and empty service instructions;
+  current helpers and local remote-tracking shared/User code only. Matching local
+  validation ref inspected: 0b48f5f85be01d148176a6410c9ca22c2b8e672e. No fetch, branch
+  merge/copy, external source, dependency, skill or agent. Human owns the clarified
+  lifecycle behavior; no rationale/trade-off analysis generated. All new changes
+  await human review; no commit/push or replacement of the running Credit service.
+
+## 037 — Import attributed messaging package and verify listener
+
+- **Date/timezone:** 2026-10-22, Asia/Singapore (UTC+08:00).
+- **Tool/model/modes:** OpenAI Codex, GPT-6; mechanical source import, integration
+  configuration, regression/integration tests, debugging and documentation.
+- **Exact prompt/key responses/PR attribution:** [Import request, source ownership
+  and actual results](prompts/037-import-messaging-listener.md).
+- **Human scope:** Supersedes the earlier package deferral. Copy shared/messaging
+  so Credit builds/listener can be tested; attribute ownership to its implementers
+  in the PR. No original broker implementation was generated or redesigned here.
+- **Source/ownership:** Existing local events/data-validation commit
+  0b48f5f85be01d148176a6410c9ca22c2b8e672e, @sunpterodactyl/shared messaging
+  contributors. Twelve files imported; 11 source/config files match byte-for-byte,
+  only README adds provenance. Original code/AI declarations preserved. Imported
+  JSON manifests/config are original upstream bytes, attributed in README/log.
+- **Changes/paths:** shared/messaging/**; root package.json/package-lock.json;
+  credit-service/package.json/Dockerfile; test/user-created.test.cjs and
+  initial-allocation.test.cjs assertions aligned with human-edited behavior;
+  new test/listener.integration.cjs; service/shared messaging/root README;
+  this log/archive 037. Workspace/build/predev/runtime dependency wiring added.
+  Existing JSON attribution exception used for generated manifest/lock changes.
+  Human's broker and userCreated helpers unchanged. No whole-branch merge or fetch.
+- **Agent checks:** Full workspace build, all 94 Credit tests and all 51 shared
+  tests passed with no failures/skips. Dedicated live listener test passed six
+  scenarios/seven results: allocation visible via JWT REST, duplicate events,
+  injected transient retry, delivery mismatch/inconsistent-account dead-lettering,
+  restart idempotency. Real compiled index, RabbitMQ and PostgreSQL used; child
+  verifies schema isolation before starting. Docker build and runtime messaging/
+  consumer module resolution passed. Source-byte equality, scoped whitespace,
+  local Markdown links and npm lock diff checked.
+- **Cleanup:** Test schemas, rows, processes, temporary public key/logs and owned
+  RabbitMQ container/anonymous volume removed. Existing Credit/Postgres containers
+  kept. No existing queues purged or application database reset. Sandbox-blocked
+  npm install was stopped by its verified PID, then permitted install succeeded
+  with lifecycle scripts disabled. amqplib 2.2.0 and Zod 4.6.7 resolve from the
+  unchanged upstream ranges; their lockfile metadata lists MIT. No broader
+  licensing validation is claimed.
+- **Review/instructions:** Root AGENTS.md and empty service instructions used.
+  Human review pending for integration/tests/docs. Original broker authors retain
+  ownership and responsibility for their declarations. No external web source,
+  skill, delegation, commit, push, remote PR edit or running-service deployment.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the

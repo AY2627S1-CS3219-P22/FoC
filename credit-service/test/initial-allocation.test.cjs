@@ -4,7 +4,9 @@
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../ai/usage-log.md, entries 005–025 (prior scopes retained).
-
+// Entry 037: OpenAI Codex (GPT-6), 2026-10-22 Asia/Singapore.
+// Scope: Updated event-level permanent-error assertions for the human-edited handler.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 037.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -118,7 +120,7 @@ test('initial grant transaction implements the human-specified event allocation 
     await t.test('an existing unconfirmed account rejects without a grant, history, or retry record', async () => {
       await client.query("INSERT INTO credit_accounts (user_id, total_credits) VALUES ('inconsistent-user', 4)");
       const before = (await client.query("SELECT * FROM credit_accounts WHERE user_id = 'inconsistent-user'")).rows[0];
-      await assert.rejects(deliver('inconsistent-user'), (error) => error.code === 'ALREADY_EXISTS');
+      await assert.rejects(deliver('inconsistent-user'), (error) => error.cause?.code === 'ALREADY_EXISTS');
       assert.deepEqual((await client.query("SELECT * FROM credit_accounts WHERE user_id = 'inconsistent-user'")).rows[0], before);
       assert.deepEqual(await counts('inconsistent-user'), { accounts: '1', history: '0', retries: '0' });
     });
@@ -128,7 +130,7 @@ test('initial grant transaction implements the human-specified event allocation 
         'INSERT INTO idempotency_records (operation_type, idempotency_key, user_id, request_hash, result) VALUES ($1, $2, $3, $4, $5)',
         ['init_credits', 'mismatch-user', 'mismatch-user', 'different-request', { totalCredits: 10, reservedCredits: 0, availableCredits: 10 }],
       );
-      await assert.rejects(deliver('mismatch-user'), (error) => error.code === 'FAILED_PRECONDITION');
+      await assert.rejects(deliver('mismatch-user'), (error) => error.cause?.code === 'FAILED_PRECONDITION');
       assert.deepEqual(await counts('mismatch-user'), { accounts: '0', history: '0', retries: '1' });
       assert.equal((await client.query("SELECT request_hash FROM idempotency_records WHERE user_id = 'mismatch-user'")).rows[0].request_hash, 'different-request');
     });
