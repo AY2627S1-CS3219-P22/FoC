@@ -233,7 +233,7 @@ export async function searchSuppliersService(text: string): Promise<PublicSuppli
   }
 
 
-export async function getNearbySuppliersService(latitude: number, longitude: number, radius: number): Promise<PublicSupplier[]> {
+export async function getNearbySuppliersService({ latitude, longitude, radius }: LocationSupplier): Promise<PublicSupplier[]> {
     const origin = sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography`;
     return db.query.supplier.findMany({
         columns: { deletedAt: false },
