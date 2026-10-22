@@ -83,7 +83,9 @@ author-approved administrator-only GET /orders listing with authorization tests.
 Verified cancellation/expiry failure recovery and applied the team's plaintext
 Order-to-Credit transport decision on order-functionality. Implemented the
 author-requested authenticated courier acceptance endpoint and concurrency tests.
-Added author-specified open/requested/assigned retrieval scopes and access/filter tests. The author
+Added author-specified open/requested/assigned retrieval scopes and access/filter tests.
+Implemented the author-approved delivery endpoint and durable Credit settlement
+recovery, with real gRPC transport and PostgreSQL integration tests. The author
 supplied the schema, contracts, retry schedule and final first-lock-wins rule.
 Human decisions and superseded requirements are recorded in the service usage log;
 no decision rationales were drafted.

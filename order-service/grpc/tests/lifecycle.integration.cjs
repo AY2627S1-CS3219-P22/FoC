@@ -18,7 +18,7 @@ after(async()=>{
  await require('../dist/db').prisma.$disconnect();
 });
 function fixture() {
- const user=prefix+'-'+(++userCounter);const ledger=new Map();let calls=0;let updates=0;let releases=0;let reserveMode;let updateMode;let releaseMode;let unavailable=false;let closed=false;let invalidSupplier=false;
+ const user=prefix+'-'+(++userCounter);const ledger=new Map();let calls=0;let updates=0;let releases=0;let settlements=0;let settleMode;let reserveMode;let updateMode;let releaseMode;let unavailable=false;let closed=false;let invalidSupplier=false;
  const err=(code)=>Object.assign(new Error('test RPC failure'),{code});
  const credit={
   getBalance:async({userId})=>({userId,totalCredits:20,reservedCredits:0,availableCredits:20}),
@@ -35,14 +35,14 @@ function fixture() {
    r.amount=amount;r.version++;if(updateMode==='after'){updateMode=undefined;throw err(4)}return {...r};
   },
   releaseCredits:async({orderId})=>{releases++;if(releaseMode==='before'){releaseMode=undefined;throw err(14)}if(releaseMode==='reject')throw err(9);const r=ledger.get(orderId);if(releaseMode==='stale')return {...r,status:'RELEASED'};if(!r)throw err(5);if(r.status==='SETTLED')throw err(9);if(r.status!=='RELEASED'){r.status='RELEASED';r.version++}if(releaseMode==='after'){releaseMode=undefined;throw err(4)}return {...r}},
-  settleCredits:async()=>{throw new Error('out of scope')},close:()=>{},
+  settleCredits:async({orderId,courierId})=>{settlements++;if(settleMode==='reject')throw err(9);if(settleMode==='before'){settleMode=undefined;throw err(14)}const r=ledger.get(orderId);if(!r)throw err(5);if(settleMode==='stale')return {...r,status:'SETTLED',courierId};if(r.status==='RELEASED')throw err(9);if(r.status==='SETTLED'&&r.courierId!==courierId)throw err(9);if(r.status!=='SETTLED'){r.status='SETTLED';r.courierId=courierId;r.version++}if(settleMode==='after'){settleMode=undefined;throw err(4)}return {...r}},close:()=>{},
  };
  const directories={getRequester:async(userId)=>({userId,username:'student',firstName:'Campus',lastName:'Friend'}),
   getSupplier:async(supplierId)=>{if(invalidSupplier)throw err(5);return {supplierId,name:'Cafe',locationDescription:'Level 1',buildingName:'NUS',floor:1}},
   isSupplierOpen:async()=>({isOpen:!closed}),close:()=>{}};
  const creation=createOrderCreation(db,credit,directories),edits=createOrderEdits(db,credit,directories),lifecycle=createOrderLifecycle(db,credit);
  const input=()=>createOrderSchema.parse({supplierId:'1',destination:'PGP',requestDetails:'Coffee',credits:4,expiryTime:new Date(Date.now()+7200000).toISOString()});
- return {user,credit,directories,creation,edits,lifecycle,input,ledger,get calls(){return calls},get updates(){return updates},get releases(){return releases},set reserveMode(v){reserveMode=v},set updateMode(v){updateMode=v},set releaseMode(v){releaseMode=v},set unavailable(v){unavailable=v},set closed(v){closed=v},set invalidSupplier(v){invalidSupplier=v}};
+ return {user,credit,directories,creation,edits,lifecycle,input,ledger,get calls(){return calls},get updates(){return updates},get releases(){return releases},get settlements(){return settlements},set settleMode(v){settleMode=v},set reserveMode(v){reserveMode=v},set updateMode(v){updateMode=v},set releaseMode(v){releaseMode=v},set unavailable(v){unavailable=v},set closed(v){closed=v},set invalidSupplier(v){invalidSupplier=v}};
 }
 async function due(orderId,type='RESERVE') {await db.creditOperation.updateMany({where:{orderId,type,state:{not:'SUCCEEDED'}},data:{state:'PENDING',nextRetryAt:new Date(0),leaseExpiresAt:null}})}
 async function editDue(orderId) {await db.orderEditOperation.updateMany({where:{orderId,state:{in:['PENDING','PROCESSING']}},data:{state:'PENDING',nextRetryAt:new Date(0),leaseExpiresAt:null}})}
@@ -337,4 +337,146 @@ test('USER retrieval scopes enforce ownership, expiry and historical visibility'
  // Once the only remaining unassigned rows expire, an empty open list is still successful.
  await db.order.updateMany({where:{status:'UNASSIGNED'},data:{expiryTime:new Date(Date.now()-1000)}});
  assert.deepEqual(await get('open'),[]);
+});
+
+// Exercise production Credit client serialization, credentials and error handling
+// alongside real Order PostgreSQL persistence; ledger handlers are test doubles.
+async function grpcCreditFixture(t, f, token='test-order-token') {
+ const grpc=require('@grpc/grpc-js'), loader=require('@grpc/proto-loader'), path=require('node:path');
+ const definition=loader.loadSync(path.resolve(__dirname,'../proto/credit.proto'),{keepCase:false,longs:String,enums:String,defaults:true,oneofs:true});
+ const service=grpc.loadPackageDefinition(definition).credit.CreditService;
+ const server=new grpc.Server(),handlers={};let calls=0;
+ for(const name of ['GetBalance','GetReservation','ReserveCredits','UpdateReservation','ReleaseCredits','SettleCredits']){
+  handlers[name]=async(call,cb)=>{
+   if(call.metadata.get('x-credit-service-token')[0]!=='test-order-token'){cb({code:grpc.status.UNAUTHENTICATED,message:'Invalid service token'});return;}
+   calls++;
+   try {cb(null,await f.credit[name[0].toLowerCase()+name.slice(1)](call.request));}
+   catch(error){cb({code:error.code??grpc.status.INTERNAL,message:'Test Credit operation failed'});}
+  };
+ }
+ server.addService(service.service,handlers);
+ const port=await new Promise((resolve,reject)=>server.bindAsync('127.0.0.1:0',grpc.ServerCredentials.createInsecure(),(error,value)=>error?reject(error):resolve(value)));
+ const client=require('../dist/dependencies/creditClient').createCreditClient('127.0.0.1:'+port,token,1000);
+ t.after(()=>{client.close();server.forceShutdown();});
+ return {client,get calls(){return calls}};
+}
+
+test('real Credit gRPC reserves creation and confirms cancellation and expiry releases',async t=>{
+ const f=fixture(),transport=await grpcCreditFixture(t,f);
+ const creation=createOrderCreation(db,transport.client,f.directories),lifecycle=createOrderLifecycle(db,transport.client);
+ const input=f.input();const created=await creation.submit(f.user,'grpc-create',input);assert.equal(created.status,201);
+ assert.equal(created.order.creditState,'RESERVED');assert.equal(f.ledger.get(created.order.id).amount,4);
+ const replay=await creation.submit(f.user,'grpc-create',input);
+ assert.equal(replay.status,200);assert.equal(replay.order.id,created.order.id);assert.equal(f.calls,1);
+ const cancelled=await lifecycle.cancel(created.order.id,f.user);assert.equal(cancelled.order.creditState,'REFUNDED');
+ assert.equal(f.ledger.get(created.order.id).status,'RELEASED');assert.equal(f.releases,1);
+ const expiring=await creation.submit(f.user,'grpc-expiry',f.input());assert.equal(expiring.status,201);
+ await db.order.update({where:{id:expiring.order.id},data:{expiryTime:new Date(0)}});
+ await lifecycle.expireBatch();await lifecycle.refundBatch();
+ const expired=await db.order.findUniqueOrThrow({where:{id:expiring.order.id}});
+ assert.equal(expired.status,'CANCELLED');assert.equal(expired.cancellationReason,'EXPIRY');assert.equal(expired.creditState,'REFUNDED');
+ assert.ok(transport.calls>0);
+});
+
+test('real Credit gRPC business rejection, uncertain outcomes and invalid token never falsely complete',async t=>{
+ const f=fixture(),transport=await grpcCreditFixture(t,f),creation=createOrderCreation(db,transport.client,f.directories);
+ f.reserveMode='reject';const rejected=await creation.submit(f.user,'grpc-rejected',f.input());assert.equal(rejected.status,409);
+ assert.equal(await db.order.count({where:{requesterId:f.user}}),0);
+ f.reserveMode='after';const pending=await creation.submit(f.user,'grpc-uncertain',f.input());assert.equal(pending.status,202);
+ assert.equal(await db.order.count({where:{id:pending.creationId}}),0);
+ await due(pending.creationId);await creation.recoverBatch();
+ const recovered=await db.order.findUniqueOrThrow({where:{id:pending.creationId}});assert.equal(recovered.creditState,'RESERVED');
+ const lifecycle=createOrderLifecycle(db,transport.client);f.releaseMode='before';
+ const cancellation=await lifecycle.cancel(recovered.id,f.user);assert.equal(cancellation.order.creditState,'REFUND_PENDING');
+ assert.equal(f.ledger.get(recovered.id).status,'RESERVED');
+ await due(recovered.id,'REFUND');await lifecycle.refundBatch();assert.equal((await db.order.findUniqueOrThrow({where:{id:recovered.id}})).creditState,'REFUNDED');
+ const denied=await grpcCreditFixture(t,f,'incorrect-token');
+ const unauthorized=await createOrderCreation(db,denied.client,f.directories).submit(f.user,'grpc-unauthorized',f.input());
+ assert.equal(unauthorized.status,202);assert.equal(denied.calls,0);
+ assert.equal(await db.order.count({where:{id:unauthorized.creationId}}),0);
+ assert.equal((await db.orderCreation.findUniqueOrThrow({where:{orderId:unauthorized.creationId}})).state,'PENDING');
+});
+
+async function pickedUp(f, key='delivery') {
+ const order=await create(f,key);
+ return db.order.update({where:{id:order.id},data:{status:'PICKED_UP',courierId:f.user+'-courier',acceptedAt:new Date(),pickedUpAt:new Date()}});
+}
+
+test('delivery over real Credit gRPC settles once to the assigned courier and replays safely',async t=>{
+ const f=fixture(),wire=await grpcCreditFixture(t,f),lifecycle=createOrderLifecycle(db,wire.client),order=await pickedUp(f);
+ const result=await lifecycle.deliver(order.id,order.courierId);assert.equal(result.order.status,'DELIVERED');assert.equal(result.order.creditState,'SETTLED');assert.ok(result.order.deliveredAt);
+ const receipt=await wire.client.getReservation({orderId:order.id});assert.equal(receipt.status,'SETTLED');assert.equal(receipt.courierId,order.courierId);assert.equal(receipt.amount,order.credits);
+ const replay=await lifecycle.deliver(order.id,order.courierId);assert.equal(replay.order.creditState,'SETTLED');assert.equal(f.settlements,1);
+ assert.equal((await db.creditOperation.findUniqueOrThrow({where:{orderId_type:{orderId:order.id,type:'SETTLE'}}})).state,'SUCCEEDED');
+ await db.order.update({where:{id:order.id},data:{expiryTime:new Date(0)}});await lifecycle.expireBatch();assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).status,'DELIVERED');
+});
+
+for(const mode of ['before','after'])test('delivery '+mode+'-commit Credit failure recovers automatically without duplicate transfer',async t=>{
+ const f=fixture(),wire=await grpcCreditFixture(t,f),order=await pickedUp(f);f.settleMode=mode;
+ const lifecycle=createOrderLifecycle(db,wire.client);const result=await lifecycle.deliver(order.id,order.courierId);
+ assert.equal(result.order.status,'DELIVERED');assert.equal(result.order.creditState,'SETTLEMENT_PENDING');
+ await due(order.id,'SETTLE');const recovered=createOrderLifecycle(db,wire.client);recovered.startWorker();t.after(()=>recovered.stopWorker());
+ const deadline=Date.now()+3000;let stored;
+ do {stored=await db.order.findUniqueOrThrow({where:{id:order.id}});if(stored.creditState==='SETTLED')break;await new Promise(r=>setTimeout(r,20));}while(Date.now()<deadline);
+ assert.equal(stored.creditState,'SETTLED');assert.equal(f.ledger.get(order.id).courierId,order.courierId);assert.equal(f.settlements,mode==='after'?1:2);
+});
+
+test('settlement rejection, stale receipts, wrong identity and exhausted retries never mark SETTLED',async()=>{
+ for(const mode of ['reject','stale','wrong-courier','wrong-amount']) {
+  const f=fixture(),order=await pickedUp(f);f.settleMode=mode==='reject'?'reject':'stale';
+  if(mode==='wrong-courier'){const receipt=f.ledger.get(order.id);receipt.status='SETTLED';receipt.courierId='different-courier';}
+  if(mode==='wrong-amount')f.ledger.get(order.id).amount++;
+  const result=await f.lifecycle.deliver(order.id,order.courierId);assert.equal(result.order.creditState,'SETTLEMENT_PENDING');
+  let work=await db.creditOperation.findUniqueOrThrow({where:{orderId_type:{orderId:order.id,type:'SETTLE'}}});
+  if(mode==='reject'){assert.equal(work.state,'PERMANENTLY_FAILED');await f.lifecycle.settlementBatch();assert.equal(f.settlements,1);}
+  else {for(let n=0;n<5;n++){await due(order.id,'SETTLE');await f.lifecycle.settlementBatch();}work=await db.creditOperation.findUniqueOrThrow({where:{id:work.id}});assert.equal(work.state,'PERMANENTLY_FAILED');assert.equal(work.attempts,6);}
+  assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).creditState,'SETTLEMENT_PENDING');
+ }
+});
+
+test('concurrent delivery requests produce one settlement intent and transfer',async()=>{
+ const f=fixture(),order=await pickedUp(f);
+ const results=await Promise.all(Array.from({length:10},()=>f.lifecycle.deliver(order.id,order.courierId)));
+ assert.ok(results.every(r=>r.order?.status==='DELIVERED'));assert.equal(f.settlements,1);
+ assert.equal(await db.creditOperation.count({where:{orderId:order.id,type:'SETTLE'}}),1);
+ assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).creditState,'SETTLED');
+});
+
+test('delivery validates caller, transition, expiry and HTTP body before settlement',async t=>{
+ const f=fixture(),order=await pickedUp(f),unassigned=await create(f,'not-picked-up');
+ assert.equal((await f.lifecycle.deliver(order.id,f.user)).status,403);
+ assert.equal((await f.lifecycle.deliver(order.id,'outsider')).status,403);
+ await db.order.update({where:{id:unassigned.id},data:{courierId:order.courierId,status:'ASSIGNED',acceptedAt:new Date()}});
+ assert.equal((await f.lifecycle.deliver(unassigned.id,order.courierId)).status,409);
+ const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});const app=createApp(publicKey.export({type:'spki',format:'pem'}),f.lifecycle);
+ const server=app.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(r=>server.close(r)));
+ const base='http://127.0.0.1:'+server.address().port+'/orders';
+ const headers=(sub,roles=['USER'])=>({'Content-Type':'application/json',Authorization:'Bearer '+jwt.sign({roles},privateKey,{algorithm:'RS256',subject:sub,expiresIn:60})});
+ const post=(id,h,body={})=>fetch(base+'/'+id+'/deliver',{method:'POST',headers:h,body:JSON.stringify(body)});
+ assert.equal((await post(order.id,{})).status,401);assert.equal((await post(order.id,headers(order.courierId,['ADMINISTRATOR']))).status,403);
+ assert.equal((await post('bad-id',headers(order.courierId))).status,400);assert.equal((await post(order.id,headers(order.courierId),{courierId:'forged'})).status,400);
+ assert.equal((await post(randomUUID(),headers(order.courierId))).status,404);
+ f.settleMode='before';let response=await post(order.id,headers(order.courierId));assert.equal(response.status,202);assert.equal((await response.json()).order.creditState,'SETTLEMENT_PENDING');
+ await due(order.id,'SETTLE');await f.lifecycle.settlementBatch();response=await post(order.id,headers(order.courierId));assert.equal(response.status,200);
+ const expired=await pickedUp(f,'delivery-expired');await db.order.update({where:{id:expired.id},data:{expiryTime:new Date(0)}});
+ assert.equal((await f.lifecycle.deliver(expired.id,expired.courierId)).status,409);assert.equal(f.settlements,2);
+});
+
+test('settlement receipt persistence failure remains pending and expired lease recovery confirms existing transfer',async()=>{
+ const f=fixture(),order=await pickedUp(f),real=f.credit.settleCredits;
+ let failSave=true;
+ const credit={...f.credit,settleCredits:async input=>{const result=await real(input);failSave=true;return result}};
+ // Fail only the post-RPC transaction, after the durable delivery intent exists.
+ const proxy=new Proxy(db,{get(target,key){
+  if(key==='$transaction')return async(callback,...args)=>{
+   if(failSave && f.settlements>0){failSave=false;throw new Error('simulated receipt write failure')}
+   return target.$transaction(callback,...args);
+  };
+  const value=target[key];return typeof value==='function'?value.bind(target):value;
+ }});
+ const lifecycle=createOrderLifecycle(proxy,credit),result=await lifecycle.deliver(order.id,order.courierId);
+ assert.equal(result.order.creditState,'SETTLEMENT_PENDING');assert.equal(f.ledger.get(order.id).status,'SETTLED');
+ const work=await db.creditOperation.findUniqueOrThrow({where:{orderId_type:{orderId:order.id,type:'SETTLE'}}});assert.equal(work.state,'PROCESSING');
+ await db.creditOperation.update({where:{id:work.id},data:{leaseExpiresAt:new Date(0)}});
+ await f.lifecycle.settlementBatch();assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).creditState,'SETTLED');assert.equal(f.settlements,1);
 });

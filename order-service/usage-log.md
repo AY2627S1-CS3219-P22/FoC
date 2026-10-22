@@ -621,3 +621,85 @@ PostgreSQL/HTTP integration tests passed (52 total). Retrieval coverage includes
 open ownership/status/expiry filters, requester/courier history, empty results,
 JWT identity, role separation and invalid/injected query fields. Used a dedicated
 order_service_test_retrieval database; normal development data was not changed.
+
+## 2026-10-22 — Credit lifecycle integration verification (in progress)
+
+Tool: ChatGPT (Codex). Mode: inspect, generate integration tests and documentation.
+Human review pending.
+
+Exact user request:
+```text
+Lets work on this now
+### Description
+Implement the agreed gRPC communication between Order Service and Credit Service to support credit operations throughout the errand lifecycle.
+
+### Tasks
+- [ ] Configure the gRPC client using the team's agreed Credit Service interface.
+- [ ] Integrate credit verification and reservation during errand creation.
+- [ ] Integrate credit transfer upon successful errand completion.
+- [ ] Integrate credit release when eligible errands are cancelled or expire.
+- [ ] Handle Credit Service errors and unavailable-service scenarios.
+- [ ] Verify that unsuccessful credit operations do not incorrectly complete the corresponding order workflow.
+- [ ] Add integration tests for credit operations.
+
+### Acceptance Criteria
+- [ ] Order Service communicates successfully with Credit Service.
+- [ ] Credits are reserved during successful errand creation.
+- [ ] Reserved credits are transferred upon successful completion.
+- [ ] Reserved credits are released for eligible cancelled or expired errands.
+- [ ] Integration failures are handled without silently reporting incorrect results.
+- [ ] Integration tests cover successful and failed operations.
+```
+
+Key response: the plaintext/token client and creation/release integration exist;
+SettleCredits is exposed by the adapter but not called by an order completion
+workflow. Asked the human for the completion route, caller, allowed source state
+and pending-settlement lifecycle; these decisions remain pending.
+
+Added test-only real gRPC transport wrapping the simulated ledger in
+`grpc/tests/lifecycle.integration.cjs` alongside real Order PostgreSQL. Tests
+exercise reservation, same-key replay, cancellation/expiry release, business
+rejection, uncertain reservation, release recovery and token rejection. These
+are contract/transport tests, not deployed Credit Service certification.
+Compared local proto with local feat/credit-implementation: identical except
+Order attribution comments. Restoring locked npm dependencies was necessary
+because the Prisma executable was missing. Verification results follow below.
+
+
+Exact user completion decision:
+```text
+POST /orders/:id/deliver
+Only the assigned courier can mark it
+PICKED_UP before delivery
+DELIVERED for now
+```
+
+Key implementation response: delivery is recorded as DELIVERED with
+SETTLEMENT_PENDING and returns 202 until matching current Credit settlement is
+confirmed, then 200. Added a durable SETTLE operation using the existing schema,
+lease and bounded retry policy; the existing worker now recovers settlements.
+Only the assigned USER courier can deliver an unexpired PICKED_UP order with a
+reserved hold. Replays do not transfer twice. Explicit business failures and
+retry exhaustion preserve unresolved financial state. Stale or mismatching
+receipts never mark settlement confirmed. No pickup endpoint was introduced.
+
+Additional affected files: grpc/src/services/orderLifecycle.ts,
+grpc/src/api/controllers/orderController.ts, grpc/src/api/routes/orderRoutes.ts,
+README.md, MANUAL_TESTING.md and root README.md. Existing source attribution
+headers apply to these AI-assisted implementation changes; human review pending.
+
+Verification: locked npm ci completed; shared/Order build passed. 13 unit tests
+and 48 PostgreSQL integration tests pass (61 total). Initial test expectations
+were corrected: an invalid service credential after durable recording returns
+202 rather than 503, with no published order. Tests exercise real plaintext gRPC
+with test-only ledger handlers; no live deployed Credit end-to-end claim.
+Settlement coverage includes before/after-commit failure, background recovery,
+concurrent delivery, same-courier replay, role/ownership/state/expiry validation,
+wrong/stale receipts, permanent failure/exhaustion and database receipt-write
+failure followed by expired-lease recovery. No dependency lockfile changes.
+
+Docker rebuild/startup succeeded with the existing alternate host ports
+(PostgreSQL 55441, HTTP 33003, gRPC 55053); both containers healthy and /health
+returned 200 with {"status":"ok","db":"up"}. Removed the disposable Credit test
+container and volume. Documentation shell snippets and git diff --check passed.
+Changes remain uncommitted on order-functionality.

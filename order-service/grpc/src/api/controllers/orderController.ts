@@ -78,3 +78,20 @@ export function acceptOrder(acceptance?: ReturnType<typeof createOrderAcceptance
     try { sendResult(res, await acceptance.accept(id.data, res.locals.user)); } catch (error) { next(error); }
   };
 }
+
+export function deliverOrder(lifecycle?: ReturnType<typeof createOrderLifecycle>): RequestHandler {
+  return async (req, res, next) => {
+    const id = z.uuid().safeParse(req.params.id);
+    if (!id.success || !z.object({}).strict().safeParse(req.body ?? {}).success) {
+      res.status(400).json({ error: 'invalid-input' }); return;
+    }
+    if (!lifecycle) { res.status(503).json({ error: 'dependency-unavailable' }); return; }
+    try {
+      const result = await lifecycle.deliver(id.data, res.locals.user.id);
+      if ('error' in result) { res.status(result.status ?? 500).json({ error: result.error }); return; }
+      res.status(result.order.creditState === 'SETTLED' ? 200 : 202).json({ order: {
+        ...result.order, supplierId: result.order.supplierId.toString(),
+      } });
+    } catch (error) { next(error); }
+  };
+}

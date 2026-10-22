@@ -7,7 +7,7 @@ import { createAuthenticate, requireUser } from '../../auth/authenticate';
 import type { createOrderCreation } from '../../services/orderCreation';
 import type { createOrderEdits } from '../../services/orderEdits';
 import type { createOrderAcceptance } from '../../services/orderAcceptance';
-import { acceptOrder, cancelOrder, createOrder, editOrder, getAllOrders } from '../controllers/orderController';
+import { deliverOrder, acceptOrder, cancelOrder, createOrder, editOrder, getAllOrders } from '../controllers/orderController';
 
 export function createOrderRouter(publicKey?: string, lifecycle?: ReturnType<typeof createOrderLifecycle>, creation?: ReturnType<typeof createOrderCreation>, edits?: ReturnType<typeof createOrderEdits>, acceptance?: ReturnType<typeof createOrderAcceptance>) {
   const router = Router();
@@ -19,5 +19,6 @@ export function createOrderRouter(publicKey?: string, lifecycle?: ReturnType<typ
   router.patch('/:id', editOrder(edits));
   router.post('/:id/accept', acceptOrder(acceptance));
   router.post('/:id/cancel', cancelOrder(lifecycle));
+  router.post('/:id/deliver', deliverOrder(lifecycle));
   return router;
 }

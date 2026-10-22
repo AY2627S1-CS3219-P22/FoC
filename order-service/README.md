@@ -62,7 +62,7 @@ and are ignored by Git.
 
 PostgreSQL row locks implement the author's confirmed first-lock-wins rule for
 Order mutations. CreditOperation and OrderEditOperation persist recovery work.
-Acceptance is implemented below; pickup/delivery remain outside this change.
+Acceptance and delivery are implemented below; pickup remains outside this change.
 
 ## Application structure
 
@@ -221,6 +221,7 @@ comes from the signed subject. ADMINISTRATOR alone does not grant permission.
 | PATCH /orders/:id | Requester edits an unassigned, unexpired order | 200, 202 pending |
 | POST /orders/:id/cancel | Requester cancels an unassigned, unexpired order; retains history | 200, 202 pending refund |
 | POST /orders/:id/accept | Another USER accepts an eligible unassigned order | 200 |
+| POST /orders/:id/deliver | Assigned USER courier delivers a PICKED_UP order | 200, 202 pending settlement |
 
 Creation and editing require a nonblank Idempotency-Key header. Creation requires
 supplierId (positive bigint decimal string), destination, requestDetails, credits
@@ -397,7 +398,7 @@ previous creation/edit/admin tests and the following cancellation/expiry checks:
 
 Live peer-service integration still requires the implemented Credit service and
 configured token; tests use separate test-only peer services. These checks did
-not add pickup/delivery or order-detail endpoints. Acceptance and scoped user
+not add pickup or order-detail endpoints. Acceptance and scoped user
 listings were implemented subsequently, as documented here.
 
 For the real User/Supplier/Credit walkthrough, see [Manual integration testing](MANUAL_TESTING.md), including current peer-service blockers and expected responses.
@@ -439,3 +440,52 @@ cancellation races, pending credit edits and HTTP JWT-derived identity.
 Retrieval verification: real PostgreSQL/HTTP tests cover scoped ownership,
 self-exclusion, overdue rows, history, empty lists, invalid query parameters and
 role separation. The full suite passes 13 unit tests and 39 integration tests.
+
+
+### Delivery and Credit settlement
+
+`POST /orders/:id/deliver` requires a USER JWT belonging to the assigned courier.
+The body must be empty or `{}`. The order must be PICKED_UP, unexpired and have
+RESERVED credits. Ownership failure returns 403, invalid state/expiry 409,
+unknown order 404, invalid UUID/body 400 and missing/invalid JWT 401. Missing
+Credit configuration returns 503. The requester cannot deliver their own order.
+
+A row-locked transaction records DELIVERED, deliveredAt, SETTLEMENT_PENDING and a
+unique durable SETTLE intent together. Delivery replay by the same courier is
+supported. The client calls `SettleCredits(orderId, courierId)` only when current
+`GetReservation` reports a matching RESERVED hold. It then reads the current
+reservation again: only matching order/requester/amount, SETTLED status and the
+correct courier can confirm SETTLED. Mutation replies alone do not confirm it.
+
+The endpoint returns `{ "order": { ... } }`: 200 when settlement is confirmed,
+202 when delivery is durably recorded but credit transfer remains pending.
+DELIVERED records with pending settlement are excluded from expiry/refund work.
+Database receipt-write failures after delivery also return 202, allowing lease
+recovery to confirm a transfer already committed by Credit.
+
+The background worker now runs settlement recovery as well as creation/edit,
+expiry and refunds. It reconciles before retrying, uses a 30-second lease, and
+shares the existing initial attempt plus five retries/backoff (5, 15, 45, 135,
+135 seconds). Explicit business rejection or exhausted retries stops automatic
+attempts and retains SETTLEMENT_PENDING with a failed operation for manual
+reconciliation; neither case reports credits as settled. No schema changes.
+
+Transport remains plaintext gRPC with `x-credit-service-token` on every call.
+The copied protobuf matches local `feat/credit-implementation` except attribution.
+Verification: 13 unit/auth/gRPC tests and 48 real Order PostgreSQL integration
+tests pass (61 total). Added real gRPC transport tests with a simulated Credit
+ledger, including successful/rejected/uncertain reservations, release recovery,
+settlement, concurrent delivery, stale/wrong receipts, bounded retries, automatic
+recovery and receipt-write failure. These tests do not certify the deployed
+Credit implementation or a complete live multi-service journey. Pickup has no
+endpoint on this branch; delivery requires a PICKED_UP order.
+
+## AI Use Summary
+
+ChatGPT (Codex), implementation/test/documentation generation, 2026-10-21–22.
+Implemented the author-provided schema and approved Order contracts, including
+plaintext Credit RPC integration, durable creation/edit/refund/settlement
+recovery and author-approved delivery. Prompts, key exchanges, affected files
+and verification are recorded in [usage-log.md](usage-log.md). Human review and
+validation remain pending. See the root README final AI Use Summary for the
+consolidated project disclosure and submission slide-deck link requirement.
