@@ -7,7 +7,8 @@
     "order-service/grpc",
     "credit-service/grpc",
     "supplier-service/grpc",
-    "shared/messaging"
+    "shared/messaging",
+    "user-service"
   ],
   "scripts": {
     "build": "npm run build --workspace @foc/grpc && npm run build --workspace @foc/order-grpc --workspace @foc/credit-grpc --workspace @foc/supplier-grpc --workspace @foc/messaging",

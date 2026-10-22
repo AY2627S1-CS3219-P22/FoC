@@ -1,78 +1,61 @@
-# Must be built with context = repo root (FoC/), not this folder.
-# compose.yaml sets: context: ..  dockerfile: user-service/Dockerfile
+# Must be built from the project root so shared/ is available.
 
-# Shared messaging is an npm workspace: use its repository lockfile.
-FROM node:20-slim AS messaging-deps
+# --- Base ---
+FROM node:22-slim AS base
+# OpenSSL is needed by Prisma's engine.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /repo
 
-COPY package*.json ./
-COPY shared/messaging/package.json ./shared/messaging/
+# npm ci needs every workspace's package.json listed in the root package.json,
+# even ones this image doesn't use.
+COPY package.json package-lock.json ./
 COPY shared/grpc/package.json ./shared/grpc/
-
-#ignore the following for now, since package.json is deleted
+COPY shared/messaging/package.json ./shared/messaging/
 COPY order-service/grpc/package.json ./order-service/grpc/
-#ignore this for now, since package.json is deleted
-COPY credit-service/grpc/package.json ./credit-service/grpc/ 
-#ignore this for now, since package.json is deleted
+COPY credit-service/grpc/package.json ./credit-service/grpc/
 COPY supplier-service/grpc/package.json ./supplier-service/grpc/
-#ignore this for now, since package.json is deleted
-
-RUN npm ci --workspace @foc/messaging --include-workspace-root=false
+COPY user-service/package.json ./user-service/
 
 # --- Build stage ---
-FROM messaging-deps AS build
+FROM base AS build
+RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci -w user-service -w @foc/messaging
 
-RUN apt-get update && apt-get install -y --no-install-recommends openssl \
-  && rm -rf /var/lib/apt/lists/*
+COPY shared/messaging ./shared/messaging
+COPY user-service ./user-service
 
 WORKDIR /repo/user-service
-COPY user-service/package.json user-service/package-lock.json ./
-COPY user-service/prisma ./prisma
-RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci
-
-COPY shared/messaging/tsconfig.json /repo/shared/messaging/
-COPY shared/messaging/src /repo/shared/messaging/src
-
-#bc workdir is changed copy from user-service folder
-COPY user-service/src ./src
-COPY user-service/tsconfig.json ./
-COPY user-service/proto ./proto
-#copies all files from user-service workdir
-# prebuild compiles messaging; build generates Prisma and compiles this service.
 RUN npm run build
 
-# Keep only the shared package's locked production dependencies.
-FROM messaging-deps AS messaging-production
-RUN npm ci --omit=dev --workspace @foc/messaging --include-workspace-root=false
+# --- Migrate stage (one-off job) ---
+# Reuses the build stage, which has the pinned Prisma CLI (a devDependency)
+# plus the schema and migrations.
+FROM build AS migrate
+USER node
+CMD ["npx", "prisma", "migrate", "deploy"]
 
 # --- Runtime stage ---
-FROM node:20-slim AS runtime
-WORKDIR /app
+FROM base AS runtime
 ENV NODE_ENV=production
+RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci --omit=dev -w user-service -w @foc/messaging
 
-RUN apt-get update && apt-get install -y --no-install-recommends openssl \
-  && rm -rf /var/lib/apt/lists/*
+# Compiled code from the build stage.
+COPY --from=build /repo/shared/messaging/dist ./shared/messaging/dist
+COPY --from=build /repo/user-service/dist ./user-service/dist
 
-#Added in for messaging package to work, since it is a workspace dependency and not installed in the user-service node_modules
-# Preserve the relative file dependency: /app -> ../shared/messaging.
-COPY --from=messaging-production /repo/node_modules /node_modules
-COPY --from=build /repo/shared/messaging/package.json /shared/messaging/
-COPY --from=build /repo/shared/messaging/dist /shared/messaging/dist
+# Prisma's generated engine/client artifacts.
+COPY --from=build /repo/node_modules/.prisma ./node_modules/.prisma
 
-COPY user-service/package*.json ./
-RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci --omit=dev
+# Prisma schema/migrations and gRPC proto files.
+COPY user-service/prisma ./user-service/prisma
+COPY user-service/proto ./user-service/proto
 
-# Copy compiled application from the build stage.
-COPY --from=build /repo/user-service/dist ./dist
+WORKDIR /repo/user-service
 
-# Copy Prisma's generated engine/client artifacts.
-COPY --from=build /repo/user-service/node_modules/.prisma ./node_modules/.prisma
-
-# Copy Prisma schema/migrations and gRPC proto files.
-COPY user-service/prisma ./prisma
-COPY user-service/proto ./proto
-
-RUN node -e "require('@foc/messaging'); require('@prisma/client')"
+# The messaging logger writes to ./logs at startup. Give the non-root user
+# that one folder; everything else stays read-only to it.
+RUN mkdir -p logs && chown node:node logs
 
 EXPOSE 3001 50051
+USER node
 CMD ["node", "dist/index.js"]
