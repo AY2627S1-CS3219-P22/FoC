@@ -703,3 +703,74 @@ Docker rebuild/startup succeeded with the existing alternate host ports
 returned 200 with {"status":"ok","db":"up"}. Removed the disposable Credit test
 container and volume. Documentation shell snippets and git diff --check passed.
 Changes remain uncommitted on order-functionality.
+
+
+## 2026-10-22 — Order editing issue verification
+
+Tool: ChatGPT (Codex). Modes: inspect, generate tests/documentation.
+Human review remains pending.
+
+Exact user request:
+```text
+Work on this issue next
+## [Order Service] Implement Order Editing with Credit Service Integration
+
+### Description
+Implement order editing functionality to allow requesters to modify their errands before they are accepted by a courier.
+
+Order Service must communicate with Credit Service via gRPC when an edit changes the number of credits offered. Credit reservations must be adjusted safely, ensuring consistency between the order details and reserved credits.
+
+### Tasks
+- [ ] Implement `PATCH /orders/:id` to allow requesters to edit their orders.
+- [ ] Restrict editing to the original requester while the order is `UNASSIGNED`.
+- [ ] Validate updated order details, including supplier, destination, request details, credits, and expiry time.
+- [ ] Integrate Credit Service's `UpdateReservation` gRPC method to adjust reserved credits when the credit amount changes.
+- [ ] Verify sufficient available credits before approving an increase in the offered credits.
+- [ ] Release excess reserved credits when the offered credit amount decreases.
+- [ ] Ensure credit adjustments are atomic and idempotent to prevent duplicate deductions or releases.
+- [ ] Prevent conflicting acceptance and editing operations using database concurrency control.
+- [ ] Persist pending credit-edit operations to support recovery after failures or crashes.
+- [ ] Handle Credit Service errors, timeouts, and unavailable-service scenarios.
+- [ ] Implement retry and reconciliation mechanisms for uncertain credit adjustment outcomes.
+- [ ] Add integration tests for successful edits, insufficient credits, concurrent requests, and Credit Service failures.
+
+### Acceptance Criteria
+- [ ] Requesters can edit their own `UNASSIGNED` orders through `PATCH /orders/:id`.
+- [ ] Orders that have already been accepted, delivered, or cancelled cannot be edited.
+- [ ] Edits that do not change credits do not trigger unnecessary credit adjustments.
+- [ ] Increasing credits successfully adjusts the existing reservation when sufficient credits are available.
+- [ ] Decreasing credits releases the excess reserved amount.
+- [ ] Failed credit adjustments do not incorrectly update the order's credit amount.
+- [ ] Concurrent editing and acceptance requests cannot produce inconsistent order or credit states.
+- [ ] Pending or uncertain credit operations can be safely recovered without duplicate adjustments.
+- [ ] Successful edits return the updated order using `{ "order": {...} }`.
+- [ ] Integration tests cover successful, failed, and concurrent editing scenarios.
+
+### Dependencies
+- Credit Service must support the agreed `UpdateReservation` gRPC contract.
+- Credit Service must provide atomic, idempotent reservation updates and sufficient information for reconciliation.
+- Order Service must support durable tracking and recovery of pending credit-edit operations.
+```
+
+Key response: existing production editing already provides the required endpoint,
+validation, row locking, durable intent and version reconciliation. Added missing
+real gRPC transport coverage rather than rewriting the working implementation.
+The test ledger now simulates insufficient available funds and pre-commit update
+unavailability; Credit remains responsible for atomic balance enforcement.
+
+Affected files: grpc/tests/lifecycle.integration.cjs, README.md,
+MANUAL_TESTING.md, this usage log and root README.md. No production code, schema,
+contracts or dependency changes. Author review remains pending.
+
+Verification: all 55 PostgreSQL integration tests passed, including added tests
+for increases consuming all available funds, insufficient credits, decreases,
+unchanged credits without mutation, same-key parallel requests, first-lock-wins
+acceptance races, unavailable preflight, terminal states, short expiry, invalid
+supplier, before/after-commit recovery and receipt-write crash recovery. Tests
+use production gRPC client plus test-only Credit handlers and a dedicated Order
+database; no deployed Credit end-to-end certification is claimed.
+
+Final verification: all 13 unit/auth/gRPC tests also passed (68 total).
+Documentation shell syntax and git diff --check passed. Removed the disposable
+edit test database container/volume; normal Docker service/data unchanged.
+Changes remain uncommitted on order-functionality.

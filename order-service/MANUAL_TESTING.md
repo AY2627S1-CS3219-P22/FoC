@@ -440,3 +440,25 @@ reconciliation after recovery (within the bounded retry window). Inspect the
 order via requested/assigned listing: creditState changes to SETTLED only after
 confirmation. After retries are exhausted it remains SETTLEMENT_PENDING for
 manual reconciliation. Do not treat DELIVERED alone as payment confirmation.
+
+## Additional edit checks
+
+Use a fresh unassigned order owned by TOKEN. Keep the exact payload and key when
+retrying a pending edit; use a new key for each distinct change.
+
+```sh
+curl -i -X PATCH "http://localhost:3003/orders/$ORDER_ID" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: manual-edit-decrease-1' -d '{"credits":2}'
+curl -i -X PATCH "http://localhost:3003/orders/$ORDER_ID" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: manual-edit-text-1' -d '{"destination":"Utown"}'
+```
+
+For a previously larger reward, decrease should return 200 with credits 2 and
+Credit reserved balance should fall by the difference; available rises by the
+same amount. The text edit changes destination without changing the hold.
+Try an amount greater than the current reservation plus available balance:
+expect 409 and unchanged order details/hold. An accepted order cannot be edited.
+For uncertain responses expect 202; the worker reconciles without double charging.
+Check the scoped requested listing to observe the persisted result.
