@@ -1,5 +1,5 @@
 {
-  "name": "Supplier-Service",
+  "name": "supplier-service",
   "version": "1.0.0",
   "description": "Supplier Service for Supplier Listings and Search",
   "main": "NA",
@@ -19,7 +19,8 @@
   "type": "module",
   "license": "MIT",
   "dependencies": {
-    "@foc/grpc": "link:../shared/grpc",
+    "@foc/grpc": "file:../shared/grpc",
+    "@foc/messaging": "file:../shared/messaging",
     "@grpc/grpc-js": "^1.14.5",
     "@supabase/supabase-js": "^2.117.1",
     "drizzle-orm": "^0.45.3",
