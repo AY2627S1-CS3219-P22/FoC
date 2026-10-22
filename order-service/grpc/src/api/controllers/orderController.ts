@@ -2,6 +2,7 @@
 // Scope: Implemented author-approved order commands and administrator listing.
 // Author review: Pending; see ../../../../usage-log.md.
 import type { RequestHandler } from 'express';
+import type { createOrderAcceptance } from '../../services/orderAcceptance';
 import type { createOrderLifecycle } from '../../services/orderLifecycle';
 import { z } from 'zod';
 import { listAllOrders } from '../../services/orderQueries';
@@ -60,3 +61,14 @@ export const getAllOrders: RequestHandler = async (_req, res, next) => {
     res.json({ orders: orders.map(order => ({ ...order, supplierId: order.supplierId.toString() })) });
   } catch (error) { next(error); }
 };
+
+export function acceptOrder(acceptance?: ReturnType<typeof createOrderAcceptance>): RequestHandler {
+  return async (req, res, next) => {
+    const id = z.uuid().safeParse(req.params.id);
+    if (!id.success || !z.object({}).strict().safeParse(req.body ?? {}).success) {
+      res.status(400).json({ error: 'invalid-input' }); return;
+    }
+    if (!acceptance) { res.status(503).json({ error: 'dependency-unavailable' }); return; }
+    try { sendResult(res, await acceptance.accept(id.data, res.locals.user)); } catch (error) { next(error); }
+  };
+}
