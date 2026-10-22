@@ -2006,6 +2006,25 @@ submission files; retained disclosure content is under this ai directory.
   push. Latest documentation awaits human review. Upstream broker authorship
   remains credited; detailed sources and prior review history stay in the log.
 
+## 045 — Migration runner for the credit-migrate job
+
+- **Timestamp:** 2026-10-23 SGT (UTC+08:00), Asia/Singapore.
+- **Tool/model/modes:** Claude Code, Claude Opus 5.5; bounded requirements
+  clarification and implementation of the human-specified design.
+- **Exact prompt/key responses:** [Migration runner prompts and outcomes](prompts/045-migration-runner.md).
+- **Human-defined design:** Apply all migration scripts in order; track each in a
+  database table (file name, time applied, success); prevent concurrent runs with
+  a PostgreSQL lock; per-file transactions so no partial migration is applied;
+  stop on the first failure; one row per file holding the latest attempt. An
+  earlier AI-designed runner was deleted at the human's request before this
+  specification was given. No trade-off analysis or rationale generated.
+- **Affected paths:** credit-service/migrations/run-migrations.cjs (new); this log
+  and archive 045. apply-migration.cjs and the SQL migrations are unchanged.
+- **Actual checks:** None run by the AI. A throwaway PostgreSQL test procedure was
+  given to the human.
+- **Review/provenance:** Root AGENTS.md read; no external source, dependency,
+  skill, agent, commit or push. [HUMAN-REVIEWED]
+
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the
 human provides them.

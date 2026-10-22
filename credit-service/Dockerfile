@@ -10,9 +10,6 @@
 # Entry 037: OpenAI Codex (GPT-6), 2026-10-22 Asia/Singapore.
 # Scope: Added the human-selected messaging workspace to image build/runtime; review pending.
 # Prompts/key responses: ai/usage-log.md, entry 037.
-# Claude Code (Claude Opus 5.5), 2026-10-22 (Asia/Singapore).
-# Scope: Aligned with the team container pattern (node:22-slim, one npm ci per stage,
-# production deps only, non-root user) and fixed the workspace manifest list.
 
 # Must be built from the project root so shared/ is available.
 
