@@ -1,7 +1,0 @@
-node_modules
-.env
-coverage
-dist
-supabase/.temp
-keys
-tests
