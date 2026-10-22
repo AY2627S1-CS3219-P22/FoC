@@ -1,38 +1,50 @@
 //message producer
 
-export interface OpeningHoursDay {
-  dayOfWeek: number;
-  opensAt: string | null;
-  closesAt: string | null;
-  isClosed: boolean;
-}
+import { z } from 'zod';
 
-interface SupplierEventBase {
-  eventId: string;
-  occurredAt: string;
+export const openingHoursDaySchema = z.object({
+  dayOfWeek: z.number(),
+  opensAt: z.string().nullable(),
+  closesAt: z.string().nullable(),
+  isClosed: z.boolean(),
+});
+export type OpeningHoursDay = z.infer<typeof openingHoursDaySchema>;
+
+const supplierEventBaseSchema = z.object({
+  eventId: z.string(),
+  occurredAt: z.string(),
   /** Decimal string; matches the gRPC uint64 wire format. */
-  supplierId: string;
-}
+  supplierId: z.string(),
+});
 
-export interface SupplierUpdated extends SupplierEventBase {
-  type: 'supplier.updated';
-  name: string;
-  supplierType: string;
-  buildingName: string;
-  locationDescription: string;
-  floor: number;
-  latitude: string;
-  longitude: string;
-  imageUrl?: string;
-}
+export const supplierUpdatedSchema = supplierEventBaseSchema.extend({
+  type: z.literal('supplier.updated'),
+  name: z.string(),
+  supplierType: z.string(),
+  buildingName: z.string(),
+  locationDescription: z.string(),
+  floor: z.number(),
+  latitude: z.string(),
+  longitude: z.string(),
+  imageUrl: z.string().optional(),
+});
 
-export interface SupplierStatusChanged extends SupplierEventBase {
-  type: 'supplier.status_changed';
-  openingHours: OpeningHoursDay[];
-}
+export const supplierStatusChangedSchema = supplierEventBaseSchema.extend({
+  type: z.literal('supplier.status_changed'),
+  openingHours: z.array(openingHoursDaySchema),
+});
 
-export interface SupplierDeleted extends SupplierEventBase {
-  type: 'supplier.deleted';
-}
+export const supplierDeletedSchema = supplierEventBaseSchema.extend({
+  type: z.literal('supplier.deleted'),
+});
 
-export type SupplierEvent = SupplierUpdated | SupplierStatusChanged | SupplierDeleted;
+export const supplierEventSchema = z.discriminatedUnion('type', [
+  supplierUpdatedSchema,
+  supplierStatusChangedSchema,
+  supplierDeletedSchema,
+]);
+
+export type SupplierUpdated = z.infer<typeof supplierUpdatedSchema>;
+export type SupplierStatusChanged = z.infer<typeof supplierStatusChangedSchema>;
+export type SupplierDeleted = z.infer<typeof supplierDeletedSchema>;
+export type SupplierEvent = z.infer<typeof supplierEventSchema>;

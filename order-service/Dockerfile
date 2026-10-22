@@ -1,5 +1,6 @@
 # AI Assistance Disclosure: ChatGPT (Codex), 2026-10-21.
-# Scope: Generated Order Docker build; team review pending; see usage-log.md.
+# Scope: Generated Order Docker build; updated Credit manifest path for merge on 2026-10-22.
+# Author review: Pending; see usage-log.md.
 FROM node:22-slim AS build
 WORKDIR /repo
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
@@ -7,7 +8,7 @@ COPY package.json package-lock.json ./
 COPY shared/grpc/package.json shared/grpc/package.json
 COPY shared/messaging/package.json shared/messaging/package.json
 COPY order-service/grpc/package.json order-service/grpc/package.json
-COPY credit-service/grpc/package.json credit-service/grpc/package.json
+COPY credit-service/package.json credit-service/package.json
 COPY supplier-service/grpc/package.json supplier-service/grpc/package.json
 RUN npm ci
 COPY shared/grpc shared/grpc

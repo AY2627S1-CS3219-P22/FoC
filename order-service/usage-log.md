@@ -774,3 +774,41 @@ Final verification: all 13 unit/auth/gRPC tests also passed (68 total).
 Documentation shell syntax and git diff --check passed. Removed the disposable
 edit test database container/volume; normal Docker service/data unchanged.
 Changes remain uncommitted on order-functionality.
+
+
+## 2026-10-22 21:42 +08 — d3-demo Credit/Order merge resolution
+
+Tool: ChatGPT (Codex). Modes: merge debugging, configuration and documentation.
+Exact user prompt: "Resolve merge conflict"
+
+Key response: two unmerged paths, README.md and package-lock.json. Existing
+partial lockfile edits were invalid JSON. Preserved that file at
+/tmp/d3-demo-package-lock-before-resolution.json, seeded the valid Order-side
+lock and regenerated against actual merged manifests. npm initially retained
+stale moved-workspace metadata; refreshed local workspace entries from their
+manifests and removed obsolete ghost paths before regeneration. No dependency
+manifest versions or service interfaces were changed. Credit remains at the
+human-approved credit-service root; Order stays at order-service/grpc.
+
+Combined both services' disclosure text under a single final AI Use Summary
+section. Updated Order Docker COPY from credit-service/grpc/package.json to
+credit-service/package.json, preserving the incoming relocation. Updated the
+Credit README JSON attribution table using the human-approved exception.
+
+Affected paths: README.md, package-lock.json, order-service/Dockerfile,
+credit-service/README.md, credit-service/ai/usage-log.md and this Order log.
+Human review pending. Incoming staged service changes were preserved; no
+commit, push, User/Supplier implementation changes or UI merge was performed.
+
+Checks: clean npm ci passed; shared gRPC, shared messaging, Order and Credit
+builds passed. Order tests: 13 passed. Shared gRPC tests: 51 passed. Credit
+tests: 36 passed, 10 database-dependent checks skipped because no test database
+was selected. These checks do not certify a full live multi-service demo.
+
+Docker verification: Order's build stage succeeded using the regenerated lock
+and relocated Credit manifest; no running service was replaced. Workspace
+metadata/link checks passed. Resolution paths pass whitespace checks; the full
+incoming staged diff has pre-existing whitespace in Credit prompt archives and
+shared messaging/source files, which were preserved rather than rewriting
+verbatim prompts or unrelated teammate source. Conflicts are staged as resolved;
+merge commit remains for the human to create.

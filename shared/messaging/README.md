@@ -1,3 +1,15 @@
+## Upstream attribution for the Credit PR
+
+This package was copied from `origin/events/data-validation` at commit
+`0b48f5f85be01d148176a6410c9ca22c2b8e672e`, authored by **@sunpterodactyl and the
+shared messaging contributors**. The broker implementation and contracts belong
+to those authors; this Credit PR does not claim their authorship. Their source
+and existing AI declarations are preserved. This README adds provenance; package
+source/configuration files are copied unchanged. Credit-specific work consists of
+consumer integration, workspace/build wiring and listener tests.
+
+The upstream README follows.
+
 ## RabbitMQ Broker
 
 Shared `@foc/messaging` workspace. One `RabbitMQClient` plus typed contracts; each microservice only plugs in its own producer/consumer.
