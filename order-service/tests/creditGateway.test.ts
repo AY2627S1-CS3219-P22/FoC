@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Updated plaintext container/production regression; existing token/RPC tests retained.
+// Author review: Pending; see ../usage-log.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { configuredCreditGateway } from '../src/dependencies/configuredCreditGateway';
@@ -61,10 +64,22 @@ test('malformed receipts and wrong-user balance responses cannot confirm financi
   assert.deepEqual(await s.gateway.getBalance('user'), { kind: 'confirmed', value: { availableCredits: 0 } });
 });
 
-test('configured connection refuses incomplete credentials and insecure remote targets', async () => {
+test('configured connection requires a token and accepts plaintext container targets', async () => {
   assert.equal(configuredCreditGateway({ CREDIT_RPC_TIMEOUT_MS: 3000 }), undefined);
   assert.throws(() => configuredCreditGateway({ CREDIT_GRPC_ADDR: '127.0.0.1:50054', CREDIT_RPC_TIMEOUT_MS: 3000 }), /credential/);
-  assert.throws(() => configuredCreditGateway({ CREDIT_GRPC_ADDR: 'credit-service:50054', CREDIT_ORDER_SERVICE_TOKEN: 'test-only', CREDIT_RPC_TIMEOUT_MS: 3000 }), /TLS/);
+  const previousEnvironment = process.env.NODE_ENV;
+  try {
+    for (const environment of ['development', 'production']) {
+      process.env.NODE_ENV = environment;
+      const connection = configuredCreditGateway({ CREDIT_GRPC_ADDR: 'credit-service:50054',
+        CREDIT_ORDER_SERVICE_TOKEN: 'test-only', CREDIT_RPC_TIMEOUT_MS: 3000 });
+      assert.ok(connection);
+      connection.close();
+    }
+  } finally {
+    if (previousEnvironment === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnvironment;
+  }
 });
 
 test('configured adapter sends service metadata and decodes current receipts over real gRPC', async () => {

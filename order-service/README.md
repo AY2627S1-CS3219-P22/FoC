@@ -1,3 +1,6 @@
+<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+Scope: Updated Credit plaintext setup documentation. Author review pending; see usage-log.md. -->
+
 # Order Service - Friend on Campus
 
 Phase 2 implements core creation, acceptance, pickup, delivery, cancellation,
@@ -357,17 +360,16 @@ including current reservation lookup and automatic retries. Credit now lives at
 `credit-service/` (not `credit-service/grpc/`). Shared protobufs are the wire
 authority; regenerate their types after contract changes.
 
-To opt in when running REST locally, set `CREDIT_GRPC_ADDR=127.0.0.1:50054`,
-`CREDIT_ORDER_SERVICE_TOKEN` to the Order credential. Only set `CREDIT_GRPC_CA_PATH`
-when Credit runs with TLS, using the trusted CA/certificate supplied by its operator.
-Leave it unset for local loopback plaintext testing. `CREDIT_RPC_TIMEOUT_MS` defaults
-to 3000 and bounds the whole RPC, including retries performed by the shared client.
-Credentials are sent as `x-credit-service-token` on every call. Production and
-non-loopback connections require TLS. In containers use the Credit service DNS
-name with a matching certificate SAN, mount the CA read-only, and inject these
-settings into the Order container; the default Compose stack does not enable it.
-No configuration means Credit-dependent writes remain gated. Invalid configured
-credentials/TLS settings fail startup rather than silently disabling integration.
+To opt in when running REST locally, set `CREDIT_GRPC_ADDR=127.0.0.1:50054`
+and `CREDIT_ORDER_SERVICE_TOKEN` to the Order credential. Order connects to Credit
+using plaintext gRPC for both localhost and container/service DNS addresses.
+`CREDIT_RPC_TIMEOUT_MS` defaults to 3000 and bounds the whole RPC, including retries
+performed by the shared client. The credential is sent as `x-credit-service-token`
+on every call. In containers, set `CREDIT_GRPC_ADDR=credit-service:50054` (or the
+actual Credit service DNS name) and inject the matching service token; the default
+Compose stack does not enable Credit integration. No configuration means
+Credit-dependent writes remain gated. A configured address without a service
+token fails startup rather than silently disabling integration.
 
 `createCreditGateway` maps refund to release (no extra balance grant), keeps our
 operation UUID local, and relies on Credit's `(RPC operation, orderId)` retry identity.
@@ -430,8 +432,8 @@ and x-credit-service-token credential match this branch.
 The new Credit implementation initializes accounts through user.created, not
 InitCredits RPC. Order does not create accounts. Until the User/broker integration
 is connected, creation requires a separately initialized Credit account. Missing
-accounts stay unavailable/recoverable. Local plaintext requires CREDIT_LOCAL_MODE=true
-on that Credit server; production/non-loopback Order connections still require a CA.
+accounts stay unavailable/recoverable. Order-to-Credit gRPC is plaintext in all
+environments and continues to require the Order service token.
 The default Order Compose stack does not configure a Credit connection.
 
 To test against this unmerged branch without switching branches or merging:

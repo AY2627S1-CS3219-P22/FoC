@@ -1,3 +1,7 @@
+<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+Scope: Added disclosure for plaintext Credit transport update; author review pending.
+See order-service/usage-log.md. -->
+
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
 
 ## Friend on Campus (FoC)
@@ -64,3 +68,11 @@ internal port; host processes should use `localhost` and the published host
 port. Reserved REST ports prevent future collisions when APIs are added.
 
 ---
+
+## AI Use Summary
+
+Tool: ChatGPT (Codex), 2026-10-22. Modes: implementation/refactoring, tests and documentation.
+Applied the team's explicit decision to use plaintext Order-to-Credit gRPC while
+retaining service-token authentication on feature/order-create. Human review is
+pending. Exact prompt, scope and verification: [Order usage log](order-service/usage-log.md).
+This entry covers this change; other team AI use must also be disclosed.

@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Changed Order-to-Credit transport to plaintext; service token unchanged.
+// Author review: Pending; see ../../usage-log.md.
 import { credentials, Metadata } from '@grpc/grpc-js';
 import { createCreditClient } from '@foc/grpc';
 import { createCreditGateway } from './creditGateway';
@@ -6,20 +8,14 @@ import { createCreditGateway } from './creditGateway';
 export interface CreditConfiguration {
   CREDIT_GRPC_ADDR?: string;
   CREDIT_ORDER_SERVICE_TOKEN?: string;
-  CREDIT_GRPC_CA_PATH?: string;
   CREDIT_RPC_TIMEOUT_MS: number;
 }
 export function configuredCreditGateway(config: CreditConfiguration) {
   if (!config.CREDIT_GRPC_ADDR) return undefined;
   if (!config.CREDIT_ORDER_SERVICE_TOKEN) throw new Error('Credit service credential is required');
-  const loopback = /^(127\.0\.0\.1|localhost|\[::1\]):[0-9]+$/.test(config.CREDIT_GRPC_ADDR);
-  if (!config.CREDIT_GRPC_CA_PATH && (!loopback || process.env.NODE_ENV === 'production'))
-    throw new Error('Credit TLS CA is required outside loopback development');
   const clientConfig = {
     timeoutMs: config.CREDIT_RPC_TIMEOUT_MS,
-    credentials: config.CREDIT_GRPC_CA_PATH
-      ? credentials.createSsl(readFileSync(config.CREDIT_GRPC_CA_PATH))
-      : credentials.createInsecure(),
+    credentials: credentials.createInsecure(),
   };
   const client = createCreditClient(config.CREDIT_GRPC_ADDR, clientConfig);
   return {
