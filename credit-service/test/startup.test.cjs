@@ -4,6 +4,9 @@
 // Author review: Pending human review.
 // Prompts/key responses: ../ai/usage-log.md, entry 036.
 // AI-generated; human review pending.
+// Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -23,6 +26,7 @@ async function lifecycle(options = {}) {
     const options = ${JSON.stringify(options)};
     const events = [], signals = {};
     let consumerReady;
+    let readListener;
     class Pool {
       on() {}
       async query() { return {}; }
@@ -56,7 +60,7 @@ async function lifecycle(options = {}) {
       } },
       './grpc/server': { createGrpcServer() { return { forceShutdown() { events.push('grpc.forceShutdown'); } }; } },
       './services/CreditService': { CreditService },
-      './rest/server': { createRestServer() { return rest; } },
+      './rest/server': { createRestServer(_service, _key, _ping, listenerStarted) { readListener = listenerStarted; return rest; } },
       './events/broker': { async startUserEventConsumer(service, url) {
         assert.ok(service instanceof CreditService); assert.equal(url, 'amqp://demo-broker:5672');
         events.push('consumer.start');
@@ -81,6 +85,7 @@ async function lifecycle(options = {}) {
       require(entry);
       await new Promise(setImmediate);
       const beforeReady = [...events];
+      const listenerBeforeReady = readListener();
       if (options.shutdownDuringConnect) {
         signals.SIGTERM();
         await new Promise(setImmediate);
@@ -89,12 +94,13 @@ async function lifecycle(options = {}) {
       if (consumerReady) consumerReady();
       await new Promise(setImmediate);
       const beforeShutdown = [...events];
+      const listenerBeforeShutdown = readListener();
       if (signals.SIGTERM) {
         signals.SIGTERM();
         if (signals.SIGINT) signals.SIGINT();
         await new Promise(setImmediate);
       }
-      process.stdout.write(JSON.stringify({ events, beforeReady, beforeShutdown, duringConnectShutdown }));
+      process.stdout.write(JSON.stringify({ events, beforeReady, beforeShutdown, duringConnectShutdown, listenerBeforeReady, listenerBeforeShutdown, listenerAfterShutdown: readListener() }));
     })().catch(error => { process.stderr.write(error.stack); process.exitCode = 1; });
   `;
   const { stdout } = await execute(process.execPath, ['-r', 'tsx/cjs', '-e', source]);
@@ -102,7 +108,9 @@ async function lifecycle(options = {}) {
 }
 
 test('consumer starts once with CreditService and configured URL; shutdown closes it before ending the pool', async () => {
-  const { events, beforeShutdown } = await lifecycle();
+  const { events, beforeShutdown, listenerBeforeShutdown, listenerAfterShutdown } = await lifecycle();
+  assert.equal(listenerBeforeShutdown, true);
+  assert.equal(listenerAfterShutdown, false);
   assert.ok(beforeShutdown.includes('consumer.start'));
   assert.ok(beforeShutdown.indexOf('rest.start') < beforeShutdown.indexOf('consumer.start'));
   assert.ok(beforeShutdown.indexOf('grpc.start') < beforeShutdown.indexOf('consumer.start'));
@@ -115,7 +123,9 @@ test('consumer starts once with CreditService and configured URL; shutdown close
 
 
 test('slow consumer connection does not delay either API or signal registration', async () => {
-  const { beforeReady, events } = await lifecycle({ delayedConsumer: true });
+  const { beforeReady, events, listenerBeforeReady, listenerBeforeShutdown } = await lifecycle({ delayedConsumer: true });
+  assert.equal(listenerBeforeReady, false);
+  assert.equal(listenerBeforeShutdown, true);
   assert.ok(beforeReady.includes('grpc.start'));
   assert.ok(beforeReady.includes('rest.start'));
   assert.ok(beforeReady.includes('consumer.start'));
@@ -124,7 +134,8 @@ test('slow consumer connection does not delay either API or signal registration'
 
 for (const options of [{ consumerFailure: true }, { moduleMissing: true }]) {
   test('consumer failure is logged and leaves API lifecycle running: ' + JSON.stringify(options), async () => {
-    const { beforeShutdown, events } = await lifecycle(options);
+    const { beforeShutdown, events, listenerBeforeShutdown } = await lifecycle(options);
+    assert.equal(listenerBeforeShutdown, false);
     assert.ok(beforeShutdown.includes('grpc.start'));
     assert.ok(beforeShutdown.includes('rest.start'));
     assert.ok(beforeShutdown.includes('logged.error'));
@@ -138,7 +149,8 @@ for (const options of [{ consumerFailure: true }, { moduleMissing: true }]) {
 }
 
 test('shutdown during consumer startup closes a late connection before ending the pool', async () => {
-  const { events, duringConnectShutdown } = await lifecycle({ delayedConsumer: true, shutdownDuringConnect: true });
+  const { events, duringConnectShutdown, listenerAfterShutdown } = await lifecycle({ delayedConsumer: true, shutdownDuringConnect: true });
+  assert.equal(listenerAfterShutdown, false);
   assert.ok(duringConnectShutdown.includes('grpc.stop'));
   assert.ok(duringConnectShutdown.includes('rest.close'));
   assert.equal(duringConnectShutdown.includes('pool.end'), false);

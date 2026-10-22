@@ -8,6 +8,9 @@
 // Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 // Added public database health and omitted internal history sequence IDs from REST entries.
 // New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
+// Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
 
 import { createServer, type ServerResponse } from 'node:http';
 import { status } from '@grpc/grpc-js';
@@ -27,14 +30,22 @@ function optionalQuery(query: URLSearchParams, name: string): string | undefined
   return values[0];
 }
 
-export function createRestServer(service: CreditService, publicKeyPem: string, pingDatabase: () => Promise<boolean>) {
+export function createRestServer(
+  service: CreditService,
+  publicKeyPem: string,
+  pingDatabase: () => Promise<boolean>,
+  listenerStarted: () => boolean,
+) {
   const identify = userTokenVerifier(publicKeyPem);
   return createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? '/', 'http://credit-service');
       if (request.method === 'GET' && url.pathname === '/health') {
         const dbUp = await pingDatabase();
-        json(response, dbUp ? 200 : 503, { status: dbUp ? 'ok' : 'degraded', db: dbUp ? 'up' : 'down' });
+        json(response, dbUp ? 200 : 503, {
+          status: dbUp ? 'ok' : 'degraded', db: dbUp ? 'up' : 'down',
+          listener: listenerStarted() ? 'up' : 'down',
+        });
         return;
       }
       if (request.method !== 'GET' || !['/credits/me/balance', '/credits/me/history'].includes(url.pathname)) {

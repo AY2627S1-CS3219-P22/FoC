@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Added and updated the final AI Use Summary section; existing project content was not generated in these exchanges.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: credit-service/ai/usage-log.md, entries 001–037.
+Prompts and key responses: credit-service/ai/usage-log.md, entries 001–038.
 Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Updated the consolidated disclosure for constraints, health, history replies and internal reference removal.
 New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
@@ -20,6 +20,8 @@ Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Recorded RabbitMQ configuration and confirmed nonfatal entrypoint lifecycle wiring; human review pending.
 Entry 037: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Recorded imported broker authorship, integration and real listener verification; human review pending.
+Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded startup-only listener health with database-based HTTP status; human review pending.
 -->
 
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
@@ -126,7 +128,8 @@ Earlier or other team usage has not yet been supplied for this summary.
   prioritization, backlog/sprint planning, architecture/design decisions, decision
   rationales, trade-off analyses, or risk justifications were generated.
 - **Prompts and key exchanges:** [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md)
-  links exact prompts and key outputs for entries 001–037. Exchange 037 imports
+  links exact prompts and key outputs for entries 001–038. Exchange 038 adds
+  startup-only listener health while retaining database-based HTTP/overall status. Exchange 037 imports
   @sunpterodactyl/shared messaging contributors' package from events/data-validation
   at 0b48f5f, preserves source/AI declarations and validates the real listener.
   Exchange 036 adds
@@ -152,7 +155,9 @@ Earlier or other team usage has not yet been supplied for this summary.
   for comment-free package.json/package-lock.json changes.
 - **Verification and review:** Latest full workspace build, 94 Credit checks
   against PostgreSQL/local listeners and 51 shared gRPC/retry checks passed with
-  zero failures/skips. The Credit Docker build/runtime package check also passed.
+  zero failures/skips. Latest health checks cover all database/listener states,
+  actual successful/failed consumer startup and shutdown races. The prior Credit
+  Docker build/runtime package check also passed.
   Six live listener scenarios passed with real RabbitMQ/PostgreSQL and actual
   Credit startup: initial grant, duplicates, retry, two dead-letter cases and
   restart. The earlier missing-package build block is resolved. Temporary broker,

@@ -5,6 +5,9 @@
 // Author review: Pending human review.
 // Prompts/key responses: ../ai/usage-log.md, entry 037.
 // AI-generated; human review pending.
+// Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -129,6 +132,9 @@ test('real listener initializes once and handles retries, dead letters and resta
     assert.equal(before.messageCount, 0, 'Use an empty dedicated test broker');
     assert.equal(before.consumerCount, 0, 'Use a dedicated test broker without existing Credit consumers');
     await start();
+    const health = await fetch('http://127.0.0.1:' + httpPort + '/health');
+    assert.equal(health.status, 200);
+    assert.deepEqual(await health.json(), { status: 'ok', db: 'up', listener: 'up' });
     const userId = randomUUID();
     let firstEvent;
     await t.test('registration delivery creates one 10-credit account visible through authenticated REST', async () => {

@@ -7,6 +7,9 @@
 // Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 // Verified REST pagination against database ordering without exposing sequence IDs.
 // New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
+// Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -158,7 +161,7 @@ test('history migration and sequence paging use the human-defined labels and acc
       )).rows;
       assert.ok(expected.every((row) => BigInt(row.sequence_id) > 9007199254740992n));
       const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-      const server = createRestServer(service, publicKey.export({ type: 'spki', format: 'pem' }), async () => true);
+      const server = createRestServer(service, publicKey.export({ type: 'spki', format: 'pem' }), async () => true, () => false);
       await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
       const origin = 'http://127.0.0.1:' + server.address().port;
       const headers = { authorization: 'Bearer ' + jwt.sign({ sub: userId }, privateKey, { algorithm: 'RS256', expiresIn: 60 }) };

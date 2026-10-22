@@ -23,6 +23,9 @@ Changes await human review; see ai/usage-log.md, entry 036.
 Entry 037: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Integrated the human-authorized upstream messaging package, documented its ownership and actual listener verification.
 Changes await human review; prompts/key responses: ai/usage-log.md, entry 037.
+Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
+Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
 -->
 
 # Credit service
@@ -203,10 +206,19 @@ maxDelayMs. Other service client behavior is unchanged.
 
 ## Health
 
-Public GET `/health` on the REST listener (default port 3004) runs `SELECT 1` against PostgreSQL. It returns
-200 with `{ "status": "ok", "db": "up" }`, or 503 with
-`{ "status": "degraded", "db": "down" }`, matching User and Order Service.
-It requires no user or service token. For a local check:
+Public GET `/health` on the REST listener (default port 3004) runs `SELECT 1`
+against PostgreSQL and reports the user-event listener's startup result:
+
+```json
+{ "status": "ok", "db": "up", "listener": "up" }
+```
+
+HTTP status and overall status remain database-based: DB up returns HTTP 200/status
+ok even if listener is down; DB down returns HTTP 503/status degraded regardless
+of listener state. Listener is down while starting, after startup failure or during
+explicit shutdown, and up after consumer startup succeeds. This flag does not
+detect a later disconnect or consumer cancellation. No shared broker source was
+changed for this field. It requires no user or service token. For a local check:
 
 ```sh
 curl -i http://localhost:3004/health

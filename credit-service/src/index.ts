@@ -13,6 +13,9 @@
 // Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 // Scope: Wired nonfatal user-event consumer startup and broker cleanup using the human's helpers.
 // Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 036.
+// Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
 
 import { startServer, stopServer } from '@foc/grpc';
 import { readFile } from 'node:fs/promises';
@@ -29,6 +32,7 @@ async function main(): Promise<void> {
   pool.on('error', () => console.error('Credit database idle connection error'));
   const service = new CreditService(pool);
   const server = createGrpcServer(service, { 'order-service': env.CREDIT_ORDER_SERVICE_TOKEN });
+  let listenerStarted = false;
   const rest = createRestServer(service, publicKeyPem, async () => {
     try {
       await pool.query('SELECT 1');
@@ -36,7 +40,7 @@ async function main(): Promise<void> {
     } catch {
       return false;
     }
-  });
+  }, () => listenerStarted);
   let port: number;
   try {
     port = await startServer(server, env.GRPC_PORT, env.GRPC_HOST, ServerCredentials.createInsecure());
@@ -58,6 +62,7 @@ async function main(): Promise<void> {
   const shutdown = async (): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
+    listenerStarted = false;
     const results = await Promise.allSettled([
       stopServer(server),
       new Promise<void>((resolve) => { rest.close(() => resolve()); }),
@@ -80,6 +85,7 @@ async function main(): Promise<void> {
       // Package loading is part of the nonfatal consumer startup attempt.
       const { startUserEventConsumer } = require('./events/broker') as typeof import('./events/broker');
       broker = await startUserEventConsumer(service, env.RABBITMQ_URL);
+      listenerStarted = !shuttingDown;
     } catch (error) {
       console.error('Credit user-event consumer unavailable; APIs remain running', error);
     }

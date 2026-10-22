@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–037 below and the linked prompt archives.
+Prompts and key responses: Entries 001–038 below and the linked prompt archives.
 Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Recorded the latest implementation request, changes and actual verification.
 New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
@@ -20,6 +20,8 @@ Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Recorded event-startup integration request, pending lifecycle/package decisions and independent configuration work; review pending.
 Entry 037: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Recorded authorized upstream messaging import, broker authorship and actual integration checks; human review pending.
+Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded the confirmed startup-only listener field and database-based health response; review pending.
 -->
 
 # AI usage log
@@ -1732,6 +1734,39 @@ submission files; retained disclosure content is under this ai directory.
   Human review pending for integration/tests/docs. Original broker authors retain
   ownership and responsibility for their declarations. No external web source,
   skill, delegation, commit, push, remote PR edit or running-service deployment.
+
+## 038 — Startup-only listener health with database-based status
+
+- **Date/timezone:** 2026-10-22, Asia/Singapore (UTC+08:00).
+- **Tool/model/modes:** OpenAI Codex, GPT-6; bounded clarification followed by
+  implementation, regression checks and documentation against human decisions.
+- **Exact prompt/answers/key responses:** [Listener-health request and choices](prompts/038-listener-health.md).
+- **Human-finalized behavior:** Add listener up/down, reporting startup success
+  only. Keep health HTTP status based on database alone. Existing overall status
+  follows the database; healthy DB returns 200/ok even when listener is down.
+- **Implementation/paths:** src/rest/server.ts receives the startup-status reader;
+  src/index.ts tracks pending/failure/success and explicit shutdown, including a
+  late consumer completion after shutdown began. No connection/cancellation
+  detection or shared broker changes. Updated tests rest/history/startup and live
+  listener integration; service/root README, local ignored Postman generator/
+  generated collections/README; this log and archive 038. All affected source/docs
+  headers attribute the new scope without claiming human review.
+- **Agent checks:** Full workspace build and 94 Credit tests passed, zero failures/
+  skips. REST health tests cover four database/listener combinations with no JWT
+  and invalid JWT; startup tests cover successful/slow/failed consumer and shutdown
+  races. Real source startup against an unreachable test broker gives HTTP 200,
+  status ok, db up, listener down with APIs available. Real compiled application
+  with isolated RabbitMQ/PostgreSQL gives health listener up; six live scenarios/
+  seven Node results passed. Postman REST lint clean; all 103 scripts parse. No
+  shared suite/Docker rebuild or full native Postman run repeated for this change.
+- **Cleanup:** Integration schemas/rows, child processes, temporary public key/logs
+  cleaned; dedicated RabbitMQ test container and its anonymous volume removed.
+  Existing services/queues/application data kept. No real broker outage forced on
+  the user's services. Shared imported source/config remains unchanged.
+- **Instructions/provenance/review:** Used root AGENTS.md, empty service instructions,
+  existing local source and installed amqplib types during inspection. No external
+  source, dependency, skill, agent, commit/push or running-service replacement.
+  Human decisions finalized before implementation. New changes await human review.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the
