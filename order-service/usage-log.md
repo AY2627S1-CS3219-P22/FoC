@@ -959,3 +959,40 @@ full multi-service Postman demo have not been exercised in this turn.
 
 Supplier REST and gRPC Docker image builds both succeeded. Incoming two-file
 trailing whitespace was cleaned without changing teammate behavior.
+
+
+## 2026-10-22 Asia/Singapore — Supplier teammate Order Docker build fix
+Tool: ChatGPT (Codex); mode: debug/configuration implementation. Human review pending.
+Exact prompt:
+```text
+Could you try handle this for my teammate in supplier service please!
+what i changed btw
+
+1. moved zod schema for supplier gRPC validation to our shared grpc folder
+2. order service imports the shared contract 
+3. orderCreation initially had locationDescription for supplier with location parameter. I've changed that to my specific location parameters . see destination.
+
+export const createOrderSchema = z.object({
+  supplierId,
+  destination: nonblank,
+  destination: grpcsupplierSchema.pick({ buildingName: true, floor: true, latitude: true, longitude: true }),
+  requestDetails: nonblank,
+  credits: z.number().int().positive().max(2147483647),
+  expiryTime: z.iso.datetime({ offset: true }).transform((value) => new Date(value)),
+currently, im struggling to build the order service with the new supplier service since the yaml copies supplier/grpc/package.json by default and im not sure how to fix it
+```
+Key response: On d3-demo Dockerfile/workspaces already use the merged package
+layout, but Order's Dockerfile.dockerignore retained obsolete Supplier/Credit
+paths and excluded the current User/Credit manifests. Corrected its allowlist,
+including shared/messaging parent traversal. Shared Supplier schema imports
+already exist. Kept the previously approved destination string and missing
+locationDescription "-" fallback; a destination object needs a matching
+human-approved persistence/API change. Duplicate destination keys in the pasted
+object are invalid TypeScript. No schema changes generated.
+Affected files: Order Dockerfile.dockerignore, this log, root README.
+Validation: git diff --check passed. Actual Docker build result recorded below.
+
+Docker verification: docker build -f order-service/Dockerfile -t
+foc-order-demo-build-check . succeeded, including npm ci, shared gRPC build,
+Prisma generation and Order TypeScript compilation. Existing containers were
+not restarted. Changes remain uncommitted for human review.

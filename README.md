@@ -170,3 +170,7 @@ main/User outbox and Supplier branch into d3-demo, preserving shared messaging
 recovery and correcting stale workspace/Docker manifest paths. Actual checks and
 verification scope are recorded in Order usage log and Credit entry
 048. Human review pending; original teammate authorship is preserved.
+
+Order Docker context correction, ChatGPT (Codex), 2026-10-22: corrected the
+manifest allowlist for the merged workspace layout. Prompt and actual Docker
+verification are in Order usage-log.md. Human review pending.
