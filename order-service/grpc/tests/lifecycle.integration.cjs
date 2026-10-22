@@ -294,3 +294,47 @@ test('acceptance HTTP derives courier from JWT and enforces eligibility without 
  const response=await accept(order.id,headers(actor,['USER','ADMINISTRATOR']));assert.equal(response.status,200);const result=await response.json();assert.equal(result.order.courierId,actor);assert.equal(result.order.status,'ASSIGNED');assert.equal(result.order.supplierId,'1');assert.ok(result.order.acceptedAt.endsWith('Z'));
  assert.equal((await accept(order.id)).status,409);assert.equal(f.calls,1);assert.equal(f.releases,0);
 });
+
+// AI-assisted retrieval coverage: exact approved scopes and JWT relationship filtering.
+test('USER retrieval scopes enforce ownership, expiry and historical visibility', async t => {
+ const f=fixture(), other=fixture(); const user=f.user;
+ const own=await create(f,'retrieval-own');
+ const available=await create(other,'retrieval-open');
+ const expired=await create(other,'retrieval-expired');
+ const assigned=await create(other,'retrieval-assigned');
+ const delivered=await create(other,'retrieval-delivered');
+ const cancelled=await create(f,'retrieval-cancelled');
+ const someoneElse=await create(other,'retrieval-other-courier');
+ await db.order.update({where:{id:expired.id},data:{expiryTime:new Date(Date.now()-1000)}});
+ await db.order.update({where:{id:assigned.id},data:{status:'ASSIGNED',courierId:user,acceptedAt:new Date()}});
+ await db.order.update({where:{id:delivered.id},data:{status:'DELIVERED',courierId:user,acceptedAt:new Date(),pickedUpAt:new Date(),deliveredAt:new Date(),creditState:'SETTLED'}});
+ await db.order.update({where:{id:cancelled.id},data:{status:'CANCELLED',cancellationReason:'REQUESTER',cancelledAt:new Date(),creditState:'REFUNDED'}});
+ await db.order.update({where:{id:someoneElse.id},data:{status:'ASSIGNED',courierId:other.user,acceptedAt:new Date()}});
+ const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+ const server=createApp(publicKey.export({type:'spki',format:'pem'})).listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(r=>server.close(r)));
+ const base='http://127.0.0.1:'+server.address().port+'/orders';
+ const headers=(sub=user,roles=['USER'])=>({Authorization:'Bearer '+jwt.sign({roles},privateKey,{algorithm:'RS256',subject:sub,expiresIn:60})});
+ const get=async(scope,sub=user,roles=['USER'])=>{
+  const response=await fetch(base+'?scope='+scope,{headers:headers(sub,roles)});assert.equal(response.status,200);return (await response.json()).orders;
+ };
+ const open=await get('open');assert.ok(open.some(o=>o.id===available.id));
+ for(const id of [own.id,expired.id,assigned.id,delivered.id,cancelled.id,someoneElse.id])assert.ok(!open.some(o=>o.id===id));
+ assert.ok(open.every(o=>o.status==='UNASSIGNED'&&o.requesterId!==user&&new Date(o.expiryTime)>new Date()));
+ const requested=await get('requested');assert.deepEqual(new Set(requested.map(o=>o.id)),new Set([own.id,cancelled.id]));
+ const courier=await get('assigned');assert.deepEqual(new Set(courier.map(o=>o.id)),new Set([assigned.id,delivered.id]));
+ for(const rows of [open,requested,courier])for(const order of rows){
+  assert.equal(typeof order.id,'string');assert.equal(typeof order.status,'string');assert.equal(typeof order.destination,'string');assert.equal(typeof order.credits,'number');
+  assert.ok(!('creation' in order));assert.ok(!('payload' in order));assert.ok(!('creditOperations' in order));
+ }
+ assert.deepEqual(await get('requested',prefix+'-empty'),[]);assert.deepEqual(await get('assigned',prefix+'-empty'),[]);
+ assert.equal((await fetch(base+'?scope=open')).status,401);
+ assert.equal((await fetch(base+'?scope=open',{headers:headers(user,['ADMINISTRATOR'])})).status,403);
+ assert.ok((await get('requested',user,['USER','ADMINISTRATOR'])).some(o=>o.id===own.id));
+ for(const query of ['scope=invalid','scope=','scope=open&scope=requested','scope[foo]=open','scope=requested&requesterId='+other.user,'userId='+other.user]){
+  assert.equal((await fetch(base+'?'+query,{headers:headers()})).status,400,query);
+ }
+ assert.equal((await fetch(base,{headers:headers()})).status,403);
+ // Once the only remaining unassigned rows expire, an empty open list is still successful.
+ await db.order.updateMany({where:{status:'UNASSIGNED'},data:{expiryTime:new Date(Date.now()-1000)}});
+ assert.deepEqual(await get('open'),[]);
+});

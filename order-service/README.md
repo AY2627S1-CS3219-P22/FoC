@@ -214,6 +214,9 @@ comes from the signed subject. ADMINISTRATOR alone does not grant permission.
 | Method / route | Behavior | Success |
 | --- | --- | --- |
 | GET /orders | ADMINISTRATOR only; all orders, including history | 200 |
+| GET /orders?scope=open | USER; unassigned, future-expiry orders created by others | 200 |
+| GET /orders?scope=requested | USER; orders created by the JWT subject, including history | 200 |
+| GET /orders?scope=assigned | USER; orders assigned to the JWT subject, including history | 200 |
 | POST /orders | Create after confirmed credit reservation | 201, 200 replay, 202 pending |
 | PATCH /orders/:id | Requester edits an unassigned, unexpired order | 200, 202 pending |
 | POST /orders/:id/cancel | Requester cancels an unassigned, unexpired order; retains history | 200, 202 pending refund |
@@ -322,6 +325,25 @@ integration tests passed (31 total). Docker build/startup, both migrations and
 HTTP health passed. These results use test-only peers for successful lifecycle
 workflows; production peer integration remains subject to the status above.
 
+### User order listings
+
+Use a User Service bearer JWT with USER role. Identity is taken exclusively from
+its subject; callers cannot supply another requester/courier ID.
+
+- `GET /orders?scope=open`: UNASSIGNED orders created by other users whose expiry
+  is later than database time, even if the expiry worker has not run yet.
+- `GET /orders?scope=requested`: all orders created by the caller, including history.
+- `GET /orders?scope=assigned`: all orders assigned to the caller as courier,
+  including completed/cancelled history.
+
+All return HTTP 200 and `{ "orders": [...] }`, using the public fields described
+below (including id, status, destination and credits), newest first, without
+pagination. Empty matches return `{ "orders": [] }`. Missing/invalid credentials
+return 401; ADMINISTRATOR without USER returns 403 for these scoped views.
+Unknown/empty/repeated scopes or unsupported query parameters return 400.
+An administrator with USER can also use these views for their own subject.
+Listings are snapshots; acceptance still rechecks eligibility under a row lock.
+
 ### Administrator dashboard: GET /orders
 
 Requires a valid User Service bearer JWT with ADMINISTRATOR role. USER alone
@@ -345,7 +367,7 @@ All persisted Order rows are returned, newest first (createdAt descending, then
 id descending), including DELIVERED, CANCELLED/EXPIRY, requester cancellations,
 and overdue active rows. Pending unpublished creations have no Order row and
 are excluded. An empty database returns `{ "orders": [] }`. There are currently
-no server-side filters or pagination. The dashboard can filter the returned
+no filters or pagination for the unscoped administrator view. The dashboard can filter the returned
 information, using DELIVERED for completed orders and cancellationReason EXPIRY
 for orders cancelled by expiry. No User/Supplier/Credit RPC is needed for this
 read; the response uses stored snapshots.
@@ -375,8 +397,8 @@ previous creation/edit/admin tests and the following cancellation/expiry checks:
 
 Live peer-service integration still requires the implemented Credit service and
 configured token; tests use separate test-only peer services. These checks did
-not add pickup/delivery or student order-list/detail endpoints. Acceptance was
-implemented subsequently, as documented below.
+not add pickup/delivery or order-detail endpoints. Acceptance and scoped user
+listings were implemented subsequently, as documented here.
 
 For the real User/Supplier/Credit walkthrough, see [Manual integration testing](MANUAL_TESTING.md), including current peer-service blockers and expected responses.
 
@@ -413,3 +435,7 @@ PostgreSQL/HTTP/gRPC integration tests passed (51 total). Acceptance coverage
 includes 12 concurrent couriers with exactly one winner, requester/role denial,
 already assigned/expired orders, expiry while waiting for the row lock,
 cancellation races, pending credit edits and HTTP JWT-derived identity.
+
+Retrieval verification: real PostgreSQL/HTTP tests cover scoped ownership,
+self-exclusion, overdue rows, history, empty lists, invalid query parameters and
+role separation. The full suite passes 13 unit tests and 39 integration tests.

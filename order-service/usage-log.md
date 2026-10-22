@@ -584,3 +584,40 @@ configuration. Manual guide updated; live peer setup was not executed.
 Docker build/startup passed and both normal containers report healthy. Removed
 only the disposable acceptance test database. Manual shell snippets passed bash -n;
 git diff --check passed. Changes remain uncommitted on order-functionality.
+
+
+## 2026-10-22 — Relationship-based retrieval
+
+Tool: ChatGPT (Codex). Modes: generate implementation, tests and documentation.
+Human review remains pending.
+
+Exact implementation request: "Lets complete this issue."
+
+Exact user contract reply:
+```text
+for available errands: GET /orders?scope=open
+for errands the user created GET /orders?scope=requested
+errands assigned to user: GET /orders?scope=assigned
+
+all return 200 OK with structure including order id, status, destination and credits
+```
+
+Key response/implementation: retained the public `{ "orders": [...] }` format,
+newest-first ordering and unpaginated response. Scoped listings require USER and
+use verified JWT subject. Open excludes own, non-UNASSIGNED and overdue orders.
+Requested/assigned retain history; this history behavior was stated as an
+implementation assumption rather than an explicit answer in the contract reply.
+Unscoped GET remains ADMINISTRATOR-only. Invalid/empty/repeated scopes and unknown
+query parameters return 400. Empty results return 200 with an empty array.
+No schema or inter-service contract changes.
+
+Affected files: grpc/src/services/orderQueries.ts,
+grpc/src/api/controllers/orderController.ts, grpc/src/api/routes/orderRoutes.ts,
+grpc/tests/lifecycle.integration.cjs, README.md, MANUAL_TESTING.md, this usage log,
+and root README.md. Author review and final validation pending.
+
+Verification: shared/Order builds passed; 13 unit/auth/gRPC tests and 39 real
+PostgreSQL/HTTP integration tests passed (52 total). Retrieval coverage includes
+open ownership/status/expiry filters, requester/courier history, empty results,
+JWT identity, role separation and invalid/injected query fields. Used a dedicated
+order_service_test_retrieval database; normal development data was not changed.

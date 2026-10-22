@@ -1,11 +1,11 @@
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
-// Scope: Implemented author-approved order commands and administrator listing.
+// Scope: Implemented author-approved order commands and approved role-scoped retrieval.
 // Author review: Pending; see ../../../../usage-log.md.
 import type { RequestHandler } from 'express';
 import type { createOrderAcceptance } from '../../services/orderAcceptance';
 import type { createOrderLifecycle } from '../../services/orderLifecycle';
 import { z } from 'zod';
-import { listAllOrders } from '../../services/orderQueries';
+import { listAllOrders, listUserOrders } from '../../services/orderQueries';
 import { createOrderSchema, editOrderSchema, idempotencyKeySchema } from '../dto/orderInput';
 import type { createOrderCreation, CommandResult } from '../../services/orderCreation';
 import type { createOrderEdits } from '../../services/orderEdits';
@@ -55,9 +55,15 @@ export function editOrder(edits?: ReturnType<typeof createOrderEdits>): RequestH
   };
 }
 
-export const getAllOrders: RequestHandler = async (_req, res, next) => {
+export const getAllOrders: RequestHandler = async (req, res, next) => {
+  const query = z.object({ scope: z.enum(['open', 'requested', 'assigned']).optional() }).strict().safeParse(req.query);
+  if (!query.success) { res.status(400).json({ error: 'invalid-input' }); return; }
+  const scope = query.data.scope;
+  const user = res.locals.user;
+  const role = scope ? 'USER' : 'ADMINISTRATOR';
+  if (!user.roles.includes(role)) { res.status(403).json({ error: 'forbidden' }); return; }
   try {
-    const orders = await listAllOrders();
+    const orders = scope ? await listUserOrders(scope, user.id) : await listAllOrders();
     res.json({ orders: orders.map(order => ({ ...order, supplierId: order.supplierId.toString() })) });
   } catch (error) { next(error); }
 };

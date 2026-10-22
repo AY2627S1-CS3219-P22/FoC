@@ -397,3 +397,21 @@ docker compose -f order-service/compose.yaml down
 Stop peer stacks using their respective Compose files when finished. Keep database
 volumes unless deliberately resetting only your own disposable development data.
 Temporary request/response files live in MANUAL_DIR, outside the repository.
+
+## Scoped order retrieval
+
+With orders created and accepted in the walkthrough, use:
+
+```sh
+curl -i 'http://localhost:3003/orders?scope=open' -H "Authorization: Bearer $TOKEN"
+curl -i 'http://localhost:3003/orders?scope=requested' -H "Authorization: Bearer $TOKEN"
+curl -i 'http://localhost:3003/orders?scope=assigned' -H "Authorization: Bearer $COURIER_TOKEN"
+```
+
+Expect 200 with `{ "orders": [...] }`. Open excludes your own orders and expired,
+assigned or terminal orders. Requested includes your created orders and history;
+assigned includes orders you accepted and their history. Entries include id,
+status, destination and credits. An empty result is `orders: []`.
+Check an invalid scope (`?scope=unknown`) returns 400, missing token returns 401,
+and unscoped `/orders` with a USER-only token returns 403. The administrator
+continues using unscoped `/orders` to retrieve all persisted orders.
