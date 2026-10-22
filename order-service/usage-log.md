@@ -434,3 +434,77 @@ administrator endpoint test. Verified ADMINISTRATOR and mixed-role access, USER
 denial, missing-token denial, all persisted statuses, internal-field exclusion,
 and unchanged USER-only write authorization. Docker rebuilt and both containers
 are healthy; git diff --check passed. Disposable admin test container removed.
+
+## 2026-10-22: ignore Prisma artifacts left after branch switch
+
+Tool: ChatGPT (Codex). Mode: configuration fix/explanation.
+Exact user prompt: “Do these need to be commited too or is something up”
+The screenshot showed untracked order-service/src/generated/prisma output.
+Confirmed current branch is order-functionality and its ignore rule covered only
+grpc/src/generated/prisma. Added the other branch's generated output directory
+to root .gitignore; no generated files were deleted or staged. Schema sources
+and migrations remain tracked. Human review pending.
+
+## 2026-10-22: previous-issue audit and cancellation/expiry verification
+
+Tool: ChatGPT (Codex). Modes: review/debugging, implementation, tests and documentation.
+Human author review remains pending.
+
+### Exact user prompt
+
+```text
+Has the previous issues been completed? Do a check and if yes, lets work on this next
+### Description
+Implement cancellation and expiry functionality for errands according to the agreed Order Service lifecycle.
+
+### Tasks
+- [ ] Implement the Cancel Errand API endpoint.
+- [ ] Allow requesters to cancel their own unassigned errands.
+- [ ] Prevent unauthorised cancellation.
+- [ ] Handle errands that have passed their expiry time.
+- [ ] Update the order status according to the agreed cancellation and expiry rules.
+- [ ] Integrate with Credit Service to release reserved credits for cancelled or expired errands.
+- [ ] Handle unsuccessful credit-release operations.
+- [ ] Add tests for cancellation and expiry scenarios.
+
+### Acceptance Criteria
+- [ ] Requesters can cancel eligible errands.
+- [ ] Assigned errands cannot be manually cancelled by requesters under the current requirements.
+- [ ] Expired errands are handled according to the agreed lifecycle.
+- [ ] Reserved credits are released correctly.
+- [ ] Invalid or unauthorised cancellation requests are rejected.
+- [ ] Tests cover successful and unsuccessful operations.
+```
+
+### Key findings and changes
+
+Confirmed current branch is order-functionality, with prior creation/edit/admin
+and cancellation/expiry code present. Preserved earlier .gitignore/log edits.
+The previously author-approved plaintext Credit change existed only on
+feature/order-create; removed the remaining CA setting, createSsl choice and CA
+file read from this branch too. Preserved readFileSync for User's public key;
+service-token authentication unchanged. Updated .env.example and README.
+
+Cancellation already commits CANCELLED/REQUESTER and REFUND_PENDING before the
+Credit call. Fixed the immediate path to retain that durable pending response
+when refund processing/receipt persistence fails, instead of returning HTTP 500.
+Added tests for cancellation authorization/input/state errors, concurrent replay,
+pre-commit release failure, explicit rejection, historical/wrong-owner receipts,
+refund retry exhaustion, failed receipt persistence/crashed lease, and autonomous
+expiry. Extended the real gRPC adapter integration test through cancellation and
+confirmed release. No schema, dependency, or new API design changes.
+
+Affected files: grpc/src/services/orderLifecycle.ts, grpc/src/dependencies/creditClient.ts,
+grpc/src/env.ts, grpc/src/index.ts, grpc/.env.example, grpc/tests/credit.test.cjs,
+grpc/tests/lifecycle.integration.cjs, Order README, root README and this log.
+
+Verification: shared gRPC/Order builds passed; all 9 unit/authentication/gRPC tests
+and 32 dedicated PostgreSQL/HTTP/gRPC integration tests passed (41 total).
+Creation/edit/admin regression cases passed. Tests use an isolated database named
+order_service_test_cancellation and test-only peer services. No deployed peer-service
+end-to-end success is claimed. Remaining courier acceptance/pickup/delivery and
+student-list/detail gaps identified earlier are outside this issue.
+
+Docker rebuild/startup passed; both normal containers healthy and /health returned
+200 with PostgreSQL up. Disposable cancellation test container removed after
+verification. No database schema or lockfile changes; git diff --check passed.

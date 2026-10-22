@@ -33,8 +33,14 @@ export function createOrderLifecycle(db: PrismaClient, credit: ReturnType<typeof
       return { order: updated };
     });
     if ('error' in result) return result;
-    if (result.order.creditState === 'REFUND_PENDING') await refundBatch(1, orderId);
-    return { order: (await db.order.findUniqueOrThrow({ where: { id: orderId } })) };
+    try {
+      if (result.order.creditState === 'REFUND_PENDING') await refundBatch(1, orderId);
+      return { order: (await db.order.findUniqueOrThrow({ where: { id: orderId } })) };
+    } catch {
+      // Cancellation and refund intent already committed. A failed release or
+      // failed receipt write must not turn this durable result into HTTP 500.
+      return { order: result.order };
+    }
   }
 
   async function expireBatch(limit = 100) {

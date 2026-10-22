@@ -33,7 +33,7 @@ function fixture() {
    if(r.status!=='RESERVED')throw err(9);if(r.version!==expectedVersion){if(r.version===expectedVersion+1&&r.amount===amount)return {...r};throw err(9)}
    r.amount=amount;r.version++;if(updateMode==='after'){updateMode=undefined;throw err(4)}return {...r};
   },
-  releaseCredits:async({orderId})=>{releases++;const r=ledger.get(orderId);if(!r)throw err(5);if(r.status==='SETTLED')throw err(9);if(r.status!=='RELEASED'){r.status='RELEASED';r.version++}if(releaseMode==='after'){releaseMode=undefined;throw err(4)}return {...r}},
+  releaseCredits:async({orderId})=>{releases++;if(releaseMode==='before'){releaseMode=undefined;throw err(14)}if(releaseMode==='reject')throw err(9);const r=ledger.get(orderId);if(releaseMode==='stale')return {...r,status:'RELEASED'};if(!r)throw err(5);if(r.status==='SETTLED')throw err(9);if(r.status!=='RELEASED'){r.status='RELEASED';r.version++}if(releaseMode==='after'){releaseMode=undefined;throw err(4)}return {...r}},
   settleCredits:async()=>{throw new Error('out of scope')},close:()=>{},
  };
  const directories={getRequester:async(userId)=>({userId,username:'student',firstName:'Campus',lastName:'Friend'}),
@@ -166,6 +166,7 @@ test('creation integrates real User/Supplier/Credit gRPC adapters with PostgreSQ
  const dirs=createDirectories('127.0.0.1:'+ports[0],'127.0.0.1:'+ports[1],1000);const credit=createCreditClient('127.0.0.1:'+ports[2],'integration-token',1000);
  t.after(()=>{dirs.close();credit.close();userServer.forceShutdown();supplierServer.forceShutdown();creditServer.forceShutdown()});
  const service=createOrderCreation(db,credit,dirs);const r=await service.submit(f.user,'real-grpc',f.input());assert.equal(r.status,201);assert.equal(r.order.status,'UNASSIGNED');assert.equal(f.ledger.get(r.order.id).status,'RESERVED');
+ const cancellation=await createOrderLifecycle(db,credit).cancel(r.order.id,f.user);assert.equal(cancellation.order.creditState,'REFUNDED');assert.equal(f.ledger.get(r.order.id).status,'RELEASED');
 });
 
 test('pending creation compensates instead of publishing when supplier is now closed',async()=>{
@@ -197,4 +198,57 @@ test('administrator GET /orders includes all statuses and history with role sepa
  // Administrator-only access to reads does not grant USER command permissions.
  assert.equal((await fetch(base,{method:'POST',headers:{...headers(['ADMINISTRATOR']),'Content-Type':'application/json'},body:'{}'})).status,403);
  assert.equal((await fetch(base,{method:'POST',headers:{...headers(['USER']),'Content-Type':'application/json'},body:'{}'})).status,400);
+});
+
+test('cancellation HTTP rejects missing credentials, wrong owner, invalid input and ineligible states',async t=>{
+ const f=fixture(),order=await create(f);const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+ const app=createApp(publicKey.export({type:'spki',format:'pem'}),f.lifecycle);const server=app.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(r=>server.close(r)));
+ const base='http://127.0.0.1:'+server.address().port+'/orders';
+ const headers=(id=f.user,roles=['USER'])=>({Authorization:'Bearer '+jwt.sign({roles},privateKey,{algorithm:'RS256',subject:id,expiresIn:60}),'Content-Type':'application/json'});
+ const cancel=(id,h=headers(),body='{}')=>fetch(base+'/'+id+'/cancel',{method:'POST',headers:h,body});
+ assert.equal((await cancel(order.id,{'Content-Type':'application/json'})).status,401);
+ assert.equal((await cancel(order.id,headers('other'))).status,403);
+ assert.equal((await cancel(order.id,headers(f.user,['ADMINISTRATOR']))).status,403);
+ assert.equal((await cancel('not-a-uuid')).status,400);assert.equal((await cancel(order.id,headers(),'{broken')).status,400);
+ assert.equal((await cancel(order.id,headers(),JSON.stringify({requesterId:'forged'}))).status,400);
+ assert.equal((await cancel(randomUUID())).status,404);
+ for(const status of ['ASSIGNED','PICKED_UP','DELIVERED']){await db.order.update({where:{id:order.id},data:{status}});assert.equal((await cancel(order.id)).status,409)}
+ await db.order.update({where:{id:order.id},data:{status:'UNASSIGNED',expiryTime:new Date(Date.now()-1000)}});assert.equal((await cancel(order.id)).status,409);assert.equal(f.releases,0);
+ await f.lifecycle.expireBatch();await f.lifecycle.refundBatch();assert.equal(f.ledger.get(order.id).status,'RELEASED');
+});
+test('concurrent cancellation requests share one refund and retain one order history record',async()=>{
+ const f=fixture(),order=await create(f);const results=await Promise.all(Array.from({length:4},()=>f.lifecycle.cancel(order.id,f.user)));
+ assert.ok(results.every(r=>r.order.status==='CANCELLED'));assert.equal(f.releases,1);assert.equal(await db.creditOperation.count({where:{orderId:order.id,type:'REFUND'}}),1);assert.equal(await db.order.count({where:{id:order.id}}),1);
+});
+test('release failure before commit leaves durable REFUND_PENDING and recovers after restart',async()=>{
+ const f=fixture(),order=await create(f);f.releaseMode='before';const r=await f.lifecycle.cancel(order.id,f.user);assert.equal(r.order.creditState,'REFUND_PENDING');assert.equal(f.ledger.get(order.id).status,'RESERVED');
+ const op=await db.creditOperation.findUniqueOrThrow({where:{orderId_type:{orderId:order.id,type:'REFUND'}}});assert.equal(op.state,'PENDING');assert.equal(op.lastError,'outcome-uncertain');assert.ok(+op.nextRetryAt> Date.now());
+ await due(order.id,'REFUND');await createOrderLifecycle(db,f.credit).refundBatch();assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).creditState,'REFUNDED');assert.equal(f.releases,2);
+});
+test('explicit release rejection is retained for reconciliation without automatic business retries',async()=>{
+ const f=fixture(),order=await create(f);f.releaseMode='reject';assert.equal((await f.lifecycle.cancel(order.id,f.user)).order.creditState,'REFUND_PENDING');
+ const op=await db.creditOperation.findUniqueOrThrow({where:{orderId_type:{orderId:order.id,type:'REFUND'}}});assert.equal(op.state,'PERMANENTLY_FAILED');assert.equal(op.lastError,'dependency-rejected');await f.lifecycle.refundBatch();assert.equal(f.releases,1);assert.equal(f.ledger.get(order.id).status,'RESERVED');
+});
+test('historical release response and wrong-owner receipt cannot falsely confirm refunds',async()=>{
+ const f=fixture(),order=await create(f);f.releaseMode='stale';assert.equal((await f.lifecycle.cancel(order.id,f.user)).order.creditState,'REFUND_PENDING');assert.equal(f.ledger.get(order.id).status,'RESERVED');
+ f.ledger.get(order.id).requesterId='wrong-owner';await due(order.id,'REFUND');await f.lifecycle.refundBatch();assert.equal(f.releases,1);assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).creditState,'REFUND_PENDING');
+ f.ledger.get(order.id).requesterId=f.user;f.releaseMode=undefined;await due(order.id,'REFUND');await f.lifecycle.refundBatch();assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).creditState,'REFUNDED');
+});
+test('refund attempts stop after five retries and preserve unresolved financial state',async()=>{
+ const f=fixture(),order=await create(f);f.unavailable=true;assert.equal((await f.lifecycle.cancel(order.id,f.user)).order.creditState,'REFUND_PENDING');
+ for(let i=0;i<5;i++){await due(order.id,'REFUND');await f.lifecycle.refundBatch()}
+ const op=await db.creditOperation.findUniqueOrThrow({where:{orderId_type:{orderId:order.id,type:'REFUND'}}});assert.equal(op.attempts,6);assert.equal(op.state,'PERMANENTLY_FAILED');assert.equal(op.lastError,'retry-exhausted');await f.lifecycle.refundBatch();assert.equal((await db.creditOperation.findUniqueOrThrow({where:{id:op.id}})).attempts,6);assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).creditState,'REFUND_PENDING');assert.equal(f.ledger.get(order.id).status,'RESERVED');
+});
+test('receipt persistence failure after Credit release returns pending and reclaims expired lease',async()=>{
+ const f=fixture(),order=await create(f);let fail=true;
+ const broken=new Proxy(db,{get(target,key){if(key==='$transaction')return(fn,...rest)=>target.$transaction(tx=>fn(new Proxy(tx,{get(t,k){if(k==='creditOperation')return new Proxy(t.creditOperation,{get(o,m){if(m==='updateMany')return async(args)=>{if(fail&&args.data.state==='SUCCEEDED'){fail=false;throw new Error('injected receipt write failure')}return o.updateMany(args)};return o[m]}});return t[k]}})),...rest);const value=target[key];return typeof value==='function'?value.bind(target):value}});
+ const result=await createOrderLifecycle(broken,f.credit).cancel(order.id,f.user);assert.equal(result.order.status,'CANCELLED');assert.equal(result.order.creditState,'REFUND_PENDING');assert.equal(f.ledger.get(order.id).status,'RELEASED');
+ await db.creditOperation.updateMany({where:{orderId:order.id,type:'REFUND'},data:{leaseExpiresAt:new Date(0)}});await f.lifecycle.refundBatch();assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).creditState,'REFUNDED');assert.equal(f.releases,1);
+});
+test('automatic expiry worker ignores future and delivered orders and refunds overdue picked-up order',async()=>{
+ const f=fixture(),future=await create(f,'future'),delivered=await create(f,'delivered'),overdue=await create(f,'overdue');
+ await db.order.update({where:{id:delivered.id},data:{status:'DELIVERED',creditState:'SETTLED',expiryTime:new Date(Date.now()-1000)}});
+ await db.order.update({where:{id:overdue.id},data:{status:'PICKED_UP',expiryTime:new Date(Date.now()-1000)}});
+ f.lifecycle.startWorker();try{const deadline=Date.now()+5000;while(Date.now()<deadline){if((await db.order.findUniqueOrThrow({where:{id:overdue.id}})).creditState==='REFUNDED')break;await new Promise(r=>setTimeout(r,50))}}finally{await f.lifecycle.stopWorker()}
+ assert.equal((await db.order.findUniqueOrThrow({where:{id:future.id}})).status,'UNASSIGNED');assert.equal((await db.order.findUniqueOrThrow({where:{id:delivered.id}})).status,'DELIVERED');const row=await db.order.findUniqueOrThrow({where:{id:overdue.id}});assert.equal(row.cancellationReason,'EXPIRY');assert.equal(row.creditState,'REFUNDED');
 });
