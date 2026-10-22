@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Navbar from "./components/Navbar"
 import LoginPage from "./pages/LoginPage"
 import SignupPage from "./pages/SignupPage"
@@ -9,6 +9,10 @@ import OrderDetailsPage from "./pages/OrderDetailsPage"
 import AcceptedOrderPage from "./pages/AcceptedOrderPage"
 import ProfilePage from "./pages/ProfilePage"
 import AdminPage from "./pages/AdminPage"
+import SuppliersPage from "./pages/SuppliersPage"
+import { SEED_ORDERS } from "./api/orders"
+import { getMe, logout, type ApiUser } from "./api/users"
+import { refreshToken } from "./api/client"
 
 export type Page =
   | "login"
@@ -22,6 +26,7 @@ export type Page =
   | "errand-complete"
   | "profile"
   | "admin"
+  | "suppliers"
 
 export interface Order {
   id: string
@@ -61,90 +66,14 @@ const CURRENT_USER: User = {
   creditsEarned: 9,
 }
 
-const SEED_ORDERS: Order[] = [
-  {
-    id: "o1",
-    pickupLocation: "COM3",
-    pickupStore: "CoffeeBean @ COM3",
-    deliveryLocation: "PGP",
-    description: "Pick up one iced latte, medium size. No sugar, please double-check the order.",
-    credits: 4,
-    deadline: "3:30 PM",
-    status: "open",
-    requesterId: "u2",
-    requesterName: "Aisha Lim",
-    createdAt: "2:45 PM",
-  },
-  {
-    id: "o2",
-    pickupLocation: "UTown",
-    pickupStore: "Cheers @ UTown",
-    deliveryLocation: "PGPR Block E",
-    description: "One packet of instant noodles (any flavour) and a 1.5L mineral water.",
-    credits: 3,
-    deadline: "5:00 PM",
-    status: "open",
-    requesterId: "u3",
-    requesterName: "Marcus Goh",
-    createdAt: "3:10 PM",
-  },
-  {
-    id: "o3",
-    pickupLocation: "Science Faculty",
-    pickupStore: "Science Canteen",
-    deliveryLocation: "Arts (AS7) Level 4",
-    description: "Chicken rice with drumstick and soup. No cucumber please.",
-    credits: 5,
-    deadline: "1:00 PM",
-    status: "accepted",
-    requesterId: "u4",
-    requesterName: "Priya Nair",
-    courierId: "u5",
-    courierName: "Ryan Chen",
-    createdAt: "12:10 PM",
-  },
-  {
-    id: "o4",
-    pickupLocation: "Engineering",
-    pickupStore: "Print Lab @ Engineering",
-    deliveryLocation: "E1A Room 02-06",
-    description: "Print 20 pages double-sided from USB labelled EE2024_Lab. Black and white is fine.",
-    credits: 6,
-    deadline: "4:30 PM",
-    status: "open",
-    requesterId: "u6",
-    requesterName: "Wei Lin",
-    createdAt: "3:55 PM",
-  },
-  {
-    id: "o5",
-    pickupLocation: "YST",
-    pickupStore: "YST Canteen",
-    deliveryLocation: "UTown Residence",
-    description: "Brown sugar pearl milk tea, 50% sugar, less ice, large.",
-    credits: 4,
-    deadline: "6:00 PM",
-    status: "completed",
-    requesterId: "u1",
-    requesterName: "Jordan Tan",
-    courierId: "u7",
-    courierName: "Sofia Park",
-    createdAt: "5:10 PM",
-  },
-  {
-    id: "o6",
-    pickupLocation: "Central Library",
-    pickupStore: "CLB Bookshop",
-    deliveryLocation: "PGPR Block A",
-    description: "Reserved book: Introduction to Sociology 3rd Ed. under the name Priya Nair.",
-    credits: 5,
-    deadline: "2:00 PM",
-    status: "open",
-    requesterId: "u8",
-    requesterName: "Priya Nair",
-    createdAt: "1:00 PM",
-  },
-]
+// Credits and stats aren't in user-service, so those still come from the mock user for now
+const fromApiUser = (u: ApiUser): User => ({
+  ...CURRENT_USER,
+  id: u.id,
+  name: `${u.firstName} ${u.lastName}`,
+  email: u.email,
+  memberSince: new Date(u.createdAt).toLocaleDateString("en-SG", { month: "long", year: "numeric" }),
+})
 
 function SuccessScreen({
   title,
@@ -198,6 +127,7 @@ function SuccessScreen({
 export default function App() {
   const [page, setPage]           = useState<Page>("login")
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [user, setUser]           = useState<User>(CURRENT_USER)
   const [orders, setOrders]       = useState<Order[]>(SEED_ORDERS)
   const [selectedOrderId, setSelectedOrderId] = useState<string>("o1")
@@ -212,12 +142,31 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "instant" })
   }
 
+  // keeps the mock user if user-service isn't running
+  const loadUser = () => getMe().then((u) => setUser(fromApiUser(u))).catch(() => {})
+
+  // Stay logged in across reloads if the refresh cookie is still valid
+  useEffect(() => {
+    refreshToken()
+      .then((token) => {
+        if (!token) return
+        setIsLoggedIn(true)
+        setPage("orders")
+        loadUser()
+      })
+      .finally(() => setCheckingSession(false))
+  }, [])
+
   const handleLogin = () => {
     setIsLoggedIn(true)
+    loadUser()
     navigate("orders")
   }
 
   const handleLogout = () => {
+    logout().catch(() => {})
+    localStorage.removeItem("token")
+    setUser(CURRENT_USER)
     setIsLoggedIn(false)
     navigate("login")
   }
@@ -251,6 +200,8 @@ export default function App() {
     acceptedOrderId
       ? (orders.find((o) => o.id === acceptedOrderId)?.credits ?? 4)
       : 4
+
+  if (checkingSession) return null
 
   // Unauthenticated
   if (!isLoggedIn) {
@@ -366,6 +317,7 @@ export default function App() {
           />
         )}
 
+        {page === "suppliers" && <SuppliersPage />}
 
         {page === "profile" && (
           <ProfilePage
