@@ -508,3 +508,21 @@ student-list/detail gaps identified earlier are outside this issue.
 Docker rebuild/startup passed; both normal containers healthy and /health returned
 200 with PostgreSQL up. Disposable cancellation test container removed after
 verification. No database schema or lockfile changes; git diff --check passed.
+
+## 2026-10-22: manual integration walkthrough
+
+Tool: ChatGPT (Codex). Mode: documentation generation from inspected code/contracts.
+Exact user prompt: “Write me up some manual testing steps like how to use with user, supplier and credit to create an order etc”
+
+Inspected User registration/login, Supplier routes/stub/conflict markers, Credit
+feature-branch Compose/environment/migration instructions and REST endpoints, and
+Order runtime override. Generated MANUAL_TESTING.md with readiness checks, separate
+working peer checkout setup, non-conflicting database ports, registration/login,
+credit-account prerequisites, supplier checks, creation, replay, edit, cancellation,
+admin view, recovery and expiry. Explicitly states current checkout cannot complete
+live creation without implemented peer services/user.created initialization.
+No live service setup or account/order mutation was performed for this documentation.
+Added README link; human author review pending.
+
+Documentation validation: all 20 shell command blocks passed bash -n syntax
+checks; git diff --check passed. Commands were not executed against live peers.

@@ -376,3 +376,5 @@ Live peer-service integration still requires the implemented Credit service and
 configured token; tests use separate test-only peer services. These checks do
 not add the separate courier acceptance/pickup/delivery endpoints previously
 identified on feature/order-create, or a student order-list/detail endpoint.
+
+For the real User/Supplier/Credit walkthrough, see [Manual integration testing](MANUAL_TESTING.md), including current peer-service blockers and expected responses.
