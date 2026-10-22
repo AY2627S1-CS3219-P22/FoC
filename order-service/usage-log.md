@@ -898,3 +898,38 @@ Final checks: git diff --check passed. Removed only the disposable shared-client
 test database container/volume and stale ignored compiled files for the deleted
 private client. No normal runtime/container/data changes. All changes remain
 uncommitted on d3-demo. User event publisher remains separate and missing.
+
+
+## 2026-10-22 Asia/Singapore — Approved demo integrations (in progress)
+
+Tool: ChatGPT (Codex), merge debugging, implementation, tests and documentation.
+Human review pending. Exact human decisions:
+```text
+Yes, retry missing accounts within the existing budget
+Merge both into d3-demo
+Just show what is available and put a "-" if LocationDescription is removed for now
+```
+
+Context: human approved bounded retry for NOT_FOUND/ACCOUNT_NOT_FOUND only,
+merging origin/main plus origin/order-supplier-gRPC, and missing Supplier
+locationDescription fallback "-". Other NOT_FOUND handling stays unchanged.
+
+Step 1: merged main's User transactional outbox, Supplier container/handler and
+updated shared broker recovery. Resolved shared gRPC docs/transport smoke test,
+shared messaging declaration and root lockfile conflicts. Retained Credit root
+workspace relocation and working shared client; removed the obsolete Supplier
+gRPC workspace reference because the approved Supplier branch removed that
+manifest and uses its existing standalone Yarn package. Root build commands
+follow the incoming package layout. Updated Order/Credit/User/Supplier gRPC
+Docker manifest copies to match the merged workspaces. No schema/interface
+design choices or decision rationales were generated.
+
+Checks before completing the main merge: npm ci succeeded; shared gRPC, shared
+messaging, Order, Credit, User and Supplier REST/gRPC compilation succeeded.
+Supplier frozen Yarn install succeeded with no dependency range changes.
+The second approved merge and runtime behavior fixes follow after this merge.
+
+Affected integration paths so far: package.json/package-lock.json, shared gRPC
+README/test, shared messaging index, Order/Credit/User/Supplier gRPC Dockerfiles,
+root/Credit README and both service usage logs. Other incoming User/Supplier
+implementation files retain teammate history; no new authorship claim.

@@ -454,3 +454,8 @@ The human approved this attribution method for comment-free JSON in
 Exact prompts/key exchanges and actual checks are archived under
 [credit-service/ai/](ai/usage-log.md). The human authors remain responsible for
 review, validation, team norms, licensing checks, and submission disclosure.
+
+Demo merge attribution (2026-10-22, entry 048): root package.json/package-lock.json
+were reconciled with the approved User workspace and Supplier's standalone Yarn
+package after removal of supplier-service/grpc/package.json. Root build paths and
+Docker manifest copies were updated accordingly. Human review pending.

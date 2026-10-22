@@ -1,3 +1,6 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+# Scope: Updated workspace manifests for merged User package; review pending.
+# Prompts/checks: ../order-service/usage-log.md.
 # AI Assistance Disclosure:
 # Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 # Scope: Containerized credit gRPC/REST, migration CLI, and human-specified SQL migrations.
@@ -15,11 +18,11 @@ FROM node:22-alpine AS build
 WORKDIR /repo
 
 COPY package.json package-lock.json ./
+COPY user-service/package.json ./user-service/
 COPY shared/grpc/package.json ./shared/grpc/
 COPY shared/messaging/package.json ./shared/messaging/
 COPY order-service/grpc/package.json ./order-service/grpc/
 COPY credit-service/package.json ./credit-service/
-COPY supplier-service/grpc/package.json ./supplier-service/grpc/
 RUN npm ci --include=dev
 
 COPY shared/grpc ./shared/grpc

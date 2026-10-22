@@ -5,11 +5,11 @@ FROM node:22-slim AS build
 WORKDIR /repo
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
+COPY user-service/package.json ./user-service/
 COPY shared/grpc/package.json shared/grpc/package.json
 COPY shared/messaging/package.json shared/messaging/package.json
 COPY order-service/grpc/package.json order-service/grpc/package.json
 COPY credit-service/package.json credit-service/package.json
-COPY supplier-service/grpc/package.json supplier-service/grpc/package.json
 RUN npm ci
 COPY shared/grpc shared/grpc
 COPY user-service/proto user-service/proto

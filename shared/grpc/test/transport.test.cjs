@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Resolved approved main/demo merge; original contributor declarations retained.
+// Author review pending; see ../../../order-service/usage-log.md.
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Verified six authenticated credit RPCs, removed initialization/history calls, and corrected the stale User Service stub assertion.

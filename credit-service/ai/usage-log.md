@@ -2084,3 +2084,24 @@ validation helper, removed private transport/proto, documentation and both logs.
 Checks passed: shared/Order builds; Order 15 unit and 56 PostgreSQL integration
 tests; shared gRPC 51 tests. Separate default-retry tests and durable-worker
 fault tests verify both retry layers. Final cleanup/checks are in Order log.
+
+
+## Entry 048 — 2026-10-22 Asia/Singapore: approved demo integrations
+
+Tool: ChatGPT (Codex). Modes: merge debugging, implementation/tests/docs.
+Human decisions, verbatim:
+```text
+Yes, retry missing accounts within the existing budget
+Merge both into d3-demo
+Just show what is available and put a "-" if LocationDescription is removed for now
+```
+
+Approved source branches: origin/main and origin/order-supplier-gRPC. Approved
+behavior: retry only missing Credit accounts within existing durable budget;
+retain other NOT_FOUND behavior; use "-" for missing Supplier locationDescription.
+Step 1 integrates main/User outbox, shared broker updates and Supplier package
+layout. Reconciled root manifests/lock with Credit relocation and User workspace;
+updated Docker manifest paths. Root JSON attribution follows existing exception.
+Checks: clean npm ci and shared/Order/Credit/User/Supplier builds passed. Exact
+paths, subsequent merge, behavior fixes and actual runtime checks are recorded
+in order-service/usage-log.md. Human review pending.

@@ -6,11 +6,11 @@
     "shared/grpc",
     "order-service/grpc",
     "credit-service",
-    "supplier-service/grpc",
-    "shared/messaging"
+    "shared/messaging",
+    "user-service"
   ],
   "scripts": {
-    "build": "npm run build --workspace @foc/grpc --workspace @foc/messaging && npm run build --workspace @foc/order-grpc --workspace @foc/credit-grpc --workspace @foc/supplier-grpc",
+    "build": "npm run build --workspace @foc/grpc --workspace @foc/messaging && npm run build --workspace @foc/order-grpc --workspace @foc/credit-grpc --workspace user-service && npm --prefix supplier-service run build && npm --prefix supplier-service run build:grpc",
     "test": "npm run test --workspace @foc/grpc",
     "grpc:generate": "npm run generate --workspace @foc/grpc"
   },

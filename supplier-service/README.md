@@ -5,11 +5,11 @@ Express app, and the gRPC server all run in containers.
 
 This stack is local only. `compose.yaml` does **not** load `.env`. It hardcodes
 `DATABASE_URL` to the compose `db` service. Do not point a production `.env` at
-this folder while you work here.
+this folder while you work here. `yarn` is the package installer and a dependency for supplier service. README.md updated to include yarn running from INSIDE docker container. 
 
 ```bash
 cd supplier-service
-docker compose up -d --build
+docker run --rm -v $(pwd):/app -w /app node:alpine yarn keys:generate
 ```
 
 This starts three containers:
@@ -174,19 +174,11 @@ process.stdout.write(token);
 
 | API endpoint                                | Sample curl command                                                                                                                                                                             |
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-<<<<<<< HEAD
 | `GET /suppliers`                            | `curl localhost:3002/suppliers`                                                                                                                                                                 |
 | `GET /suppliers/search?q=coffee`            | `curl "localhost:3002/suppliers/search?q=coffee"`                                                                                                                                               |
 | `GET /suppliers/search-radius`              | `curl "localhost:3002/suppliers/search-radius?latitude=1.294167&longitude=103.773611&radius=500"`                                                                                                |
 | `GET /suppliers/category?type=printing`     | `curl "localhost:3002/suppliers/category?type=printing"`                                                                                                                                        |
 | `GET /supplier/:id`                         | `curl localhost:3002/supplier/1`                                                                                                                                                                |
-=======
-| `GET /suppliers`                            | `curl localhost:3001/suppliers`                                                                                                                                                                 |
-| `GET /suppliers/search?q=coffee`            | `curl "localhost:3001/suppliers/search?q=coffee"`                                                                                                                                               |
-| `GET /suppliers/search-radius`              | `curl "localhost:3001/suppliers/search-radius?latitude=1.294167&longitude=103.773611&radius=500"`                                                                                                |
-| `GET /suppliers/category?type=printing`     | `curl "localhost:3001/suppliers/category?type=printing"`                                                                                                                                        |
-| `GET /supplier/:id`                         | `curl localhost:3001/supplier/1`                                                                                                                                                                |
->>>>>>> a76812b (Add in the location post gis functionality)
 | `POST /supplier`                            | see the multi-line sample below; the body needs all seven days of `openingHours`                                                                                                                |
 | `PUT /supplier/:id`                         | `curl -X PUT localhost:3002/supplier/1 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"buildingName":"COM2","expectedUpdatedAt":"2026-01-01T00:00:00.000Z"}'`       |
 | `DELETE /supplier/:id`                      | `curl -X DELETE localhost:3002/supplier/1 -H "Authorization: Bearer $TOKEN"`                                                                                                                    |
@@ -212,7 +204,7 @@ it at the published Postgres port (not a production URL):
 
 ```bash
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres \
-  npm run dev --workspace @foc/supplier-grpc
+  yarn --cwd supplier-service dev:grpc
 ```
 
 That prints `supplier-service gRPC listening on 0.0.0.0:50052`. Client samples,
@@ -234,14 +226,13 @@ try {
 `supplierId` is a `uint64`, so it is a **string** on the wire (`'1'`, not `1`).
 
 ```bash
-# GetSupplier is still a stub: expect gRPC UNIMPLEMENTED, not a supplier payload
+# GetSupplier: name, latitude, longitude for seed supplier 1
 node --input-type=module -e "
 import { createSupplierClient } from '@foc/grpc';
 const supplier = createSupplierClient('localhost:50052', { timeoutMs: 3000 });
 try {
-  await supplier.getSupplier({ supplierId: '1' });
-} catch (e) {
-  console.log(e.code, e.details);
+  const { name, latitude, longitude } = await supplier.getSupplier({ supplierId: '1' });
+  console.log({ name, latitude, longitude });
 } finally {
   supplier.close();
 }
@@ -281,6 +272,9 @@ Order-service already has a peer client at `SUPPLIER_GRPC_ADDR` (default
 
 ```ts
 const { isOpen } = await clients.supplier.isOpen({ supplierId: String(id) });
+const { name, latitude, longitude } = await clients.supplier.getSupplier({
+  supplierId: String(id),
+});
 ```
 
 ## Creating a supplier

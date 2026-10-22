@@ -1,3 +1,4 @@
+<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22. Resolved integration merge documentation; author review pending; see ../../order-service/usage-log.md. -->
 <!--
 AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
@@ -60,6 +61,12 @@ No gRPC history messages/client wrappers remain.
   [Protobuf update guidance](https://protobuf.dev/programming-guides/proto3/#updating).
 
 ## Calling Credit from Order Service
+
+```bash
+npm run dev --workspace @foc/order-grpc
+npm run dev --workspace @foc/credit-grpc
+yarn --cwd supplier-service dev:grpc
+```
 
 Credit uses plaintext gRPC, with the same configured secret on both services:
 
