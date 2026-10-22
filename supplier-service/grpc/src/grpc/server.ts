@@ -1,17 +1,10 @@
 import { status } from '@grpc/grpc-js';
 import { SupplierService, createServer, type SupplierServiceHandlers } from '@foc/grpc';
+import { parseSupplierId } from '@foc/grpc';
 
 type GetSupplierHandler = SupplierServiceHandlers['GetSupplier'];
 type IsOpenHandler = SupplierServiceHandlers['IsOpen'];
 
-//Defined to handle errors in gRPC! 
-function parseSupplierId(supplierId: string): number | undefined {
-  const id = Number(supplierId);
-  if (!Number.isSafeInteger(id) || id <= 0) {
-    return undefined;
-  }
-  return id;
-}
 
 const GetSupplier: GetSupplierHandler = (call, callback) => {
   void handleGetSupplier(call, callback);

@@ -165,8 +165,8 @@ custom transport/protobuf with direct @foc/grpc client use as the human requeste
 Retained response validation, metadata and durable lifecycle recovery; tests
 are recorded in Order usage log and Credit entry 047. Human review pending.
 
-Demo integration update, ChatGPT (Codex), 2026-10-22: merging the human-approved
+Demo integration update, ChatGPT (Codex), 2026-10-22: merged the human-approved
 main/User outbox and Supplier branch into d3-demo, preserving shared messaging
 recovery and correcting stale workspace/Docker manifest paths. Actual checks and
-remaining implementation steps are recorded in Order usage log and Credit entry
+verification scope are recorded in Order usage log and Credit entry
 048. Human review pending; original teammate authorship is preserved.

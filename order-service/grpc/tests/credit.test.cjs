@@ -53,3 +53,12 @@ test('Order retains response validation without implementing its own transport',
  assert.throws(()=>validateReservation({orderId:id,requesterId:'u',amount:4,status:'RESERVATION_STATUS_UNSPECIFIED',reservationId:'r',version:1}));
  assert.throws(()=>validateBalance({userId:'u',availableCredits:-1,reservedCredits:1,totalCredits:0}));
 });
+
+
+test('missing Credit accounts are retryable while other NOT_FOUND reasons stay permanent',()=>{
+ const metadata=new grpc.Metadata();metadata.set('x-credit-error-reason','ACCOUNT_NOT_FOUND');
+ assert.equal(classifyCreditError({code:grpc.status.NOT_FOUND,metadata}),'unavailable');
+ metadata.set('x-credit-error-reason','RESERVATION_NOT_FOUND');
+ assert.equal(classifyCreditError({code:grpc.status.NOT_FOUND,metadata}),'rejected');
+ assert.equal(classifyCreditError({code:grpc.status.NOT_FOUND}),'rejected');
+});

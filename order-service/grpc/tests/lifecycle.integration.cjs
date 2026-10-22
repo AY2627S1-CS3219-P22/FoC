@@ -159,7 +159,7 @@ test('creation integrates real User/Supplier/Credit gRPC adapters with PostgreSQ
  const f=fixture();const rpc=require('@foc/grpc');const grpc=require('@grpc/grpc-js');
  const {createDirectories}=require('../dist/dependencies/directories');const {createCreditClient}=require('@foc/grpc');
  const userServer=rpc.createServer(rpc.UserService.service,{GetPublicProfile:(call,cb)=>cb(null,{userId:call.request.userId,username:'student',firstName:'Campus',lastName:'Friend'})});
- const supplierServer=rpc.createServer(rpc.SupplierService.service,{GetSupplier:(call,cb)=>cb(null,{supplierId:call.request.supplierId,name:'Cafe',locationDescription:'Level 1'}),IsOpen:(_call,cb)=>cb(null,{isOpen:true})});
+ const supplierServer=rpc.createServer(rpc.SupplierService.service,{GetSupplier:(call,cb)=>cb(null,{supplierId:call.request.supplierId,name:'Cafe',buildingName:'NUS',floor:1,latitude:1.3,longitude:103.77}),IsOpen:(_call,cb)=>cb(null,{isOpen:true})});
  const creditServer=new grpc.Server();const CreditService=rpc.CreditService;
  const handlers={};for(const [wire,method] of [['GetBalance','getBalance'],['GetReservation','getReservation'],['ReserveCredits','reserveCredits'],['UpdateReservation','updateReservation'],['ReleaseCredits','releaseCredits'],['SettleCredits','settleCredits']])handlers[wire]=(call,cb)=>{
   if(call.metadata.get('x-credit-service-token')[0]!=='integration-token'){cb({code:16});return}
@@ -170,6 +170,8 @@ test('creation integrates real User/Supplier/Credit gRPC adapters with PostgreSQ
  const dirs=createDirectories('127.0.0.1:'+ports[0],'127.0.0.1:'+ports[1],1000);const credit=createCreditClient('127.0.0.1:'+ports[2],{timeoutMs:1000});const metadata=new grpc.Metadata();metadata.set('x-credit-service-token','integration-token');const creditOptions={metadata};
  t.after(()=>{dirs.close();credit.close();userServer.forceShutdown();supplierServer.forceShutdown();creditServer.forceShutdown()});
  const service=createOrderCreation(db,credit,dirs,creditOptions);const r=await service.submit(f.user,'real-grpc',f.input());assert.equal(r.status,201);assert.equal(r.order.status,'UNASSIGNED');assert.equal(f.ledger.get(r.order.id).status,'RESERVED');
+ assert.equal(r.order.pickupLocation,'-');const snapshot=await dirs.getSupplier('1');assert.equal(snapshot.buildingName,'NUS');assert.equal(snapshot.floor,1);assert.equal(snapshot.latitude,1.3);assert.equal(snapshot.locationDescription,'-');
+ const edited=await createOrderEdits(db,credit,dirs,creditOptions).edit(r.order.id,f.user,'real-grpc-edit',editOrderSchema.parse({destination:'Library'}));assert.equal(edited.order.pickupLocation,'-');
  const cancellation=await createOrderLifecycle(db,credit,[],creditOptions).cancel(r.order.id,f.user);assert.equal(cancellation.order.creditState,'REFUNDED');assert.equal(f.ledger.get(r.order.id).status,'RELEASED');
 });
 
@@ -355,7 +357,7 @@ async function grpcCreditFixture(t, f, token='test-order-token', options={}) {
    if(call.metadata.get('x-credit-service-token')[0]!=='test-order-token'){cb({code:grpc.status.UNAUTHENTICATED,message:'Invalid service token'});return;}
    calls++;
    try {cb(null,await f.credit[name[0].toLowerCase()+name.slice(1)](call.request));}
-   catch(error){cb({code:error.code??grpc.status.INTERNAL,message:'Test Credit operation failed'});}
+   catch(error){cb({code:error.code??grpc.status.INTERNAL,message:'Test Credit operation failed',metadata:error.metadata});}
   };
  }
  server.addService(service.service,handlers);
@@ -567,4 +569,32 @@ test('shared Credit default retries recover transport faults before Order needs 
  const edited=await edits.edit(created.order.id,f.user,'shared-retry-edit',{credits:7});assert.equal(edited.status,200);assert.equal(f.ledger.get(created.order.id).version,2);
  const lifecycle=createOrderLifecycle(db,wire.client,[],wire.options);f.releaseMode='before';
  const cancelled=await lifecycle.cancel(created.order.id,f.user);assert.equal(cancelled.order.creditState,'REFUNDED');assert.equal(f.ledger.get(created.order.id).version,3);
+});
+
+
+// Missing-account tests use the real shared client and real gRPC trailers.
+function delayCourierAccount(f) {
+ const grpc=require('@grpc/grpc-js'),original=f.credit.settleCredits;let ready=false;
+ f.credit.settleCredits=async input=>{
+  if(!ready){const metadata=new grpc.Metadata();metadata.set('x-credit-error-reason','ACCOUNT_NOT_FOUND');throw Object.assign(new Error('Courier account not initialized'),{code:grpc.status.NOT_FOUND,metadata});}
+  return original(input);
+ };
+ return ()=>{ready=true};
+}
+test('missing courier Credit account keeps settlement pending and succeeds after account initialization',async t=>{
+ const f=fixture(),makeReady=delayCourierAccount(f),wire=await grpcCreditFixture(t,f),order=await pickedUp(f);
+ const lifecycle=createOrderLifecycle(db,wire.client,[],wire.options);
+ const pending=await lifecycle.deliver(order.id,order.courierId);assert.equal(pending.order.status,'DELIVERED');assert.equal(pending.order.creditState,'SETTLEMENT_PENDING');
+ let work=await db.creditOperation.findUniqueOrThrow({where:{orderId_type:{orderId:order.id,type:'SETTLE'}}});assert.equal(work.state,'PENDING');assert.equal(work.attempts,1);
+ assert.equal(f.ledger.get(order.id).status,'RESERVED');assert.equal(f.settlements,0);
+ makeReady();await due(order.id,'SETTLE');await lifecycle.settlementBatch();
+ assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).creditState,'SETTLED');assert.equal(f.settlements,1);
+ work=await db.creditOperation.findUniqueOrThrow({where:{id:work.id}});assert.equal(work.state,'SUCCEEDED');assert.equal(work.attempts,2);
+});
+test('missing courier account stops after the existing five retries and retains manual reconciliation state',async t=>{
+ const f=fixture();delayCourierAccount(f);const wire=await grpcCreditFixture(t,f),order=await pickedUp(f),lifecycle=createOrderLifecycle(db,wire.client,[],wire.options);
+ await lifecycle.deliver(order.id,order.courierId);
+ for(let attempt=0;attempt<5;attempt++){await due(order.id,'SETTLE');await lifecycle.settlementBatch();}
+ const work=await db.creditOperation.findUniqueOrThrow({where:{orderId_type:{orderId:order.id,type:'SETTLE'}}});assert.equal(work.attempts,6);assert.equal(work.state,'PERMANENTLY_FAILED');assert.equal(work.lastError,'retry-exhausted');
+ await lifecycle.settlementBatch();assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).creditState,'SETTLEMENT_PENDING');assert.equal(f.settlements,0);assert.equal(f.ledger.get(order.id).status,'RESERVED');
 });

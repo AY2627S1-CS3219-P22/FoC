@@ -1,5 +1,5 @@
 <!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22 (Asia/Singapore).
-Scope: Generated setup and Postman checks from the agreed service contracts and READMEs.
+Scope: Generated setup/Postman checks; updated approved User/Supplier merges and retry behavior.
 Author review pending. Exact prompt and verification: usage-log.md, Credit entry 046. -->
 
 # Postman demo: Order and Credit
@@ -13,17 +13,19 @@ Credit's six gRPC operations and authenticated REST balance/history are implemen
 Order now uses createCreditClient directly from the shared @foc/grpc package.
 Order has creation, editing, acceptance, cancellation, expiry and delivery/settlement.
 
-The current full-stack blockers are:
+This demo branch now includes main's User transactional outbox and the approved
+Supplier gRPC branch. Registration records a durable `user.created` event; its
+background dispatcher publishes to Credit's queue. Supplier implements
+`GetSupplier` and `IsOpen`; its Compose file has no merge markers. Order retains
+available Supplier fields and stores `"-"` for an absent location description.
 
-- Supplier `GetSupplier` is UNIMPLEMENTED; its Compose file contains existing
-  conflict markers. Use the Supplier teammate's working branch/runtime before
-  attempting successful `POST /orders`.
-- Current User registration does not publish `user.created`. Credit reads do not
-  create accounts. Use an integrated User publisher or the explicitly manual
-  demo-event setup below, using IDs of your registered demo users.
-- Order has no pickup endpoint. A complete accept/pickup/deliver REST journey
-  cannot be presented from this branch. Direct Credit settlement can be shown
-  independently of Order pickup.
+Order has no pickup endpoint. A complete accept/pickup/deliver REST journey
+cannot be presented from this branch. Direct Credit settlement can be shown
+independently of Order pickup.
+
+Credit `NOT_FOUND` with `ACCOUNT_NOT_FOUND` stays pending within the existing
+initial attempt plus five retries. After exhaustion it requires manual
+reconciliation; other NOT_FOUND reasons retain their existing handling.
 
 The Credit-only demo below works without Supplier or Order. It uses synthetic
 reservation IDs; those reservations are not Order Service rows. Use fresh users
@@ -57,7 +59,11 @@ and its listener is ready:
 
 ```sh
 docker compose -f shared/messaging/compose.yaml up -d --wait
-docker compose -f user-service/compose.yaml up --build -d --wait
+# Create only if missing; keep existing local settings.
+[ -f user-service/.env ] || cp user-service/.env.example user-service/.env
+# Ensure POSTGRES_USER, POSTGRES_PASSWORD and POSTGRES_DB are set in that file.
+docker compose --env-file user-service/.env -f user-service/compose.yaml \
+  -f user-service/compose.override.yaml up --build -d --wait
 curl -i http://localhost:3001/health
 ```
 
@@ -191,10 +197,13 @@ Repeat for the courier email, saving `courierToken`.
 
 ## 6. Initialize demo Credit accounts
 
-With the integrated User publisher, wait for the `user.created` events and
-proceed to the baseline balance check. On the **current checkout**, User does
-not publish them. For an explicitly labelled manual Credit consumer demo,
-copy the two registration IDs into this terminal:
+Registration now publishes through User's durable outbox. Wait briefly, then
+check both users' Credit balances. If an account remains absent, inspect User
+outbox/dispatcher logs and Credit listener logs before proceeding.
+
+The following is an **optional manual event/replay diagnostic**, not the normal
+registration path. To demonstrate consumer idempotency, copy the registered
+user IDs into this terminal:
 
 ```sh
 export DEMO_REQUESTER_ID='paste-requesterId-here'
@@ -238,7 +247,7 @@ For each fresh user expect:
 ```
 
 GET `{{creditBase}}/credits/me/history?pageSize=50`: expect one INITIAL_GRANT.
-Rerun manual event publication for these same users: balances remain 10 and
+If testing optional manual event replay for these same users: balances remain 10 and
 history still has one INITIAL_GRANT per user. Account initialization is async;
 poll balance briefly after publishing. A 404 means the account is not initialized.
 
@@ -382,11 +391,19 @@ amount 3 each. Exactly one can succeed; the other is insufficient, leaving
 5 total / 3 reserved / 2 available. Release the successful hold afterwards.
 Use the automated concurrency suite for reproducible simultaneous execution.
 
-## 9. Order-to-Credit checks once Supplier is working
+## 9. Order-to-Credit checks
 
 Use a fresh requester/courier pair initialized as above. Do not mix synthetic
 Credit-only reservation IDs with persisted Order IDs. Start the working Supplier
-REST/gRPC services on 3002/50052 first; select a supplier that is open now.
+REST/gRPC services on 3002/50052 first; select a supplier that is open now:
+
+```sh
+docker compose -f supplier-service/compose.yaml up --build -d --wait
+curl -i http://localhost:3002/suppliers
+```
+
+Supplier uses its local seeded database on 54332. Its REST and gRPC image
+builds use the repository root so the shared gRPC package link resolves.
 
 Start Order from this repo with its authenticated lifecycle overlay:
 

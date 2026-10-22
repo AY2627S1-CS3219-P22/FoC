@@ -15,6 +15,7 @@ WORKDIR /repo
 # required so `npm ci` can resolve the workspaces list.
 COPY package.json package-lock.json ./
 COPY user-service/package.json ./user-service/
+COPY shared/messaging/package.json ./shared/messaging/
 COPY shared/grpc ./shared/grpc
 COPY user-service/proto ./user-service/proto
 COPY order-service/grpc/package.json ./order-service/grpc/

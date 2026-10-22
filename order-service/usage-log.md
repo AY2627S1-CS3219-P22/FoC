@@ -933,3 +933,29 @@ Affected integration paths so far: package.json/package-lock.json, shared gRPC
 README/test, shared messaging index, Order/Credit/User/Supplier gRPC Dockerfiles,
 root/Credit README and both service usage logs. Other incoming User/Supplier
 implementation files retain teammate history; no new authorship claim.
+
+
+Completed approved demo integration, 2026-10-22 Asia/Singapore:
+- Merged origin/main (c7778fe), then resolved origin/order-supplier-gRPC.
+- Kept approved string destination/pickupLocation schema; incoming coordinate
+  payload changes were incompatible with that schema. Supplier adapter retains
+  available building/floor/coordinates and substitutes "-" for missing description.
+- ACCOUNT_NOT_FOUND trailers on NOT_FOUND now use existing bounded recovery;
+  reservation-not-found/plain NOT_FOUND remain permanent. Tested late courier
+  account availability and exhaustion after initial attempt plus five retries.
+- Corrected Supplier REST Docker build context and shared workspace manifest
+  copies in REST/gRPC images. Updated POSTMAN_DEMO.md for User outbox, Supplier
+  startup and optional manual replay diagnostics.
+Validation: clean npm ci --ignore-scripts passed; Order units 16/16, shared gRPC
+51/51, User tests 8/8, Order PostgreSQL integration tests 58/58 passed. The latter
+include real gRPC transport, missing location creation/edit, recovery and retry
+exhaustion. First sandboxed unit run could not bind sockets; rerun with socket
+access passed. An added test initially omitted its edit idempotency key; fixed
+and the complete 58-test suite reran successfully. Supplier Compose validation
+passed. Docker build result recorded below. Test database was a separate
+throwaway container on 55449; existing demo databases were not changed.
+Human review pending. Full deployed User-to-RabbitMQ-to-Credit registration and
+full multi-service Postman demo have not been exercised in this turn.
+
+Supplier REST and gRPC Docker image builds both succeeded. Incoming two-file
+trailing whitespace was cleaned without changing teammate behavior.

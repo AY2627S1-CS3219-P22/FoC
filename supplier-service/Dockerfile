@@ -1,15 +1,44 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+# Scope: Updated workspace manifest copies for approved demo merge; review pending.
+# Prompts/checks: ../order-service/usage-log.md.
+# AI Assistance Disclosure:
+# Tool: OpenAI Codex (model: GPT-6), date: 2026-10-21 (Asia/Singapore).
+# Scope: Updated only the credit workspace manifest COPY path for the human-requested credit source relocation.
+# Author review: Pending human review.
+# Prompts and key responses: ../credit-service/ai/usage-log.md, entry 024.
+# AI-assisted path update; human review pending.
+
 FROM node:22-alpine
-WORKDIR /app
+WORKDIR /repo
 
-RUN corepack enable
+# Workspace lockfile lives at the FoC root; other grpc package.json files are
+# required so `npm ci` can resolve the workspaces list.
+COPY package.json package-lock.json ./
+COPY user-service/package.json ./user-service/
+COPY shared/messaging/package.json ./shared/messaging/
+COPY shared/grpc ./shared/grpc
+COPY user-service/proto ./user-service/proto
+COPY order-service/grpc/package.json ./order-service/grpc/
+COPY credit-service/package.json ./credit-service/
+COPY supplier-service/package.json supplier-service/yarn.lock ./supplier-service/
+COPY supplier-service/tsconfig.json ./supplier-service/
+COPY supplier-service/src ./supplier-service/src
+COPY supplier-service/grpc/tsconfig.json ./supplier-service/grpc/
+COPY supplier-service/grpc/src ./supplier-service/grpc/src
 
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+# Shared contracts still come from the FoC npm workspace. Build them before
+# Yarn links @foc/grpc into supplier-service/node_modules.
+RUN npm ci --include=dev \
+ && npm run build --workspace @foc/grpc
 
-COPY tsconfig.json ./
-COPY src ./src
+# REST src and grpc share one Yarn package (drizzle-orm / pg / @foc/grpc / tsx).
+# Install before NODE_ENV=production so parent devDependencies stay.
+RUN corepack enable \
+ && yarn --cwd supplier-service install --frozen-lockfile
 
+WORKDIR /repo/supplier-service
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
 ENV PORT=3002
 EXPOSE 3002
 

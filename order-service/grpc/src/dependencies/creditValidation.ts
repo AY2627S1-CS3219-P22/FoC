@@ -18,7 +18,11 @@ export const validateReservation = (value: unknown) => reservationSchema.parse(v
 export const validateBalance = (value: unknown) => balanceSchema.parse(value);
 
 export function classifyCreditError(error: unknown): 'rejected' | 'unavailable' | 'uncertain' {
-  const code = (error as Partial<ServiceError> | null)?.code;
+  const failure = error as Partial<ServiceError> | null;
+  const code = failure?.code;
+  // User registration events can arrive after an Order operation. Retry only
+  // the explicitly identified account gap within the existing durable budget.
+  if (code === status.NOT_FOUND && failure?.metadata?.get('x-credit-error-reason').includes('ACCOUNT_NOT_FOUND')) return 'unavailable';
   if (code === status.INVALID_ARGUMENT || code === status.FAILED_PRECONDITION || code === status.NOT_FOUND) return 'rejected';
   if (code === status.UNAUTHENTICATED || code === status.PERMISSION_DENIED || code === status.UNIMPLEMENTED) return 'unavailable';
   return 'uncertain';
