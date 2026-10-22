@@ -13,7 +13,6 @@ const schema = z.object({
   GRPC_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   USER_SERVICE_PUBLIC_KEY_PATH: z.string().min(1).optional(),
   CREDIT_ORDER_SERVICE_TOKEN: z.string().trim().min(1).optional(),
-  CREDIT_GRPC_CA_PATH: z.string().min(1).optional(),
   USER_GRPC_ADDR: z.string().min(1).default('localhost:50051'),
   ORDER_GRPC_ADDR: z.string().min(1).default('localhost:50053'),
   CREDIT_GRPC_ADDR: z.string().min(1).default('localhost:50054'),

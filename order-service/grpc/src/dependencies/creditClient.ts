@@ -20,9 +20,9 @@ const definition = loadSync(path.resolve(__dirname, '../../proto/credit.proto'),
 });
 const contract = loadPackageDefinition(definition) as unknown as { credit: { CreditService: ServiceClientConstructor } };
 
-export function createCreditClient(address: string, token: string, timeoutMs: number, ca?: Buffer) {
+export function createCreditClient(address: string, token: string, timeoutMs: number) {
   if (!token.trim() || !Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new Error('Invalid Credit configuration');
-  const client = new contract.credit.CreditService(address, ca ? credentials.createSsl(ca) : credentials.createInsecure());
+  const client = new contract.credit.CreditService(address, credentials.createInsecure());
   const methods = contract.credit.CreditService.service;
   async function call<T>(name: string, input: object, schema: z.ZodType<T>): Promise<T> {
     const method = methods[name];

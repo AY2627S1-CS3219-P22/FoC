@@ -24,3 +24,11 @@ test('agreed Credit RPCs carry token, expected version and current reservation f
 test('business rejection differs from uncertain or unavailable integration',()=>{
  assert.equal(classifyCreditError({code:grpc.status.FAILED_PRECONDITION}),'rejected');assert.equal(classifyCreditError({code:grpc.status.DEADLINE_EXCEEDED}),'uncertain');assert.equal(classifyCreditError({code:grpc.status.UNAVAILABLE}),'uncertain');assert.equal(classifyCreditError({code:grpc.status.UNIMPLEMENTED}),'unavailable');
 });
+
+test('plaintext Credit accepts container targets in production and retains credential validation',()=>{
+ const previous=process.env.NODE_ENV;
+ try {
+  process.env.NODE_ENV='production';const client=createCreditClient('credit-service:50054','test-token',1000);client.close();
+  assert.throws(()=>createCreditClient('credit-service:50054','',1000),/configuration/);
+ } finally {if(previous===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=previous}
+});

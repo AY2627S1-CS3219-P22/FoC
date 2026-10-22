@@ -19,7 +19,7 @@ async function main(): Promise<void> {
   const grpcServer = createGrpcServer();
   const publicKey = env.USER_SERVICE_PUBLIC_KEY_PATH ? readFileSync(env.USER_SERVICE_PUBLIC_KEY_PATH, 'utf8') : undefined;
   const credit = env.CREDIT_ORDER_SERVICE_TOKEN ? createCreditClient(env.CREDIT_GRPC_ADDR, env.CREDIT_ORDER_SERVICE_TOKEN,
-    env.GRPC_TIMEOUT_MS, env.CREDIT_GRPC_CA_PATH ? readFileSync(env.CREDIT_GRPC_CA_PATH) : undefined) : undefined;
+    env.GRPC_TIMEOUT_MS) : undefined;
   const directories = createDirectories(env.USER_GRPC_ADDR, env.SUPPLIER_GRPC_ADDR, env.GRPC_TIMEOUT_MS);
   const creation = credit ? createOrderCreation(prisma, credit, directories) : undefined;
   const edits = credit ? createOrderEdits(prisma, credit, directories) : undefined;

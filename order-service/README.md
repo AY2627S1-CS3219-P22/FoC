@@ -183,13 +183,12 @@ USER_GRPC_ADDR=localhost:50051
 SUPPLIER_GRPC_ADDR=localhost:50052
 CREDIT_GRPC_ADDR=localhost:50054
 CREDIT_ORDER_SERVICE_TOKEN=your-order-credential
-# CREDIT_GRPC_CA_PATH=/absolute/path/to/trusted-credit-ca.pem
 ```
 
-Use the same credential configured by Credit. Set the CA path when Credit uses
-TLS. Leave it unset only for the team's explicit local plaintext Credit mode.
-Only User's public key is needed by Order. Configured unreadable key/CA paths
-fail startup. Without a public key, Order writes return 503; without a Credit
+Use the same credential configured by Credit. Order-to-Credit gRPC is plaintext
+for both localhost and container/service DNS addresses; there is no CA setting.
+Only User's public key is needed by Order. A configured unreadable public-key
+path fails startup. Without a public key, Order writes return 503; without a Credit
 credential, Credit-dependent writes return 503 and no recovery worker runs.
 Health continues to probe PostgreSQL independently.
 
@@ -203,11 +202,9 @@ docker compose -f order-service/compose.yaml \
 
 Generate User's keys through its existing instructions if absent; do not replace
 an existing key pair. The override mounts only the public key read-only and uses
-Docker Desktop's host.docker.internal for peer RPCs. It assumes explicit local
-plaintext Credit mode. For TLS, supply a Compose override mounting the trusted CA
-read-only and set CREDIT_GRPC_CA_PATH to its container path and CREDIT_GRPC_ADDR
-to the certificate's hostname. The base Compose stack remains usable for health
-and database setup without peer configuration.
+Docker Desktop's host.docker.internal for peer RPCs. Credit uses plaintext gRPC
+with the unchanged x-credit-service-token credential. The base Compose stack
+remains usable for health and database setup without peer configuration.
 
 ### HTTP contract
 
@@ -351,3 +348,31 @@ no server-side filters or pagination. The dashboard can filter the returned
 information, using DELIVERED for completed orders and cancellationReason EXPIRY
 for orders cancelled by expiry. No User/Supplier/Credit RPC is needed for this
 read; the response uses stored snapshots.
+
+### Cancellation and expiry issue verification
+
+Verified 2026-10-22 on order-functionality: 9 unit/authentication/gRPC tests and
+32 PostgreSQL/HTTP/gRPC integration tests passed (41 total). This includes the
+previous creation/edit/admin tests and the following cancellation/expiry checks:
+
+- Requester can POST /orders/:id/cancel only for an unassigned, unexpired order.
+- Missing credentials, wrong owner, admin-only role, malformed UUID/body and
+  unknown orders are rejected. Assigned, picked-up and delivered orders cannot
+  be manually cancelled; overdue cancellation requests return 409 and the worker
+  applies expiry instead.
+- Concurrent cancellation/replay retains one history row and one refund intent.
+- Expiry cancels UNASSIGNED, ASSIGNED and PICKED_UP, preserving delivered and
+  future orders; the configured worker handles it without a frontend request.
+- Release transport errors, uncertain commits, wrong-owner receipts and stale
+  release replies never falsely mark REFUNDED. Restart/expired-lease recovery
+  checks current reservation state before completing the refund.
+- Initial attempt plus five retries is enforced; explicit rejection and exhausted
+  work remain recorded as unresolved REFUND_PENDING for reconciliation.
+- If cancellation is committed but the immediate refund or receipt write fails,
+  the endpoint returns 202 with the durable cancelled/pending order. A failure
+  before cancellation commits is still an error.
+
+Live peer-service integration still requires the implemented Credit service and
+configured token; tests use separate test-only peer services. These checks do
+not add the separate courier acceptance/pickup/delivery endpoints previously
+identified on feature/order-create, or a student order-list/detail endpoint.
