@@ -11,6 +11,7 @@ import ProfilePage from "./pages/ProfilePage"
 import AdminPage from "./pages/AdminPage"
 import SuppliersPage from "./pages/SuppliersPage"
 import { getMe, logout, type ApiUser } from "./api/users"
+import { getBalance } from "./api/credits"
 import { refreshToken } from "./api/client"
 
 export type Page =
@@ -47,7 +48,7 @@ export interface User {
   id: string
   name: string
   email: string
-  credits: number
+  credits: number | null  // null until credit-service answers
   memberSince: string
   isAdmin: boolean
 }
@@ -56,12 +57,11 @@ const CURRENT_USER: User = {
   id: "u1",
   name: "Jordan Tan",
   email: "jordan.tan@u.nus.edu",
-  credits: 12,
+  credits: null,
   memberSince: "September 2026",
   isAdmin: false,
 }
 
-// Credits aren't in user-service, so that still comes from the mock user for now
 const fromApiUser = (u: ApiUser): User => ({
   ...CURRENT_USER,
   id: u.id,
@@ -139,7 +139,19 @@ export default function App() {
   }
 
   // keeps the mock user if user-service isn't running
-  const loadUser = () => getMe().then((u) => setUser(fromApiUser(u))).catch(() => {})
+  const loadUser = () => getMe()
+    .then((u) => setUser((prev) => ({ ...fromApiUser(u), credits: prev.credits })))
+    .catch(() => {})
+
+  // balance shows as "–" if credit-service is down or has no account for this user yet
+  const loadCredits = () => getBalance()
+    .then((b) => setUser((prev) => ({ ...prev, credits: b.availableCredits })))
+    .catch(() => setUser((prev) => ({ ...prev, credits: null })))
+
+  // creating, delivering and cancelling all move credits, so refresh on every page change
+  useEffect(() => {
+    if (isLoggedIn) loadCredits()
+  }, [page, isLoggedIn])
 
   // Stay logged in across reloads if the refresh cookie is still valid
   useEffect(() => {

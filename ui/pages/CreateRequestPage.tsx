@@ -105,7 +105,9 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
   })
 
   const set = (k: keyof typeof form, v: string | number) => setForm((f) => ({ ...f, [k]: v }))
-  const creditsAfter = user.credits - form.credits
+  // if the balance didn't load, let order-service decide whether there are enough credits
+  const creditsAfter = user.credits === null ? null : user.credits - form.credits
+  const notEnough = creditsAfter !== null && creditsAfter < 0
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState("")
@@ -335,19 +337,22 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
                 <span className="text-sm text-[#3F6B5A] ml-1.5">credits</span>
               </div>
               <button
-                onClick={() => set("credits", Math.min(user.credits, form.credits + 1))}
+                onClick={() => set("credits", user.credits === null ? form.credits + 1 : Math.min(user.credits, form.credits + 1))}
                 className="w-10 h-10 border border-[#E4E8E6] rounded-lg flex items-center justify-center hover:bg-[#F7F9F8] text-xl text-[#1B2522] transition-colors"
               >
                 +
               </button>
             </div>
             <div className="flex justify-between mt-3 text-xs text-[#3F6B5A]">
-              <span>Available: <strong className="text-[#162A46]">{user.credits}</strong> credits</span>
-              <span className={creditsAfter < 0 ? "text-red-500 font-medium" : ""}>
-                Remaining: <strong>{creditsAfter}</strong> credits
+              <span>Available: <strong className="text-[#162A46]">{user.credits ?? "–"}</strong> credits</span>
+              <span className={notEnough ? "text-red-500 font-medium" : ""}>
+                Remaining: <strong>{creditsAfter ?? "–"}</strong> credits
               </span>
             </div>
-            {creditsAfter < 0 && (
+            {user.credits === null && (
+              <p className="text-xs text-[#3F6B5A] mt-1.5">Couldn't load your balance right now.</p>
+            )}
+            {notEnough && (
               <p className="text-xs text-red-500 mt-1.5">Insufficient credits.</p>
             )}
           </div>
@@ -384,7 +389,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
           {submitError && <p role="alert" className="text-xs text-red-600">{submitError}</p>}
           <button
             onClick={handleSubmit}
-            disabled={creditsAfter < 0 || !deadlineValid || submitting}
+            disabled={notEnough || !deadlineValid || submitting}
             className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {submitting ? "Placing request…" : "Place Request"}
