@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import type { RegisterInput } from '../api/dto/registerDto';
 import { buildNewUser, duplicateField, profileSelect } from './userService';
+import { enqueueUserCreated } from '../events/outboxStore';
 
 // App-wide key for the admin lock.
 const ADMIN_LOCK_KEY = 32190001;
@@ -38,6 +39,7 @@ export async function bootstrapAdmin(input: RegisterInput) {
         data: { ...data, roles: ['USER', 'ADMINISTRATOR'] },
         select: profileSelect,
       });
+      await enqueueUserCreated(tx, user.id);
       await tx.systemBootstrap.create({ data: { adminUserId: user.id } });
       await tx.adminRoleChange.create({
         data: { actorId: null, targetId: user.id, action: 'GRANT' },

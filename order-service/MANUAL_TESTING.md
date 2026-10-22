@@ -35,8 +35,8 @@ is no need to switch the checkout serving Order to a different branch.
 | --- | --- | --- | --- |
 | User | 3001 | 50051 | 5432 |
 | Supplier | 3002 | 50052 | 54332 |
-| Order | 3003 | 50053 | 5433 |
-| Credit | 3004 | 50054 | choose 5434 to avoid Order's 5433 |
+| Order | 3003 | 50053 | 5434 |
+| Credit | 3004 | 50054 | 5433 |
 
 ## 2. Start services
 
@@ -110,12 +110,12 @@ Use that checkout's README if its migration list has since changed.
 Start Order with authenticated lifecycle integration enabled:
 
 ```sh
-cd "$ORDER_REPO"
+cd "$ORDER_REPO/order-service"
 # Set this if User's keys live in a different checkout:
 # export USER_PUBLIC_KEY_PATH=/absolute/path/to/user-service/keys/public.pem
+# order-service/.env must contain CREDIT_ORDER_SERVICE_TOKEN (copy .env.example).
 
-docker compose -f order-service/compose.yaml \
-  -f order-service/compose.lifecycle.yaml up --build -d --wait
+docker compose up --build -d --wait
 curl -i http://localhost:3003/health
 ```
 
@@ -375,8 +375,7 @@ manually changing normal service database rows.
 ## 11. Troubleshooting and shutdown
 
 ```sh
-docker compose -f order-service/compose.yaml -f order-service/compose.lifecycle.yaml \
-  logs --tail 100 order-service
+docker compose -f order-service/compose.yaml logs --tail 100 order-service
 ```
 
 - Order health 200 but writes 503: check public-key/token settings and peer RPCs.
