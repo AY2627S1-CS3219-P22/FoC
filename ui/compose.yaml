@@ -25,9 +25,12 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
-    networks: [internal]
+    # public: where outside traffic comes in (the published port).
+    # internal: where the backends are. nginx is the only container on both.
+    networks: [public, internal]
 
-# Private network for service-to-service traffic. Every service's compose file
-# declares the same `internal`, the root compose merges them into one network.
 networks:
+  public:
+  # Private network for service-to-service traffic. Every service's compose file
+  # declares the same `internal`, the root compose merges them into one network.
   internal:
