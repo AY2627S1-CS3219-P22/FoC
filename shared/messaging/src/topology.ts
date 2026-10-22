@@ -9,8 +9,10 @@ export const EXCHANGES = {
   retry: 'retry.events' //subject to specific implementation
 } as const;
 
+export const CREDIT_USER_QUEUE = 'credit.user-events';
+
 export const QUEUES = {
-  creditUser: "credit.user-events",
+  creditUser: CREDIT_USER_QUEUE,
   orderUser: "order.user-events",
   orderSupplier: "order.supplier-events",
   notificationOrders: "notification.order-events",

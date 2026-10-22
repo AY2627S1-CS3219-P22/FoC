@@ -4,6 +4,7 @@ import path from 'node:path';
 import amqp, { type ChannelModel, type ConfirmChannel, type ConsumeMessage, type Options } from 'amqplib';
 import { QueueLogger } from './queueLog';
 import { deadLetterExchange, deadLetterQueue, MAX_RETRIES, RETRY_HEADER } from './topology';
+import { NonRetryableError, toError } from './errors';
 
 export type RabbitMQConfig = {
   url?: string;
@@ -21,7 +22,7 @@ export type QueueMessage<T = unknown> = {
   retryCount: number; 
 };
 
-const DEFAULT_PREFETCH = 10;
+const DEFAULT_PREFETCH = 10; //default value for prefetch if not specified in service's config
 /*
 Classic RabbitMQ singleton 
 
@@ -29,7 +30,7 @@ Classic RabbitMQ singleton
 AI has suggested the following additions that were accepted by @sunpterodactyl
 - Generic queuehandler added in: 
 - close() function added in
-- uuid for eventId using the event broker 
+- uuid for eventId using the event broker it was initially a string
 
 */
 
@@ -185,12 +186,12 @@ export class RabbitMQClient {
     const retryCount = Number.isFinite(parsedRetry) ? parsedRetry : maxRetries;
     const messageId = msg.properties.messageId ?? '';
 
-    let payload: T;
+    let payload: T; //my data payload
     try {
       payload = JSON.parse(msg.content.toString()) as T;
       if (payload === null) throw new Error('null payload'); //handle null case
     } catch {
-      channel.nack(msg, false, false); //make sure no acknowledgement incites retry
+      channel.nack(msg, false, false); // Reject without requeueing; route to the configured DLQ.
       this.log.error('dead-letter', [queue, deadLetterQueue(queue)], {
         eventId: messageId,
         reason: 'invalid-json',
@@ -207,18 +208,26 @@ export class RabbitMQClient {
     let failure: Error | undefined
     try {
       await handler({ eventId, payload, retryCount });
-      channel.ack(msg);
-      //this.log.info('acked', queue, { eventId, retryCount });
     } catch (err) {
-      const failure = err instanceof Error ? err.message : String(err);
+      failure = toError(err);
     }
     if (!failure) {
-      channel.ack(msg);  // now outside the try haha so we dont have logging failing --> rabbitmq failing 
+      channel.ack(msg); // Acknowledge once, after the handler succeeds.
       this.log.info('acked', queue, { eventId, retryCount });
       return;
     }
 
+    //need to make sure that invalid inputs does not clog the queue
+    if (failure instanceof NonRetryableError) {
+        channel.nack(msg, false, false);
+        this.log.error('dead-letter', [queue, deadLetterQueue(queue)], {
+        eventId, retryCount, reason: 'non-retryable', message: failure.message,
+      });
+      return;
+    }
+
     if (retryCount < maxRetries) {
+      //recreate the event message here
       const republished = await this.confirmSend(queue, msg.content, {
         persistent: true,
         messageId: msg.properties.messageId,
@@ -226,10 +235,10 @@ export class RabbitMQClient {
         headers: { ...msg.properties.headers, [RETRY_HEADER]: retryCount + 1 },
       });
       if (republished) {
-        channel.ack(msg);
+        channel.ack(msg); //acknowledge the original message so it does not get retried again
         this.log.info('retry', queue, { eventId, retryCount: retryCount + 1, message: failure.message });
       } else {
-        channel.nack(msg, false, true);
+        channel.nack(msg, false, true);//requeue the original message so it can be retried again
         this.log.error('retry-blocked', queue, { eventId, retryCount, message: failure.message });
       }
       return;
@@ -241,6 +250,7 @@ export class RabbitMQClient {
 }
 
 export * from './topology';
+export { NonRetryableError } from './errors';
 export * from './contracts/credit';
 export * from './contracts/order';
 export * from './contracts/supplier';
