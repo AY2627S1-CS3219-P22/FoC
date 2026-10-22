@@ -51,9 +51,25 @@ export class RabbitMQClient {
     );
   }
 
+  //addresses comments on shutdown log 
   async connect(): Promise<void> {
     const url = this.config.url || 'amqp://guest:guest@localhost:5672';
-    this.connection = await amqp.connect(url);
+    this.connection = await amqp.connect(url); 
+    
+    this.connection.on("error", (err) => {
+        if (err.message !== "Connection closing") {
+          this.log.error("[AMQP] conn error", err.message);
+          this.close()
+        }
+      });
+      
+      this.connection.on("close", () => {
+        this.log.error("[AMQP] connection was closed, please manually reconnect. Automatic restarts are not yet supported");
+        this.close()
+        //return setTimeout(start, 1000); 
+      })
+
+
     this.channel = await this.connection.createConfirmChannel();
     this.log.info('connected');
 
@@ -85,7 +101,7 @@ export class RabbitMQClient {
       persistent: true,
       messageId: id,
       contentType: 'application/json',
-    });
+    }); //correctly specifies content type
     this.log.info(sent ? 'published' : 'publish-rejected', queue, { eventId: id });
     return sent;
   }
