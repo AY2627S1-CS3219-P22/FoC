@@ -10,7 +10,6 @@ import AcceptedOrderPage from "./pages/AcceptedOrderPage"
 import ProfilePage from "./pages/ProfilePage"
 import AdminPage from "./pages/AdminPage"
 import SuppliersPage from "./pages/SuppliersPage"
-import { SEED_ORDERS } from "./api/orders"
 import { getMe, logout, type ApiUser } from "./api/users"
 import { refreshToken } from "./api/client"
 
@@ -36,7 +35,7 @@ export interface Order {
   description: string
   credits: number
   deadline: string
-  status: "open" | "accepted" | "picked-up" | "delivered" | "completed" | "cancelled" | "expired"
+  status: "open" | "accepted" | "picked-up" | "delivered" | "cancelled" | "expired"
   requesterId: string
   requesterName: string
   courierId?: string
@@ -50,9 +49,6 @@ export interface User {
   email: string
   credits: number
   memberSince: string
-  requestsCreated: number
-  errandsCompleted: number
-  creditsEarned: number
   isAdmin: boolean
 }
 
@@ -62,13 +58,10 @@ const CURRENT_USER: User = {
   email: "jordan.tan@u.nus.edu",
   credits: 12,
   memberSince: "September 2026",
-  requestsCreated: 2,
-  errandsCompleted: 2,
-  creditsEarned: 9,
   isAdmin: false,
 }
 
-// Credits and stats aren't in user-service, so those still come from the mock user for now
+// Credits aren't in user-service, so that still comes from the mock user for now
 const fromApiUser = (u: ApiUser): User => ({
   ...CURRENT_USER,
   id: u.id,
@@ -132,9 +125,9 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
   const [user, setUser]           = useState<User>(CURRENT_USER)
-  const [orders, setOrders]       = useState<Order[]>(SEED_ORDERS)
-  const [selectedOrderId, setSelectedOrderId] = useState<string>("o1")
-  const [acceptedOrderId, setAcceptedOrderId] = useState<string | null>(null)
+  const [selectedOrderId, setSelectedOrderId] = useState("")
+  const [earnedCredits, setEarnedCredits] = useState(0)
+  const [createPending, setCreatePending] = useState(false)
 
   const [orderReturnPage, setOrderReturnPage] = useState<"orders" | "my-orders">("orders")
 
@@ -174,35 +167,10 @@ export default function App() {
     navigate("login")
   }
 
-  const handleAcceptOrder = (orderId: string) => {
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === orderId
-          ? { ...o, status: "accepted", courierId: user.id, courierName: user.name }
-          : o
-      )
-    )
-    setAcceptedOrderId(orderId)
-    navigate("accepted-order", orderId)
-  }
-
-  const handleMarkPickedUp = (orderId: string) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: "picked-up" } : o))
-    )
-  }
-
-  const handleMarkDelivered = (orderId: string) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: "completed" } : o))
-    )
+  const handleDelivered = (order: Order) => {
+    setEarnedCredits(order.credits)
     navigate("errand-complete")
   }
-
-  const completedOrderCredits =
-    acceptedOrderId
-      ? (orders.find((o) => o.id === acceptedOrderId)?.credits ?? 4)
-      : 4
 
   if (checkingSession) return null
 
@@ -217,38 +185,25 @@ export default function App() {
     return <AdminPage user={user} onNavigate={navigate} />
   }
 
-  const selectedOrder  = orders.find((o) => o.id === selectedOrderId)
-  const acceptedOrder  = orders.find((o) => o.id === acceptedOrderId)
-
   return (
     <div className="flex min-h-dvh flex-col">
       <Navbar user={user} currentPage={page} onNavigate={navigate} onLogout={handleLogout} />
 
       <main className="min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] md:pb-0">
         {page === "orders" && (
-          <OrdersPage orders={orders} onNavigate={navigate} onSelectOrder={(id) => navigate("order-details", id)} />
+          <OrdersPage onNavigate={navigate} onSelectOrder={(id) => navigate("order-details", id)} />
         )}
 
         {page === "my-orders" && (
-          <MyOrdersPage
-            orders={orders}
-            user={user}
-            onSelectOrder={(id) => navigate("order-details", id)}
-            onDeleteOrder={(id) => setOrders((prev) => prev.filter((o) => o.id !== id))}
-            onMarkPickedUp={handleMarkPickedUp}
-            onMarkDelivered={(id) => setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "picked-up" } : o))}
-            onConfirmDelivery={(id) => setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "completed" } : o))}
-            onReleaseCredits={(id) => setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "completed" } : o))}
-          />
+          <MyOrdersPage onSelectOrder={(id) => navigate("order-details", id)} />
         )}
 
         {page === "create-request" && (
           <CreateRequestPage
             user={user}
             onNavigate={navigate}
-            onSubmit={(order) => {
-              setOrders((prev) => [order, ...prev])
-              setUser((prev) => ({ ...prev, credits: prev.credits - order.credits }))
+            onCreated={(pending) => {
+              setCreatePending(pending)
               navigate("create-success")
             }}
           />
@@ -256,8 +211,10 @@ export default function App() {
 
         {page === "create-success" && (
           <SuccessScreen
-            title="Request created"
-            subtitle="Your request is now visible to available couriers."
+            title={createPending ? "Request submitted" : "Request created"}
+            subtitle={createPending
+              ? "We're still reserving your credits. It'll show up in My Orders once that's done."
+              : "Your request is now visible to available couriers."}
             primaryLabel="Back to Orders"
             secondaryLabel="View Requests"
             onPrimary={() => navigate("orders")}
@@ -265,40 +222,22 @@ export default function App() {
           />
         )}
 
-        {page === "order-details" && selectedOrder && (() => {
-          const isRequester = selectedOrder.requesterId === user.id
-          const isCourier   = selectedOrder.courierId   === user.id
-          const inProgress  = ["accepted", "picked-up", "delivered"].includes(selectedOrder.status)
-          return (
-            <OrderDetailsPage
-              order={selectedOrder}
-              currentUserId={user.id}
-              onBack={() => navigate(orderReturnPage)}
-              onAccept={handleAcceptOrder}
-              onDelete={isRequester && selectedOrder.status === "open"
-                ? () => setOrders((prev) => prev.filter((o) => o.id !== selectedOrder.id))
-                : undefined}
-              onMarkPickedUp={isCourier && selectedOrder.status === "accepted"
-                ? () => handleMarkPickedUp(selectedOrder.id)
-                : undefined}
-              onMarkDelivered={isCourier && selectedOrder.status === "picked-up"
-                ? () => { setOrders((prev) => prev.map((o) => o.id === selectedOrder.id ? { ...o, status: "completed" } : o)); navigate("orders") }
-                : undefined}
-              onConfirm={isRequester && inProgress
-                ? () => setOrders((prev) => prev.map((o) => o.id === selectedOrder.id ? { ...o, status: "completed" } : o))
-                : undefined}
-              onReleaseCredits={isRequester && inProgress
-                ? () => { setOrders((prev) => prev.map((o) => o.id === selectedOrder.id ? { ...o, status: "completed" } : o)); navigate("orders") }
-                : undefined}
-            />
-          )
-        })()}
+        {page === "order-details" && (
+          <OrderDetailsPage
+            key={selectedOrderId}
+            orderId={selectedOrderId}
+            currentUserId={user.id}
+            onBack={() => navigate(orderReturnPage)}
+            onAccepted={(id) => navigate("accepted-order", id)}
+            onDelivered={handleDelivered}
+          />
+        )}
 
-        {page === "accepted-order" && acceptedOrder && (
+        {page === "accepted-order" && (
           <AcceptedOrderPage
-            order={acceptedOrder}
-            onMarkPickedUp={handleMarkPickedUp}
-            onMarkDelivered={handleMarkDelivered}
+            key={selectedOrderId}
+            orderId={selectedOrderId}
+            onDelivered={handleDelivered}
             onBack={() => navigate("orders")}
           />
         )}
@@ -306,7 +245,7 @@ export default function App() {
         {page === "errand-complete" && (
           <SuccessScreen
             title="Errand completed"
-            accent={`+${completedOrderCredits} Credits`}
+            accent={`+${earnedCredits} Credits`}
             subtitle="Credits have been added to your balance."
             primaryLabel="Back to Orders"
             onPrimary={() => navigate("orders")}
@@ -318,7 +257,6 @@ export default function App() {
         {page === "profile" && (
           <ProfilePage
             user={user}
-            orders={orders}
             onNavigate={navigate}
             onLogout={handleLogout}
           />

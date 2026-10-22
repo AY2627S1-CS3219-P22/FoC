@@ -1,6 +1,10 @@
-import { SUPPLIERS } from "../data/suppliers"
+// AI-assisted (Claude), reviewed and tested by Maliha
 import { useEffect, useState } from "react"
-import type { User, Order, Page } from "../App"
+import type { User, Page } from "../App"
+import { getSuppliers } from "../api/suppliers"
+import { createOrder, orderError, type NewOrder } from "../api/orders"
+
+type SupplierOption = { id: string; name: string; location: string; type: string }
 
 const DELIVERY_LOCATIONS = [
   "PGP", "PGPR Block A", "PGPR Block B", "PGPR Block E",
@@ -24,13 +28,13 @@ const DELIVERY_TIMES = Array.from({ length: 96 }, (_, index) => {
 interface Props {
   user: User
   onNavigate: (page: Page) => void
-  onSubmit: (order: Order) => void
+  onCreated: (pending: boolean) => void
 }
 
 const inputCls =
   "w-full px-3.5 py-2.5 border border-[#E4E8E6] rounded-lg text-sm text-[#1B2522] bg-white focus:outline-none focus:border-[#1A4A36] focus:ring-1 focus:ring-[#1A4A36] transition-colors placeholder-[#9CA3AF]"
 
-export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props) {
+export default function CreateRequestPage({ user, onNavigate, onCreated }: Props) {
   const [step, setStep] = useState(1)
   const [now, setNow] = useState(() => Date.now())
   const [deliveryDate, setDeliveryDate] = useState(() => localDateValue(new Date()))
@@ -68,14 +72,32 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
     setDeadlineError("")
     return true
   }
+  // order-service needs the real supplier id, so suppliers have to come from supplier-service
+  const [suppliers, setSuppliers] = useState<SupplierOption[] | null>(null)
+  const [suppliersError, setSuppliersError] = useState("")
+  const loadSuppliers = () => {
+    setSuppliersError("")
+    getSuppliers()
+      .then((data) => setSuppliers(data.map((s) => ({
+        id: String(s.supplierId),
+        name: s.name,
+        location: `${s.buildingName}, Level ${s.floor}`,
+        type: s.type,
+      }))))
+      .catch(() => setSuppliersError("Couldn't load suppliers. Is supplier-service running?"))
+  }
+  useEffect(loadSuppliers, [])
+
   const [supplierSearch, setSupplierSearch] = useState("")
   const [supplierType, setSupplierType] = useState("All")
-  const visibleSuppliers = SUPPLIERS.filter((supplier) =>
+  const supplierTypes = ["All", ...new Set((suppliers ?? []).map((s) => s.type))]
+  const visibleSuppliers = (suppliers ?? []).filter((supplier) =>
     (supplierType === "All" || supplier.type === supplierType) &&
     `${supplier.name} ${supplier.location}`.toLowerCase().includes(supplierSearch.trim().toLowerCase())
   )
   const [form, setForm] = useState({
     pickupLocation: "",
+    supplierId: "",
     supplier: "",
     deliveryLocation: "",
     description: "",
@@ -85,22 +107,34 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
   const set = (k: keyof typeof form, v: string | number) => setForm((f) => ({ ...f, [k]: v }))
   const creditsAfter = user.credits - form.credits
 
-  const handleSubmit = () => {
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState("")
+  // reuse the key if the exact same request is retried, so it can't get created twice
+  const [lastAttempt, setLastAttempt] = useState<{ body: string; key: string } | null>(null)
+
+  const handleSubmit = async () => {
     if (!validateDeadline()) { setStep(2); return }
-    const order: Order = {
-      id: `o${Date.now()}`,
-      pickupLocation: form.pickupLocation,
-      pickupStore: form.supplier,
-      deliveryLocation: form.deliveryLocation,
-      description: form.description,
+    const order: NewOrder = {
+      supplierId: form.supplierId,
+      destination: form.deliveryLocation,
+      requestDetails: form.description.trim(),
       credits: form.credits,
-      deadline: deadlineLabel,
-      status: "open",
-      requesterId: user.id,
-      requesterName: user.name,
-      createdAt: new Date().toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" }),
+      expiryTime: new Date(deadlineTimestamp).toISOString(),
     }
-    onSubmit(order)
+    const body = JSON.stringify(order)
+    const key = lastAttempt?.body === body ? lastAttempt.key : crypto.randomUUID()
+    setLastAttempt({ body, key })
+
+    setSubmitting(true)
+    setSubmitError("")
+    try {
+      const { pending } = await createOrder(order, key)
+      onCreated(pending)
+    } catch (err) {
+      setSubmitError(orderError(err))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const step1Valid = !!form.pickupLocation && !!form.supplier
@@ -154,7 +188,7 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
             />
           </div>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Supplier category">
-            {["All", "F&B", "Convenience", "Services", "Retail"].map((type) => (
+            {supplierTypes.map((type) => (
               <button
                 key={type}
                 type="button"
@@ -185,18 +219,23 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
                       name="supplier"
                       value={supplier.id}
                       checked={selected}
-                      onChange={() => setForm((previous) => ({ ...previous, supplier: label, pickupLocation: supplier.location }))}
+                      onChange={() => setForm((previous) => ({ ...previous, supplierId: supplier.id, supplier: label, pickupLocation: supplier.location }))}
                       className="h-4 w-4 shrink-0 accent-[#1A4A36]"
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-[#162A46]">{supplier.name}</span>
                       <span className="mt-1 block text-xs text-[#3F6B5A]">{supplier.location} · {supplier.type}</span>
-                      {supplier.hours && <span className="mt-1 block text-xs text-[#3F6B5A]">{supplier.hours}</span>}
                     </span>
                   </label>
                 )
               })}
-              {visibleSuppliers.length === 0 && (
+              {!suppliers && (
+                <div className="rounded-xl border border-[#E4E8E6] bg-white p-6 text-center">
+                  <p className="text-xs text-[#3F6B5A]">{suppliersError || "Loading suppliers…"}</p>
+                  {suppliersError && <button type="button" onClick={loadSuppliers} className="mt-3 text-xs font-semibold text-[#1A4A36] underline">Try again</button>}
+                </div>
+              )}
+              {suppliers && visibleSuppliers.length === 0 && (
                 <div className="rounded-xl border border-[#E4E8E6] bg-white p-6 text-center">
                   <p className="text-sm font-medium text-[#162A46]">No suppliers found</p>
                   <p className="mt-1 text-xs text-[#3F6B5A]">Try another name, location, or category.</p>
@@ -342,12 +381,13 @@ export default function CreateRequestPage({ user, onNavigate, onSubmit }: Props)
           </p>
 
           {!deadlineValid && <p role="alert" className="text-xs text-red-600">Your delivery time has passed. Go back to choose a later date and time.</p>}
+          {submitError && <p role="alert" className="text-xs text-red-600">{submitError}</p>}
           <button
             onClick={handleSubmit}
-            disabled={creditsAfter < 0 || !deadlineValid}
+            disabled={creditsAfter < 0 || !deadlineValid || submitting}
             className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            Place Request
+            {submitting ? "Placing request…" : "Place Request"}
           </button>
         </div>
       )}

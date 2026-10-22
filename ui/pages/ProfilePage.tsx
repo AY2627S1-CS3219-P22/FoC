@@ -1,8 +1,9 @@
+import { useEffect, useState } from "react"
 import type { User, Order, Page } from "../App"
+import { listOrders } from "../api/orders"
 
 interface Props {
   user: User
-  orders: Order[]
   onNavigate: (page: Page) => void
   onLogout: () => void
 }
@@ -15,9 +16,17 @@ const TRANSACTIONS = [
   { id: 5, credit: true,  amount: 10, desc: "Welcome bonus credits",                 date: "Aug 2024" },
 ]
 
-export default function ProfilePage({ user, orders, onNavigate, onLogout }: Props) {
-  const myRequests   = orders.filter((o) => o.requesterId === user.id)
-  const myDeliveries = orders.filter((o) => o.courierId === user.id)
+export default function ProfilePage({ user, onNavigate, onLogout }: Props) {
+  const [myRequests, setMyRequests]     = useState<Order[]>([])
+  const [myDeliveries, setMyDeliveries] = useState<Order[]>([])
+
+  // stats just stay at 0 if order-service isn't up
+  useEffect(() => {
+    listOrders("requested").then(setMyRequests).catch(() => {})
+    listOrders("assigned").then(setMyDeliveries).catch(() => {})
+  }, [])
+
+  const delivered = myDeliveries.filter((o) => o.status === "delivered")
   const initials = user.name.split(" ").map((n) => n[0]).join("").slice(0, 2)
 
   return (
@@ -48,9 +57,9 @@ export default function ProfilePage({ user, orders, onNavigate, onLogout }: Prop
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: "Requests created",  value: user.requestsCreated },
-          { label: "Errands completed", value: user.errandsCompleted },
-          { label: "Credits earned",    value: user.creditsEarned },
+          { label: "Requests created",  value: myRequests.length },
+          { label: "Errands completed", value: delivered.length },
+          { label: "Credits earned",    value: delivered.reduce((sum, o) => sum + o.credits, 0) },
         ].map(({ label, value }) => (
           <div key={label} className="bg-white border border-[#E4E8E6] rounded-xl p-4 text-center">
             <p className="text-xl font-semibold text-[#162A46]">{value}</p>
@@ -80,7 +89,7 @@ export default function ProfilePage({ user, orders, onNavigate, onLogout }: Prop
               </div>
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded ml-3 flex-shrink-0 uppercase tracking-wider ${
-                  order.status === "completed"
+                  order.status === "delivered"
                     ? "bg-[#E8F1ED] text-[#1A4A36]"
                     : order.status === "open"
                     ? "bg-[#E8F1ED] text-[#1A4A36]"

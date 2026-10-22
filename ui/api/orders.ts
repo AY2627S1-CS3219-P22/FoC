@@ -1,99 +1,13 @@
+// AI-assisted (Claude), reviewed and tested by Maliha
 import type { Order } from "../App"
-import { api } from "./client"
-
-// MOCK DATA: replace with real calls once order-service has REST endpoints.
-export const SEED_ORDERS: Order[] = [
-  {
-    id: "o1",
-    pickupLocation: "COM3",
-    pickupStore: "CoffeeBean @ COM3",
-    deliveryLocation: "PGP",
-    description: "Pick up one iced latte, medium size. No sugar, please double-check the order.",
-    credits: 4,
-    deadline: "3:30 PM",
-    status: "open",
-    requesterId: "u2",
-    requesterName: "Aisha Lim",
-    createdAt: "2:45 PM",
-  },
-  {
-    id: "o2",
-    pickupLocation: "UTown",
-    pickupStore: "Cheers @ UTown",
-    deliveryLocation: "PGPR Block E",
-    description: "One packet of instant noodles (any flavour) and a 1.5L mineral water.",
-    credits: 3,
-    deadline: "5:00 PM",
-    status: "open",
-    requesterId: "u3",
-    requesterName: "Marcus Goh",
-    createdAt: "3:10 PM",
-  },
-  {
-    id: "o3",
-    pickupLocation: "Science Faculty",
-    pickupStore: "Science Canteen",
-    deliveryLocation: "Arts (AS7) Level 4",
-    description: "Chicken rice with drumstick and soup. No cucumber please.",
-    credits: 5,
-    deadline: "1:00 PM",
-    status: "accepted",
-    requesterId: "u4",
-    requesterName: "Priya Nair",
-    courierId: "u5",
-    courierName: "Ryan Chen",
-    createdAt: "12:10 PM",
-  },
-  {
-    id: "o4",
-    pickupLocation: "Engineering",
-    pickupStore: "Print Lab @ Engineering",
-    deliveryLocation: "E1A Room 02-06",
-    description: "Print 20 pages double-sided from USB labelled EE2024_Lab. Black and white is fine.",
-    credits: 6,
-    deadline: "4:30 PM",
-    status: "open",
-    requesterId: "u6",
-    requesterName: "Wei Lin",
-    createdAt: "3:55 PM",
-  },
-  {
-    id: "o5",
-    pickupLocation: "YST",
-    pickupStore: "YST Canteen",
-    deliveryLocation: "UTown Residence",
-    description: "Brown sugar pearl milk tea, 50% sugar, less ice, large.",
-    credits: 4,
-    deadline: "6:00 PM",
-    status: "completed",
-    requesterId: "u1",
-    requesterName: "Jordan Tan",
-    courierId: "u7",
-    courierName: "Sofia Park",
-    createdAt: "5:10 PM",
-  },
-  {
-    id: "o6",
-    pickupLocation: "Central Library",
-    pickupStore: "CLB Bookshop",
-    deliveryLocation: "PGPR Block A",
-    description: "Reserved book: Introduction to Sociology 3rd Ed. under the name Priya Nair.",
-    credits: 5,
-    deadline: "2:00 PM",
-    status: "open",
-    requesterId: "u8",
-    requesterName: "Priya Nair",
-    createdAt: "1:00 PM",
-  },
-]
-
-export const getOrders = async (): Promise<Order[]> => SEED_ORDERS
+import { api, ApiError } from "./client"
 
 // Order as returned by order-service
 export type ApiOrder = {
   id: string
   requesterId: string
   courierId: string | null
+  supplierId: string
   pickupStore: string
   pickupLocation: string
   requesterName: string
@@ -103,12 +17,95 @@ export type ApiOrder = {
   credits: number
   expiryTime: string
   status: "UNASSIGNED" | "ASSIGNED" | "PICKED_UP" | "DELIVERED" | "CANCELLED"
-  cancellationReason: string | null
+  cancellationReason: "REQUESTER" | "EXPIRY" | null
   createdAt: string
   acceptedAt: string | null
   pickedUpAt: string | null
   deliveredAt: string | null
   cancelledAt: string | null
+}
+
+export type OrderAction = "accept" | "pickup" | "deliver" | "cancel"
+
+// open = everyone else's unassigned orders, requested = mine, assigned = ones I'm delivering
+export type OrderScope = "open" | "requested" | "assigned"
+
+export const formatTime = (iso: string) =>
+  new Date(iso).toLocaleString("en-SG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })
+
+// order-service status -> the ones StatusBadge knows. An unassigned order past
+// its expiry never found a courier, so it shows as expired even before the
+// backend gets round to cancelling it.
+export function orderStatus(o: ApiOrder): Order["status"] {
+  switch (o.status) {
+    case "UNASSIGNED": return new Date(o.expiryTime) < new Date() ? "expired" : "open"
+    case "ASSIGNED":   return "accepted"
+    case "PICKED_UP":  return "picked-up"
+    case "DELIVERED":  return "delivered"
+    case "CANCELLED":  return o.cancellationReason === "EXPIRY" ? "expired" : "cancelled"
+  }
+}
+
+const toOrder = (o: ApiOrder): Order => ({
+  id: o.id,
+  pickupLocation: o.pickupLocation,
+  pickupStore: o.pickupStore,
+  deliveryLocation: o.destination,
+  description: o.requestDetails,
+  credits: o.credits,
+  deadline: formatTime(o.expiryTime),
+  status: orderStatus(o),
+  requesterId: o.requesterId,
+  requesterName: o.requesterName,
+  courierId: o.courierId ?? undefined,
+  courierName: o.courierName ?? undefined,
+  createdAt: formatTime(o.createdAt),
+})
+
+export const listOrders = (scope: OrderScope) =>
+  api<{ orders: ApiOrder[] }>(`/orders?scope=${scope}`).then((r) => r.orders.map(toOrder))
+
+export const getOrderDetails = (id: string) =>
+  api<{ order: ApiOrder }>(`/orders/${id}`).then((r) => toOrder(r.order))
+
+export const updateOrder = (id: string, action: OrderAction) =>
+  api<{ order: ApiOrder }>(`/orders/${id}/${action}`, { method: "POST", body: "{}" })
+    .then((r) => toOrder(r.order))
+
+export type NewOrder = {
+  supplierId: string
+  destination: string
+  requestDetails: string
+  credits: number
+  expiryTime: string
+}
+
+// The key lets order-service spot a retried submit, so the same request
+// should be sent with the same key. Comes back pending if credits are still
+// being reserved.
+export const createOrder = (order: NewOrder, idempotencyKey: string) =>
+  api<{ order?: ApiOrder; creationId?: string }>("/orders", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(order),
+  }).then((r) => ({ order: r.order ? toOrder(r.order) : undefined, pending: !r.order }))
+
+// order-service sends back short codes like "invalid-transition", so turn
+// those into something readable
+const ERRORS: Record<string, string> = {
+  "dependency-unavailable": "This isn't available yet, order-service can't reach the other services.",
+  "dependency-rejected": "That supplier isn't taking orders right now.",
+  "invalid-transition": "This order has already changed. Refresh to see the latest.",
+  "expired": "This order has expired.",
+  "conflict": "Someone else got to this order first.",
+  "forbidden": "You can't do that on this order.",
+  "not-found": "This order doesn't exist anymore.",
+  "invalid-input": "Something in the request was invalid.",
+}
+
+export function orderError(err: unknown) {
+  if (!(err instanceof ApiError)) return "Something went wrong."
+  return ERRORS[err.message] ?? err.message
 }
 
 // Admin only: every order across all statuses, newest first

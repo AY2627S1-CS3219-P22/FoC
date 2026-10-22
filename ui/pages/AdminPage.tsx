@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { Order, User, Page } from "../App"
 import StatusBadge from "../components/StatusBadge"
-import { getAllOrders, getOrder, type ApiOrder } from "../api/orders"
+import { getAllOrders, getOrder, orderStatus as badgeStatus, type ApiOrder } from "../api/orders"
 
 type Section = "overview" | "orders" | "users" | "suppliers" | "logs"
 
@@ -37,18 +37,6 @@ const LOG_COLORS: Record<string, string> = {
   credit:   "bg-[#E8F1ED] text-[#1A4A36]",
   user:     "bg-purple-50 text-purple-500",
   supplier: "bg-amber-50 text-amber-500",
-}
-
-// order-service status -> the ones StatusBadge knows. An unassigned order past
-// its expiry never found a courier, so it shows as expired.
-function badgeStatus(o: ApiOrder): Order["status"] {
-  switch (o.status) {
-    case "UNASSIGNED": return new Date(o.expiryTime) < new Date() ? "expired" : "open"
-    case "ASSIGNED":   return "accepted"
-    case "PICKED_UP":  return "picked-up"
-    case "DELIVERED":  return "delivered"
-    case "CANCELLED":  return "cancelled"
-  }
 }
 
 const formatTime = (iso: string) =>

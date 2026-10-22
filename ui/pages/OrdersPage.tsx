@@ -1,18 +1,31 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { Order, Page } from "../App"
 import RequestCard from "../components/RequestCard"
+import LoadMessage from "../components/LoadMessage"
+import { listOrders, orderError } from "../api/orders"
 
 interface Props {
-  orders: Order[]
   onNavigate: (page: Page) => void
   onSelectOrder: (id: string) => void
 }
 
-export default function OrdersPage({ orders, onNavigate, onSelectOrder }: Props) {
+export default function OrdersPage({ onNavigate, onSelectOrder }: Props) {
+  const [orders, setOrders] = useState<Order[] | null>(null)
+  const [error, setError] = useState("")
   const [search, setSearch] = useState("")
+
+  // backend already leaves out my own orders and expired ones
+  const load = () => {
+    setError("")
+    listOrders("open")
+      .then(setOrders)
+      .catch((err) => setError(orderError(err)))
+  }
+
+  useEffect(load, [])
+
   const query = search.trim().toLowerCase()
-  const openOrders = orders.filter((order) => order.status === "open")
-  const visibleOrders = openOrders.filter((order) =>
+  const visibleOrders = (orders ?? []).filter((order) =>
     order.pickupStore.toLowerCase().includes(query) ||
     order.deliveryLocation.toLowerCase().includes(query)
   )
@@ -36,9 +49,11 @@ export default function OrdersPage({ orders, onNavigate, onSelectOrder }: Props)
           placeholder="Search pickup supplier or delivery location…"
           className="w-full rounded-lg border border-[#E4E8E6] bg-white px-3.5 py-2.5 text-sm text-[#1B2522] placeholder-[#9CA3AF] transition-colors focus:border-[#1A4A36] focus:outline-none focus:ring-1 focus:ring-[#1A4A36]"
         />
-        <p role="status" className="mt-2 text-xs text-[#3F6B5A]">{visibleOrders.length} open request{visibleOrders.length === 1 ? "" : "s"}{query ? " found" : ""}</p>
+        {orders && <p role="status" className="mt-2 text-xs text-[#3F6B5A]">{visibleOrders.length} open request{visibleOrders.length === 1 ? "" : "s"}{query ? " found" : ""}</p>}
       </div>
-      {visibleOrders.length === 0 ? (
+      {!orders ? (
+        <LoadMessage error={error} onRetry={load} />
+      ) : visibleOrders.length === 0 ? (
         <div className="py-16 text-center">
           <p className="mb-1 text-sm font-medium text-[#162A46]">{query ? "No matching requests" : "No open errands right now"}</p>
           <p className="text-xs text-[#3F6B5A]">{query ? "Try another pickup supplier or delivery location." : "Check again later or create your own request."}</p>
