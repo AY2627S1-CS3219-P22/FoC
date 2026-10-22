@@ -4,6 +4,9 @@ Mode/scope: Credit-service implementation support and project disclosure documen
 Review: Earlier reviews are logged; latest documentation changes await human review.
 Exact prompts, key responses and checks: credit-service/ai/usage-log.md, entries 001–044.
 -->
+<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-21–2026-10-22.
+Scope: Maintained the final AI Use Summary section. Team review pending.
+See order-service/usage-log.md. -->
 
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
 
@@ -74,6 +77,8 @@ port. Reserved REST ports prevent future collisions when APIs are added.
 
 ## AI Use Summary
 
+### Credit service
+
 This summary covers recorded assistance on feat/credit-implementation from
 2026-10-19. Other team members' usage must be consolidated by the authors.
 
@@ -112,3 +117,30 @@ This summary covers recorded assistance on feat/credit-implementation from
   norms, include the agent/skill instructions used, consolidate team disclosures,
   and link this README from the submission slides. Root AGENTS.md and
   credit-service/AGENTS.md are retained; no skills were invoked for these exchanges.
+
+### Order service
+
+Tool: ChatGPT (Codex), 2026-10-21–2026-10-22. Modes: implementation, configuration and documentation generation.
+Used to install Express 5.2.1 and Prisma 6.19.3, transcribe and migrate the author-provided Order schema,
+and configure a local Order PostgreSQL container after the author selected
+PostgreSQL and Docker, following the existing User Service setup. Also generated the team-approved Express/gRPC startup, database-backed health,
+environment validation and application Docker setup.
+Also implemented author-specified creation, credit-edit recovery, cancellation
+and expiry, with tests and a durable OrderEditOperation migration. Added the
+author-approved administrator-only GET /orders listing with authorization tests.
+Verified cancellation/expiry failure recovery and applied the team's plaintext
+Order-to-Credit transport decision on order-functionality. Implemented the
+author-requested authenticated courier acceptance endpoint and concurrency tests.
+Added author-specified open/requested/assigned retrieval scopes and access/filter tests.
+Implemented the author-approved delivery endpoint and durable Credit settlement
+recovery, with real gRPC transport and PostgreSQL integration tests. Verified
+the existing editing workflow with additional funding, concurrency and crash
+recovery tests against real gRPC transport and Order PostgreSQL. The author
+supplied the schema, contracts, retry schedule and final first-lock-wins rule.
+Human decisions and superseded requirements are recorded in the service usage log;
+no decision rationales were drafted.
+
+Team review and validation remain pending. Prompts, key responses and verification
+results are recorded in [order-service/usage-log.md](order-service/usage-log.md). Add a link to this README
+to the submission slide deck. This entry covers this session only; the team must
+record other AI use and include applicable AGENTS.md/SKILLS.md files before submission.
