@@ -31,6 +31,9 @@ function fixture() {
   },
   updateReservation:async({orderId,amount,expectedVersion})=>{
    updates++;const r=ledger.get(orderId);if(updateMode==='reject')throw err(9);
+   if(updateMode==='before'){updateMode=undefined;throw err(14)}
+   const reserved=[...ledger.values()].filter(x=>x.requesterId===r.requesterId&&x.status==='RESERVED').reduce((sum,x)=>sum+x.amount,0);
+   if(amount-r.amount>20-reserved)throw err(9);
    if(r.status!=='RESERVED')throw err(9);if(r.version!==expectedVersion){if(r.version===expectedVersion+1&&r.amount===amount)return {...r};throw err(9)}
    r.amount=amount;r.version++;if(updateMode==='after'){updateMode=undefined;throw err(4)}return {...r};
   },
@@ -479,4 +482,76 @@ test('settlement receipt persistence failure remains pending and expired lease r
  const work=await db.creditOperation.findUniqueOrThrow({where:{orderId_type:{orderId:order.id,type:'SETTLE'}}});assert.equal(work.state,'PROCESSING');
  await db.creditOperation.update({where:{id:work.id},data:{leaseExpiresAt:new Date(0)}});
  await f.lifecycle.settlementBatch();assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).creditState,'SETTLED');assert.equal(f.settlements,1);
+});
+
+// AI-assisted editing issue coverage: real client transport + durable Order DB.
+test('real gRPC edits increase/decrease the held amount, reject insufficient funds and skip unchanged amounts',async t=>{
+ const f=fixture(),order=await create(f),wire=await grpcCreditFixture(t,f),edits=createOrderEdits(db,wire.client,f.directories);
+ const balance=()=>{const reserved=[...f.ledger.values()].filter(r=>r.status==='RESERVED').reduce((sum,r)=>sum+r.amount,0);return {reserved,available:20-reserved}};
+ assert.deepEqual(balance(),{reserved:4,available:16});
+ const increased=await edits.edit(order.id,f.user,'edit-all-funds',{credits:20});assert.equal(increased.status,200);assert.equal(increased.order.credits,20);assert.deepEqual(balance(),{reserved:20,available:0});
+ const rejected=await edits.edit(order.id,f.user,'edit-insufficient',{credits:21,destination:'must-not-persist'});assert.equal(rejected.status,409);
+ assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).destination,order.destination);assert.equal(f.ledger.get(order.id).amount,20);
+ assert.equal((await db.orderEditOperation.findFirstOrThrow({where:{orderId:order.id,targetCredits:21}})).state,'FAILED');
+ const lower=await edits.edit(order.id,f.user,'edit-lower',{credits:2});assert.equal(lower.status,200);assert.deepEqual(balance(),{reserved:2,available:18});
+ const updates=f.updates,version=f.ledger.get(order.id).version;
+ const plain=await edits.edit(order.id,f.user,'edit-text',{destination:'Utown',requestDetails:'Tea',credits:2});assert.equal(plain.status,200);assert.equal(plain.order.destination,'Utown');assert.equal(f.updates,updates);assert.equal(f.ledger.get(order.id).version,version);
+ const replay=await edits.edit(order.id,f.user,'edit-lower',{credits:2});assert.equal(replay.status,200);assert.equal(f.updates,updates);
+});
+
+for(const mode of ['before','after'])test('credit edit '+mode+'-commit gRPC failure recovers after restart without duplicate adjustment',async t=>{
+ const f=fixture(),order=await create(f),wire=await grpcCreditFixture(t,f),edits=createOrderEdits(db,wire.client,f.directories);f.updateMode=mode;
+ const result=await edits.edit(order.id,f.user,'edit-grpc-'+mode,{credits:7});assert.equal(result.status,202);assert.equal(result.order.credits,4);
+ const op=await db.orderEditOperation.findFirstOrThrow({where:{orderId:order.id}});assert.equal(op.expectedVersion,1);assert.equal(op.targetCredits,7);
+ assert.equal((await edits.edit(order.id,f.user,'another-pending-edit',{credits:8})).status,409);
+ assert.equal((await createOrderAcceptance(db).accept(order.id,{id:f.user+'-courier',roles:['USER']})).status,409);
+ await editDue(order.id);const restarted=createOrderEdits(db,wire.client,f.directories);await restarted.recoverBatch();
+ assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).credits,7);assert.equal(f.ledger.get(order.id).amount,7);assert.equal(f.ledger.get(order.id).version,2);assert.equal(f.updates,mode==='after'?1:2);
+ assert.equal((await restarted.edit(order.id,f.user,'edit-grpc-'+mode,{credits:7})).status,200);assert.equal(f.ledger.get(order.id).version,2);
+});
+
+test('concurrent same-key edits over gRPC produce one operation and one reservation adjustment',async t=>{
+ const f=fixture(),order=await create(f),wire=await grpcCreditFixture(t,f),edits=createOrderEdits(db,wire.client,f.directories);
+ const results=await Promise.all(Array.from({length:10},()=>edits.edit(order.id,f.user,'edit-concurrent',{credits:8})));
+ assert.ok(results.every(r=>r.status===200||r.status===202));await edits.recoverBatch();
+ assert.equal(await db.orderEditOperation.count({where:{orderId:order.id}}),1);assert.equal(f.updates,1);assert.equal(f.ledger.get(order.id).version,2);assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).credits,8);
+ assert.equal((await edits.edit(order.id,f.user,'edit-concurrent',{credits:9})).status,409);
+});
+
+test('edit and actual acceptance racing over the same row leave matching order and credit state',async t=>{
+ for(let n=0;n<4;n++){
+  const f=fixture(),order=await create(f),wire=await grpcCreditFixture(t,f),edits=createOrderEdits(db,wire.client,f.directories),acceptance=createOrderAcceptance(db);
+  const [edit,accept]=await Promise.all([edits.edit(order.id,f.user,'edit-accept-race',{credits:6}),acceptance.accept(order.id,{id:f.user+'-courier',roles:['USER']})]);
+  const stored=await db.order.findUniqueOrThrow({where:{id:order.id}}),receipt=f.ledger.get(order.id);
+  assert.equal(stored.credits,receipt.amount);
+  if(edit.status===409){assert.equal(accept.status,200);assert.equal(stored.status,'ASSIGNED');assert.equal(f.updates,0);}
+  else {assert.equal(edit.status,200);assert.ok(accept.status===409||accept.status===200);assert.equal(receipt.amount,6);assert.equal(f.updates,1);}
+ }
+});
+
+test('credit-changing edit receipt-write crash is recovered from its expired processing lease',async t=>{
+ const f=fixture(),order=await create(f),wire=await grpcCreditFixture(t,f);let rejectWrite=true;
+ const proxy=new Proxy(db,{get(target,key){
+  if(key==='$transaction')return async(callback,...args)=>{if(rejectWrite&&f.updates>0){rejectWrite=false;throw new Error('simulated edit receipt failure')}return target.$transaction(callback,...args)};
+  const value=target[key];return typeof value==='function'?value.bind(target):value;
+ }});
+ const result=await createOrderEdits(proxy,wire.client,f.directories).edit(order.id,f.user,'edit-save-crash',{credits:9});assert.equal(result.status,202);assert.equal(result.order.credits,4);assert.equal(f.ledger.get(order.id).amount,9);
+ const operation=await db.orderEditOperation.findFirstOrThrow({where:{orderId:order.id}});assert.equal(operation.state,'PROCESSING');
+ await db.orderEditOperation.update({where:{id:operation.id},data:{leaseExpiresAt:new Date(0)}});
+ await createOrderEdits(db,wire.client,f.directories).recoverBatch();assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).credits,9);assert.equal(f.updates,1);
+});
+
+test('editing rejects terminal states, invalid suppliers, short expiry and unavailable preflight without mutations',async t=>{
+ const f=fixture(),wire=await grpcCreditFixture(t,f),edits=createOrderEdits(db,wire.client,f.directories);
+ for(const status of ['ASSIGNED','PICKED_UP','DELIVERED','CANCELLED']){
+  const order=await create(f,'edit-terminal-'+status);await db.order.update({where:{id:order.id},data:{status}});
+  assert.equal((await edits.edit(order.id,f.user,'terminal',{credits:5})).status,409);
+ }
+ const order=await create(f,'edit-validation');
+ assert.equal((await edits.edit(order.id,'outsider','owner',{credits:6})).status,403);
+ const short=editOrderSchema.parse({expiryTime:new Date(Date.now()+1800000).toISOString()});assert.equal((await edits.edit(order.id,f.user,'short',short)).status,400);
+ f.invalidSupplier=true;assert.equal((await edits.edit(order.id,f.user,'supplier',{supplierId:'2'})).status,409);f.invalidSupplier=false;
+ f.unavailable=true;assert.equal((await edits.edit(order.id,f.user,'unavailable',{credits:6})).status,503);f.unavailable=false;
+ assert.equal(f.updates,0);assert.equal(await db.orderEditOperation.count({where:{orderId:order.id}}),0);
+ assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).credits,4);
 });

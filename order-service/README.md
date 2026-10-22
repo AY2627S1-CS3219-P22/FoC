@@ -480,6 +480,46 @@ recovery and receipt-write failure. These tests do not certify the deployed
 Credit implementation or a complete live multi-service journey. Pickup has no
 endpoint on this branch; delivery requires a PICKED_UP order.
 
+
+### Order editing with Credit integration
+
+`PATCH /orders/:id` requires a requester USER JWT and an `Idempotency-Key` header.
+Supply a nonempty partial body containing supplierId (decimal string), destination,
+requestDetails, credits (positive int32), and/or offset-bearing ISO expiryTime.
+The resulting order must meet the existing validation rules, including expiry at
+least one hour after database time and a currently open supplier. Only the
+original requester can edit an unexpired UNASSIGNED order.
+
+The durable OrderEditOperation saves the request, complete target fields and
+Credit expectedVersion before adjustment. A credit change calls atomic
+`UpdateReservation(orderId, targetCredits, expectedVersion)`. Credit checks funds
+for the extra amount on an increase and releases excess hold on a decrease;
+Order does not release/re-reserve or rely on a potentially stale balance check.
+Credit remains responsible for enforcing that adjustment atomically. When the
+amount is unchanged, Order performs no UpdateReservation mutation (it still
+reads the current reservation to validate/reconcile it).
+
+Matching current reservation amount/version must be confirmed before persisting
+new order fields. Success returns 200 `{ "order": {...} }`; uncertain durable
+work returns 202 with the current order, whose credits are not prematurely
+changed. Same key/body resumes the operation; changed body with that key returns
+409. A business rejection returns 409 without applying proposed order fields.
+Unavailable preflight dependencies return 503 before creating an edit intent.
+
+Active durable edits block acceptance and other edits. If acceptance acquires
+the row lock and assigns first, editing returns 409 without changing Credit.
+Recovery uses the saved expectedVersion, processing lease and existing bounded
+retry/backoff policy. Exhausted uncertain work remains RECONCILIATION_REQUIRED
+and blocks conflicting commands until reconciled.
+
+Editing issue verified 2026-10-22: all 13 unit tests and 55 integration tests pass
+(68 total). Added real gRPC client transport coverage for full available-funds
+increases, insufficient funds, decreases, unchanged amounts, concurrent same-key
+requests, actual acceptance races, pre/post-commit failures and receipt-write
+crash recovery. These tests use real Order PostgreSQL and test-only Credit
+ledger handlers; verification of the deployed Credit implementation is separate.
+The existing production edit implementation required no changes for this issue.
+
 ## AI Use Summary
 
 ChatGPT (Codex), implementation/test/documentation generation, 2026-10-21–22.

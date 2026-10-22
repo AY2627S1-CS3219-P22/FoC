@@ -85,7 +85,9 @@ Order-to-Credit transport decision on order-functionality. Implemented the
 author-requested authenticated courier acceptance endpoint and concurrency tests.
 Added author-specified open/requested/assigned retrieval scopes and access/filter tests.
 Implemented the author-approved delivery endpoint and durable Credit settlement
-recovery, with real gRPC transport and PostgreSQL integration tests. The author
+recovery, with real gRPC transport and PostgreSQL integration tests. Verified
+the existing editing workflow with additional funding, concurrency and crash
+recovery tests against real gRPC transport and Order PostgreSQL. The author
 supplied the schema, contracts, retry schedule and final first-lock-wins rule.
 Human decisions and superseded requirements are recorded in the service usage log;
 no decision rationales were drafted.
