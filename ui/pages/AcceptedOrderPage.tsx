@@ -1,11 +1,10 @@
 // AI-assisted (Claude), reviewed and tested by Maliha
 import type { Order } from "../App"
 import StatusBadge from "../components/StatusBadge"
-import LoadMessage from "../components/LoadMessage"
 import { useOrder } from "../hooks/useOrder"
 
 interface Props {
-  orderId: string
+  initialOrder: Order
   onDelivered: (order: Order) => void
   onBack: () => void
 }
@@ -19,10 +18,8 @@ function stepIndex(status: Order["status"]): number {
   return 0
 }
 
-export default function AcceptedOrderPage({ orderId, onDelivered, onBack }: Props) {
-  const { order, loadError, actionError, busy, reload, run } = useOrder(orderId)
-
-  if (!order) return <LoadMessage error={loadError} onRetry={reload} />
+export default function AcceptedOrderPage({ initialOrder, onDelivered, onBack }: Props) {
+  const { order, actionError, busy, run } = useOrder(initialOrder)
 
   const current = stepIndex(order.status)
 

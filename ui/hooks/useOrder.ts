@@ -1,31 +1,23 @@
 // AI-assisted (Claude), reviewed and tested by Maliha
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import type { Order } from "../App"
-import { getOrderDetails, orderError, updateOrder, type OrderAction } from "../api/orders"
+import { orderError, updateOrder, type OrderAction } from "../api/orders"
 
-// Loads one order and runs accept / pickup / deliver / cancel on it.
+// Holds one order and runs accept / pickup / deliver / cancel on it.
+// order-service has no single-order endpoint, so the page starts from the
+// order the list already loaded, and each action returns the updated one.
 // Used by the details page and the active errand page.
-export function useOrder(id: string) {
-  const [order, setOrder] = useState<Order | null>(null)
-  const [loadError, setLoadError] = useState("")
+export function useOrder(initial: Order) {
+  const [order, setOrder] = useState(initial)
   const [actionError, setActionError] = useState("")
   const [busy, setBusy] = useState(false)
-
-  const load = () => {
-    setLoadError("")
-    getOrderDetails(id)
-      .then(setOrder)
-      .catch((err) => setLoadError(orderError(err)))
-  }
-
-  useEffect(load, [id])
 
   // returns the updated order, or null if it failed (error is shown on the page)
   const run = async (action: OrderAction) => {
     setBusy(true)
     setActionError("")
     try {
-      const updated = await updateOrder(id, action)
+      const updated = await updateOrder(order.id, action)
       setOrder(updated)
       return updated
     } catch (err) {
@@ -36,5 +28,5 @@ export function useOrder(id: string) {
     }
   }
 
-  return { order, loadError, actionError, busy, reload: load, run }
+  return { order, actionError, busy, run }
 }

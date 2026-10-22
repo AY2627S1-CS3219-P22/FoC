@@ -2,30 +2,20 @@
 import { useState } from "react"
 import type { Order } from "../App"
 import StatusBadge from "../components/StatusBadge"
-import LoadMessage from "../components/LoadMessage"
 import { useOrder } from "../hooks/useOrder"
 
 interface Props {
-  orderId: string
+  initialOrder: Order
   currentUserId: string
   onBack: () => void
-  onAccepted: (orderId: string) => void
+  onAccepted: (order: Order) => void
   onDelivered: (order: Order) => void
 }
 
-export default function OrderDetailsPage({ orderId, currentUserId, onBack, onAccepted, onDelivered }: Props) {
-  const { order, loadError, actionError, busy, reload, run } = useOrder(orderId)
+export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, onAccepted, onDelivered }: Props) {
+  const { order, actionError, busy, run } = useOrder(initialOrder)
   const [showAcceptModal, setShowAcceptModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
-
-  if (!order) {
-    return (
-      <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6 sm:py-8">
-        <button onClick={onBack} className="text-sm text-[#3F6B5A] hover:text-[#1A4A36]">← Back</button>
-        <LoadMessage error={loadError} onRetry={reload} />
-      </div>
-    )
-  }
 
   const isRequester = order.requesterId === currentUserId
   const isCourier   = order.courierId   === currentUserId
@@ -34,7 +24,8 @@ export default function OrderDetailsPage({ orderId, currentUserId, onBack, onAcc
 
   const accept = async () => {
     setShowAcceptModal(false)
-    if (await run("accept")) onAccepted(order.id)
+    const updated = await run("accept")
+    if (updated) onAccepted(updated)
   }
 
   const deliver = async () => {

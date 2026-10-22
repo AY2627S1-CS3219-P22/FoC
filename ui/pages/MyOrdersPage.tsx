@@ -17,7 +17,7 @@ const TABS: { key: Tab; label: string }[] = [
 const isActive = (o: Order) => ["open", "accepted", "picked-up"].includes(o.status)
 
 interface Props {
-  onSelectOrder: (id: string) => void
+  onSelectOrder: (order: Order) => void
 }
 
 export default function MyOrdersPage({ onSelectOrder }: Props) {
@@ -130,7 +130,7 @@ export default function MyOrdersPage({ onSelectOrder }: Props) {
             <RequestCard
               key={order.id}
               order={order}
-              onClick={() => onSelectOrder(order.id)}
+              onClick={() => onSelectOrder(order)}
               actions={getActions(order)}
               busy={busyId === order.id}
             />

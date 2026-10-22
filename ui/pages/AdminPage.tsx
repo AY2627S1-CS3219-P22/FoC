@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import type { User, Page } from "../App"
 import StatusBadge from "../components/StatusBadge"
-import { getAllOrders, getOrder, orderStatus as badgeStatus, type ApiOrder } from "../api/orders"
+import { getAllOrders, orderStatus as badgeStatus, type ApiOrder } from "../api/orders"
 
 type Section = "overview" | "orders" | "users" | "suppliers" | "logs"
 
@@ -61,8 +61,6 @@ export default function AdminPage({ user, onNavigate }: Props) {
 
   const [selectedId, setSelectedId]     = useState<string | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<ApiOrder | null>(null)
-  const [detailError, setDetailError]   = useState("")
-  const latestDetail = useRef<string | null>(null)
 
   const loadOrders = () => {
     setLoading(true)
@@ -75,18 +73,13 @@ export default function AdminPage({ user, onNavigate }: Props) {
 
   useEffect(loadOrders, [])
 
+  // the list already has every field, so details come straight from it
   const openOrder = (id: string) => {
-    latestDetail.current = id
     setSelectedId(id)
-    setSelectedOrder(null)
-    setDetailError("")
-    getOrder(id)
-      .then((o) => { if (latestDetail.current === id) setSelectedOrder(o) })
-      .catch((err) => { if (latestDetail.current === id) setDetailError(err instanceof Error ? err.message : "Could not load order.") })
+    setSelectedOrder(orders.find((o) => o.id === id) ?? null)
   }
 
   const closeOrder = () => {
-    latestDetail.current = null
     setSelectedId(null)
     setSelectedOrder(null)
   }
@@ -283,10 +276,8 @@ export default function AdminPage({ user, onNavigate }: Props) {
                         </svg>
                       </button>
                     </div>
-                    {detailError ? (
-                      <p className="text-xs text-red-600">{detailError}</p>
-                    ) : !selectedOrder ? (
-                      <p className="text-xs text-[#3F6B5A]">Loading…</p>
+                    {!selectedOrder ? (
+                      <p className="text-xs text-[#3F6B5A]">This order is no longer in the list.</p>
                     ) : (
                       <>
                         <div className="mb-4">

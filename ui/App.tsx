@@ -125,16 +125,16 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
   const [user, setUser]           = useState<User>(CURRENT_USER)
-  const [selectedOrderId, setSelectedOrderId] = useState("")
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [earnedCredits, setEarnedCredits] = useState(0)
   const [createPending, setCreatePending] = useState(false)
   const [loginNotice, setLoginNotice] = useState("")
 
   const [orderReturnPage, setOrderReturnPage] = useState<"orders" | "my-orders">("orders")
 
-  const navigate = (p: Page, orderId?: string) => {
+  const navigate = (p: Page, order?: Order) => {
     if (p === "order-details" && (page === "orders" || page === "my-orders")) setOrderReturnPage(page)
-    if (orderId) setSelectedOrderId(orderId)
+    if (order) setSelectedOrder(order)
     setPage(p)
     window.scrollTo({ top: 0, behavior: "instant" })
   }
@@ -212,11 +212,11 @@ export default function App() {
 
       <main className="min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] md:pb-0">
         {page === "orders" && (
-          <OrdersPage onNavigate={navigate} onSelectOrder={(id) => navigate("order-details", id)} />
+          <OrdersPage onNavigate={navigate} onSelectOrder={(order) => navigate("order-details", order)} />
         )}
 
         {page === "my-orders" && (
-          <MyOrdersPage onSelectOrder={(id) => navigate("order-details", id)} />
+          <MyOrdersPage onSelectOrder={(order) => navigate("order-details", order)} />
         )}
 
         {page === "create-request" && (
@@ -243,21 +243,21 @@ export default function App() {
           />
         )}
 
-        {page === "order-details" && (
+        {page === "order-details" && selectedOrder && (
           <OrderDetailsPage
-            key={selectedOrderId}
-            orderId={selectedOrderId}
+            key={selectedOrder.id}
+            initialOrder={selectedOrder}
             currentUserId={user.id}
             onBack={() => navigate(orderReturnPage)}
-            onAccepted={(id) => navigate("accepted-order", id)}
+            onAccepted={(order) => navigate("accepted-order", order)}
             onDelivered={handleDelivered}
           />
         )}
 
-        {page === "accepted-order" && (
+        {page === "accepted-order" && selectedOrder && (
           <AcceptedOrderPage
-            key={selectedOrderId}
-            orderId={selectedOrderId}
+            key={selectedOrder.id}
+            initialOrder={selectedOrder}
             onDelivered={handleDelivered}
             onBack={() => navigate("orders")}
           />

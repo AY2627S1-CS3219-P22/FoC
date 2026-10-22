@@ -65,9 +65,6 @@ const toOrder = (o: ApiOrder): Order => ({
 export const listOrders = (scope: OrderScope) =>
   api<{ orders: ApiOrder[] }>(`/orders?scope=${scope}`).then((r) => r.orders.map(toOrder))
 
-export const getOrderDetails = (id: string) =>
-  api<{ order: ApiOrder }>(`/orders/${id}`).then((r) => toOrder(r.order))
-
 export const updateOrder = (id: string, action: OrderAction) =>
   api<{ order: ApiOrder }>(`/orders/${id}/${action}`, { method: "POST", body: "{}" })
     .then((r) => toOrder(r.order))
@@ -105,12 +102,11 @@ const ERRORS: Record<string, string> = {
 
 export function orderError(err: unknown) {
   if (!(err instanceof ApiError)) return "Something went wrong."
+  // a 404 with no error code means order-service has no such endpoint yet (e.g. pickup)
+  if (err.status === 404 && !ERRORS[err.message]) return "This step isn't available on order-service yet."
   return ERRORS[err.message] ?? err.message
 }
 
-// Admin only: every order across all statuses, newest first
+// Admin only: no scope = every order across all statuses, newest first
 export const getAllOrders = () =>
-  api<{ orders: ApiOrder[] }>("/orders?scope=all").then((r) => r.orders)
-
-export const getOrder = (id: string) =>
-  api<{ order: ApiOrder }>(`/orders/${id}`).then((r) => r.order)
+  api<{ orders: ApiOrder[] }>("/orders").then((r) => r.orders)

@@ -6,7 +6,7 @@ import { listOrders, orderError } from "../api/orders"
 
 interface Props {
   onNavigate: (page: Page) => void
-  onSelectOrder: (id: string) => void
+  onSelectOrder: (order: Order) => void
 }
 
 export default function OrdersPage({ onNavigate, onSelectOrder }: Props) {
@@ -42,7 +42,7 @@ export default function OrdersPage({ onNavigate, onSelectOrder }: Props) {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {orders.map((order) => <RequestCard key={order.id} order={order} onClick={() => onSelectOrder(order.id)} />)}
+          {orders.map((order) => <RequestCard key={order.id} order={order} onClick={() => onSelectOrder(order)} />)}
         </div>
       )}
     </div>
