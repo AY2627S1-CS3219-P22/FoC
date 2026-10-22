@@ -5,10 +5,13 @@
   "workspaces": [
     "shared/grpc",
     "order-service/grpc",
-    "credit-service/grpc"
+    "credit-service/grpc",
+    "supplier-service/grpc",
+    "shared/messaging",
+    "user-service"
   ],
   "scripts": {
-    "build": "npm run build --workspace @foc/grpc && npm run build --workspace @foc/order-grpc --workspace @foc/credit-grpc",
+    "build": "npm run build --workspace @foc/grpc && npm run build --workspace @foc/order-grpc --workspace @foc/credit-grpc --workspace @foc/supplier-grpc --workspace @foc/messaging",
     "test": "npm run test --workspace @foc/grpc",
     "grpc:generate": "npm run generate --workspace @foc/grpc"
   },

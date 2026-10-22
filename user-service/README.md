@@ -57,6 +57,9 @@ booting. When it's ready you'll have:
 Stop it with `Ctrl+C`, or wipe everything (including the database) with
 `docker compose down -v`.
 
+On a fresh database, create the first admin next — see
+[Administrator accounts](#administrator-accounts).
+
 > **Note:** the JWT keys are not baked into the image — compose mounts your local
 > `keys/` folder into the container (read-only). Run `npm run keys:generate`
 > first (see above), otherwise the container exits at boot with
@@ -96,6 +99,9 @@ npm run dev
 Leave `npm run dev` running; edit files and it restarts automatically. Stop with
 `Ctrl+C`. The Postgres container keeps running in the background — stop it with
 `docker compose stop postgres` when you're done for the day.
+
+On a fresh database, create the first admin next — see
+[Administrator accounts](#administrator-accounts).
 
 ---
 
@@ -142,6 +148,8 @@ not allowed). Roles: `USER` (default) and `ADMINISTRATOR`.
 | PATCH  | `/users/me`        | any authenticated     | Update own first/last name, username (F2.4)     |
 | GET    | `/users`           | `ADMINISTRATOR`       | List all users                                  |
 | GET    | `/users/:id`       | `ADMINISTRATOR`       | View a specific user                            |
+| POST   | `/users/:id/admin` | `ADMINISTRATOR`       | Grant the Administrator role (F3.3)             |
+| DELETE | `/users/:id/admin` | `ADMINISTRATOR`       | Revoke the Administrator role (F3.3, F3.2)      |
 
 Quick demo (service running on `:3001`):
 
@@ -155,8 +163,60 @@ curl -i localhost:3001/users    -H "Authorization: Bearer $TOKEN"   # USER    �
 ```
 
 Responses only ever include public fields — `passwordHash` is never returned.
-(To get an admin, promote a user's `roles` to `["ADMINISTRATOR"]` via
-`npx prisma studio`, then log in again.)
+To get an admin account, see [Administrator accounts](#administrator-accounts).
+
+### Administrator accounts
+
+> **Upgrading from before F3?** Admins used to be created by setting `roles` in
+> Prisma Studio. Don't do this anymore, because it skips the last-admin check and the
+> audit record, and can leave accounts without the `USER` role. Reset your local database once
+> (see [Reset the database completely](#reset-the-database-completely)), then
+> create your admin with the command below.
+
+**Creating the first admin.** Run once per **database** (not per container or
+pod — they all share the same DB), from an interactive terminal:
+
+```bash
+npm run admin:create:dev                                        # Path B (local)
+docker compose exec user-service npm run admin:create           # Path A (container)
+kubectl exec -it deploy/user-service -- npm run admin:create    # Kubernetes
+```
+
+It prompts for email, username, name and password (hidden, typed twice), applies
+the same validation as `/users/register`, and creates an account with both
+`USER` and `ADMINISTRATOR`. Once that succeeds the system is **initialized**:
+re-running changes nothing, even if that admin is later revoked. The password is
+never accepted as an argument or env var. (The container must be built from a
+version that includes the script — rebuild with `docker compose up --build`.)
+
+**Granting and revoking.** Only an active admin can call these; both take the
+target user's id and no body, and both are idempotent (repeat → `200`, no change):
+
+| Request                   | Result                                                                   |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `POST /users/:id/admin`   | `200` + profile — adds `ADMINISTRATOR`; `USER` is kept                   |
+| `DELETE /users/:id/admin` | `200` + profile — removes `ADMINISTRATOR`; `USER` is kept                |
+| caller isn't an admin     | `403` — nothing changes                                                  |
+| unknown or deleted user   | `404`                                                                    |
+| would remove the last admin | `409` `Cannot revoke the last remaining active administrator.`         |
+
+```bash
+curl -i -X POST   localhost:3001/users/<userId>/admin -H "Authorization: Bearer $TOKEN"
+curl -i -X DELETE localhost:3001/users/<userId>/admin -H "Authorization: Bearer $TOKEN"
+```
+
+Rules worth knowing:
+
+- **There is always at least one active admin.** Admin changes run one at a
+  time (a database lock), so two admins revoking each other at once can't leave
+  zero. Admins may revoke themselves unless they are the last one.
+- **The caller is re-checked in the database**, not just from their token — a
+  just-demoted admin's token still says admin for up to 15m, but is refused here.
+- **The target's token updates on their next login or refresh** (≤15m).
+- **Every change is recorded** in the `AdminRoleChange` table (who, whom,
+  grant/revoke, when); the first admin's row has no actor.
+- **Never edit roles directly in the database / Prisma Studio** — that skips the
+  lock, the last-admin check and the audit record.
 
 ### Sessions: refresh & logout
 
@@ -362,6 +422,8 @@ npm run prisma:migrate
 | `npm run prisma:migrate`  | Create & apply a migration (`migrate dev`)    |
 | `npm run prisma:generate` | Regenerate the Prisma client                  |
 | `npm run format`          | Format code with Prettier                     |
+| `npm run admin:create`    | Create the first admin (compiled; in the container) |
+| `npm run admin:create:dev`| Create the first admin (local, via `tsx`)     |
 
 ## Environment variables
 
@@ -406,7 +468,7 @@ Request → routes → middleware → controller → service → Prisma → Post
 ```text
 user-service/
 ├── prisma/
-│   ├── schema.prisma      # User + RefreshToken models, Roles enum
+│   ├── schema.prisma      # User, RefreshToken, SystemBootstrap, AdminRoleChange
 │   └── migrations/        # versioned schema history — commit these
 ├── proto/user.proto       # internal gRPC contract (F2.6)
 ├── src/
@@ -414,6 +476,7 @@ user-service/
 │   ├── env.ts             # zod-validated config
 │   ├── db.ts              # Prisma client + DB ping
 │   ├── services/          # business logic shared by REST + gRPC (DB via Prisma)
+│   ├── scripts/           # operator commands (createAdmin.ts)
 │   ├── api/               # HTTP (REST) transport
 │   │   ├── app.ts         #   Express app + /health, mounts routers
 │   │   ├── routes/        #   path → handler wiring

@@ -4,11 +4,12 @@ import { prisma } from '../db';
 import type { RegisterInput } from '../api/dto/registerDto';
 import type { LoginInput } from '../api/dto/loginDto';
 import type { UpdateProfileInput } from '../api/dto/updateProfileDto';
+import { enqueueUserCreated } from '../events/outboxStore';
 
 const SALT_ROUNDS = 10;
 
 // Profile: everything except secrets — for the user themselves or an admin.
-const profileSelect = {
+export const profileSelect = {
   id: true,
   username: true,
   firstName: true,
@@ -26,6 +27,29 @@ const publicProfileSelect = {
   lastName: true,
 } satisfies Prisma.UserSelect;
 
+// Shared by register and the admin bootstrap so every
+// account is built the same way.
+export async function buildNewUser(input: RegisterInput) {
+  return {
+    firstName: input.firstName,
+    lastName: input.lastName,
+    username: input.username,
+    email: input.email,
+    passwordHash: await bcrypt.hash(input.password, SALT_ROUNDS),
+  };
+}
+
+// Which field a unique-constraint violation (Prisma P2002) hit, or null if
+// it's not a duplicate email/username.
+export function duplicateField(err: unknown): 'email' | 'username' | null {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return null;
+  const target = err.meta?.target;
+  const fields = Array.isArray(target) ? target.join(',') : String(target ?? '');
+  if (fields.includes('email')) return 'email';
+  if (fields.includes('username')) return 'username';
+  return null;
+}
+
 export async function register(input: RegisterInput) {
   // Check duplicate email or username
   const existing = await prisma.user.findFirst({
@@ -37,29 +61,22 @@ export async function register(input: RegisterInput) {
     return { ok: false as const, field };
   }
 
-  const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
   try {
-    const user = await prisma.user.create({
-      data: {
-        firstName: input.firstName,
-        lastName: input.lastName,
-        username: input.username,
-        email: input.email,
-        passwordHash,
-      },
-      select: profileSelect,
+    //DECLARATION CHANGED
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: await buildNewUser(input),
+        select: profileSelect,
+      });
+      await enqueueUserCreated(tx, created.id);
+      return created;
     });
     return { ok: true as const, user };
   } catch (err) {
     // Safety net for the check-then-insert race: the DB's @unique constraint
     // rejects a duplicate that slipped past the pre-check (Prisma code P2002).
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      const target = err.meta?.target;
-      const hitEmail = Array.isArray(target)
-        ? target.includes('email')
-        : String(target ?? '').includes('email');
-      return { ok: false as const, field: hitEmail ? ('email' as const) : ('username' as const) };
-    }
+    const field = duplicateField(err);
+    if (field) return { ok: false as const, field };
     throw err;
   }
 }
