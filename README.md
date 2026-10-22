@@ -153,3 +153,14 @@ disclosures and workspace lockfile, and corrected Order Docker manifest paths
 for the incoming Credit relocation. Human review pending. Exact prompt and
 verification are in [Order usage log](order-service/usage-log.md) and
 [Credit usage log](credit-service/ai/usage-log.md).
+
+Postman demo documentation: ChatGPT (Codex), 2026-10-22, generated the
+[Order/Credit walkthrough](order-service/POSTMAN_DEMO.md) from existing
+contracts and READMEs and verified Credit against disposable PostgreSQL and
+RabbitMQ. Exact prompt/results: Order usage log and Credit entry 046. Human
+review pending; no deployed full-stack or Postman UI verification is claimed.
+
+Shared Credit client adoption: ChatGPT (Codex), 2026-10-22, replaced Order
+custom transport/protobuf with direct @foc/grpc client use as the human requested.
+Retained response validation, metadata and durable lifecycle recovery; tests
+are recorded in Order usage log and Credit entry 047. Human review pending.

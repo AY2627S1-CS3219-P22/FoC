@@ -2037,3 +2037,50 @@ Entry 045 final checks: Order Docker build stage passed and all workspace
 manifest/link entries match the lock. Incoming archives/source already contain
 whitespace warnings; preserved their exact content. Resolved paths are staged,
 with no remaining unmerged entries. No merge commit or push was created.
+
+
+## Entry 046 — 2026-10-22 21:55 +08: Postman demo support
+
+Tool: ChatGPT (Codex), setup/test documentation and existing-code verification.
+Exact human prompt:
+```text
+Could you support me on giving a back-end demo on postman? Like how do I set everything up (you can read the readmes) and what sorta tests i should do with the credit service
+```
+
+Created order-service/POSTMAN_DEMO.md from existing READMEs/contracts with local
+startup, explicit fresh-only nine-migration setup, User registration/login and
+manual agreed-event demo initialization where automatic publication is absent.
+Documented all six Credit RPCs, hold/delta/release/settlement balances, original
+response replay versus current GetReservation, insufficient funds and other
+errors, REST history, identity and the later Order workflow/recovery checks.
+Manual event publication is labelled as a test fixture, not automatic User
+integration. No interface/design/schema choices or decision rationales added.
+
+Paths: order-service/POSTMAN_DEMO.md, order-service/README.md,
+credit-service/README.md, root README.md and both service usage logs. Human
+review pending. Actual checks: Credit 103/103 PostgreSQL-backed tests passed;
+listener 7/7 tests passed with isolated PostgreSQL 17/RabbitMQ containers.
+Postman UI itself and deployed full-stack flow were not executed. Cleanup and
+document checks follow in the Order log.
+
+
+## Entry 047 — 2026-10-22 22:21 +08: Order adopts shared Credit client
+
+Tool: ChatGPT (Codex). Implementation/refactoring/tests/docs; human review pending.
+Exact human instruction:
+```text
+shared gRPC Credit client. Do not use own adaptor, use the one by supplier in feat/credit-implementation
+```
+
+Order startup now imports createCreditClient directly from @foc/grpc. Removed
+the custom Order transport and duplicated protobuf. Propagated shared RpcOptions
+with x-credit-service-token across all lifecycle calls, preserving pure response
+validation/error classification and durable recovery. Shared Credit client and
+Credit implementation/contract source were not changed. No User publisher merge
+or implementation was performed. Detailed paths and exchanges are in
+order-service/usage-log.md. Changes affect Order startup/services/tests, response
+validation helper, removed private transport/proto, documentation and both logs.
+
+Checks passed: shared/Order builds; Order 15 unit and 56 PostgreSQL integration
+tests; shared gRPC 51 tests. Separate default-retry tests and durable-worker
+fault tests verify both retry layers. Final cleanup/checks are in Order log.

@@ -168,12 +168,12 @@ that attribution refers to the same records now maintained in this service.
 
 ## Order lifecycle (2026-10-22)
 
-**Peer-service status:** this checkout still has Supplier GetSupplier and the old
-Credit handlers as stubs. Successful production creation requires the real User
-GetPublicProfile, implemented Supplier GetSupplier/IsOpen, and Credit from the
-agreed `feat/credit-implementation` contract. The local copy of that Credit wire
-contract is `grpc/proto/credit.proto`; shared contracts and teammate sources are
-unchanged. No test doubles are enabled in normal startup.
+**Peer-service status:** Credit's implementation is merged on d3-demo. Supplier
+GetSupplier is still a stub in this checkout; creation requires working User
+GetPublicProfile and Supplier GetSupplier/IsOpen plus initialized Credit accounts.
+The runtime Credit client and protobuf come directly from `@foc/grpc` and
+`shared/grpc/proto/credit.proto`. The former Order-specific transport and copied
+protobuf have been removed. No test doubles are enabled in normal startup.
 
 Configure `grpc/.env` for host development:
 
@@ -519,6 +519,38 @@ requests, actual acceptance races, pre/post-commit failures and receipt-write
 crash recovery. These tests use real Order PostgreSQL and test-only Credit
 ledger handlers; verification of the deployed Credit implementation is separate.
 The existing production edit implementation required no changes for this issue.
+
+### Postman backend demo
+
+See [Postman demo guide](POSTMAN_DEMO.md) for startup, account initialization,
+exact gRPC/REST requests, expected balances, failure checks and current
+full-stack blockers. Credit checks use a real database and broker; full User/
+Supplier integration still requires the working peer implementations.
+
+### Shared Credit gRPC client
+
+Order imports `createCreditClient` directly from `@foc/grpc` in `grpc/src/index.ts`.
+There is no Order-specific gRPC transport or duplicate Credit protobuf. The
+existing GRPC_TIMEOUT_MS config is passed as the shared client's timeoutMs;
+plaintext credentials and transient application retries come from the shared
+implementation. Order passes `RpcOptions.metadata` containing
+`x-credit-service-token` to every RPC, including edit preflight/recovery and
+creation compensation. The shared client owns RPC paths, serialization,
+deadlines, retryable statuses/backoff and preservation of error trailers.
+
+`grpc/src/dependencies/creditValidation.ts` contains only Order response-schema
+validation and error classification; it creates no channel/client and sends no
+requests. Lifecycle services retain their durable intents and current-reservation
+checks. The shared client has up to three transient wire attempts within each
+configured RPC budget; Order's initial durable attempt plus five retries remains
+a separate persisted recovery policy. Tests aimed at persistent recovery set
+shared RpcOptions.maxAttempts to 1 to expose that layer; additional tests exercise
+the shared default retries through create/edit/cancel without durable deferral.
+
+Verified: shared/Order builds, 15 Order unit/auth/client tests, 56 PostgreSQL
+lifecycle tests and all 51 shared gRPC transport/retry tests passed. The client
+and shared contract sources were used unchanged. User event publication remains
+a separate missing integration and was not implemented or merged in this change.
 
 ## AI Use Summary
 

@@ -812,3 +812,89 @@ incoming staged diff has pre-existing whitespace in Credit prompt archives and
 shared messaging/source files, which were preserved rather than rewriting
 verbatim prompts or unrelated teammate source. Conflicts are staged as resolved;
 merge commit remains for the human to create.
+
+
+## 2026-10-22 21:55 +08 — Postman backend demo support
+
+Tool: ChatGPT (Codex). Modes: bounded test suggestions, setup/test documentation
+and verification of existing implementation; no architecture or schema changes.
+Human review pending.
+
+Exact user prompt:
+```text
+Could you support me on giving a back-end demo on postman? Like how do I set everything up (you can read the readmes) and what sorta tests i should do with the credit service
+```
+
+Key response: read the merged Credit/User/Supplier/Order READMEs, event contracts,
+Docker configs and handlers. Credit is now implemented; current Supplier
+GetSupplier/Compose, User event publishing and missing pickup remain actual
+full-stack blockers. Wrote POSTMAN_DEMO.md with startup and migrations 001–009,
+fresh local Postman identities/tokens, direct RPC hold/update/release/transfer
+checks, replay and failure expectations, and the later Order integration flow.
+The optional manual event publisher is explicitly a demo fixture using the
+agreed user.created payload/shared publisher, not a claim of automatic User
+registration integration. No fake endpoint, direct SQL funding or shortened
+expiry rule was added. Existing service interfaces/architecture are unchanged.
+
+Affected paths: order-service/POSTMAN_DEMO.md, order-service/README.md,
+credit-service/README.md, root README.md, order-service/usage-log.md and
+credit-service/ai/usage-log.md. No collection JSON was created; copyable
+requests and existing Postman REST assertion scripts are in Markdown.
+
+Verification: all 103 Credit tests passed against a dedicated disposable
+PostgreSQL 17 database. All 7 live event-listener tests passed against that
+database and a separate disposable RabbitMQ broker, including duplicate grants,
+retries, dead letters and restart. No existing user/demo data or queues changed.
+Postman application UI and complete live User/Supplier/Order path were not run.
+
+Final checks: guide shell snippets passed bash -n and git diff --check passed.
+Removed only foc-postman-credit-check-db and foc-postman-credit-check-broker
+with their disposable volumes. Existing service containers/data were not
+changed. Documentation remains uncommitted on d3-demo.
+
+
+## 2026-10-22 22:21 +08 — Adopt team's shared Credit gRPC client
+
+Tool: ChatGPT (Codex). Modes: implementation/refactoring/debugging/tests/docs.
+Human review pending.
+
+Exact user instruction:
+```text
+shared gRPC Credit client. Do not use own adaptor, use the one by supplier in feat/credit-implementation
+```
+
+Key response: replaced Order's custom dynamic gRPC transport with direct
+createCreditClient import/instantiation from @foc/grpc in Order startup. Removed
+Order's custom creditClient.ts and local credit.proto copy. Shared library/client
+source is unchanged. Each lifecycle service now receives shared RpcOptions
+containing the Order service-token metadata, used for all six calls including
+edit preflight and recovery. Retained the prior response validation and error
+classification as pure functions in creditValidation.ts, with no client/channel
+or request wrapper. Existing timeout is passed via shared config; shared
+transport owns deadlines and transient retries. No service/schema/interfaces
+were invented and no User publisher branch was merged.
+
+Updated existing transport tests to use the shared CreditService contract and
+factory directly. Tests of durable failures intentionally set supported shared
+RpcOptions.maxAttempts=1, exposing backend persistent recovery; separate default
+retry tests confirm transparent transient recovery with the original token/body.
+Added checks for unchanged service-token metadata across retries, preserved
+error trailers, and unchanged permanent-rejection handling.
+
+Affected: order-service/grpc/src/index.ts, services/orderCreation.ts,
+services/orderEdits.ts, services/orderLifecycle.ts, dependencies/creditClient.ts
+(deleted), dependencies/creditValidation.ts (added), grpc/proto/credit.proto
+(deleted), grpc/tests/credit.test.cjs, grpc/tests/lifecycle.integration.cjs,
+Order/Credit/root READMEs, POSTMAN_DEMO.md and both service usage logs.
+Existing uncommitted Postman documentation from the preceding task is retained.
+
+Verification: shared/Order builds passed; 15 Order unit/auth/client tests,
+56 real PostgreSQL lifecycle tests and 51 shared gRPC tests all passed. Used
+a dedicated order_service_test_shared_credit database; normal service data
+unchanged. Runtime shared client/contract code was not edited. Tests include
+reserve/update/release/settlement and transient/auth/business failure handling.
+
+Final checks: git diff --check passed. Removed only the disposable shared-client
+test database container/volume and stale ignored compiled files for the deleted
+private client. No normal runtime/container/data changes. All changes remain
+uncommitted on d3-demo. User event publisher remains separate and missing.

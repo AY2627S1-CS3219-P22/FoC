@@ -176,7 +176,9 @@ multiple tokens yield `UNAUTHENTICATED`; a known unauthorized service yields
 Set `CREDIT_ORDER_SERVICE_TOKEN` to the same secret on Credit and Order Service.
 Credit gRPC always uses plaintext on port 50054 (or the configured GRPC_PORT).
 Order uses the shared client's default plaintext credentials and sends
-x-credit-service-token. There are no Credit TLS configuration variables.
+x-credit-service-token. Order now imports createCreditClient directly from
+@foc/grpc in order-service/grpc/src/index.ts; the previous Order-specific
+transport/protobuf copy was removed (usage-log entry 047). There are no Credit TLS configuration variables.
 CREDIT_JWT_PUBLIC_KEY_PATH is still required for REST user-token verification.
 
 Business errors preserve gRPC codes and the `x-credit-error-reason` trailer:
@@ -429,6 +431,13 @@ Wait for the broker ping to succeed before running the test. This file is outsid
 the default test glob and refuses to proceed if the Credit queue is already in
 use. It never purges an existing queue. Integration tests clean up their schemas,
 listeners and child processes. Agent-run checks do not establish human review.
+
+## Order/Credit Postman demo
+
+The [demo walkthrough](../order-service/POSTMAN_DEMO.md) provides startup
+commands, local Postman variables, all six RPCs, expected balance/version
+changes, replay and failure checks. It explicitly labels manual user-event
+publication and the current Supplier/User/pickup integration gaps.
 
 ## Attribution for JSON files
 
