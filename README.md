@@ -55,23 +55,64 @@ microservice (`user-service/`, `supplier-service/`, `order-service/`,
   may be added as needed, but must still **respect the
   one-service-per-folder skeleton** for core implementation.
 
+## Run the whole stack (Docker)
+
+Requires Docker Desktop. One-time setup:
+
+```sh
+npm run keys:generate --prefix user-service     # JWT keys (other services mount the public key)
+cp user-service/.env.example user-service/.env
+cp supplier-service/.env.example supplier-service/.env
+cp credit-service/.env.example credit-service/.env
+cp order-service/.env.example order-service/.env
+```
+
+Then, from the repository root:
+
+```sh
+docker compose up --build -d
+docker compose ps -a          # *-migrate jobs Exited (0); everything else healthy
+```
+
+Open <http://localhost:8080>. The root `compose.yaml` includes each service's own
+compose file (plus `shared/messaging` for RabbitMQ and `ui/`):
+
+- **One entry point:** only the UI (nginx) publishes a port, `8080`. It serves the
+  app and proxies `/backend/*` to the services. Databases, gRPC and RabbitMQ are
+  reachable only on the shared `internal` network, by service name.
+- **Migrations:** each service has a one-off `*-migrate` job; the service starts
+  only after its job succeeds. Applied migrations are skipped on later runs.
+- **Data:** each database uses a named volume, so data survives `down`/`up`.
+  `docker compose down -v` deletes it.
+
+```sh
+docker compose logs -f <service>    # e.g. credit-service
+docker compose down                 # stop, keep data
+docker compose down -v              # stop and delete data
+```
+
+Each service can also run on its own from its folder (`docker compose up`); its
+`compose.override.yaml` then publishes its ports and points it at peers on the
+host. Stop standalone stacks before starting the full stack, and vice versa.
+
 ## Local service ports
 
-Use these reserved ports for local development. REST and gRPC ports are kept
-the same inside and outside containers to make service configuration predictable.
+REST and gRPC ports are the same inside and outside containers to make service
+configuration predictable.
 
-| Service | REST | gRPC |
-| --- | ---: | ---: |
-| User service | 3001 | 50051 |
-| Supplier service | 3002 | 50052 |
-| Order service | 3003 (reserved) | 50053 |
-| Credit service | 3004 | 50054 |
+| Service | REST | gRPC | DB host port (standalone only) |
+| --- | ---: | ---: | ---: |
+| User service | 3001 | 50051 | 5432 |
+| Supplier service | 3002 | 50052 | 54332 |
+| Order service | 3003 | 50053 | 5434 |
+| Credit service | 3004 | 50054 | 5433 |
+| UI (nginx) | 8080 | — | — |
+| RabbitMQ | — | — | 5672 (AMQP), 15672 (management UI) |
 
-PostgreSQL containers continue to listen on `5432` internally. Host mappings
-may differ when databases share a machine, for example supplier Postgres uses
-`54332:5432`. Container-to-container calls should use service names and the
-internal port; host processes should use `localhost` and the published host
-port. Reserved REST ports prevent future collisions when APIs are added.
+PostgreSQL containers listen on `5432` internally. In the full stack only the UI's
+8080 is published; service and database ports are published only when a service
+runs standalone. Container-to-container calls use service names and the internal
+port; host processes use `localhost` and the published host port.
 
 ---
 
