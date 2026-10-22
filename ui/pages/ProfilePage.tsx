@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Connected approved Order UI/API flow; author review pending.
+// Prompts and verification: ../../order-service/usage-log.md.
 import type { User, Order, Page } from "../App"
 
 interface Props {
@@ -37,7 +40,7 @@ export default function ProfilePage({ user, orders, onNavigate, onLogout }: Prop
             <p className="text-sm text-[#3F6B5A] mb-3 truncate">{user.email}</p>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-1.5 bg-[#E8F1ED] text-[#1A4A36] text-xs font-semibold px-3 py-1.5 rounded-full">
-                {user.credits} Credits
+                {user.credits ?? "—"} Credits
               </div>
               <span className="text-xs text-[#9CA3AF]">Member since {user.memberSince}</span>
             </div>

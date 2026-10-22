@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Connected approved Order UI/API flow; author review pending.
+// Prompts and verification: ../../order-service/usage-log.md.
 import type { Order } from "../App"
 import StatusBadge from "../components/StatusBadge"
 
@@ -104,10 +107,11 @@ export default function AcceptedOrderPage({ order, onMarkPickedUp, onMarkDeliver
       {/* Contextual action */}
       {order.status === "accepted" && (
         <button
-          onClick={() => onMarkPickedUp(order.id)}
+          disabled
+          title="Pickup is not implemented by the current Order Service"
           className="w-full py-3 bg-[#1A4A36] text-white text-sm font-medium rounded-xl hover:bg-[#163D2C] transition-colors"
         >
-          Mark as Picked Up
+          Pickup unavailable
         </button>
       )}
       {order.status === "picked-up" && (
@@ -123,6 +127,7 @@ export default function AcceptedOrderPage({ order, onMarkPickedUp, onMarkDeliver
           </button>
         </div>
       )}
+      {order.creditState === "SETTLEMENT_PENDING" && <p role="status">Delivered. Credit settlement pending.</p>}
       {order.status === "completed" && (
         <div className="bg-[#E8F1ED] border border-[#1A4A36]/10 rounded-xl px-5 py-4 text-center">
           <p className="text-sm font-semibold text-[#1A4A36] mb-0.5">Errand completed</p>

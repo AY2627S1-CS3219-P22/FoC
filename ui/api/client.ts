@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Connected approved Order UI/API flow; author review pending.
+// Prompts and verification: ../../order-service/usage-log.md.
 // Error with the HTTP status so pages can tell "wrong password" (4xx)
 // apart from "service not running" (5xx / network).
 export class ApiError extends Error {
@@ -18,8 +21,31 @@ type ErrorBody = {
 // user-service returns { message } for most errors, but validation errors
 // come back as { details: { field: [msg] } } instead
 function errorMessage(body: ErrorBody, status: number) {
-  const detail = body.details ? Object.values(body.details).flat()[0] : undefined
-  return body.message ?? detail ?? body.errors?.[0] ?? body.error ?? `Request failed (${status})`
+  const detail = body.details
+    ? Object.values(body.details).flat()[0]
+    : undefined
+  const orderErrors: Record<string, string> = {
+    "dependency-unavailable":
+      "A required service is unavailable. Please try again.",
+    "dependency-rejected":
+      "The request could not be completed. Check supplier availability, credits and order details.",
+    "invalid-transition":
+      "This order has changed and this action is no longer available. Refresh orders.",
+    expired: "This order has expired. Refresh orders.",
+    conflict:
+      "Another operation is processing or the order changed. Refresh orders before retrying.",
+    forbidden: "You do not have permission for this action.",
+    unauthorized: "Your session has expired. Please sign in again.",
+    "invalid-input": "Check all required fields, credits and expiry time.",
+  }
+  return (
+    body.message ??
+    (body.error ? orderErrors[body.error] : undefined) ??
+    detail ??
+    body.errors?.[0] ??
+    body.error ??
+    `Request failed (${status})`
+  )
 }
 
 let refreshing: Promise<string | null> | null = null
@@ -36,7 +62,9 @@ export function refreshToken() {
       return token
     })
     .catch(() => null)
-    .finally(() => { refreshing = null })
+    .finally(() => {
+      refreshing = null
+    })
   return refreshing
 }
 
@@ -54,11 +82,21 @@ function send(path: string, options: RequestInit) {
 
 // Shared fetch helper: adds JSON headers + login token, throws on errors.
 // On a 401 it refreshes the token once and retries.
-export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiWithStatus<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<{
+  data: T
+  status: number
+}> {
   let res: Response
   try {
     res = await send(path, options)
-    if (res.status === 401 && path !== "/users/login" && (await refreshToken())) {
+    if (
+      res.status === 401 &&
+      path !== "/users/login" &&
+      (await refreshToken())
+    ) {
       res = await send(path, options)
     }
   } catch {
@@ -66,5 +104,11 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   }
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new ApiError(errorMessage(body, res.status), res.status)
-  return body as T
+  return { data: body as T, status: res.status }
+}
+export async function api<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  return (await apiWithStatus<T>(path, options)).data
 }

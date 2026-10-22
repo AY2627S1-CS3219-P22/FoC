@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Connected approved Order UI/API flow; author review pending.
+// Prompts and verification: ../../order-service/usage-log.md.
 import { useState } from "react"
 import type { Order } from "../App"
 import StatusBadge from "../components/StatusBadge"
@@ -7,6 +10,7 @@ interface Props {
   currentUserId: string
   onBack: () => void
   onAccept: (orderId: string) => void
+  onEdit?: () => void
   onDelete?: () => void
   onMarkPickedUp?: () => void
   onMarkDelivered?: () => void
@@ -16,7 +20,7 @@ interface Props {
 
 export default function OrderDetailsPage({
   order, currentUserId, onBack, onAccept,
-  onDelete, onMarkPickedUp, onMarkDelivered, onConfirm, onReleaseCredits,
+  onEdit, onDelete, onMarkPickedUp, onMarkDelivered, onConfirm, onReleaseCredits,
 }: Props) {
   const [showAcceptModal, setShowAcceptModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -43,6 +47,8 @@ export default function OrderDetailsPage({
         <StatusBadge status={order.status} />
       </div>
 
+      {onEdit && <button onClick={onEdit} className="mb-4 underline">Edit request</button>}
+      {order.creditState.endsWith('_PENDING') && <p role="status" className="mb-4">Credit processing pending. Payment is not yet confirmed.</p>}
       {/* Journey card */}
       <div className="bg-white border border-[#E4E8E6] rounded-xl p-5 mb-4">
         <div className="flex items-center gap-3 mb-5">
@@ -291,7 +297,7 @@ export default function OrderDetailsPage({
           >
             <h3 className="text-base font-semibold text-[#162A46] mb-2">Delete this request?</h3>
             <p className="text-sm text-[#3F6B5A] mb-6 leading-relaxed">
-              Your reserved credits will be returned to your balance.
+              The request will be cancelled. Credits return once the release is confirmed.
             </p>
             <div className="flex gap-3">
               <button
@@ -301,7 +307,7 @@ export default function OrderDetailsPage({
                 Cancel
               </button>
               <button
-                onClick={() => { setShowDeleteModal(false); onDelete?.(); onBack() }}
+                onClick={() => { setShowDeleteModal(false); onDelete?.() }}
                 className="flex-1 py-2.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
               >
                 Delete Request

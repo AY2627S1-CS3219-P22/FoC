@@ -89,6 +89,9 @@ recovery, with real gRPC transport and PostgreSQL integration tests. Verified
 the existing editing workflow with additional funding, concurrency and crash
 recovery tests against real gRPC transport and Order PostgreSQL. The author
 supplied the schema, contracts, retry schedule and final first-lock-wins rule.
+Connected the existing React Order UI using teammate ui/api-layer authentication,
+real Order/Supplier/Credit requests, durable-tab idempotency, and pending/error
+states; added frontend tests and setup instructions.
 Human decisions and superseded requirements are recorded in the service usage log;
 no decision rationales were drafted.
 

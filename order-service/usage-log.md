@@ -774,3 +774,91 @@ Final verification: all 13 unit/auth/gRPC tests also passed (68 total).
 Documentation shell syntax and git diff --check passed. Removed the disposable
 edit test database container/volume; normal Docker service/data unchanged.
 Changes remain uncommitted on order-functionality.
+
+
+## 2026-10-22 — Order UI connection on order-ui
+
+Tool: ChatGPT (Codex). Modes: implementation, debugging, tests and documentation.
+Human author review remains pending.
+
+Exact initial request: "I have now created a new branch. Can we work on UI connection"
+The attached issue is archived verbatim in [ui-integration-issue.md](ai-prompts/ui-integration-issue.md).
+
+Exact human reply for backend/authentication context:
+```text
+I can get the PR from the UI side. UI pr is at ui/api-layer
+## What's changed
+- Added `ui/api/` layer (client, users, suppliers, orders) so pages call functions instead of hard-coded data
+- Linked Suppliers page in the navbar; it fetches from supplier-service and falls back to sample data if the service isn't running
+- Login + signup call user-service (`/users/login`, `/users/register`); signup validation matches the backend rules, and signing up logs you straight in
+- Profile loads from `/users/me` (name, email, join date)
+- Session stays logged in after a reload using `/users/refresh`; expired tokens refresh automatically and the request is retried once
+- Logout calls `/users/logout` and clears the session
+- Login fails closed if user-service is down (no more mock login fallback)
+- Vite dev proxy (`/backend/*`) to user-service (3001) and supplier-service (3002) to avoid CORS
+- Credits and orders still use mock data until those services are connected
+
+## Notes
+- user-service sets the refresh cookie on `Path=/users`, so the proxy rewrites it to `/backend/users`, otherwise the browser never sends it back
+- Removed deprecated `baseUrl` from `ui/tsconfig.json`
+
+## Testing
+- Signed up, logged in, profile shows real details
+- Reloaded the page and stayed logged in
+- Stopped user-service and confirmed login is refused
+```
+
+Exact second reply:
+```text
+UI PR is at ui/api-layer branch. If there is no implementation, tell me what needs to be decided.
+```
+
+Key response: inspected/fetched origin/ui/api-layer, found the existing shared
+client and refresh flow, merged it into order-ui with --no-commit. No conflicts.
+Used the implemented Order contracts: scoped USER listings, unscoped ADMIN read,
+create/edit/accept/cancel/deliver. Documented differences from pasted issue:
+Order defaults to 3003; no pickup/detail endpoint or scope=all on this branch.
+No backend interfaces/architecture changes were introduced.
+
+Implementation: real order DTO mapping with original timestamps/IDs, JWT client,
+server-only Vite proxy destinations, real Supplier selection and Credit balance,
+requester editing, server-confirmed commands, no local credit deductions or
+sample orders. Pending creation/edit bodies and keys survive tab reload in
+per-user session storage and are reused on uncertain retry; repeated submissions
+are blocked. DELIVERED with pending settlement is never shown as paid/completed.
+Removed requester confirm/release actions, disabled unavailable pickup/admin
+mutation. Listing errors remain visible without fabricated results. Existing
+teammate Suppliers catalog sample fallback is retained and labelled; creation
+uses only live Supplier IDs. No live deployment or service-contract change.
+
+AI-influenced files: ui/App.tsx, ui/api/client.ts, ui/api/orders.ts,
+ui/vite.config.ts, ui/.env.example, ui/package.json,
+ui/components/Navbar.tsx, ui/components/RequestCard.tsx,
+ui/pages/CreateRequestPage.tsx, ui/pages/MyOrdersPage.tsx,
+ui/pages/OrderDetailsPage.tsx, ui/pages/AcceptedOrderPage.tsx,
+ui/pages/AdminPage.tsx, ui/pages/ProfilePage.tsx, ui/tests/orders.test.cjs,
+ui/README.md, root README.md, this log and the pasted-issue archive.
+Other staged UI login/signup/supplier/client additions originate from the
+teammate branch and are preserved with its Git history; no authorship claim.
+
+Verification so far: baseline and updated UI TypeScript checks pass with Node
+22.22.0 (default Node 20.10.0 cannot run Vite). All six API tests pass: routing,
+JWT headers, pending/settled/expired mapping, body/key preservation including
+401 refresh replay, action routes, rejected/unavailable/network responses.
+Browser checks against a disposable test HTTP server verified creation 202,
+reload with pending state, same-key/body retry and success, acceptance with
+pickup disabled, editing with updated details, cancellation retained in history
+with REFUND_PENDING, and service-outage errors without sample data. The fixture
+request log confirmed identical creation body/key across reload/retry and JWT
+headers on every Order request. No real user/order/credit data was changed.
+
+Final verification: Node 22.22.0 UI TypeScript check, production Vite build and all
+six API tests passed. The repository's old formatter briefly removed separators
+in three inline TypeScript types; corrected those and reran final checks.
+Minimized formatting-only changes in unrelated component markup. Staged and
+unstaged diff whitespace checks passed. Closed the agent-created browser tab
+and stopped only the temporary fixture/dev servers (34009/5179). Screenshot of
+cancellation/history verification: /tmp/order-ui-cancellation.png (test records).
+No backend code or dependency lockfiles changed. The ui/api-layer merge remains
+uncommitted on order-ui; its staged files and subsequent unstaged integration
+changes must both be included when the author commits.

@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Connected approved Order UI/API flow; author review pending.
+// Prompts and verification: ../../order-service/usage-log.md.
 import { useState } from "react"
 import type { Order, User, Page } from "../App"
 import StatusBadge from "../components/StatusBadge"
@@ -42,7 +45,7 @@ interface Props {
   orders: Order[]
   user: User
   onNavigate: (page: Page) => void
-  onDeleteOrder: (id: string) => void
+  onDeleteOrder?: (id: string) => void
 }
 
 export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: Props) {
@@ -231,8 +234,10 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
                           <td className={`${tdCls} text-[#9CA3AF] whitespace-nowrap`}>{order.createdAt}</td>
                           <td className={tdCls} onClick={(e) => e.stopPropagation()}>
                             <button
+                              disabled={!onDeleteOrder}
+                              title={!onDeleteOrder ? "Administrator deletion is unavailable" : undefined}
                               onClick={() => {
-                                onDeleteOrder(order.id)
+                                onDeleteOrder?.(order.id)
                                 if (selectedOrder?.id === order.id) setSelectedOrder(null)
                               }}
                               className="text-red-400 hover:text-red-600 transition-colors text-xs font-medium"
@@ -286,8 +291,10 @@ export default function AdminPage({ orders, user, onNavigate, onDeleteOrder }: P
                       ))}
                     </div>
                     <button
+                      disabled={!onDeleteOrder}
+                      title={!onDeleteOrder ? "Administrator deletion is unavailable" : undefined}
                       onClick={() => {
-                        onDeleteOrder(selectedOrder.id)
+                        onDeleteOrder?.(selectedOrder.id)
                         setSelectedOrder(null)
                       }}
                       className="w-full py-2 border border-red-100 text-red-600 text-xs font-medium rounded-lg hover:bg-red-50 transition-colors"

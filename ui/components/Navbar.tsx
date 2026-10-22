@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Connected approved Order UI/API flow; author review pending.
+// Prompts and verification: ../../order-service/usage-log.md.
 import type { User, Page } from "../App"
 
 interface NavbarProps {
@@ -120,7 +123,7 @@ export default function Navbar({ user, currentPage, onNavigate }: NavbarProps) {
             <svg className="h-3 w-3 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm.75 14.25h-1.5v-5.5h1.5v5.5zm0-7h-1.5v-1.5h1.5v1.5z" />
             </svg>
-            <span>{user.credits}</span>
+            <span>{user.credits ?? "—"}</span>
             <span className="hidden min-[380px]:inline">Credits</span>
           </div>
           <button

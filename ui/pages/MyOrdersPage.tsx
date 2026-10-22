@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Connected approved Order UI/API flow; author review pending.
+// Prompts and verification: ../../order-service/usage-log.md.
 import { useState } from "react"
 import type { Order, User } from "../App"
 import RequestCard from "../components/RequestCard"
@@ -19,14 +22,11 @@ interface Props {
   onDeleteOrder: (id: string) => void
   onMarkPickedUp: (id: string) => void
   onMarkDelivered: (id: string) => void
-  onConfirmDelivery: (id: string) => void
-  onReleaseCredits: (id: string) => void
 }
 
 export default function MyOrdersPage({
   orders, user, onSelectOrder,
   onDeleteOrder, onMarkPickedUp, onMarkDelivered,
-  onConfirmDelivery, onReleaseCredits,
 }: Props) {
   const [tab, setTab] = useState<Tab>("my-requests")
 
@@ -36,21 +36,18 @@ export default function MyOrdersPage({
     return true
   })
 
-  const activeRequests   = orders.filter((o) => o.requesterId === user.id && o.status !== "completed" && o.status !== "cancelled").length
-  const activeDeliveries = orders.filter((o) => o.courierId === user.id && o.status !== "completed").length
+  const activeRequests   = orders.filter((o) => o.requesterId === user.id && !["completed", "cancelled", "expired"].includes(o.status)).length
+  const activeDeliveries = orders.filter((o) => o.courierId === user.id && !["completed", "cancelled", "expired"].includes(o.status)).length
 
   function getActions(order: Order): CardActions {
     if (tab === "my-deliveries" && order.courierId === user.id) {
       return {
-        onMarkPickedUp:  order.status === "accepted"  ? () => onMarkPickedUp(order.id)  : undefined,
+        onMarkPickedUp:  undefined,
         onMarkDelivered: order.status === "picked-up" ? () => onMarkDelivered(order.id) : undefined,
       }
     }
     if (tab === "my-requests" && order.requesterId === user.id) {
-      const inProgress = ["accepted", "picked-up", "delivered"].includes(order.status)
       return {
-        onConfirm:       inProgress ? () => onConfirmDelivery(order.id) : undefined,
-        onReleaseCredits: inProgress ? () => onReleaseCredits(order.id) : undefined,
         onDelete: order.status === "open" ? () => onDeleteOrder(order.id) : undefined,
       }
     }

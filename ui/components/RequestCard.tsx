@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Connected approved Order UI/API flow; author review pending.
+// Prompts and verification: ../../order-service/usage-log.md.
 import type { Order } from "../App"
 import StatusBadge from "../components/StatusBadge"
 
@@ -81,7 +84,7 @@ export default function RequestCard({ order, onClick, actions = {} }: { order: O
           )}
 
           {/* Delete (my-requests) */}
-          {onDelete && btn("Delete", onDelete, "red")}
+          {onDelete && btn("Cancel", onDelete, "red")}
         </div>
       </div>
     </article>

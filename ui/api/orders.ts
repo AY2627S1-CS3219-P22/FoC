@@ -1,89 +1,104 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
+// Scope: Connected approved Order REST contracts to existing UI types; review pending.
+// Prompts and verification: ../../order-service/usage-log.md.
 import type { Order } from "../App"
+import { apiWithStatus } from "./client"
 
-// MOCK DATA: replace with real calls once order-service has REST endpoints.
-export const SEED_ORDERS: Order[] = [
-  {
-    id: "o1",
-    pickupLocation: "COM3",
-    pickupStore: "CoffeeBean @ COM3",
-    deliveryLocation: "PGP",
-    description: "Pick up one iced latte, medium size. No sugar, please double-check the order.",
-    credits: 4,
-    deadline: "3:30 PM",
-    status: "open",
-    requesterId: "u2",
-    requesterName: "Aisha Lim",
-    createdAt: "2:45 PM",
-  },
-  {
-    id: "o2",
-    pickupLocation: "UTown",
-    pickupStore: "Cheers @ UTown",
-    deliveryLocation: "PGPR Block E",
-    description: "One packet of instant noodles (any flavour) and a 1.5L mineral water.",
-    credits: 3,
-    deadline: "5:00 PM",
-    status: "open",
-    requesterId: "u3",
-    requesterName: "Marcus Goh",
-    createdAt: "3:10 PM",
-  },
-  {
-    id: "o3",
-    pickupLocation: "Science Faculty",
-    pickupStore: "Science Canteen",
-    deliveryLocation: "Arts (AS7) Level 4",
-    description: "Chicken rice with drumstick and soup. No cucumber please.",
-    credits: 5,
-    deadline: "1:00 PM",
-    status: "accepted",
-    requesterId: "u4",
-    requesterName: "Priya Nair",
-    courierId: "u5",
-    courierName: "Ryan Chen",
-    createdAt: "12:10 PM",
-  },
-  {
-    id: "o4",
-    pickupLocation: "Engineering",
-    pickupStore: "Print Lab @ Engineering",
-    deliveryLocation: "E1A Room 02-06",
-    description: "Print 20 pages double-sided from USB labelled EE2024_Lab. Black and white is fine.",
-    credits: 6,
-    deadline: "4:30 PM",
-    status: "open",
-    requesterId: "u6",
-    requesterName: "Wei Lin",
-    createdAt: "3:55 PM",
-  },
-  {
-    id: "o5",
-    pickupLocation: "YST",
-    pickupStore: "YST Canteen",
-    deliveryLocation: "UTown Residence",
-    description: "Brown sugar pearl milk tea, 50% sugar, less ice, large.",
-    credits: 4,
-    deadline: "6:00 PM",
-    status: "completed",
-    requesterId: "u1",
-    requesterName: "Jordan Tan",
-    courierId: "u7",
-    courierName: "Sofia Park",
-    createdAt: "5:10 PM",
-  },
-  {
-    id: "o6",
-    pickupLocation: "Central Library",
-    pickupStore: "CLB Bookshop",
-    deliveryLocation: "PGPR Block A",
-    description: "Reserved book: Introduction to Sociology 3rd Ed. under the name Priya Nair.",
-    credits: 5,
-    deadline: "2:00 PM",
-    status: "open",
-    requesterId: "u8",
-    requesterName: "Priya Nair",
-    createdAt: "1:00 PM",
-  },
-]
-
-export const getOrders = async (): Promise<Order[]> => SEED_ORDERS
+export type OrderInput = {
+  supplierId: string
+  destination: string
+  requestDetails: string
+  credits: number
+  expiryTime: string
+}
+export type OrderScope = "open" | "requested" | "assigned"
+export type ApiOrder = {
+  id: string
+  supplierId: string
+  pickupLocation: string
+  pickupStore: string
+  destination: string
+  requestDetails: string
+  credits: number
+  expiryTime: string
+  status: "UNASSIGNED" | "ASSIGNED" | "PICKED_UP" | "DELIVERED" | "CANCELLED"
+  creditState: string
+  cancellationReason: string | null
+  requesterId: string
+  requesterName: string
+  courierId: string | null
+  courierName: string | null
+  createdAt: string
+}
+export function fromApiOrder(row: ApiOrder): Order {
+  const status: Order["status"] =
+    row.status === "UNASSIGNED"
+      ? "open"
+      : row.status === "ASSIGNED"
+        ? "accepted"
+        : row.status === "PICKED_UP"
+          ? "picked-up"
+          : row.status === "DELIVERED"
+            ? row.creditState === "SETTLED"
+              ? "completed"
+              : "delivered"
+            : row.cancellationReason === "EXPIRY"
+              ? "expired"
+              : "cancelled"
+  return {
+    ...row,
+    status,
+    deliveryLocation: row.destination,
+    description: row.requestDetails,
+    deadline: new Date(row.expiryTime).toLocaleString("en-SG"),
+    courierId: row.courierId ?? undefined,
+    courierName: row.courierName ?? undefined,
+  }
+}
+export async function getOrders(scope?: OrderScope) {
+  const { data } = await apiWithStatus<{ orders: ApiOrder[] }>(
+    `/orders${scope ? `?scope=${scope}` : ""}`,
+  )
+  return data.orders.map(fromApiOrder)
+}
+export async function createOrder(body: OrderInput, key: string) {
+  const { status, data } = await apiWithStatus<{
+    order?: ApiOrder
+    creationId?: string
+    state?: string
+  }>("/orders", {
+    method: "POST",
+    headers: { "Idempotency-Key": key },
+    body: JSON.stringify(body),
+  })
+  return {
+    status,
+    order: data.order ? fromApiOrder(data.order) : undefined,
+    creationId: data.creationId,
+  }
+}
+export async function changeOrder(
+  id: string,
+  action: "accept" | "cancel" | "deliver",
+) {
+  const { status, data } = await apiWithStatus<{ order: ApiOrder }>(
+    `/orders/${encodeURIComponent(id)}/${action}`,
+    { method: "POST" },
+  )
+  return { status, order: fromApiOrder(data.order) }
+}
+export async function editOrder(
+  id: string,
+  body: Partial<OrderInput>,
+  key: string,
+) {
+  const { status, data } = await apiWithStatus<{ order: ApiOrder }>(
+    `/orders/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { "Idempotency-Key": key },
+      body: JSON.stringify(body),
+    },
+  )
+  return { status, order: fromApiOrder(data.order) }
+}
