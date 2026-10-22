@@ -7,6 +7,9 @@
 // Entry 037: OpenAI Codex (GPT-6), 2026-10-22 Asia/Singapore.
 // Scope: Updated event-level permanent-error assertions for the human-edited handler.
 // Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 037.
+// Entry 040: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Removed the account timestamp write from the allocation-replay fixture.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 040.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -101,7 +104,7 @@ test('initial grant transaction implements the human-specified event allocation 
     });
 
     await t.test('saved success is replayed after later balance changes, with no new writes', async () => {
-      await client.query("UPDATE credit_accounts SET total_credits = 8, reserved_credits = 2, updated_at = now() WHERE user_id = 'new-user'");
+      await client.query("UPDATE credit_accounts SET total_credits = 8, reserved_credits = 2 WHERE user_id = 'new-user'");
       const before = (await client.query("SELECT * FROM credit_accounts WHERE user_id = 'new-user'")).rows[0];
       assert.deepEqual(await service.initCredits({ userId: 'new-user' }), {
         totalCredits: 10, reservedCredits: 0, availableCredits: 10,

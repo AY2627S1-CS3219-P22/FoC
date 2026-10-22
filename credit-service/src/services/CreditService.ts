@@ -2,10 +2,13 @@
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Implemented human-specified core credit business rules, reads, and transaction ownership.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
+// Author review: [HUMAN-REVIEWED] I edited the initial allocation to use a constant and removed the hard-coded 10 across four usages.
 // Prompts and key responses: ../../ai/usage-log.md, entries 005–026 and 028 (prior scopes retained).
 // Changes in entries 026 and 028: Pending human review; prior review markers apply to earlier content.
 // Entry 028: AI-generated settled-reservation retry fallback; human review pending.
+// Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Resolved history-entry bookmarks to private sequence boundaries within the authenticated user's scope.
+// Changes await human review; prompts/key responses: ../../ai/usage-log.md, entry 043.
 
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
@@ -17,6 +20,7 @@ import { assertIdentifier, assertOrderId, assertPositiveInteger, assertUserId, V
 import { decodeHistoryBookmark, encodeHistoryBookmark } from './historyBookmark';
 
 type InitialAllocationBalance = Omit<Balance, 'userId'>;
+const initAlloc = 10;
 
 export interface CreditHistoryPage {
   entries: CreditHistoryEntry[];
@@ -50,14 +54,16 @@ export class CreditService {
     assertUserId(userId);
     assertPositiveInteger(pageSize, 'pageSize');
     if (pageSize > 100) throw new ValidationError('pageSize must be at most 100');
-    const boundary = pageToken === undefined ? undefined : decodeHistoryBookmark(pageToken, userId);
+    const entryId = pageToken === undefined ? undefined : decodeHistoryBookmark(pageToken);
     return this.read(async (repository) => {
+      const boundary = entryId === undefined ? undefined : await repository.findHistorySequenceId(entryId, userId);
+      if (entryId !== undefined && boundary === undefined) throw new ValidationError('Invalid history page token');
       const rows = await repository.findHistoryByUser(userId, boundary, pageSize + 1);
       const entries = rows.slice(0, pageSize);
       return {
         entries,
         nextPageToken: rows.length > pageSize
-          ? encodeHistoryBookmark(userId, entries[entries.length - 1].sequenceId) : null,
+          ? encodeHistoryBookmark(entries[entries.length - 1].id) : null,
       };
     });
   }
@@ -252,7 +258,7 @@ export class CreditService {
         const account = await repository.findAccount(userId);
         if (account) {
           const grant = await repository.findCreditHistoryEntry(userId, 'INITIAL_GRANT');
-          if (!grant || grant.totalAmountChange !== 10 || grant.totalReservedChange !== 0) {
+          if (!grant || grant.totalAmountChange !== initAlloc || grant.totalReservedChange !== 0) {
             throw new InitialAllocationError('ALREADY_EXISTS', 'Credit account exists without a confirmed initial grant');
           }
           result = {
@@ -262,11 +268,11 @@ export class CreditService {
           };
           confirmedExistingGrant = true;
         } else {
-          result = { totalCredits: 10, reservedCredits: 0, availableCredits: 10 };
-          await repository.createAccount({ userId, totalCredits: 10, reservedCredits: 0 });
+          result = { totalCredits: initAlloc, reservedCredits: 0, availableCredits: initAlloc };
+          await repository.createAccount({ userId, totalCredits: initAlloc, reservedCredits: 0 });
           await repository.appendHistory({
             userId, orderId: null, reservationId: null, type: 'INITIAL_GRANT',
-            totalAmountChange: 10, totalReservedChange: 0,
+            totalAmountChange: initAlloc, totalReservedChange: 0,
           });
           await repository.saveIdempotencyRecord({
             operationType: operation, key: userId, userId, requestHash, result,

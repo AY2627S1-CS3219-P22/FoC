@@ -4,6 +4,9 @@
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../../ai/usage-log.md, entries 005–024 (prior scopes retained).
+// Entry 040: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Removed account timestamps at the human's request; history timestamps remain.
+// Changes await human review; prompts/key responses: ../../ai/usage-log.md, entry 040.
 
 import type { Balance__Output as Balance } from '@foc/grpc/dist/generated/credit/Balance';
 
@@ -11,8 +14,6 @@ export interface CreditAccount {
   userId: string;
   totalCredits: number;
   reservedCredits: number;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface CreditHistoryEntry {

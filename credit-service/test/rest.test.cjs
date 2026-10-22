@@ -11,6 +11,9 @@
 // Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 // Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
 // Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
+// Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Tested base64url entry-ID bookmark decoding and rejection of malformed/legacy formats.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 043.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -22,19 +25,23 @@ const { createRestServer } = require('../src/rest/server.ts');
 const { CreditService, CreditOperationError } = require('../src/services/CreditService.ts');
 const { encodeHistoryBookmark, decodeHistoryBookmark } = require('../src/services/historyBookmark.ts');
 
-test('bookmarks accept only the exact user-scoped positive signed-bigint object', () => {
-  const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
-  const userId = 'student';
-  assert.equal(decodeHistoryBookmark(encodeHistoryBookmark(userId, '9007199254740993'), userId), '9007199254740993');
-  assert.equal(decodeHistoryBookmark(encode({ sequenceId: '9223372036854775807', userId }), userId), '9223372036854775807');
-  for (const value of [
-    null, [], [userId, '1'], {}, { userId }, { sequenceId: '1' },
-    { userId: 'other', sequenceId: '1' }, { userId, sequenceId: '1', extra: true },
-    ...['', '0', '01', '-1', '+1', ' 1', '1.5', '1e2', '9223372036854775808', '١', 1, null].map((sequenceId) => ({ userId, sequenceId })),
-  ]) assert.throws(() => decodeHistoryBookmark(encode(value), userId), ValidationError);
-  const valid = encode({ userId, sequenceId: '1' });
-  for (const token of [undefined, '', '!', valid + '=', 'a', Buffer.from([0xff]).toString('base64url'), Buffer.from('{').toString('base64url')]) {
-    assert.throws(() => decodeHistoryBookmark(token, userId), ValidationError);
+test('bookmarks encode only the history entry UUID and reject malformed or legacy formats', () => {
+  const encode = value => Buffer.from(value).toString('base64url');
+  const entryId = '9f27cd6c-06f0-4db7-9b45-0106dfcfc4ff';
+  const valid = encodeHistoryBookmark(entryId);
+  assert.equal(Buffer.from(valid, 'base64url').toString('utf8'), entryId);
+  assert.equal(decodeHistoryBookmark(valid), entryId);
+  const invalid = [
+    undefined, '', '!', valid + '=', 'a', valid.slice(0, -1),
+    Buffer.from([0xff]).toString('base64url'),
+    ...['not-a-uuid', entryId.replaceAll('-', ''), entryId + ' ', ' ' + entryId, entryId + '\n',
+      JSON.stringify(entryId), JSON.stringify({ id: entryId }),
+      JSON.stringify({ userId: 'student', sequenceId: '9007199254740993' }),
+      JSON.stringify(['student', '1']), '{}', 'null'].map(encode),
+  ];
+  for (const token of invalid) {
+    assert.throws(() => decodeHistoryBookmark(token), error =>
+      error instanceof ValidationError && error.message === 'Invalid history page token');
   }
 });
 
@@ -44,7 +51,8 @@ test('invalid history input fails before obtaining a database connection', async
     await assert.rejects(service.getUserCreditHistory({ userId: 'student', pageSize }), ValidationError);
   }
   await assert.rejects(service.getUserCreditHistory({ userId: 'student', pageToken: '' }), ValidationError);
-  await assert.rejects(service.getUserCreditHistory({ userId: 'student', pageToken: encodeHistoryBookmark('other', '1') }), ValidationError);
+  const legacy = Buffer.from(JSON.stringify({ userId: 'student', sequenceId: '1' })).toString('base64url');
+  await assert.rejects(service.getUserCreditHistory({ userId: 'student', pageToken: legacy }), ValidationError);
   await assert.rejects(service.getUserCreditHistory({ userId: ' bad' }), ValidationError);
 });
 

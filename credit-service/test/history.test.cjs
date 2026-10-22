@@ -10,6 +10,12 @@
 // Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 // Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
 // Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
+// Entry 039: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Implemented/documented the human-defined history constraints and scoped SQL/seeded concurrency checks.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 039 (repository-relative).
+// Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Tested entry-ID bookmarks, scoped sequence lookup and uniform REST rejection while preserving sequence pagination.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 043.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -23,6 +29,7 @@ const { ValidationError } = require('../src/services/validation.ts');
 const { CreditService } = require('../src/services/CreditService.ts');
 const { SqlCreditRepository } = require('../src/repos/SqlCreditRepository.ts');
 const { createRestServer } = require('../src/rest/server.ts');
+const { encodeHistoryBookmark } = require('../src/services/historyBookmark.ts');
 
 const migrations = ['001_initial.sql', '002_align_credit_contract.sql', '003_uppercase_reservation_status.sql', '004_reservation_invariants.sql'];
 const latest = '006_history_types_and_paging.sql';
@@ -40,9 +47,9 @@ test('history migration and sequence paging use the human-defined labels and acc
     try { await client.query(sql); await client.query('COMMIT'); }
     catch (error) { await client.query('ROLLBACK'); throw error; }
   };
-  const insert = async (type, change = 0, userId = 'legacy', reserved = 0) => client.query(
-    'INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change) VALUES ($1, $2, $3, $4) RETURNING id',
-    [userId, type, change, reserved],
+  const insert = async (type, change = 0, userId = 'legacy', reserved = 0, reservation) => client.query(
+    'INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change, order_id, reservation_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+    [userId, type, change, reserved, reservation?.order_id ?? null, reservation?.reservation_id ?? null],
   );
   try {
     await client.connect(); connected = true;
@@ -68,7 +75,8 @@ test('history migration and sequence paging use the human-defined labels and acc
 
     await t.test('one migration converts all legacy types and creates the exact sequence and grant indexes', async () => {
       const expected = ['INITIAL_GRANT', 'RESERVED', 'RESERVATION_UPDATED', 'RELEASED', 'TRANSFER_OUT', 'TRANSFER_IN'];
-      for (const [type, change, reserved] of [['init_credits', 10, 0], ['reserve', 0, 3], ['update', 0, -1], ['release', 0, -2], ['transfer', -3, -3], ['transfer', 3, 0]]) await insert(type, change, 'legacy', reserved);
+      const reservation = (await client.query("INSERT INTO reservations (order_id, requester_id, credit_amount, version) VALUES ($1,'legacy',3,1) RETURNING *", [randomUUID()])).rows[0];
+      for (const [type, change, reserved] of [['init_credits', 10, 0], ['reserve', 0, 3], ['update', 0, -1], ['release', 0, -2], ['transfer', -3, -3], ['transfer', 3, 0]]) await insert(type, change, 'legacy', reserved, type === 'init_credits' ? undefined : reservation);
       await apply(latest);
       const rows = (await client.query('SELECT * FROM credit_history ORDER BY sequence_id')).rows;
       assert.deepEqual(rows.map((row) => row.type).sort(), expected.sort());
@@ -89,6 +97,7 @@ test('history migration and sequence paging use the human-defined labels and acc
     });
 
     await apply('007_credit_delta_constraints.sql');
+    await apply('008_history_links_and_uniqueness.sql');
 
     await t.test('sequence boundary excludes writes during paging and preserves bigint precision', async () => {
       const service = new CreditService(pool);
@@ -106,6 +115,9 @@ test('history migration and sequence paging use the human-defined labels and acc
         const all = await repository.findHistoryByUser(userId, undefined, 100);
         assert.equal(all.length, 9);
         assert.equal(all.at(-1).sequenceId, '9007199254740993');
+        assert.equal(await repository.findHistorySequenceId(all.at(-1).id, userId), '9007199254740993');
+        assert.equal(await repository.findHistorySequenceId(all.at(-1).id, 'other'), undefined);
+        assert.equal(await repository.findHistorySequenceId(randomUUID(), userId), undefined);
         const first = await repository.findHistoryByUser(userId, undefined, 3);
         const boundary = first.at(-1).sequenceId;
         await service.reserveCredits({ orderId: randomUUID(), requesterId: userId, amount: 1 });
@@ -129,9 +141,7 @@ test('history migration and sequence paging use the human-defined labels and acc
       assert.equal(first.entries.length, 50);
       assert.ok(first.entries.every((row) => row.userId === userId));
       assert.equal(typeof first.entries[0].sequenceId, 'string');
-      assert.deepEqual(JSON.parse(Buffer.from(first.nextPageToken, 'base64url').toString()), {
-        userId, sequenceId: first.entries.at(-1).sequenceId,
-      });
+      assert.equal(Buffer.from(first.nextPageToken, 'base64url').toString('utf8'), first.entries.at(-1).id);
       const hundred = await service.getUserCreditHistory({ userId, pageSize: 100 });
       assert.equal(hundred.entries.length, 100);
       await service.reserveCredits({ orderId: randomUUID(), requesterId: userId, amount: 1 });
@@ -144,7 +154,12 @@ test('history migration and sequence paging use the human-defined labels and acc
       assert.equal(new Set(ids).size, 103);
       assert.deepEqual(ids, [...ids].sort((a, b) => BigInt(a) > BigInt(b) ? -1 : 1));
       assert.deepEqual(await service.getUserCreditHistory({ userId: 'unknown' }), { entries: [], nextPageToken: null });
-      await assert.rejects(service.getUserCreditHistory({ userId: 'other', pageToken: first.nextPageToken }), ValidationError);
+      for (const input of [
+        { userId: 'other', pageToken: first.nextPageToken },
+        { userId, pageToken: encodeHistoryBookmark(randomUUID()) },
+        { userId, pageToken: Buffer.from(JSON.stringify({ userId, sequenceId: first.entries.at(-1).sequenceId })).toString('base64url') },
+      ]) await assert.rejects(service.getUserCreditHistory(input), error =>
+        error instanceof ValidationError && error.message === 'Invalid history page token');
     });
 
     await t.test('REST pages omit sequence IDs and match database sequence order across a later write', async () => {
@@ -167,6 +182,7 @@ test('history migration and sequence paging use the human-defined labels and acc
       const headers = { authorization: 'Bearer ' + jwt.sign({ sub: userId }, privateKey, { algorithm: 'RS256', expiresIn: 60 }) };
       const seen = [];
       let token;
+      let firstToken;
       try {
         do {
           const response = await fetch(origin + '/credits/me/history?pageSize=2' + (token ? '&pageToken=' + encodeURIComponent(token) : ''), { headers });
@@ -177,11 +193,29 @@ test('history migration and sequence paging use the human-defined labels and acc
             assert.equal(Object.hasOwn(entry, 'sequence_id'), false);
             seen.push(entry.id);
           }
-          if (!token) await service.reserveCredits({ orderId: randomUUID(), requesterId: userId, amount: 1 });
+          if (page.nextPageToken !== null) {
+            assert.equal(Buffer.from(page.nextPageToken, 'base64url').toString('utf8'), page.entries.at(-1).id);
+          }
+          if (!token) {
+            firstToken = page.nextPageToken;
+            await service.reserveCredits({ orderId: randomUUID(), requesterId: userId, amount: 1 });
+          }
           token = page.nextPageToken;
         } while (token);
         assert.deepEqual(seen, expected.map((row) => row.id));
         assert.equal(new Set(seen).size, expected.length);
+        const otherHeaders = { authorization: 'Bearer ' + jwt.sign({ sub: 'other' }, privateKey, { algorithm: 'RS256', expiresIn: 60 }) };
+        for (const [badToken, callerHeaders] of [
+          ['garbage', headers],
+          [Buffer.from('not-a-uuid').toString('base64url'), headers],
+          [encodeHistoryBookmark(randomUUID()), headers],
+          [Buffer.from(JSON.stringify({ userId, sequenceId: expected[0].sequence_id })).toString('base64url'), headers],
+          [firstToken, otherHeaders],
+        ]) {
+          const response = await fetch(origin + '/credits/me/history?pageToken=' + encodeURIComponent(badToken), { headers: callerHeaders });
+          assert.equal(response.status, 400);
+          assert.deepEqual(await response.json(), { error: 'Bad Request', message: 'Invalid history page token' });
+        }
       } finally { await new Promise((resolve) => server.close(resolve)); }
     });
 
@@ -190,12 +224,12 @@ test('history migration and sequence paging use the human-defined labels and acc
       const userId = randomUUID();
       await service.initCredits({ userId });
       const orderId = randomUUID();
-      await service.reserveCredits({ orderId, requesterId: userId, amount: 2 });
+      const reservation = await service.reserveCredits({ orderId, requesterId: userId, amount: 2 });
       await client.query('BEGIN');
       let pending;
       try {
         await client.query('SELECT user_id FROM credit_accounts WHERE user_id = $1 FOR UPDATE', [userId]);
-        const { rows: [late] } = await client.query("INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change) VALUES ($1, 'RESERVATION_UPDATED', 0, 1) RETURNING sequence_id", [userId]);
+        const { rows: [late] } = await client.query("INSERT INTO credit_history (user_id, order_id, reservation_id, type, total_amount_change, total_reserved_change) VALUES ($1, $2, $3, 'RESERVATION_UPDATED', 0, 1) RETURNING sequence_id", [userId, orderId, reservation.reservationId]);
         pending = service.updateReservation({ orderId, amount: 3, expectedVersion: 1 });
         // The page query can see committed rows while the later insert remains invisible.
         const reader = await pool.connect();

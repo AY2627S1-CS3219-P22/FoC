@@ -2,8 +2,13 @@
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Implemented human-specified SQL account/reservation/history/idempotency operations and transaction-level bigint advisory/row locks.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
+// Author review: [HUMAN-REVIEWED] I decided to remove accounts and reservation timestamp fields.
 // Prompts and key responses: ../../ai/usage-log.md, entries 005–024 (prior scopes retained).
+// Entry 040: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Removed account timestamp reads and account/reservation timestamp writes.
+// Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Looked up bookmark sequence boundaries by history entry ID and authenticated user ID.
+// Changes await human review; prompts/key responses: ../../ai/usage-log.md, entry 043.
 
 import type { PoolClient } from 'pg';
 import type {
@@ -44,7 +49,7 @@ export class SqlCreditRepository implements CreditRepository {
 
   async findAccount(userId: string): Promise<CreditAccount | undefined> {
     const { rows } = await this.client.query<CreditAccount>(
-      'SELECT user_id AS "userId", total_credits AS "totalCredits", reserved_credits AS "reservedCredits", created_at AS "createdAt", updated_at AS "updatedAt" FROM credit_accounts WHERE user_id = $1',
+      'SELECT user_id AS "userId", total_credits AS "totalCredits", reserved_credits AS "reservedCredits" FROM credit_accounts WHERE user_id = $1',
       [userId],
     );
     return rows[0];
@@ -59,7 +64,7 @@ export class SqlCreditRepository implements CreditRepository {
 
   async saveAccount(account: CreditAccount): Promise<void> {
     const result = await this.client.query(
-      'UPDATE credit_accounts SET total_credits = $2, reserved_credits = $3, updated_at = now() WHERE user_id = $1',
+      'UPDATE credit_accounts SET total_credits = $2, reserved_credits = $3 WHERE user_id = $1',
       [account.userId, account.totalCredits, account.reservedCredits],
     );
     if (result.rowCount !== 1) throw new Error('Account disappeared during its locked update');
@@ -85,7 +90,7 @@ export class SqlCreditRepository implements CreditRepository {
 
   async saveReservation(reservation: Reservation): Promise<void> {
     const result = await this.client.query(
-      'UPDATE reservations SET credit_amount = $2, status = $3, courier_id = $4, version = $5, updated_at = now() WHERE reservation_id = $1',
+      'UPDATE reservations SET credit_amount = $2, status = $3, courier_id = $4, version = $5 WHERE reservation_id = $1',
       [reservation.reservationId, reservation.amount, reservation.status, reservation.courierId ?? null, reservation.version],
     );
     if (result.rowCount !== 1) throw new Error('Reservation disappeared during its locked update');
@@ -104,6 +109,14 @@ export class SqlCreditRepository implements CreditRepository {
       'INSERT INTO credit_history (user_id, order_id, reservation_id, type, total_amount_change, total_reserved_change) VALUES ($1, $2, $3, $4, $5, $6)',
       [entry.userId, entry.orderId, entry.reservationId, entry.type, entry.totalAmountChange, entry.totalReservedChange],
     );
+  }
+
+  async findHistorySequenceId(id: string, userId: string): Promise<string | undefined> {
+    const { rows } = await this.client.query<{ sequenceId: string }>(
+      'SELECT sequence_id AS "sequenceId" FROM credit_history WHERE id = $1 AND user_id = $2',
+      [id, userId],
+    );
+    return rows[0]?.sequenceId;
   }
 
   async findHistoryByUser(userId: string, beforeSequenceId: string | undefined, limit: number): Promise<CreditHistoryEntry[]> {

@@ -4,31 +4,31 @@
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: [HUMAN-REVIEWED]
 // Prompts and key responses: ../../ai/usage-log.md, entries 005–025 (prior scopes retained).
+// Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Replaced user/sequence JSON bookmarks with base64url history-entry IDs.
+// Changes await human review; prompts/key responses: ../../ai/usage-log.md, entry 043.
 
 import { TextDecoder } from 'node:util';
 import { ValidationError } from './validation';
 
-export function encodeHistoryBookmark(userId: string, sequenceId: string): string {
-  return Buffer.from(JSON.stringify({ userId, sequenceId }), 'utf8').toString('base64url');
+export function encodeHistoryBookmark(entryId: string): string {
+  return Buffer.from(entryId, 'utf8').toString('base64url');
 }
 
-export function decodeHistoryBookmark(token: unknown, userId: string): string {
+export function decodeHistoryBookmark(token: unknown): string {
   const invalid = () => new ValidationError('Invalid history page token');
   if (typeof token !== 'string' || !/^[A-Za-z0-9_-]+$/.test(token)) throw invalid();
   const bytes = Buffer.from(token, 'base64url');
   if (bytes.toString('base64url') !== token) throw invalid();
-  let value: unknown;
+  let entryId: string;
   try {
-    value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    entryId = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch (error) {
-    if (error instanceof SyntaxError || (error instanceof TypeError
-      && (error as NodeJS.ErrnoException).code === 'ERR_ENCODING_INVALID_ENCODED_DATA')) throw invalid();
+    if (error instanceof TypeError
+      && (error as NodeJS.ErrnoException).code === 'ERR_ENCODING_INVALID_ENCODED_DATA') throw invalid();
     throw error;
   }
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw invalid();
-  const fields = value as Record<string, unknown>;
-  if (Object.keys(fields).length !== 2 || fields.userId !== userId
-    || typeof fields.sequenceId !== 'string' || !/^[1-9][0-9]*$/.test(fields.sequenceId)
-    || BigInt(fields.sequenceId) > 9223372036854775807n) throw invalid();
-  return fields.sequenceId;
+  if (entryId.length !== 36
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entryId)) throw invalid();
+  return entryId;
 }

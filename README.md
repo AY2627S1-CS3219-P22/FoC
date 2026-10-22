@@ -1,27 +1,8 @@
 <!--
-AI Assistance Disclosure:
-Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
-Scope: Added and updated the final AI Use Summary section; existing project content was not generated in these exchanges.
-Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: credit-service/ai/usage-log.md, entries 001–038.
-Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Updated the consolidated disclosure for constraints, health, history replies and internal reference removal.
-New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
-Entry 032: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded local Git exclusions; human review pending.
-Entry 033: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Corrected Credit REST port status and recorded README verification; human review pending.
-Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded local scripts/docs and approved migration-runner relocation; human review pending.
-Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
-Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
-Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded RabbitMQ configuration and confirmed nonfatal entrypoint lifecycle wiring; human review pending.
-Entry 037: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded imported broker authorship, integration and real listener verification; human review pending.
-Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded startup-only listener health with database-based HTTP status; human review pending.
+AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-19–2026-10-22 (Asia/Singapore).
+Mode/scope: Credit-service implementation support and project disclosure documentation.
+Review: Earlier reviews are logged; latest documentation changes await human review.
+Exact prompts, key responses and checks: credit-service/ai/usage-log.md, entries 001–044.
 -->
 
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
@@ -93,107 +74,41 @@ port. Reserved REST ports prevent future collisions when APIs are added.
 
 ## AI Use Summary
 
-This covers assistance recorded from 2026-10-19 on feat/credit-implementation.
-Earlier or other team usage has not yet been supplied for this summary.
+This summary covers recorded assistance on feat/credit-implementation from
+2026-10-19. Other team members' usage must be consolidated by the authors.
 
-- **Tool and modes:** OpenAI Codex (GPT-6), bounded requirements interpretation/
-  formatting, implementation after human design finalization, boilerplate,
-  debugging/testing, refactoring, documentation, and explanations.
-- **Scope:** Repository AI-use rules and service-local logs; archiving the human's
-  requirements and design; Docker/PostgreSQL 17 setup; human-specified SQL schema,
-  seven migrations and pg tooling; shared credit proto/client/generated types;
-  replacement of InitCredits RPC with the internal user.created allocation
-  callback; account/reservation/history/idempotency repositories; initialization,
-  balance/reservation reads, reserve/update/release/settle transactions; specified
-  SHA-256 request and advisory-lock encoding; history label/identity/index changes;
-  order-history RPC removal; strict user-history sequence bookmarks; order-only
-  authenticated plaintext gRPC with reason trailers; own-balance/history
-  REST with RS256 subject authentication; concurrency/rollback/authentication/
-  paging tests; the human-requested service-root workspace/source relocation;
-  correction of the unshared migration's history spelling; explicit validation
-  errors and generic logged internal errors; REST route matching/authentication
-  corrections and documented wrong-method behavior; restored balance user IDs
-  and full-reservation lookup responses; bounded shared Credit client retries
-  with client/per-call settings and one overall deadline; no-write same-courier
-  settlement fallback and different-courier conflicts when retry records are absent;
-  local Postman REST/gRPC demos and tests-first Order/Credit/concurrent-acceptance
-  collections, temporary-script exclusion and demo preparation instructions;
-  corresponding docs and disclosures. Credit consumer startup/shutdown is wired;
-  the shared messaging package is imported from the broker contributors with
-  attribution, and User Service publication remains with its implementer.
-  Credit retries use the human's three-attempt, 1,300 ms defaults and specified
-  growing/capped/half-base jitter; other service clients retain their behavior.
-- **Boundaries:** Requirements, schema, architecture, interfaces, access policies,
-  locking, and pagination definitions came from the human authors. No requirements
-  prioritization, backlog/sprint planning, architecture/design decisions, decision
-  rationales, trade-off analyses, or risk justifications were generated.
-- **Prompts and key exchanges:** [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md)
-  links exact prompts and key outputs for entries 001–038. Exchange 038 adds
-  startup-only listener health while retaining database-based HTTP/overall status. Exchange 037 imports
-  @sunpterodactyl/shared messaging contributors' package from events/data-validation
-  at 0b48f5f, preserves source/AI declarations and validates the real listener.
-  Exchange 036 adds
-  broker URL configuration and nonfatal consumer startup/shutdown, using the
-  human-confirmed keep-APIs-running behavior.
-  Exchange 035 implements
-  the human-approved plaintext-only Credit gRPC transport. Exchange 034 makes
-  scripts/docs local-only and relocates the required migration runner. Exchange 033 checks
-  the service README against current health/API/schema/event code. Exchange 032 moves
-  personal exclusions into local Git metadata. Exchange 031 records positive database checks, internal-only history sequence IDs, public
-  database health and untracking internal references. History CHECKs enforce the
-  human-confirmed operation deltas and exact 10-credit initial grant. Entry 030
-  records the human's Postman scenarios, Order branch selection and tests-first
-  integration scope. Entry 029 records restoration of the original shared Credit
-  retry code, tests and README sections. Entry 028 records the
-  human-defined settled-reservation fallback and regression checks.
-  Entry 027 records the shared Credit retry settings and checks.
-  Entry 026 records balance user IDs and full Reservation
-  lookup responses for Order Service integration.
-  All credit-service AI records are under that service. Affected files carry
-  attribution comments.
-  The human approved the [service README attribution table](credit-service/README.md#attribution-for-json-files)
-  for comment-free package.json/package-lock.json changes.
-- **Verification and review:** Latest full workspace build, 94 Credit checks
-  against PostgreSQL/local listeners and 51 shared gRPC/retry checks passed with
-  zero failures/skips. Latest health checks cover all database/listener states,
-  actual successful/failed consumer startup and shutdown races. The prior Credit
-  Docker build/runtime package check also passed.
-  Six live listener scenarios passed with real RabbitMQ/PostgreSQL and actual
-  Credit startup: initial grant, duplicates, retry, two dead-letter cases and
-  restart. The earlier missing-package build block is resolved. Temporary broker,
-  schemas, child processes and logs were cleaned up; existing services were kept.
-  Checks cover migration rollback, direct SQL
-  amount/version rejections, public health and REST paging against database order.
-  Migration 007 is applied to the local Credit database. A scoped Node report
-  from exchange 022, before the
-  layout relocation, for implemented credit core/API
-  source reported 98.29% lines/94.44% branches; startup/env/generated code was
-  excluded. Earlier Docker build/start and
-  no-write runtime authentication/trailer checks passed on ports 3004/50054. Prior checks
-  remain in the log. Entry 030 Postman verification passed 187 actual REST assertions;
-  44 gRPC requests/84 assertions passed through a local adapter against real
-  Credit, including restart persistence. All four updated collections pass lint,
-  and 103 scripts parse; native Postman gRPC execution still requires login here. Order/Credit
-  and concurrency await Order's existing User/Supplier integrations and were
-  not verified live. Human review and validation are pending; agent checks do
-  not establish author approval.
-- **Sources/licensing:** Shared broker implementation/contracts are credited to
-  @sunpterodactyl and the shared messaging contributors, copied from local
-  events/data-validation commit 0b48f5f85be01d148176a6410c9ca22c2b8e672e;
-  [package provenance](shared/messaging/README.md) preserves their authorship and
-  existing AI declarations. Integration AI assistance does not claim that code.
-  Consulted official [PostgreSQL 17](https://www.postgresql.org/docs/17/index.html),
-  [PostgreSQL Docker image](https://github.com/docker-library/docs/blob/master/postgres/README.md),
-  [Compose startup](https://docs.docker.com/compose/how-tos/startup-order/),
-  [node-postgres](https://node-postgres.com/features/transactions),
-  [Protobuf updates](https://protobuf.dev/programming-guides/proto3/#updating),
-  [Node crypto](https://nodejs.org/api/crypto.html),
-  [jsonwebtoken verification](https://github.com/auth0/node-jsonwebtoken#jwtverifytoken-secretorpublickey-options-callback),
-  [gRPC authentication](https://grpc.io/docs/guides/auth/), and the earlier
-  [Stripe saved-response explanation](https://docs.stripe.com/api/idempotent_requests).
-  Specific consulted pages appear in the service log. No third-party implementation
-  code was copied. Authors remain responsible for assignment/licensing validation.
-- **Submission tasks:** Human authors must review outputs, confirm team AI norms,
-  consolidate other team usage, include agent/skill instructions used, and link
-  this README from the submission slide deck. Root AGENTS.md and the existing
-  credit-service/AGENTS.md are in the repository; no skills were invoked here.
+- **Tool and modes:** OpenAI Codex (GPT-6), implementation after human design
+  finalization, bounded requirements interpretation/formatting, boilerplate,
+  debugging, tests, refactoring, documentation and explanations.
+- **Scope:** Credit's PostgreSQL schema and nine migrations; domain/repository/
+  service implementation; atomic initialization, reservation, update, release and
+  settlement; gRPC contracts/client retries and service-token authentication;
+  authenticated own-balance/history REST with entry-ID bookmarks; RabbitMQ consumer
+  integration; Docker/workspace setup; health reporting; tests, local demo
+  preparation and attribution records. The [service README](credit-service/README.md)
+  documents current interfaces, behavior and setup.
+- **Human decisions:** Requirements, architecture, schema, interfaces, policies,
+  locking, pagination and security changes came from the human authors. No
+  requirements prioritization, backlog/sprint planning, design decisions or
+  decision rationales were generated.
+- **Prompts and key responses:** Exact exchanges, affected files, recorded reviews
+  and actual checks are in [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md),
+  entries 001–044. Attribution comments identify AI-influenced files. The approved
+  [JSON attribution table](credit-service/README.md#attribution-for-json-files)
+  covers formats that cannot contain comments.
+- **Verification:** The latest implementation run passed the Credit build and
+  103 Credit checks, including scoped seeded ledger invariants and entry-ID
+  paging. Earlier shared gRPC checks, Docker builds, live listener and local demo
+  results are recorded separately in the log. This README update did not rerun
+  them. Order/Credit demo integration has not been verified live. Agent checks
+  do not establish human approval; latest documentation changes await review.
+- **Provenance:** Shared messaging code belongs to @sunpterodactyl and the shared
+  messaging contributors, imported from events/data-validation commit
+  0b48f5f85be01d148176a6410c9ca22c2b8e672e. Its [provenance and original declarations](shared/messaging/README.md)
+  are retained; Credit integration assistance does not claim that authorship.
+  Official documentation consulted during implementation is cited in the usage
+  log. Human authors remain responsible for licensing and assignment validation.
+- **Submission:** Authors must review and validate assisted outputs, agree team AI
+  norms, include the agent/skill instructions used, consolidate team disclosures,
+  and link this README from the submission slides. Root AGENTS.md and
+  credit-service/AGENTS.md are retained; no skills were invoked for these exchanges.

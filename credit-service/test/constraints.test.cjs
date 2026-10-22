@@ -4,6 +4,9 @@
 // Author review: Pending human review.
 // Prompts and key responses: ../ai/usage-log.md, entry 031.
 // AI-generated; human review pending.
+// Entry 039: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+// Scope: Implemented/documented the human-defined history constraints and scoped SQL/seeded concurrency checks.
+// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 039 (repository-relative).
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -64,6 +67,7 @@ test('database amount/version and history delta constraints', {
     });
 
     await apply(latest);
+    await apply('008_history_links_and_uniqueness.sql');
     await t.test('positive reservation values are accepted while zero/negative inserts and updates fail in PostgreSQL', async () => {
       const { rows: [row] } = await insertReservation(1, 1);
       for (const value of [0, -1, -2147483648]) {
@@ -91,7 +95,10 @@ test('database amount/version and history delta constraints', {
         for (const total of values) for (const reserved of values) {
           const userId = randomUUID();
           await client.query('INSERT INTO credit_accounts (user_id, total_credits) VALUES ($1, 10)', [userId]);
-          const insert = () => client.query('INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change) VALUES ($1, $2, $3, $4) RETURNING id', [userId, type, total, reserved]);
+          const r = type === 'INITIAL_GRANT' ? undefined : (await client.query(
+            'INSERT INTO reservations (order_id, requester_id, credit_amount, version) VALUES ($1,$2,1,1) RETURNING *', [randomUUID(), userId],
+          )).rows[0];
+          const insert = () => client.query('INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change, order_id, reservation_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id', [userId, type, total, reserved, r?.order_id ?? null, r?.reservation_id ?? null]);
           if (valid(total, reserved)) {
             const { rows: [entry] } = await insert();
             // Direct SQL updates must obey the same rule, including a disallowed zero pair.

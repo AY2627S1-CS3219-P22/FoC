@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
 Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–038 below and the linked prompt archives.
+Prompts and key responses: Entries 001–044 below and the linked prompt archives.
 Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Recorded the latest implementation request, changes and actual verification.
 New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
@@ -22,6 +22,21 @@ Entry 037: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Recorded authorized upstream messaging import, broker authorship and actual integration checks; human review pending.
 Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Scope: Recorded the confirmed startup-only listener field and database-based health response; review pending.
+Entry 039: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Implemented/documented the human-defined history constraints and scoped SQL/seeded concurrency checks.
+Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 039 (repository-relative).
+Entry 040: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded human-requested account/reservation timestamp removal and actual checks.
+Changes await human review; prompts/key responses: entry 040 below and its archive.
+Entry 041: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Applied the requested local migration and recorded rebuild/restart/runtime checks.
+Changes await human review; prompts/key responses: entry 041 below and its archive.
+Entry 042: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded the human-requested direct service-token comparison and targeted checks.
+Changes await human review; prompts/key responses: entry 042 below and its archive.
+Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
+Scope: Recorded the human-defined entry-ID history token and paging implementation/checks.
+Changes await human review; prompts/key responses: entry 043 below and its archive.
 -->
 
 # AI usage log
@@ -1767,6 +1782,229 @@ submission files; retained disclosure content is under this ai directory.
   existing local source and installed amqplib types during inspection. No external
   source, dependency, skill, agent, commit/push or running-service replacement.
   Human decisions finalized before implementation. New changes await human review.
+
+## 039 — History constraints and scoped seeded ledger invariants
+
+- **Timestamp:** Verification/documentation completed 2026-10-22 12:04 SGT
+  (UTC+08:00); date/timezone Asia/Singapore.
+- **Tool/model/modes:** OpenAI Codex, GPT-6; implementation/test/documentation
+  against the human's complete schema/invariant/scenario definitions.
+- **Exact prompt/key responses:** [Full schema/invariant/randomized request and
+  outcomes](prompts/039-history-ledger-invariants.md).
+- **Human-defined changes:** Non-grants require both history links; initial grants
+  forbid both. Partial uniqueness on (reservation_id, type) for RESERVED,
+  RELEASED, TRANSFER_OUT and TRANSFER_IN. Shared scoped SQL returns violating
+  rows for actor/order/held-amount/version/status/terminal/ledger/conservation
+  checks. Seeded bounded concurrency, account initialization through initCredits,
+  per-round drained checks, allowed business errors, unexpected/deadlock failure,
+  skip without PGDATABASE, stop/report genuine violations without weakening.
+- **Code confirmation:** createReservation sets version 1; update/release/settle
+  each adds 1 on actual state change; settlement writes one OUT/one IN, so version
+  counts OUT only. Saved replay/no-write fallbacks do not change history/version.
+  No production business implementation was changed.
+- **Affected paths:** migrations/008_history_links_and_uniqueness.sql;
+  test/sql/ledger-violations.sql, test/helpers/ledger-invariants.cjs;
+  test/history-links.test.cjs and ledger-invariants.test.cjs;
+  test/constraints.test.cjs/history.test.cjs linked-fixture updates;
+  service/root READMEs; this log/archive 039. The pre-existing human edit to
+  migration 001's review comment was preserved; no applied migration rewritten.
+- **Scenario/oracle:** New test owns isolated schemas and explicit user/reservation
+  arrays. SQL returns named violating rows/details, including missing expected
+  accounts. Deterministic control covers both update directions, identical
+  requests, opposing settlements, release and rejected terminal transitions.
+  Query self-tests inject known bad fixtures then roll back; explicit scope
+  excludes inconsistent unrelated account/reservation fixtures. Four seeds
+  (12825, 587811, 1592594996, 3735928559), four accounts per random scenario,
+  eight rounds of 48 requests each (1,536 random requests plus deterministic
+  operations). Six workers never exceed the six-connection pool. No oracle query
+  runs until all active operations drain. Seed override documented; thread winners
+  can vary. Unexpected errors, including 40P01, are never accepted/retried as
+  business outcomes. A failure stops remaining scenario rounds/seeds and prints
+  the seed/round/request or SQL violation details.
+- **Actual verification:** Six new Node test results passed first; then all 100
+  Credit tests passed against local PostgreSQL/listeners with zero failures/skips.
+  All seeded round queries returned empty arrays. No genuine service violation,
+  deadlock or unexpected error found. Explicit no-PGDATABASE run cleanly skipped
+  the two new integration tests. Migration rollback tests cover bad legacy links
+  and duplicate indexed events without losing rows or leaving partial DDL;
+  direct insert/update constraints and repeated allowed update events checked.
+  Oracle probe failures were deliberate expected fixtures, not service violations.
+- **Database/cleanup:** Migration 008 applied successfully to the local Credit
+  database through the transactional CLI; existing data not repaired/deleted.
+  Isolated test schemas/pools cleaned up. No existing service replacement, queue
+  changes or broker tests for this SQL/test-only task. Prior build/shared-suite/
+  Docker results remain historical; not unnecessarily rerun.
+- **Review/provenance/instructions:** Root AGENTS.md/empty service instructions,
+  supplied rules and existing repository implementation only. Local Markdown links,
+  scoped whitespace, test syntax and final diff checked. No external source,
+  dependency, skill, agent, commit, push or deployment. Human review remains
+  pending; no assignment compliance/human validation asserted.
+
+## 040 — Remove account and reservation timestamps
+
+- **Timestamp:** 2026-10-22 12:35 SGT (UTC+08:00), Asia/Singapore.
+- **Tool/model/modes:** OpenAI Codex, GPT-6; implementation, tests and documentation
+  of the human's finalized column-removal request.
+- **Exact prompt/key responses:** [Timestamp-removal request and outcomes](prompts/040-remove-account-reservation-timestamps.md).
+- **Human-defined change:** Remove createdAt/updatedAt (SQL created_at/updated_at)
+  from accounts and reservations. No archival/deletion design was generated.
+- **Implementation/affected paths:** New migrations/009_remove_account_reservation_timestamps.sql
+  drops four columns; src/domains/types.ts removes CreditAccount date fields;
+  src/repos/SqlCreditRepository.ts removes their SELECT/UPDATE references;
+  test/initial-allocation.test.cjs removes an obsolete timestamp write;
+  test/timestamp-removal.test.cjs adds an isolated-schema upgrade regression;
+  service/root READMEs and this log/archive updated. Existing migration SQL was
+  not rewritten; the human's pre-existing migration 001 comment edit remains.
+  Reservation already had no timestamp fields in its domain/API output. History
+  and idempotency timestamps are retained; public API shapes are unchanged.
+- **Actual verification:** Credit TypeScript build passed. All 103 Credit Node
+  results passed against local PostgreSQL/listeners, zero failures/skips. The
+  new upgrade test seeds valid accounts/holds through CreditService before 009,
+  checks all business data plus history/idempotency records are preserved exactly,
+  verifies only the intended timestamps disappear, exercises new/existing account
+  operations and saved update replay, and runs the existing scoped ledger oracle.
+  All four seeded concurrency scenarios passed against the latest schema with no
+  genuine invariant violation, unexpected error or deadlock. The new integration
+  test also cleanly skips without PGDATABASE. Test syntax/reference/diff checks
+  completed; no unrelated shared-suite, Docker or live-broker rerun.
+- **Database/cleanup:** Migration 009 ran only in isolated test schemas, which
+  were removed and connections closed. Running local database remains at 008;
+  README documents applying 009 with the updated service build. No running service
+  was replaced, application rows changed or queue altered.
+- **Review/provenance/instructions:** Root AGENTS.md and empty service instructions
+  read; existing implementation and supplied requirements used. No new external
+  source, dependency, skill, sub-agent, commit, push or deployment. Human review
+  remains pending; agent-run tests do not establish author validation.
+
+## 041 — Apply timestamp-removal migration locally
+
+- **Timestamp:** 2026-10-22 12:39 SGT (UTC+08:00), Asia/Singapore.
+- **Tool/model/modes:** OpenAI Codex, GPT-6; execution of human-requested migration,
+  local build/runtime verification and documentation.
+- **Exact prompt/key responses:** [Application request and outcomes](prompts/041-apply-timestamp-migration.md).
+- **Authorized action:** Apply the already implemented migration 009 to the local
+  Credit database. The existing container still referenced removed timestamps;
+  it was rebuilt, briefly stopped during migration, then recreated from the new
+  image. Its existing service environment and public-key mount were preserved
+  and compared without printing credentials. PostgreSQL and RabbitMQ were kept.
+- **Actual checks/results:** Credit Docker image build passed. Transactional
+  migrations/apply-migration.cjs applied 009 successfully. Preflight found all four
+  old columns; postflight found none on credit_accounts/reservations and retained
+  created_at on credit_history/idempotency_records. Row counts/checksums excluding
+  only the four removed fields matched. All four application tables were empty
+  before/after, so preservation of populated data remains covered by entry 040's
+  upgrade test, not this runtime check. Rebuilt compiled repository checked for
+  obsolete timestamp references. /health returned HTTP 200 with status ok, db up,
+  listener up. Authenticated gRPC getBalance/getReservation with fresh nonexistent
+  IDs returned NOT_FOUND with ACCOUNT_NOT_FOUND/RESERVATION_NOT_FOUND trailers,
+  confirming current database-backed queries without creating rows.
+- **Affected paths:** Service/root READMEs, this log and archive 041. No production
+  source, migration SQL, dependency or test change. Previous 103-test result
+  remains the latest regression run; no unnecessary repeat. Temporary local
+  runtime helper/build output contained no saved credentials; existing container
+  configuration was consumed in memory only.
+- **Review/provenance:** Existing repository instructions and approved migration
+  used; no external source, skill, agent, commit or push. Human review pending.
+
+## 042 — Simplify gRPC service-token comparison
+
+- **Timestamp:** 2026-10-22 12:49 SGT (UTC+08:00), Asia/Singapore.
+- **Tool/model/modes:** OpenAI Codex, GPT-6; implementation, verification and
+  documentation of the human's explicit authentication change.
+- **Exact prompt/key responses:** [Authentication simplification request and outcomes](prompts/042-direct-service-token-comparison.md).
+- **Human-defined change:** Remove hashing and timingSafeEqual from auth.ts.
+  Implemented direct string equality for gRPC service secrets; the human made
+  the security choice. No trade-off analysis or decision rationale generated.
+- **Affected paths:** src/grpc/auth.ts; service/root READMEs; this log and archive
+  042. Removed node:crypto import, configured-secret digests and incoming-token
+  hashing; lookup now compares the supplied token directly with configured
+  tokens. Existing empty/duplicate configuration checks, missing/non-string/
+  unknown token rejection and identity-based authorization remain. REST JWT,
+  request hashes and advisory-lock encoding were not part of this change.
+- **Actual verification:** Credit TypeScript build passed; all eight existing
+  auth.test.cjs tests passed, zero failures/skips. Tests cover configured secret
+  identity, invalid token/configuration rejection, all six RPC authorization
+  checks, successful authorized calls, reason trailers, generic internal errors,
+  JWT verification and input validation. No new tests were needed. Scoped source
+  and documentation/diff checks completed. Previous full 103-test result remains
+  historical; no unrelated SQL/shared-suite/Docker rerun or container replacement.
+- **Review/provenance:** Root AGENTS.md and empty service instructions read;
+  existing implementation/tests and the supplied change used. No external
+  source, dependency, skill, agent, commit or push. Human review pending.
+
+## 043 — Entry-ID history bookmarks with internal sequence boundaries
+
+- **Timestamp:** 2026-10-22 13:36 SGT (UTC+08:00), Asia/Singapore.
+- **Tool/model/modes:** OpenAI Codex, GPT-6; implementation, tests and documentation
+  against the human's finalized token and boundary-lookup specification.
+- **Exact prompt/key responses:** [Full bookmark request and outcomes](prompts/043-entry-id-history-bookmarks.md).
+- **Human-defined change:** Base64url-encode the last returned entry's ID instead
+  of user/sequence JSON. Resolve sequence through entry ID plus authenticated user;
+  keep ordering/index/query internal and otherwise unchanged. Same validation
+  error for malformed, missing and other-user IDs; reject old format. No schema,
+  migration, page-size or response-shape change apart from token contents.
+- **Affected paths:** src/services/historyBookmark.ts and CreditService.ts;
+  src/repos/CreditRepository.ts and SqlCreditRepository.ts; test/rest.test.cjs
+  and history.test.cjs; service/root READMEs; this log and archive 043. Bookmark
+  decoder validates canonical unpadded base64url/UTF-8 and a hyphenated UUID;
+  SQL lookup is parameterized `WHERE id = $1 AND user_id = $2`. Missing scoped
+  lookup results throw ValidationError('Invalid history page token'), matching
+  malformed/legacy format errors. Sequence values remain decimal strings inside
+  the repository/service; REST already omits them from entries. Existing human
+  edits to allocation constants and review comments were preserved; REST server
+  was not edited in this exchange.
+- **Actual verification:** Credit TypeScript build and all 103 Credit Node tests
+  passed, zero failures/skips, using local PostgreSQL and REST/gRPC test listeners.
+  Unit cases cover exact decoded UUID, malformed IDs, trailing whitespace/control
+  characters, invalid UTF-8/base64url, JSON-wrapped IDs and legacy objects. SQL
+  tests resolve sequences above JavaScript safe-integer range and reject missing/
+  other-user lookups. Service tests retain default 50/max 100 and exact full-page
+  continuation. Authenticated REST tests compare pages with database sequence
+  order, inspect every outgoing token, exclude later writes and verify identical
+  400 bodies for malformed/missing/other-user/legacy tokens. Existing account-lock
+  late-commit and all four seeded ledger scenarios also passed with no genuine
+  violation, unexpected error or deadlock. Test syntax/source/diff checked.
+- **Runtime/review/provenance:** Isolated schemas and test listeners cleaned up;
+  no application rows, migrations, running container or dependencies changed.
+  No unrelated shared-suite/Docker/live-broker run. Root AGENTS.md and empty
+  service instructions plus existing source/supplied decisions used; no external
+  source, skill, agent, commit or push. Human review pending.
+
+## 044 — Refresh current README and condense attribution headers
+
+- **Timestamp:** 2026-10-22 14:30 SGT (UTC+08:00), Asia/Singapore.
+- **Tool/model/modes:** OpenAI Codex, GPT-6; source-based documentation review,
+  editing and disclosure formatting.
+- **Exact prompt/key responses:** [README request and outcomes](prompts/044-readme-refresh-and-short-headers.md).
+- **Human request:** Check that README reflects latest implementation and replace
+  its long top attribution history with a small header. Both root/service README
+  headers now have six lines, naming tool/model/dates, scope, review status and
+  full log reference. Detailed historical records/prompts remain in ai; no human
+  approval was inferred for the new documentation.
+- **Affected paths:** credit-service/README.md and root README.md; this log and
+  archive 044. Service docs now lead with interfaces/access, list current six-RPC
+  request/response shapes, document registration event payload/consumer behavior,
+  direct string authentication, entry-ID bookmarks and uniform errors, /health
+  database-based HTTP status/startup-only listener flag, host/Compose settings,
+  all nine migrations and timestamp removal, replay semantics and runnable scoped
+  test commands. Removed obsolete relocation/test-count/coverage chronology and
+  separated last recorded local migration application from fresh-clone setup.
+  Root final AI Use Summary was shortened with scope/provenance/verification/
+  review/submission details retained and linked to the full records. The existing
+  comment-free JSON attribution table remains. Root project content outside the
+  attribution header and final AI summary was preserved.
+- **Actual checks:** Compared docs with current service methods, gRPC proto/client,
+  token verifier/bookmark/repository, REST routing/health, events/broker/index,
+  shared message contract/topology, environment examples, package scripts, Docker/
+  Compose and migrations. Checked relative links, documented migration/test paths,
+  JSON examples, short header sizes, final AI-section placement and diff whitespace.
+  No application tests/build/runtime checks rerun for this documentation-only
+  change; the 103 Credit/51 shared results are explicitly historical.
+- **Review/provenance:** Existing repository instructions and local source/logs
+  used; no new external source, dependency, implementation, schema, design,
+  rationale, skill, sub-agent, database change, container replacement, commit or
+  push. Latest documentation awaits human review. Upstream broker authorship
+  remains credited; detailed sources and prior review history stay in the log.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the

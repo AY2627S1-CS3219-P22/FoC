@@ -1,43 +1,31 @@
 <!--
-AI Assistance Disclosure:
-Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-Scope: Documented human-specified credit rules, SQL migrations, authenticated gRPC, Docker configuration, verification, and approved JSON attribution.
-Human Reviewed.
-Changes from entries 007–029: Pending human review. The prior Human Reviewed marker does not validate these changes.
-Prompts and key responses: ai/usage-log.md, entries 003–029.
-Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Documented health, internal-only history sequence IDs and local reference removal.
-New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
-Entry 033: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Checked README against current health/API/schema/event code and clarified setup and verification.
-New documentation changes await human review; see ai/usage-log.md, entry 033.
-Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Relocated the human-selected migration runner and updated references while making scripts/docs local-only.
-Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 034 (repository-relative).
-Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
-Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
-Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Documented the human-updated event helpers, broker URL and nonfatal consumer startup/shutdown.
-Changes await human review; see ai/usage-log.md, entry 036.
-Entry 037: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Integrated the human-authorized upstream messaging package, documented its ownership and actual listener verification.
-Changes await human review; prompts/key responses: ai/usage-log.md, entry 037.
-Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
-Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
+AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-10-22 (Asia/Singapore).
+Mode/scope: Documented and checked the human-defined Credit implementation.
+Review: [HUMAN-REVIEWED]
+Exact prompts, key responses and checks: ai/usage-log.md, entries 003–044.
 -->
 
 # Credit service
 
-CreditService implements account initialization, balance/reservation reads, reserve,
-update, release, and settlement using PostgreSQL 17 and `pg` with SQL migrations.
-The human's definitions are recorded in [the exact prompt archives](ai/usage-log.md).
-Archival is deferred. Internal requirements/design reference copies are local-only.
+Credit Service manages credit accounts, reservations and history using PostgreSQL
+17 and `pg` with explicit SQL migrations. User registration events grant 10 credits
+once per user ID. Order Service uses authenticated plaintext gRPC; the frontend
+uses JWT-authenticated REST for each user's own balance and history.
+
+| Interface | Address / path | Access |
+| --- | --- | --- |
+| gRPC | Port 50054, six RPCs listed below | Order Service token |
+| REST balance | GET `/credits/me/balance` on port 3004 | User JWT |
+| REST history | GET `/credits/me/history` on port 3004 | User JWT |
+| Health | GET `/health` on port 3004 | Public |
+| User events | RabbitMQ queue `credit.user-events` | `user.created` consumer |
+
+The current implementation has entry-ID page tokens, direct service-token
+comparison, and no account/reservation timestamp columns. Archival, restoration
+and deletion are deferred. The human's definitions and AI records are retained in
+[the usage log](ai/usage-log.md).
 
 ## Source layout
-
-The human finalized this layout in [exchange 024](ai/prompts/024-service-src-layout.md):
 
 ```text
 credit-service/
@@ -57,18 +45,10 @@ credit-service/
   .env.example
 ```
 
-There is one Node workspace at credit-service/. Its existing package name remains
-@foc/credit-grpc, so npm workspace commands stay the same. TypeScript outputs to
-credit-service/dist/. Both transports start from src/index.ts. Package files,
-tests now live directly under credit-service rather than an outer grpc
-directory. The tracked migration runner is migrations/apply-migration.cjs;
-scripts/ and docs/ are local-only folders. Existing personal env files were not overwritten.
-For host startup, merge the needed values from credit-service/.env.example into
-the ignored service-root .env; relative public-key paths resolve from that root.
-
-The relocation passed the full build, all 70 credit checks, eight shared checks,
-and a clean Docker install/build/start. The local Docker working directory is
-/repo/credit-service. No schema or business-operation behavior changed.
+The workspace is `credit-service/`, named `@foc/credit-grpc`. TypeScript builds
+into `dist/`; `src/index.ts` starts REST, gRPC and the event consumer. The migration
+runner is `migrations/apply-migration.cjs`. Local `scripts/` and `docs/` are not
+required by a fresh clone.
 
 ## Business operations
 
@@ -88,8 +68,7 @@ and a clean Docker install/build/start. The local Docker working directory is
 - `updateReservation` takes the new total held and expected version. It checks
   saved result, existence, active status, matching version, changed amount, then
   available credits for an increase. It applies only the difference, increments
-  version, and records signed `RESERVATION_UPDATED` deltas, using the human's
-  corrected spelling. Unchanged amounts are rejected.
+  version, and records signed `RESERVATION_UPDATED` deltas. Unchanged amounts are rejected.
 - `releaseCredits` decreases reserved credits only, marks `RELEASED`, increments
   version, and records `RELEASED`. Settled reservations fail. An already released
   reservation without a saved result returns its current state without writes.
@@ -100,8 +79,8 @@ and a clean Docker install/build/start. The local Docker working directory is
   a saved retry result, an already SETTLED reservation returns its current state
   without writes when the courier matches; a different courier fails with
   FAILED_PRECONDITION/REQUEST_CONFLICT. RELEASED reservations fail with INVALID_STATE.
-- `getReservation` reads the current reservation. The RPC returns the full Reservation message: orderId, requesterId, amount,
-  status, optional courierId, reservationId, and version. Missing reservations fail with `NOT_FOUND`.
+- `getReservation` reads the full current reservation, including its IDs, amount,
+  status, courier and version. Missing reservations fail with `NOT_FOUND`.
 
 Mutations own one READ COMMITTED transaction. Lock order is retry key, order
 resource (account resource for initialization), then account rows in ascending
@@ -126,12 +105,25 @@ release at transaction end.
 
 ## Initial-allocation implementation
 
+Credit accepts this `user.created` payload from User Service's event transport:
+
+```json
+{
+  "type": "user.created",
+  "eventId": "registration-event-id",
+  "occurredAt": "2026-10-22T00:00:00.000Z",
+  "userId": "registered-user-id"
+}
+```
+
 The [user.created callback and registration helper](src/events/userCreated.ts)
 validate deliveries with the shared `userEventSchema`, verify matching delivery
 and payload event IDs, and allocate through `initCredits({ userId })`. Allocation
-uniqueness remains per userId. The human-updated handler marks malformed events,
-unsupported lifecycle types and inconsistent prior allocations as NonRetryableError;
-other failures propagate to the shared client's retry/dead-letter handling.
+uniqueness remains per userId. Malformed events, unsupported lifecycle types and
+inconsistent prior allocations become NonRetryableError; other failures propagate to the shared client's
+retry/dead-letter handling. A successful handler finishes only after the allocation
+transaction commits or an existing grant is confirmed. Duplicate event IDs or
+different events for the same user cannot grant credits again.
 
 The [consumer startup helper](src/events/broker.ts) connects a RabbitMQClient for
 CREDIT_USER_QUEUE using serviceName credit-service and prefetch 10. It closes its
@@ -153,47 +145,55 @@ package was copied from `origin/events/data-validation` at
 `0b48f5f85be01d148176a6410c9ca22c2b8e672e`. **Broker implementation and contracts
 are authored by @sunpterodactyl and the shared messaging contributors.** This PR
 includes their code for integration/testing and does not claim its authorship.
-All 11 imported source/config files match that commit byte for byte; only the
-[package README](../shared/messaging/README.md) adds provenance. Their existing AI
-declarations are retained. Credit-specific work is consumer wiring and tests.
+The [package README](../shared/messaging/README.md) records the import and original
+AI declarations. Credit-specific work is consumer wiring and tests.
 User Service publication remains owned by its implementer. There is no InitCredits RPC.
 
 ## gRPC authentication and errors
 
-Following [exchange 026](ai/prompts/026-expanded-read-responses.md), Balance
-restores user_id at protobuf field 1 and GetReservation returns the same full
-Reservation message used by mutations. Shared TypeScript types and the client
-wrapper reflect these shapes; the old GetReservationResponse type is removed.
-REST balance still returns its existing userId and three credit values.
+The shared [credit.proto](../shared/grpc/proto/credit.proto) exposes:
+
+| RPC | Request fields | Response |
+| --- | --- | --- |
+| GetBalance | userId | userId, totalCredits, reservedCredits, availableCredits |
+| ReserveCredits | orderId, requesterId, amount | Full reservation |
+| UpdateReservation | orderId, amount, expectedVersion | Full reservation |
+| ReleaseCredits | orderId | Full reservation |
+| SettleCredits | orderId, courierId | Full reservation |
+| GetReservation | orderId | Full current reservation |
+
+A full reservation contains orderId, requesterId, amount, status, optional courierId,
+reservationId and version. Shared TypeScript clients use camelCase; protobuf field
+names use snake_case. Initialization is event-driven and history is REST-only.
 
 The six order-only RPCs are GetBalance, ReserveCredits, UpdateReservation,
 ReleaseCredits, SettleCredits, and GetReservation. The caller supplies
 `x-credit-service-token` metadata. Credit derives service identity from its
-configured secret using constant-time digest comparison. Missing/unknown or
+configured secret using direct string equality. Missing/unknown or
 multiple tokens yield `UNAUTHENTICATED`; a known unauthorized service yields
 `PERMISSION_DENIED`. Only the order-service secret is configured at startup.
 
 Set `CREDIT_ORDER_SERVICE_TOKEN` to the same secret on Credit and Order Service.
 Credit gRPC always uses plaintext on port 50054 (or the configured GRPC_PORT).
-There is no TLS/local-mode switch. CREDIT_LOCAL_MODE, CREDIT_TLS_CERT_PATH and
-CREDIT_TLS_KEY_PATH have been removed from the service configuration and examples;
-leftover values are ignored. Order should use the shared client's default
-plaintext credentials and continue sending its x-credit-service-token.
+Order uses the shared client's default plaintext credentials and sends
+x-credit-service-token. There are no Credit TLS configuration variables.
 CREDIT_JWT_PUBLIC_KEY_PATH is still required for REST user-token verification.
 
 Business errors preserve gRPC codes and the `x-credit-error-reason` trailer:
 ACCOUNT_NOT_FOUND, RESERVATION_NOT_FOUND, INSUFFICIENT_CREDITS, VERSION_CONFLICT,
 INVALID_STATE, or REQUEST_CONFLICT. Invalid IDs/amounts fail before connecting to
 the database. Order IDs must be lowercase hyphenated UUIDs. Amounts and expected
-versions are positive int32 integers; IDs follow the human's length/whitespace/
-control-character rules. Database serialization/deadlock/lock failures map to
+versions are positive int32 integers. IDs must be nonempty, at most 128 characters,
+with no leading/trailing whitespace or control characters.
+Database serialization/deadlock/lock failures map to
 ABORTED; connection failures map to UNAVAILABLE; unknown failures map to INTERNAL.
 Only the dedicated ValidationError maps to INVALID_ARGUMENT (or REST 400).
 Unexpected errors, including ordinary TypeError, return generic INTERNAL/500
 messages and are logged with the original error on the server. Known business,
-authentication and transient error mappings are preserved, as confirmed by the
-human in exchange 025. The shared Credit client preserves codes/trailers and
-retries only UNAVAILABLE, ABORTED and DEADLINE_EXCEEDED using an application loop.
+authentication and transient error mappings are preserved.
+
+The shared Credit client preserves codes/trailers and retries only UNAVAILABLE,
+ABORTED and DEADLINE_EXCEEDED using an application loop.
 The defaults are three total attempts within one 1,300 ms budget; the backoff base
 starts at 50 ms, doubles, caps at 500 ms, and each wait is half the base plus a
 random amount up to half the base. Every attempt uses the remaining budget.
@@ -206,34 +206,27 @@ maxDelayMs. Other service client behavior is unchanged.
 
 ## Health
 
-Public GET `/health` on the REST listener (default port 3004) runs `SELECT 1`
-against PostgreSQL and reports the user-event listener's startup result:
+Public GET `/health` on port 3004 runs `SELECT 1` and reports event-listener startup:
 
 ```json
 { "status": "ok", "db": "up", "listener": "up" }
 ```
 
-HTTP status and overall status remain database-based: DB up returns HTTP 200/status
-ok even if listener is down; DB down returns HTTP 503/status degraded regardless
-of listener state. Listener is down while starting, after startup failure or during
-explicit shutdown, and up after consumer startup succeeds. This flag does not
-detect a later disconnect or consumer cancellation. No shared broker source was
-changed for this field. It requires no user or service token. For a local check:
+| Database | Listener startup | HTTP | Overall status |
+| --- | --- | --- | --- |
+| up | up or down | 200 | ok |
+| down | up or down | 503 | degraded |
+
+The listener flag is down while starting, after startup failure or during explicit
+shutdown, and up after startup succeeds. It reports startup success only; it does
+not detect later broker disconnects or consumer cancellation. API listeners remain
+available if consumer startup fails. No token is required.
 
 ```sh
 curl -i http://localhost:3004/health
 ```
 
-An existing container must be rebuilt to serve newly added routes. From the
-repository root, using the local example configuration:
-
-```sh
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml up -d --build credit-service
-```
-
-Use the same selected env file as your existing stack if you configured personal
-values. The current Compose file has a PostgreSQL healthcheck; it does not yet
-configure a healthcheck for the Credit application.
+Compose has a PostgreSQL healthcheck; it does not configure one for Credit itself.
 
 ## Frontend REST and user history
 
@@ -241,8 +234,9 @@ GET `/credits/me/balance` returns userId, totalCredits, reservedCredits, and
 availableCredits. GET `/credits/me/history` accepts optional pageSize and
 pageToken and returns entries and nextPageToken (null on the last page).
 Responses use camelCase, string IDs, ISO UTC timestamps, integer credits, and
-null optional links. History entries omit the internal sequenceId; pagination tokens
-continue to carry the internal boundary.
+null optional links. History entries and pagination tokens omit the internal
+sequenceId. Each nextPageToken is the base64url-encoded UUID of the last entry
+returned on that page.
 
 Both routes require `Authorization: Bearer <user token>`. Credit verifies the
 User Service RSA public key, RS256 only, a subject and an unexpired exp. The
@@ -272,51 +266,80 @@ unique index. There is no order-history method/index. Queries page downward belo
 the sequence boundary; sequence values stay decimal strings in JavaScript.
 Created_at is display-only: PostgreSQL [now()](https://www.postgresql.org/docs/17/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT)
 uses transaction start. The human selected default page size 50, maximum 100,
-base64url user/boundary tokens, and INVALID_ARGUMENT for invalid sizes/tokens.
-Bookmarks encode UTF-8 JSON `{ userId, sequenceId }` as base64url. Decoding requires
-exactly those two keys, the current subject as userId, and a positive decimal
-sequence string without leading zeros, no greater than signed bigint max. Query
-pageSize defaults to 50 and must be an integer from 1 to 100. Pages fetch one extra
-row; later requests use sequence_id strictly below the last returned boundary.
+entry-ID bookmarks, and INVALID_ARGUMENT for invalid sizes/tokens.
+Bookmarks encode the last returned entry's UUID as UTF-8 base64url, without JSON,
+user ID or sequence ID. On continuation, Credit validates the token and looks up
+the private sequence boundary using `WHERE id = $1 AND user_id = $2`, with user_id
+from the authenticated subject. Malformed UUIDs, nonexistent entries and entries
+belonging to another user all produce `Invalid history page token` (REST 400).
+Old `{ userId, sequenceId }` tokens are rejected. No schema or migration change
+is needed. Query pageSize defaults to 50 and must be an integer from 1 to 100.
+Pages fetch one extra row; later requests use sequence_id strictly below the
+resolved boundary. Sequence values and the existing ordering/index stay internal.
 
-## Local containers
+## Setup and configuration
 
-From the repository root:
+Run commands from the repository root. Supply User Service's public PEM before
+starting Credit. Host execution reads `CREDIT_JWT_PUBLIC_KEY_PATH`; Compose mounts
+`CREDIT_JWT_PUBLIC_KEY_FILE` read-only. No private User Service key is needed.
+
+| Configuration | Host default / requirement |
+| --- | --- |
+| CREDIT_ORDER_SERVICE_TOKEN | Required; match Order Service's configured secret |
+| CREDIT_JWT_PUBLIC_KEY_PATH | `../user-service/keys/public.pem`, relative to Credit's working directory |
+| RABBITMQ_URL | `amqp://guest:guest@localhost:5672` |
+| HTTP_HOST / HTTP_PORT | `0.0.0.0` / `3004` |
+| GRPC_HOST / GRPC_PORT | `0.0.0.0` / `50054` |
+| PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE | Set for the chosen PostgreSQL database |
+
+For host development, populate the ignored `credit-service/.env` from
+[.env.example](.env.example), then run:
+
+```sh
+npm ci
+npm run dev --workspace @foc/credit-grpc
+```
+
+The predev script builds both shared packages. For Docker, provide a reachable
+RabbitMQ broker separately; this Compose file starts PostgreSQL and Credit only:
 
 ```sh
 docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml up -d --build
 ```
 
-The example database password and service token are local development values.
-For personal values pass an ignored env file; existing env files are unchanged.
-The database is `credit_service`, user `credit_service`, at localhost:5433
-(override CREDIT_POSTGRES_PORT), or postgres:5432 inside Compose. PostgreSQL 17
-uses the named credit_service_pgdata volume at /var/lib/postgresql/data. The
-[official image documentation](https://github.com/docker-library/docs/blob/master/postgres/README.md)
-describes this path. Credit gRPC listens at localhost:50054.
-Compose waits for database [service_healthy](https://docs.docker.com/compose/how-tos/startup-order/).
-Only PostgreSQL and Credit are started; migrations are explicit.
+The example uses local development credentials. For personal configuration, pass
+your selected ignored env file consistently. The Docker example connects to
+RabbitMQ through `host.docker.internal`. PostgreSQL uses database/user
+`credit_service`, host port 5433 (override CREDIT_POSTGRES_PORT), and internal
+address `postgres:5432`. Data persists in the named credit_service_pgdata volume.
+Compose waits for PostgreSQL's healthcheck. Migrations are applied explicitly below.
+
+After source changes, rebuild the running container using the same selected
+configuration; a previous image does not pick up source edits automatically:
+
+```sh
+docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml up -d --build --no-deps credit-service
+```
+
+To open psql or stop the stack while retaining the database volume:
 
 ```sh
 docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec postgres psql -U credit_service -d credit_service
 docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml down
 ```
 
-The down command keeps the database volume.
-
 ## SQL migrations
+
+The current tables are credit_accounts, reservations, credit_history and
+idempotency_records.
 
 Apply each SQL file once, in order, using the transactional CLI at
 `migrations/apply-migration.cjs` (invoked by `npm run db:migrate`). It has no migration
-ledger or automatic skipping. The local development database has migrations
-001–007 applied. Other databases must apply migration 007 explicitly.
-Migrations 001–005 were preserved. The human confirmed migration 006 has not
-been applied to any shared database, so its update label was corrected in place
-to RESERVATION_UPDATED in exchange 025. The already-migrated local database was
-corrected transactionally by renaming the old label and replacing only its type
-check; no sequence/index migration was rerun. Existing row data and indexes were
-verified unchanged apart from the intended label. Historical prompt/log spelling
-is preserved. Fresh databases use the corrected migration 006.
+ledger or automatic skipping. Apply only missing files on an existing database;
+the commands below list the full sequence for a fresh database. Migration 009
+requires the updated service queries that omit account/reservation timestamps.
+The last recorded local application completed migrations 001–009; that does not
+establish which migrations a teammate's database has applied.
 
 ```sh
 docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/001_initial.sql
@@ -326,6 +349,8 @@ docker compose --env-file credit-service/.env.docker.example -f credit-service/c
 docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/005_initial_grant_history_type.sql
 docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/006_history_types_and_paging.sql
 docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/007_credit_delta_constraints.sql
+docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/008_history_links_and_uniqueness.sql
+docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/009_remove_account_reservation_timestamps.sql
 ```
 
 The CLI uses PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE; PGDATABASE must be explicit.
@@ -342,26 +367,55 @@ deltas are checked by type: INITIAL_GRANT exactly (10, 0); RESERVED
 TRANSFER_OUT (negative, equal negative); TRANSFER_IN (positive, 0).
 Each pair is (total_amount_change, total_reserved_change). Existing invalid rows
 reject the entire migration without rewriting data.
+Migration 008 requires order_id and reservation_id for every non-INITIAL_GRANT
+history entry and forbids both links on INITIAL_GRANT. Its partial unique index
+on (reservation_id, type) covers RESERVED, RELEASED, TRANSFER_OUT and TRANSFER_IN;
+RESERVATION_UPDATED may occur multiple times. Invalid legacy links or duplicate
+indexed events reject the entire migration; no data is repaired or deleted.
+Migration 009 drops created_at and updated_at from credit_accounts and reservations.
+The account model and repository no longer read or write those columns.
+credit_history.created_at and idempotency_records.created_at remain. The existing
+balance/reservation REST and gRPC response fields are unchanged.
 
 ## Verification
 
+Build and run the Credit suite from the repository root:
+
 ```sh
 npm run build
-npm test
 PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_local PGDATABASE=credit_service npm test --workspace @foc/credit-grpc
+npm test --workspace @foc/grpc
 ```
 
-The latest recorded run passed all 94 Credit checks and 51 shared gRPC checks,
-with zero failures/skips. The full workspace build and Credit Docker build pass
-with the real messaging package. A separate live listener check passed six
-scenarios (seven Node test results including its parent): initial allocation via
-actual Credit startup and authenticated REST, duplicate events, transient retry,
-invalid delivery dead-lettering, inconsistent-account dead-lettering and restart.
-The test uses a temporary PostgreSQL schema and an empty dedicated RabbitMQ
-instance, and removes its database rows, child processes and temporary logs.
+The last recorded Credit build and all 103 Credit checks passed after the entry-ID
+bookmark change. The shared gRPC suite previously passed 51 checks. These are
+recorded results, not a new test run for this README update; detailed outputs and
+older Docker/live-broker runs are in [the usage log](ai/usage-log.md).
+Root `npm test` runs the shared gRPC suite; use the Credit workspace command above
+for Credit tests. Without PGDATABASE, the database integration checks skip.
 
-To repeat the live listener check, first build and start a disposable broker
-that no other service is using:
+Tests cover migrations and rollback, initial-allocation duplicates, full atomic
+rollback, no overspend, version conflicts, settle/release races, opposing
+settlements, exact history links/deltas, entry-ID pagination, late writes,
+authentication, error trailers and public health. Migration 009's upgrade test
+verifies populated-row preservation and operations after timestamp removal.
+
+The shared [SQL ledger oracle](test/sql/ledger-violations.sql) returns violating
+rows for explicitly scoped scenario users/reservations (empty means pass).
+It checks order/actor links, held amounts, reservation versions, terminal history,
+account/history sums and conservation. The [seeded scenario](test/ledger-invariants.test.cjs)
+uses four accounts, six workers within a six-connection pool, and four default
+seeds with eight rounds of 48 operations each. Checks run after each round drains;
+unexpected errors and deadlocks fail, print the seed and stop remaining rounds.
+To replay one seed:
+
+```sh
+PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_local PGDATABASE=credit_service CREDIT_INVARIANT_SEED=12825 node --test credit-service/test/ledger-invariants.test.cjs
+```
+
+The separate live-listener test requires a disposable broker with no other
+consumers. It tests registration, duplicate events, retries, dead-letter handling
+and restart using a temporary database schema and actual Credit startup:
 
 ```sh
 npm run build
@@ -371,31 +425,10 @@ PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_loc
 docker rm -f -v credit-listener-test
 ```
 
-Wait for the broker ping to succeed before running the test. This integration
-file is separate from the default test glob; it requires PGDATABASE and
-RABBITMQ_TEST_URL and refuses to proceed if the Credit queue is already in use.
-It never purges an existing queue. Failure/retry injection is confined to the
-test child process. Existing application databases and running services stay intact.
-
-Regressions cover public `/health` responses for database up/down, positive
-reservation amount/version checks, exact per-operation history deltas, and REST
-pagination compared against database sequence order while omitting sequenceId
-from entries. Credit tests also cover migration/default/FK constraints, initial allocation, account
-and order concurrency, duplicate replay, no overspend, competing settle/release,
-opposing settlements, full rollback after injected failures, history sequence
-precision, writes during paging, late commits, service authorization, RS256
-validation, plaintext transport configuration, and reason trailers. Added regressions verify
-ordinary service TypeError becomes a generic INTERNAL/500 and the actual error
-is logged, unknown unauthenticated paths return 404, known unauthenticated GET
-routes return 401, wrong methods retain the documented 404, and reserve retries
-after update/release replay their saved snapshots while lookup returns current state. Integration tests use and
-remove temporary schemas. Without PGDATABASE their database checks are skipped.
-
-A scoped Node test-coverage run reported 98.29% lines and 94.44% branches for
-services/repositories/messaging/api/controller source files before the layout move; startup/env/generated
-code was outside that report. Docker rebuild/start and no-write runtime checks
-for authentication, error trailers, UUID validation, and REST token rejection passed. These are agent
-checks; human review remains pending.
+Wait for the broker ping to succeed before running the test. This file is outside
+the default test glob and refuses to proceed if the Credit queue is already in
+use. It never purges an existing queue. Integration tests clean up their schemas,
+listeners and child processes. Agent-run checks do not establish human review.
 
 ## Attribution for JSON files
 
