@@ -10,7 +10,7 @@ COPY package.json package-lock.json .npmrc ./
 COPY shared/grpc/package.json ./shared/grpc/
 COPY shared/messaging/package.json ./shared/messaging/
 COPY order-service/grpc/package.json ./order-service/grpc/
-COPY credit-service/grpc/package.json ./credit-service/grpc/
+COPY credit-service/package.json ./credit-service/
 COPY supplier-service/package.json ./supplier-service/
 COPY user-service/package.json ./user-service/
 
