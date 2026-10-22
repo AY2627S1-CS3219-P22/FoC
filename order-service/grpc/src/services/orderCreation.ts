@@ -55,7 +55,7 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
           if (!isAllowedExpiry(input.expiryTime, await now(tx))) return null;
           const row = await tx.orderCreation.create({ data: { orderId: randomUUID(), requesterId, idempotencyKey: key,
             requestFingerprint: hash, payload: { ...canonical(input), requesterName, pickupStore: supplier.name,
-              pickupLocation: supplier.locationDescription } } });
+              pickupLongitude: supplier.longitude, pickupLatitude: supplier.latitude } } }); //added in by @sunpterodactly to match supplier schema
           await tx.creditOperation.create({ data: { orderId: row.orderId, type: 'RESERVE', payload: { requesterId, amount: input.credits } } });
           return row;
         });
