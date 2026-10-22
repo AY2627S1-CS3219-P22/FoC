@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { RabbitMQClient, CREDIT_USER_QUEUE, type UserCreated } from '@foc/messaging';
+import { CREDIT_USER_QUEUE, type UserCreated } from '@foc/messaging';
+import { prisma } from '../db';
+import { enqueueUserCreated } from './outboxStore';
 
 export { CREDIT_USER_QUEUE };
 export type { UserCreated };
@@ -21,19 +23,15 @@ async function publishFromCli(): Promise<void> {
   const userIds = process.argv.slice(2);
   if (userIds.length === 0) throw new Error('Pass at least one user id');
 
-  const client = new RabbitMQClient({
-    serviceName: 'dev-script',
-    prefetch: 10,
-  });
-  await client.connect();
   try {
-    for (const userId of userIds) {
-      const event = buildUserCreated(userId);
-      const ok = await client.publishToQueue(CREDIT_USER_QUEUE, event, event.eventId);
-      console.log(ok ? 'published' : 'NOT confirmed', userId);
-    }
+    await prisma.$transaction(async (tx) => {
+      for (const userId of userIds) {
+        await enqueueUserCreated(tx, userId);
+      }
+    });
+    for (const userId of userIds) console.log('queued', userId);
   } finally {
-    await client.close();
+    await prisma.$disconnect();
   }
 }
 
