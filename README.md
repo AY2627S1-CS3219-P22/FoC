@@ -109,3 +109,11 @@ and included main's .npmrc in the Order Docker context. Root JSON attribution
 uses this summary and Order usage log. PR_DESCRIPTION.md documents implemented
 APIs, reproducible reviewer tests and missing teammate contract prerequisites.
 Human review pending; ordinary build is blocked until those contracts merge.
+
+Shared prerequisites completed, ChatGPT (Codex), 2026-10-25: agreed Credit shared
+contracts/client/types and Supplier validators are now tracked, with explicit
+Zod dependency and approved JSON attribution in shared README/Order usage log.
+Normal repository build and 128 shared/Order tests pass without overrides; Order
+Docker builds normally. Full Credit business runtime remains the teammate PR;
+this branch only keeps its scaffold type-compatible. Earlier build-blocker
+notes are superseded by this update. Human review pending.

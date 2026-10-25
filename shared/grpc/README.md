@@ -1,19 +1,25 @@
+<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-25 Asia/Singapore.
+Scope: Documented agreed shared client/validation integration; human review pending.
+Approved JSON attribution for shared/grpc/package.json and root lock: this README and Order usage-log.md. -->
+
 # gRPC endpoint scaffolding
 
 The shared `@foc/grpc` package provides generated TypeScript contracts, Promise
-clients, deadlines, and server helpers. Every endpoint remains `UNIMPLEMENTED`.
-Existing REST handlers, repositories, databases, auth, and startup files are unchanged.
+clients, deadlines, and server helpers. User and Supplier RPC handlers are
+implemented in their services. The Credit scaffold remains UNIMPLEMENTED; its
+full business runtime is in the teammate PR.
 
 | Service  | Default host port | RPCs                                                              | Contract                                   |
 | -------- | ----------------- | ----------------------------------------------------------------- | ------------------------------------------ |
 | User     | 50051             | `GetPublicProfile`                                                | `user-service/proto/user.proto` (existing) |
 | Order    | 50053             | `GetOrder`                                                        | `shared/grpc/proto/order.proto`            |
-| Credit   | 50054             | `GetBalance`, `ReserveCredits`, `ReleaseCredits`, `SettleCredits` | `shared/grpc/proto/credit.proto`           |
+| Credit   | 50054             | `GetBalance`, `GetReservation`, `ReserveCredits`, `UpdateReservation`, `ReleaseCredits`, `SettleCredits` | `shared/grpc/proto/credit.proto`           |
 | Supplier | 50052             | `GetSupplier`, `IsOpen`                                           | `shared/grpc/proto/supplier.proto`         |
 
-The order and credit contracts are initial integration proposals because the
-fetched branches have no implementations for those services. Credit mutation
-comments describe the intended behavior for future handlers; no ledger logic is implemented.
+Credit contract/client/types follow the agreed teammate feature branch. Order
+uses per-call x-credit-service-token metadata and versioned receipts. Supplier
+exports grpcsupplierSchema, isOpenResponseSchema and parseSupplierId. Zod is an
+explicit shared-package dependency. No Credit ledger implementation is added here.
 
 ## Run locally
 
@@ -22,6 +28,7 @@ From the repository root, with Node.js 20+:
 ```bash
 npm ci
 npm run build
+npm run build --workspace user-service
 npm test
 ```
 
@@ -117,3 +124,10 @@ scaffolding introduces no additional conflicting paths in these rehearsals.
 The supplier branch's empty root `package.json` merged with the workspace
 manifest automatically. Preserve its service-level Yarn setup. These rehearsals
 check Git compatibility; they do not validate the merged services' business logic.
+
+## AI disclosure for shared dependency integration
+
+ChatGPT (Codex), 2026-10-25: imported agreed Credit contracts/client/tests and
+Supplier validators. Added Zod to shared/grpc/package.json and regenerated the
+root lockfile. JSON attribution in this README and order-service/usage-log.md
+was approved by the human. Human review pending; no human validation claimed.

@@ -1,61 +1,50 @@
 <!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-25 Asia/Singapore.
-Scope: Documented Order-owned port and dependency/validation facts.
-Human review pending; exact prompts and results: usage-log.md. -->
+Scope: Document completed shared contract integration and validation facts.
+Human review pending; exact prompts/results: usage-log.md. -->
 # Order functionality integration
 
-The Order-only port was followed by the human-authorized merge of origin/main
-(2c8a068) on 2026-10-25. Incoming teammate files remain main baseline changes,
-not new implementations for this PR. The sole conflict was package-lock.json;
-resolution adds only seven Order dependency entries relative to main. Order
-Docker now includes main's .npmrc. Untracked postman 2 remains excluded.
+Main at 2c8a068 is merged. Lockfile conflicts are resolved and npm ci works.
+The later human instruction to complete the remaining merge prerequisites
+extended scope to the missing agreed shared contracts and dependency metadata.
 
-## Required teammate contracts before a normal build
+## Completed build prerequisites
 
-Current branch's shared Credit client lacks GetReservation/UpdateReservation,
-versioned receipts and totalCredits. Current shared index also lacks Supplier
-validation exports. Order requires the agreed contracts present on d3-demo:
+- Shared Credit protobuf, generated types, client and tests imported from
+  origin/feat/credit-implementation at 006d5a7.
+- Six RPCs: GetBalance, GetReservation, ReserveCredits, UpdateReservation,
+  ReleaseCredits, SettleCredits; versioned receipts, totalCredits, bounded
+  transport retry/deadline support and per-call metadata.
+- Supplier validators/ID parser imported from order-supplier-gRPC and exported
+  by @foc/grpc. Zod explicitly declared in shared package.
+- Existing Credit scaffold extended with two UNIMPLEMENTED entries to compile
+  against the agreed contract. No Credit business implementation imported.
+- Normal repository build, Order tests and Docker build use tracked sources
+  directly. No temporary dependency checkout or module override is needed.
 
-- `@foc/grpc`: createCreditClient with getBalance, getReservation, reserveCredits,
-  updateReservation, releaseCredits, settleCredits, RpcOptions metadata/deadline/
-  retry support; reservationId/version and balance totalCredits fields.
-- Shared Supplier: grpcsupplierSchema, isOpenResponseSchema, parseSupplierId.
-- Credit runtime: plaintext gRPC, x-credit-service-token and reason trailers,
-  atomic versioned reservation adjustment and idempotent lifecycle operations.
-- Supplier runtime: working GetSupplier/IsOpen. Missing description is "-";
-  existing Order destination/pickupLocation string schema is preserved.
-- User runtime: GetPublicProfile and compatible JWT signing key. user.created
-  event/outbox initializes Credit accounts asynchronously; this is in teammate PRs.
+## Runtime prerequisites
 
-Until shared contract PRs land, the ordinary Order build fails on missing
-methods/exports. No private replacement client or stub implementation is added.
-Main workspace metadata and Order lock entries are now reconciled. Credit
-package relocation/shared contract changes still need the relevant teammate PRs.
-Do not copy d3-demo's root lockfile over the merged main workspace layout.
+The teammate's implemented Credit runtime is still required for real credit
+operations. This branch's Credit scaffold intentionally returns UNIMPLEMENTED.
+User event/outbox and Supplier GetSupplier/IsOpen come from main. Use the same
+JWT public key, Order/Credit token and configured gRPC addresses across services.
+Apply Credit's own migrations using its README when that implementation lands.
 
-## Order changes included
+Order owns the lifecycle APIs, state/ownership rules, PostgreSQL schema,
+durable creation/edit/refund/settlement recovery and pickup. Creation validates
+current Supplier opening; pickup/delivery use saved snapshot. Missing Supplier
+description is "-"; destination remains a string. No schema change was needed
+for the later integration port or pickup addition.
 
-Shared Credit transport adoption and per-call token options for all workflows;
-Order-local response validation; ACCOUNT_NOT_FOUND bounded recovery; Supplier
-validation/description fallback; assigned-courier pickup; updated tests.
-No Order schema/migration change. No Postman/demo-only artifacts added.
+No demo Postman folders or synthetic database fixtures are included in this PR.
+Untracked postman 2 remains untouched. Peer service implementations and database
+contents were not imported from d3-demo.
 
-Order Dockerfile copies peer directories through its strict manifest allowlist,
-supporting the old and relocated package paths. Other service source, private
-keys, node_modules and .env files stay outside its build context. Build with
-repository-root context after required shared contracts are available.
+## Verification
 
-## Validation scope
-
-An isolated temporary copy of d3-demo shared/grpc plus User proto supplied the
-agreed contracts for build/tests. Teammate tracked files were not changed. A
-short-lived ignored node_modules override was used for that verification, then
-removed; it is not a permanent dependency workaround.
-
-Order build, 16 unit tests and 61 PostgreSQL integration tests passed using the
-agreed temporary contracts. Integration database was disposable. Docker check
-passed in isolated contexts for both current and relocated workspace metadata
-layouts, each supplied with the agreed shared contracts. Details are in usage-log.md. Tests use real PostgreSQL and test-only gRPC
-ledger handlers; this port did not restart any running demo service or claim a
-new deployed cross-service verification.
+Normal npm ci, repository build and User build passed. Shared gRPC tests 51,
+Order units 16 and Order PostgreSQL integrations 61 passed with this branch's
+actual contracts. Integration tests use real PostgreSQL with test-only peer
+handlers; they do not certify the deployed Credit ledger. Docker check and
+cleanup results are recorded in usage-log.md.
 
 PR body and reproducible reviewer steps: [PR_DESCRIPTION.md](PR_DESCRIPTION.md).

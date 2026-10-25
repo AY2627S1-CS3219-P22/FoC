@@ -168,8 +168,8 @@ that attribution refers to the same records now maintained in this service.
 
 ## Order lifecycle (2026-10-22)
 
-**Peer-service status:** this checkout still has Supplier GetSupplier and the old
-Credit handlers as stubs. Successful production creation requires the real User
+**Peer-service status:** Supplier GetSupplier/IsOpen and User outbox are inherited
+from main. The Credit runtime in this checkout remains a scaffold. Successful production creation requires the real User
 GetPublicProfile, implemented Supplier GetSupplier/IsOpen, and Credit from the
 agreed `feat/credit-implementation` contract. Order now imports that contract
 from `@foc/grpc`; the duplicate local protobuf was removed. Shared contracts
@@ -524,10 +524,9 @@ The existing production edit implementation required no changes for this issue.
 ## Order-only integration update (2026-10-24)
 
 See [INTEGRATION_NOTES.md](INTEGRATION_NOTES.md) for teammate dependency
-requirements and the exact validation scope. This branch currently has older
-shared contracts; a normal build requires those contract PRs to land first.
-Order source and tests were verified using isolated copies of the agreed shared
-contracts, without importing other services' implementations into this branch.
+requirements and validation scope. The agreed shared Credit/Supplier contracts
+are now included; normal builds and tests no longer need temporary overrides.
+The full Credit business runtime remains in the teammate PR.
 
 Order now uses shared createCreditClient with service-token metadata on each
 RPC; creditValidation.ts retains response validation and error classification.

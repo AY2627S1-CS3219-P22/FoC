@@ -14,21 +14,18 @@ Merged main at `2c8a068`. The lockfile conflict is resolved; relative to main,
 its only changes are seven Order dependency entries. Teammate service changes
 inherited from main are not additional implementations in this PR.
 
-## Merge prerequisites — currently blocked
+## Shared contracts included; live Credit runtime remains separate
 
-Main still lacks the agreed shared Credit client methods/receipt fields and
-shared Supplier validation exports. The normal Order build currently fails on
-these missing contracts. Merge the corresponding teammate contract PRs before
-merging this PR or running the commands below successfully:
+Includes the agreed six-method Credit protobuf/generated types/shared client
+from `feat/credit-implementation` and Supplier validation exports from
+`order-supplier-gRPC`. Zod is explicitly declared in the shared package. The
+ordinary build now succeeds without temporary dependency overrides.
 
-- Shared Credit: GetReservation, UpdateReservation, versioned reservation
-  receipts, totalCredits and the agreed RpcOptions/retry support.
-- Shared Supplier: grpcsupplierSchema, isOpenResponseSchema, parseSupplierId.
-- For live workflows: the implemented Credit runtime with matching service token.
-
-User outbox and Supplier GetSupplier are now inherited from main. No private
-Credit transport or duplicate protobuf is included as a replacement. See
-[INTEGRATION_NOTES.md](INTEGRATION_NOTES.md) for the exact contract requirements.
+The existing Credit scaffold has UNIMPLEMENTED handlers for all six methods;
+it is type-compatible, not a ledger implementation. The teammate's full Credit
+runtime remains a separate PR and is required for deployed reserve/update/
+release/settlement smoke checks. User outbox and Supplier GetSupplier are inherited
+from main. No private Credit transport or duplicate protobuf is included.
 
 ## Implemented APIs
 
@@ -73,25 +70,26 @@ and invalid/conflicting transitions 409.
 
 ## Verification performed
 
-- Clean merged-workspace `npm ci --ignore-scripts`: passed.
-- Ordinary build: **BLOCKED** by missing teammate shared contracts above.
-- Docker build with merged main workspace/.npmrc plus isolated agreed contracts: passed.
-- With isolated agreed shared contracts: Order build, 16 unit tests and 61
-  PostgreSQL integration tests passed. These are conditional checks, not a
-  claim that a clean checkout of this PR currently builds unaided.
+- Clean workspace dependency install: passed.
+- Normal repository `npm run build`: passed without temporary overrides.
+- Shared gRPC tests: 51 passed; Order unit tests: 16 passed.
+- Real PostgreSQL Order integration tests: 61 passed.
+- Normal Order Docker image build: passed (see usage log for actual result).
 - Integration tests use real Order PostgreSQL and test-only gRPC handlers for
   deterministic failures. They cover JWT/role/ownership, validation, idempotency,
-  concurrent acceptance/edit/pickup/delivery, expiry, failed and uncertain Credit
-  calls, recovery after restart/lease expiry, and no duplicate credit operations.
+  concurrency, expiry, Credit failures/recovery and no duplicate credit operations.
+- Full deployed Credit business implementation is not part of this PR.
 
-## Reviewer checks — after dependency PRs land
+## Reviewer checks
 
-From the repository root, with Node 22 and Docker Desktop running:
+From repository root, with Node 22 and Docker Desktop running:
 
 ```sh
 npm ci
-npm run build --workspace @foc/grpc
-npm run build --workspace @foc/order-grpc
+npm run build
+# Shared transport tests import User; generate/build its existing Prisma client.
+npm run build --workspace user-service
+npm test --workspace @foc/grpc
 npm test --workspace @foc/order-grpc
 ```
 
@@ -117,7 +115,7 @@ docker rm -f order-pr-test-db
 unset TEST_DATABASE_URL
 ```
 
-Expected: 16 unit tests and 61 integration tests pass. No running User/Supplier/
+Expected: 51 shared gRPC tests, 16 Order unit tests and 61 integration tests pass. No running User/Supplier/
 Credit services are needed for that integration suite.
 
 ### Docker startup and live smoke checks

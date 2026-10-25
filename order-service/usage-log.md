@@ -851,3 +851,40 @@ to origin/main has no Credit/User/Supplier/shared implementation changes.
 reports only unchanged whitespace inherited from main; no unrelated cleanup.
 Staged resolved lock and PR documentation. Authorized merge commit follows;
 untracked postman 2 excluded. No GitHub PR created and no push performed.
+
+## 2026-10-25 Asia/Singapore — Complete tracked shared integration prerequisites
+Tool: ChatGPT (Codex), mode: contract integration, build/test fixes, documentation.
+Human review pending. Exact task:
+```text
+Complete the portions that are missing before merge
+```
+Asked: "The shared Supplier schemas need Zod declared in the existing shared/grpc/package.json. May I record that JSON file’s AI attribution in shared/grpc/README.md and order-service/usage-log.md? Your repository policy requires an approved attribution method because JSON cannot contain comments."
+Exact human approval:
+```text
+Yes, use README and usage log attribution
+```
+Fetched origin/feat/credit-implementation and origin/order-supplier-gRPC. Imported
+only agreed shared Credit protobuf/client/generated types and contract/retry
+tests from Credit commit 006d5a7; imported Supplier validator/ID helper exports
+from Supplier branch. Added explicit Zod shared dependency, regenerated lock.
+JSON attribution is recorded in shared README and this log as approved. Source
+provenance/comments preserved and added current integration headers.
+Extended existing Credit scaffold with UNIMPLEMENTED GetReservation and
+UpdateReservation entries to remain type-compatible; no Credit business logic
+or database implementation imported. Updated shared smoke test: implemented
+User validates empty ID; all six Credit scaffold calls remain UNIMPLEMENTED.
+Order private transport remains removed; no dependency overrides needed.
+Updated PR_DESCRIPTION/INTEGRATION_NOTES/Order and shared READMEs to remove
+resolved build blockers and distinguish separate full Credit runtime dependency.
+Validation directly from tracked sources: repository npm run build passed;
+existing User build passed; 51 shared gRPC tests, 16 Order units and 61 real
+PostgreSQL integration tests passed. Normal Order Docker build passed from this
+branch, without temporary source contexts. A dedicated disposable test DB was
+used; no live demo services restarted. Normal npm ci result/cleanup follow.
+Existing untracked postman 2 left untouched; no Postman assets added.
+
+Final normal npm ci (including package install scripts) passed. All checks use
+this branch's tracked shared contracts; no Order-local dependency link remains.
+Disposable PostgreSQL container removed. git diff --check passed. PR Markdown
+now documents 51 shared + 16 unit + 61 integration results and normal reviewer
+commands, with live Credit runtime explicitly separate. Commit follows; no push.
