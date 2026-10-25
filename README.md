@@ -117,3 +117,8 @@ Normal repository build and 128 shared/Order tests pass without overrides; Order
 Docker builds normally. Full Credit business runtime remains the teammate PR;
 this branch only keeps its scaffold type-compatible. Earlier build-blocker
 notes are superseded by this update. Human review pending.
+
+PR documentation refresh, ChatGPT (Codex), 2026-10-25: documented the existing
+shared Supplier validators' runtime Zod import and corrected the dependency
+summary in Order PR_DESCRIPTION.md. Prompt/checks: Order usage log. Human review
+pending; documentation-only update.

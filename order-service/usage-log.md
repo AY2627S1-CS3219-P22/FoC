@@ -888,3 +888,18 @@ this branch's tracked shared contracts; no Order-local dependency link remains.
 Disposable PostgreSQL container removed. git diff --check passed. PR Markdown
 now documents 51 shared + 16 unit + 61 integration results and normal reviewer
 commands, with live Credit runtime explicitly separate. Commit follows; no push.
+
+## 2026-10-25 Asia/Singapore — Explain shared Zod usage and refresh PR
+Tool: ChatGPT (Codex), mode: code inspection and factual documentation.
+Human review pending. Exact prompt:
+```text
+Why is Zod needed? If you are sure, write me an updated PR
+```
+Confirmed shared Supplier schema module imports zod at runtime and Order's
+Supplier adapter invokes its parse() functions on GetSupplier/IsOpen responses.
+Explained existing direct dependency, not a new architecture choice. Updated
+PR_DESCRIPTION.md with the runtime import/validation facts and corrected lock
+scope to include shared Zod alongside Order dependencies. Retained actual
+previously-run 51 shared/16 unit/61 integration and Docker results and reviewer
+commands, clearly distinguishing separate full Credit runtime. Documentation
+only; no tests rerun or new runtime verification claimed. git diff --check used.
