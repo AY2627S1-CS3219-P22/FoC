@@ -5,9 +5,9 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { PrismaClient, Prisma } from '../generated/prisma';
 import { createOrderSchema, editOrderSchema, isAllowedExpiry } from '../api/dto/orderInput';
-import type { createCreditClient } from '../dependencies/creditClient';
+import type { createCreditClient, RpcOptions } from '@foc/grpc';
 import type { createDirectories } from '../dependencies/directories';
-import { classifyCreditError } from '../dependencies/creditClient';
+import { classifyCreditError, validateReservation } from '../dependencies/creditValidation';
 import type { CommandResult } from './orderCreation';
 const active = ['PENDING', 'PROCESSING', 'RECONCILIATION_REQUIRED'] as const;
 const delays = [5, 15, 45, 135, 135];
@@ -21,7 +21,7 @@ function canonical(patch: z.infer<typeof editOrderSchema>) {
     key === 'expiryTime' ? patch.expiryTime!.toISOString() : patch[key as keyof typeof patch]]));
 }
 
-export function createOrderEdits(db: PrismaClient, credit: ReturnType<typeof createCreditClient>, directories: ReturnType<typeof createDirectories>) {
+export function createOrderEdits(db: PrismaClient, credit: ReturnType<typeof createCreditClient>, directories: ReturnType<typeof createDirectories>, creditOptions: RpcOptions = {}) {
   async function edit(orderId: string, requesterId: string, key: string, patch: z.infer<typeof editOrderSchema>): Promise<CommandResult> {
     const id = operationId(requesterId, orderId, key);
     const request = canonical(patch);
@@ -46,7 +46,7 @@ export function createOrderEdits(db: PrismaClient, credit: ReturnType<typeof cre
       let supplier, opening, reservation;
       try {
         [supplier, opening, reservation] = await Promise.all([
-          directories.getSupplier(input.supplierId), directories.isSupplierOpen(input.supplierId), credit.getReservation({ orderId }),
+          directories.getSupplier(input.supplierId), directories.isSupplierOpen(input.supplierId), credit.getReservation({ orderId }, creditOptions).then(validateReservation),
         ]);
       } catch (error) { return classifyCreditError(error) === 'rejected' ? { status: 409, error: 'dependency-rejected' } : { status: 503, error: 'dependency-unavailable' }; }
       if (!opening.isOpen || supplier.supplierId !== input.supplierId || !supplier.name.trim() || !supplier.locationDescription.trim()
@@ -88,15 +88,15 @@ export function createOrderEdits(db: PrismaClient, credit: ReturnType<typeof cre
     let failed = false;
     try {
       const order = await db.order.findUniqueOrThrow({ where: { id: work.orderId } });
-      let reservation = await credit.getReservation({ orderId: work.orderId });
+      let reservation = validateReservation(await credit.getReservation({ orderId: work.orderId }, creditOptions));
       if (reservation.orderId !== work.orderId || reservation.requesterId !== work.requesterId) throw new Error('Reservation mismatch');
       const time = await now(db);
       if (order.status !== 'UNASSIGNED' || order.expiryTime <= time || input.expiryTime <= time || reservation.status !== 'RESERVED') {
         failed = true;
       } else {
         if (reservation.version === work.expectedVersion && reservation.amount !== work.targetCredits) {
-          await credit.updateReservation({ orderId: work.orderId, amount: work.targetCredits, expectedVersion: work.expectedVersion });
-          reservation = await credit.getReservation({ orderId: work.orderId });
+          validateReservation(await credit.updateReservation({ orderId: work.orderId, amount: work.targetCredits, expectedVersion: work.expectedVersion }, creditOptions));
+          reservation = validateReservation(await credit.getReservation({ orderId: work.orderId }, creditOptions));
         }
         confirmed = reservation.orderId === work.orderId && reservation.requesterId === work.requesterId
           && reservation.status === 'RESERVED' && reservation.amount === work.targetCredits

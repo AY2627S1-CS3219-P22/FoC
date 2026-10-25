@@ -1,9 +1,9 @@
-// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
-// Scope: Implemented author-approved cancellation, expiry, delivery and durable credit recovery.
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+// Scope: Implemented approved pickup transition alongside cancellation, expiry and delivery recovery.
 // Author review: Pending; see ../../usage-log.md.
 import type { PrismaClient, Prisma } from '../generated/prisma';
-import type { createCreditClient } from '../dependencies/creditClient';
-import { classifyCreditError } from '../dependencies/creditClient';
+import type { createCreditClient, RpcOptions } from '@foc/grpc';
+import { classifyCreditError, validateReservation } from '../dependencies/creditValidation';
 
 const delays = [5, 15, 45, 135, 135];
 const MAX_ATTEMPTS = 6; // Initial attempt plus five retries.
@@ -13,7 +13,7 @@ async function databaseTime(tx: Prisma.TransactionClient): Promise<Date> {
   return row.now;
 }
 
-export function createOrderLifecycle(db: PrismaClient, credit: ReturnType<typeof createCreditClient>, additionalWork: Array<() => Promise<unknown>> = []) {
+export function createOrderLifecycle(db: PrismaClient, credit: ReturnType<typeof createCreditClient>, additionalWork: Array<() => Promise<unknown>> = [], creditOptions: RpcOptions = {}) {
   async function cancel(orderId: string, requesterId: string) {
     const result = await db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId}::uuid FOR UPDATE`;
@@ -41,6 +41,22 @@ export function createOrderLifecycle(db: PrismaClient, credit: ReturnType<typeof
       // failed receipt write must not turn this durable result into HTTP 500.
       return { order: result.order };
     }
+  }
+
+  async function pickup(orderId: string, courierId: string) {
+    return db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId}::uuid FOR UPDATE`;
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) return { error: 'not-found' as const, status: 404 };
+      if (order.courierId !== courierId || order.requesterId === courierId) return { error: 'forbidden' as const, status: 403 };
+      if (order.status !== 'ASSIGNED') return { error: 'invalid-transition' as const, status: 409 };
+      const now = await databaseTime(tx);
+      if (order.expiryTime <= now) return { error: 'expired' as const, status: 409 };
+      // Pickup uses the creation snapshot and does not call Supplier or Credit.
+      return { order: await tx.order.update({ where: { id: orderId }, data: {
+        status: 'PICKED_UP', pickedUpAt: now,
+      } }) };
+    });
   }
 
   async function deliver(orderId: string, courierId: string) {
@@ -88,11 +104,11 @@ export function createOrderLifecycle(db: PrismaClient, credit: ReturnType<typeof
         const order = await db.order.findUniqueOrThrow({ where: { id: row.orderId } });
         const matches = (receipt: Awaited<ReturnType<typeof credit.getReservation>>) =>
           receipt.orderId === order.id && receipt.requesterId === order.requesterId && receipt.amount === order.credits;
-        let receipt = await credit.getReservation({ orderId: order.id });
+        let receipt = validateReservation(await credit.getReservation({ orderId: order.id }, creditOptions));
         if (!matches(receipt) || !order.courierId) throw new Error('Reservation mismatch');
         if (receipt.status === 'RESERVED') {
-          await credit.settleCredits({ orderId: order.id, courierId: order.courierId });
-          receipt = await credit.getReservation({ orderId: order.id });
+          validateReservation(await credit.settleCredits({ orderId: order.id, courierId: order.courierId }, creditOptions));
+          receipt = validateReservation(await credit.getReservation({ orderId: order.id }, creditOptions));
         }
         confirmed = matches(receipt) && receipt.status === 'SETTLED' && receipt.courierId === order.courierId;
         if (!confirmed) throw new Error('Settlement not confirmed');
@@ -152,13 +168,13 @@ export function createOrderLifecycle(db: PrismaClient, credit: ReturnType<typeof
       let permanent = false;
       try {
         const order = await db.order.findUniqueOrThrow({ where: { id: work.orderId } });
-        let receipt = await credit.getReservation({ orderId: work.orderId });
+        let receipt = validateReservation(await credit.getReservation({ orderId: work.orderId }, creditOptions));
         if (receipt.orderId !== work.orderId || receipt.requesterId !== order.requesterId) {
           throw new Error('Reservation mismatch');
         }
         if (receipt.status === 'RESERVED') {
-          await credit.releaseCredits({ orderId: work.orderId });
-          receipt = await credit.getReservation({ orderId: work.orderId });
+          validateReservation(await credit.releaseCredits({ orderId: work.orderId }, creditOptions));
+          receipt = validateReservation(await credit.getReservation({ orderId: work.orderId }, creditOptions));
         }
         confirmed = receipt.orderId === work.orderId && receipt.requesterId === order.requesterId
           && receipt.status === 'RELEASED';
@@ -200,5 +216,5 @@ export function createOrderLifecycle(db: PrismaClient, credit: ReturnType<typeof
     tick();
   }
   async function stopWorker() { stopping = true; if (timer) clearTimeout(timer); await running; }
-  return { cancel, deliver, expireBatch, refundBatch, settlementBatch, startWorker, stopWorker };
+  return { cancel, pickup, deliver, expireBatch, refundBatch, settlementBatch, startWorker, stopWorker };
 }

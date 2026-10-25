@@ -96,3 +96,9 @@ Team review and validation remain pending. Prompts, key responses and verificati
 results are recorded in [order-service/usage-log.md](order-service/usage-log.md). Add a link to this README
 to the submission slide deck. This entry covers this session only; the team must
 record other AI use and include applicable AGENTS.md/SKILLS.md files before submission.
+
+Order-only integration port, ChatGPT (Codex), 2026-10-24: transferred shared-client
+usage, missing-account recovery, Supplier compatibility and courier pickup from
+d3-demo into Order. Teammate implementations/root workspace metadata were not
+merged. Dependencies and validation limits: Order INTEGRATION_NOTES.md and usage
+log. Human review pending; normal build awaits shared contract PRs.
