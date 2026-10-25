@@ -827,3 +827,27 @@ postman 2 stays excluded. Latest main still lacks agreed Credit GetReservation/
 UpdateReservation and shared Supplier schemas. These remain explicit dependent
 PRs rather than silently importing teammate implementations. Actual merge,
 conflicts, checks and reviewer instructions follow below.
+
+Merge result: only conflict package-lock.json. Seeded main's lock and regenerated
+against merged manifests; net diff from main is seven added Order dependency
+entries. Clean npm ci --ignore-scripts passed. Included main's .npmrc in Order
+Dockerfile/allowlist because main's Supplier dependency resolver requires it.
+Normal shared build passed; normal Order build blocked by missing shared Credit
+methods and Supplier exports, confirmed with compiler output. With temporary
+agreed contract package: Order build, 16/16 units, 61/61 PostgreSQL integrations
+passed after merge. Removed ignored dependency override afterwards.
+Created PR_DESCRIPTION.md covering final diff to main, explicit blockers,
+automated isolated-DB commands and live API/credit reviewer checks. No fake
+claim of green standalone branch build or deployed cross-service verification.
+Existing demo folders not included. Docker check and merge commit follow.
+
+Final checks: clean npm install lock validation passed; normal shared build
+passed, ordinary Order build remains blocked by dependency exports. With agreed
+isolated contracts, build + 16 units + 61 PostgreSQL integrations passed, and
+Order Docker image built using merged main workspace and .npmrc. Temporary
+Order dependency override and disposable test database removed. Current diff
+to origin/main has no Credit/User/Supplier/shared implementation changes.
+`git diff origin/main --check` passed. Cached merge-parent whitespace check
+reports only unchanged whitespace inherited from main; no unrelated cleanup.
+Staged resolved lock and PR documentation. Authorized merge commit follows;
+untracked postman 2 excluded. No GitHub PR created and no push performed.

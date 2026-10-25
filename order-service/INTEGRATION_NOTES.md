@@ -1,11 +1,13 @@
-<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-24 Asia/Singapore.
+<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-25 Asia/Singapore.
 Scope: Documented Order-owned port and dependency/validation facts.
 Human review pending; exact prompts and results: usage-log.md. -->
 # Order functionality integration
 
-Only Order source/tests/Docker/docs and required root AI summary were changed.
-Credit, User, Supplier, shared packages and root package/lock files were not
-merged or edited. Existing untracked postman 2 files remain untouched.
+The Order-only port was followed by the human-authorized merge of origin/main
+(2c8a068) on 2026-10-25. Incoming teammate files remain main baseline changes,
+not new implementations for this PR. The sole conflict was package-lock.json;
+resolution adds only seven Order dependency entries relative to main. Order
+Docker now includes main's .npmrc. Untracked postman 2 remains excluded.
 
 ## Required teammate contracts before a normal build
 
@@ -26,8 +28,9 @@ validation exports. Order requires the agreed contracts present on d3-demo:
 
 Until shared contract PRs land, the ordinary Order build fails on missing
 methods/exports. No private replacement client or stub implementation is added.
-After teammate merges reconcile the root workspace/lockfile in that integration;
-they were deliberately not copied from d3-demo here.
+Main workspace metadata and Order lock entries are now reconciled. Credit
+package relocation/shared contract changes still need the relevant teammate PRs.
+Do not copy d3-demo's root lockfile over the merged main workspace layout.
 
 ## Order changes included
 
@@ -54,3 +57,5 @@ passed in isolated contexts for both current and relocated workspace metadata
 layouts, each supplied with the agreed shared contracts. Details are in usage-log.md. Tests use real PostgreSQL and test-only gRPC
 ledger handlers; this port did not restart any running demo service or claim a
 new deployed cross-service verification.
+
+PR body and reproducible reviewer steps: [PR_DESCRIPTION.md](PR_DESCRIPTION.md).

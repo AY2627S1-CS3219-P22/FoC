@@ -30,7 +30,7 @@ Start each new scaffold in a separate terminal:
 ```bash
 npm run dev --workspace @foc/order-grpc
 npm run dev --workspace @foc/credit-grpc
-npm run dev --workspace @foc/supplier-grpc
+yarn --cwd supplier-service dev:grpc
 ```
 
 These are independent gRPC processes under each service's `grpc/` directory.

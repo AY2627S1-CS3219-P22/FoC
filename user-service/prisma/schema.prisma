@@ -32,6 +32,21 @@ model User {
   refreshTokens RefreshToken[]
 }
 
+// Transactional outbox: sign-up writes a user.created row in the same
+// transaction as the User insert. A background dispatcher is the only
+// process that talks to RabbitMQ, so a broker outage cannot fail register.
+model UserOutbox {
+  eventId     String    @id @map("event_id") @db.Uuid
+  queue       String
+  body        String
+  createdAt   DateTime  @default(now()) @map("created_at")
+  publishedAt DateTime? @map("published_at")
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+
+  @@map("user_outbox")
+}
+
 // One row per login session, for its whole life: rotation swaps the token on
 // this same row, so every change to a session serializes on one row lock.
 // The raw token only ever lives in the client's httpOnly cookie; we store its

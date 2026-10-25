@@ -3,7 +3,7 @@
 FROM node:22-slim AS build
 WORKDIR /repo
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 COPY shared/grpc/package.json shared/grpc/package.json
 COPY shared/messaging/package.json shared/messaging/package.json
 COPY order-service/grpc/package.json order-service/grpc/package.json

@@ -102,3 +102,10 @@ usage, missing-account recovery, Supplier compatibility and courier pickup from
 d3-demo into Order. Teammate implementations/root workspace metadata were not
 merged. Dependencies and validation limits: Order INTEGRATION_NOTES.md and usage
 log. Human review pending; normal build awaits shared contract PRs.
+
+Main merge / PR preparation, ChatGPT (Codex), 2026-10-25: merged main at 2c8a068,
+resolved root package-lock.json from main plus seven Order manifest entries,
+and included main's .npmrc in the Order Docker context. Root JSON attribution
+uses this summary and Order usage log. PR_DESCRIPTION.md documents implemented
+APIs, reproducible reviewer tests and missing teammate contract prerequisites.
+Human review pending; ordinary build is blocked until those contracts merge.
