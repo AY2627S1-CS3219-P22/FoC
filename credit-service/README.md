@@ -1,8 +1,8 @@
 <!--
-AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-10-22 (Asia/Singapore).
+AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-10-26 (Asia/Singapore).
 Mode/scope: Documented and checked the human-defined Credit implementation.
 Review: [HUMAN-REVIEWED]
-Exact prompts, key responses and checks: ai/usage-log.md, entries 003–044.
+Exact prompts, key responses and checks: ai/usage-log.md, entries 003–045.
 -->
 
 # Credit service
@@ -21,7 +21,8 @@ uses JWT-authenticated REST for each user's own balance and history.
 | User events | RabbitMQ queue `credit.user-events` | `user.created` consumer |
 
 The current implementation has entry-ID page tokens, direct service-token
-comparison, and no account/reservation timestamp columns. Archival, restoration
+comparison, no account/reservation timestamp columns, and idempotency records
+without user or timestamp metadata. Archival, restoration
 and deletion are deferred. The human's definitions and AI records are retained in
 [the usage log](ai/usage-log.md).
 
@@ -340,6 +341,8 @@ the commands below list the full sequence for a fresh database. Migration 009
 requires the updated service queries that omit account/reservation timestamps.
 The last recorded local application completed migrations 001–009; that does not
 establish which migrations a teammate's database has applied.
+Migration 010 has been tested in isolated schemas and has not been applied to the
+running local database. Apply it together with the updated Credit service build.
 
 ```sh
 docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/001_initial.sql
@@ -351,6 +354,7 @@ docker compose --env-file credit-service/.env.docker.example -f credit-service/c
 docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/007_credit_delta_constraints.sql
 docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/008_history_links_and_uniqueness.sql
 docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/009_remove_account_reservation_timestamps.sql
+docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/010_remove_idempotency_metadata.sql
 ```
 
 The CLI uses PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE; PGDATABASE must be explicit.
@@ -374,8 +378,12 @@ RESERVATION_UPDATED may occur multiple times. Invalid legacy links or duplicate
 indexed events reject the entire migration; no data is repaired or deleted.
 Migration 009 drops created_at and updated_at from credit_accounts and reservations.
 The account model and repository no longer read or write those columns.
-credit_history.created_at and idempotency_records.created_at remain. The existing
-balance/reservation REST and gRPC response fields are unchanged.
+Migration 010 drops user_id and created_at from idempotency_records. Its remaining
+columns are operation_type, idempotency_key, request_hash and result (jsonb), with
+the same composite primary key on (operation_type, idempotency_key). Retry lookup,
+request-hash conflict checks and saved-response replay are unchanged; allocation
+tests identify records by operation_type = 'init_credits' and idempotency_key =
+userId. credit_history.created_at remains. The public REST/gRPC shapes are unchanged.
 
 ## Verification
 
@@ -387,18 +395,23 @@ PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_loc
 npm test --workspace @foc/grpc
 ```
 
-The last recorded Credit build and all 103 Credit checks passed after the entry-ID
-bookmark change. The shared gRPC suite previously passed 51 checks. These are
-recorded results, not a new test run for this README update; detailed outputs and
-older Docker/live-broker runs are in [the usage log](ai/usage-log.md).
+The Credit build and all 103 Credit checks passed after removing idempotency
+metadata. The shared gRPC suite previously passed 51 checks; it was not rerun for
+this refactor. Detailed outputs and prior checks are in [the usage log](ai/usage-log.md).
+All seven live-listener test results also passed against a disposable RabbitMQ
+broker and the fully migrated isolated schema, including duplicate allocation,
+retry/dead-letter behavior and restart. The test broker was removed afterwards.
 Root `npm test` runs the shared gRPC suite; use the Credit workspace command above
 for Credit tests. Without PGDATABASE, the database integration checks skip.
 
 Tests cover migrations and rollback, initial-allocation duplicates, full atomic
 rollback, no overspend, version conflicts, settle/release races, opposing
 settlements, exact history links/deltas, entry-ID pagination, late writes,
-authentication, error trailers and public health. Migration 009's upgrade test
-verifies populated-row preservation and operations after timestamp removal.
+authentication, error trailers and public health. The combined 009/010 upgrade
+test verifies populated-row preservation, exact remaining idempotency columns,
+replay of successes saved before migration, and operations after column removal.
+Only the historical upgrade fixture supplies the old idempotency user column;
+current service, repository and runtime test queries do not use it.
 
 The shared [SQL ledger oracle](test/sql/ledger-violations.sql) returns violating
 rows for explicitly scoped scenario users/reservations (empty means pass).

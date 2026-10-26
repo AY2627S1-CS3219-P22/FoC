@@ -7,6 +7,9 @@
 // Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 // Scope: Relocated the human-selected migration runner and updated references while making scripts/docs local-only.
 // Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 034 (repository-relative).
+// Entry 045: OpenAI Codex (GPT-6), 2026-10-26 (Asia/Singapore).
+// Scope: Checked current idempotency columns, operation/key uniqueness and remaining required values.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 045.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -156,17 +159,20 @@ test('SQL migrations implement the supplied schema', {
       await bad('UPDATE credit_history SET total_amount_change = NULL WHERE id = $1', [initial.id], '23502');
     });
 
-    await t.test('idempotency keys are unique per operation and user IDs are logical references', async () => {
-      const insert = 'INSERT INTO idempotency_records (operation_type, idempotency_key, user_id, request_hash, result) VALUES ($1, $2, $3, $4, $5) RETURNING *';
+    await execute(process.execPath, [runner, join(__dirname, '../migrations/010_remove_idempotency_metadata.sql')], {
+      env: { ...process.env, PGOPTIONS: '-c search_path=' + schema },
+    });
+    await t.test('idempotency keys are unique per operation without user or timestamp metadata', async () => {
+      const insert = 'INSERT INTO idempotency_records (operation_type, idempotency_key, request_hash, result) VALUES ($1, $2, $3, $4) RETURNING *';
       for (const type of ['init_credits', 'reserve', 'update', 'release', 'transfer']) {
-        const { rows: [record] } = await client.query(insert, [type, 'same-key', 'logical-user', 'hash', { ok: true }]);
+        const { rows: [record] } = await client.query(insert, [type, 'same-key', 'hash', { ok: true }]);
         assert.deepEqual(record.result, { ok: true });
-        assert.ok(record.created_at instanceof Date);
+        assert.deepEqual(Object.keys(record).sort(), ['idempotency_key', 'operation_type', 'request_hash', 'result']);
       }
-      await bad(insert, ['reserve', 'same-key', 'another-user', 'hash', {}], '23505');
-      await bad(insert, ['restore', 'new-key', 'logical-user', 'hash', {}], '23514');
-      await bad(insert, ['reserve', 'new-key', 'logical-user', 'hash', null], '23502');
-      await bad(insert, ['reserve', 'new-key', 'logical-user', null, {}], '23502');
+      await bad(insert, ['reserve', 'same-key', 'hash', {}], '23505');
+      await bad(insert, ['restore', 'new-key', 'hash', {}], '23514');
+      await bad(insert, ['reserve', 'new-key', 'hash', null], '23502');
+      await bad(insert, ['reserve', 'new-key', null, {}], '23502');
     });
   } finally {
     try {

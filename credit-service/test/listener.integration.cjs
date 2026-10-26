@@ -8,6 +8,9 @@
 // Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 // Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
 // Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
+// Entry 045: OpenAI Codex (GPT-6), 2026-10-26 (Asia/Singapore).
+// Scope: Scoped saved allocation checks by operation/key instead of the removed user column.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 045.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -67,7 +70,7 @@ test('real listener initializes once and handles retries, dead letters and resta
   const snapshot = async (userId) => ({
     accounts: (await pool.query('SELECT total_credits, reserved_credits FROM credit_accounts WHERE user_id = $1', [userId])).rows,
     history: (await pool.query('SELECT type, total_amount_change, total_reserved_change FROM credit_history WHERE user_id = $1 ORDER BY sequence_id', [userId])).rows,
-    retryCount: (await pool.query('SELECT count(*) FROM idempotency_records WHERE user_id = $1', [userId])).rows[0].count,
+    retryCount: (await pool.query("SELECT count(*) FROM idempotency_records WHERE operation_type = 'init_credits' AND idempotency_key = $1", [userId])).rows[0].count,
   });
   const stop = async () => {
     if (!child) return;

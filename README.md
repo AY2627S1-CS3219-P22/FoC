@@ -1,8 +1,8 @@
 <!--
-AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-19–2026-10-22 (Asia/Singapore).
+AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-19–2026-10-26 (Asia/Singapore).
 Mode/scope: Credit-service implementation support and project disclosure documentation.
 Review: Earlier reviews are logged; latest documentation changes await human review.
-Exact prompts, key responses and checks: credit-service/ai/usage-log.md, entries 001–044.
+Exact prompts, key responses and checks: credit-service/ai/usage-log.md, entries 001–045.
 -->
 
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
@@ -80,12 +80,13 @@ This summary covers recorded assistance on feat/credit-implementation from
 - **Tool and modes:** OpenAI Codex (GPT-6), implementation after human design
   finalization, bounded requirements interpretation/formatting, boilerplate,
   debugging, tests, refactoring, documentation and explanations.
-- **Scope:** Credit's PostgreSQL schema and nine migrations; domain/repository/
+- **Scope:** Credit's PostgreSQL schema and ten migrations; domain/repository/
   service implementation; atomic initialization, reservation, update, release and
   settlement; gRPC contracts/client retries and service-token authentication;
   authenticated own-balance/history REST with entry-ID bookmarks; RabbitMQ consumer
   integration; Docker/workspace setup; health reporting; tests, local demo
-  preparation and attribution records. The [service README](credit-service/README.md)
+  preparation and attribution records; removal of idempotency user/timestamp
+  columns and corresponding repository/test refactoring. The [service README](credit-service/README.md)
   documents current interfaces, behavior and setup.
 - **Human decisions:** Requirements, architecture, schema, interfaces, policies,
   locking, pagination and security changes came from the human authors. No
@@ -93,14 +94,16 @@ This summary covers recorded assistance on feat/credit-implementation from
   decision rationales were generated.
 - **Prompts and key responses:** Exact exchanges, affected files, recorded reviews
   and actual checks are in [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md),
-  entries 001–044. Attribution comments identify AI-influenced files. The approved
+  entries 001–045. Attribution comments identify AI-influenced files. The approved
   [JSON attribution table](credit-service/README.md#attribution-for-json-files)
   covers formats that cannot contain comments.
 - **Verification:** The latest implementation run passed the Credit build and
-  103 Credit checks, including scoped seeded ledger invariants and entry-ID
-  paging. Earlier shared gRPC checks, Docker builds, live listener and local demo
-  results are recorded separately in the log. This README update did not rerun
-  them. Order/Credit demo integration has not been verified live. Agent checks
+  103 Credit checks after the idempotency refactor, including scoped seeded ledger
+  invariants, entry-ID paging and preservation/replay of pre-migration results.
+  All seven live-listener checks also passed against a disposable broker and the
+  new schema. Migration 010 remains pending on the running local database.
+  Shared gRPC checks, Docker builds, live listener and local demo results are
+  recorded separately in the log. Order/Credit demo integration has not been verified live. Agent checks
   do not establish human approval; latest documentation changes await review.
 - **Provenance:** Shared messaging code belongs to @sunpterodactyl and the shared
   messaging contributors, imported from events/data-validation commit

@@ -1,9 +1,9 @@
 <!--
 AI Assistance Disclosure:
-Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-21 (Asia/Singapore).
+Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-26 (Asia/Singapore).
 Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–044 below and the linked prompt archives.
+Prompts and key responses: Entries 001–045 below and the linked prompt archives.
 Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Recorded the latest implementation request, changes and actual verification.
 New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
@@ -2005,6 +2005,57 @@ submission files; retained disclosure content is under this ai directory.
   rationale, skill, sub-agent, database change, container replacement, commit or
   push. Latest documentation awaits human review. Upstream broker authorship
   remains credited; detailed sources and prior review history stay in the log.
+
+## 045 — Remove user and timestamp metadata from idempotency records
+
+- **Timestamp:** 2026-10-26 12:55 SGT (UTC+08:00), Asia/Singapore.
+- **Tool/model/modes:** OpenAI Codex, GPT-6; implementation, refactoring, tests and
+  documentation against the human's finalized column-removal request.
+- **Exact prompt/key responses:** [Idempotency refactor request and outcomes](prompts/045-remove-idempotency-metadata.md).
+- **Human-defined change:** Remove user_id and created_at from the existing
+  idempotency_records table and refactor its code/tests. New migration 010 drops
+  only those columns. operation_type, idempotency_key, request_hash and result
+  remain, including the existing composite PK/checks/NOT NULL rules. Previous
+  migrations were preserved. No new schema/interface/architecture decision or
+  rationale was generated.
+- **Affected implementation:** migrations/010_remove_idempotency_metadata.sql;
+  src/domains/types.ts removes IdempotencyRecord.userId; SqlCreditRepository.ts
+  reads/writes four remaining columns; CreditService.ts stops passing userId to
+  saved idempotency records. Operation keys, hashes, atomic transactions, conflict
+  checks, response JSON and replay behavior remain as supplied by the human.
+- **Affected tests:** initial-allocation.test.cjs and listener.integration.cjs
+  count allocation records by operation_type='init_credits'/idempotency_key=userId;
+  fixtures and injected retry-write triggers use the operation key. History and
+  reservation scenarios advance to the new schema before invoking current code.
+  schema.test.cjs tests the four-column idempotency shape and retained uniqueness/
+  required values after its historical-schema assertions. timestamp-removal.test.cjs
+  now upgrades populated data through 009/010, compares all remaining business
+  rows/results/hashes, checks exact SQL/repository keys and replays initialization
+  and reserve successes saved before migration after subsequent balance/version
+  changes. Its legacy fixture intentionally supplies the old NOT NULL user
+  column before migration; no current runtime/test lookup requires that column.
+  Existing scoped SQL ledger oracle checks are retained.
+- **Actual verification:** Credit TypeScript build passed. All 103 Credit tests
+  passed against local PostgreSQL/API listeners with zero failures/skips. All
+  four seeded ledger scenarios passed with no genuine violation, unexpected error
+  or deadlock. The upgraded integration test cleanly skips without PGDATABASE.
+  Live listener integration passed all seven Node results against a separate
+  RabbitMQ test container and isolated migrated schema: initial allocation,
+  duplicate events, transient retry, invalid/inconsistent-event dead letters and
+  restart. Test syntax, source references, Markdown paths and diff whitespace
+  checked. Unrelated shared-client suite and Docker build were not repeated.
+- **Docs/disclosure:** Both READMEs describe ten migrations, the current four-column
+  retry record, preserved replay behavior and current checks; attribution headers
+  remain short. This log and archive 045 added. Human review is pending.
+- **Runtime/cleanup:** Tests removed their schemas/child processes/connections;
+  dedicated credit-idempotency-test broker and anonymous volume removed. Existing
+  PostgreSQL, RabbitMQ and services retained. Metadata-only inspection confirmed
+  the running public idempotency table still has both old columns: 010 has not
+  been applied there and no runtime container was replaced.
+- **Instructions/provenance:** Followed updated user-supplied/root AGENTS.md and
+  empty service instructions. Existing source/contracts and supplied decisions
+  only; no external source, dependency, skill, sub-agent, commit or push. Agent
+  checks do not establish author validation or assignment compliance.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the

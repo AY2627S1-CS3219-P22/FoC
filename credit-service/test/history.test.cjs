@@ -16,6 +16,9 @@
 // Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 // Scope: Tested entry-ID bookmarks, scoped sequence lookup and uniform REST rejection while preserving sequence pagination.
 // Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 043.
+// Entry 045: OpenAI Codex (GPT-6), 2026-10-26 (Asia/Singapore).
+// Scope: Ran paging/repository scenarios against the metadata-free idempotency schema.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 045.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -98,6 +101,8 @@ test('history migration and sequence paging use the human-defined labels and acc
 
     await apply('007_credit_delta_constraints.sql');
     await apply('008_history_links_and_uniqueness.sql');
+    await apply('009_remove_account_reservation_timestamps.sql');
+    await apply('010_remove_idempotency_metadata.sql');
 
     await t.test('sequence boundary excludes writes during paging and preserves bigint precision', async () => {
       const service = new CreditService(pool);

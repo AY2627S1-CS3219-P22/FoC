@@ -9,6 +9,9 @@
 // Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 // Scope: Looked up bookmark sequence boundaries by history entry ID and authenticated user ID.
 // Changes await human review; prompts/key responses: ../../ai/usage-log.md, entry 043.
+// Entry 045: OpenAI Codex (GPT-6), 2026-10-26 (Asia/Singapore).
+// Scope: Removed idempotency user-column reads/writes; changes await human review.
+// Prompts/key responses: ../../ai/usage-log.md, entry 045.
 
 import type { PoolClient } from 'pg';
 import type {
@@ -34,7 +37,7 @@ export class SqlCreditRepository implements CreditRepository {
 
   async findIdempotencyRecord<Result>(operation: string, key: string): Promise<IdempotencyRecord<Result> | undefined> {
     const { rows } = await this.client.query<IdempotencyRecord<Result>>(
-      'SELECT operation_type AS "operationType", idempotency_key AS key, user_id AS "userId", request_hash AS "requestHash", result FROM idempotency_records WHERE operation_type = $1 AND idempotency_key = $2',
+      'SELECT operation_type AS "operationType", idempotency_key AS key, request_hash AS "requestHash", result FROM idempotency_records WHERE operation_type = $1 AND idempotency_key = $2',
       [operation, key],
     );
     return rows[0];
@@ -42,8 +45,8 @@ export class SqlCreditRepository implements CreditRepository {
 
   async saveIdempotencyRecord<Result>(record: IdempotencyRecord<Result>): Promise<void> {
     await this.client.query(
-      'INSERT INTO idempotency_records (operation_type, idempotency_key, user_id, request_hash, result) VALUES ($1, $2, $3, $4, $5)',
-      [record.operationType, record.key, record.userId, record.requestHash, record.result],
+      'INSERT INTO idempotency_records (operation_type, idempotency_key, request_hash, result) VALUES ($1, $2, $3, $4)',
+      [record.operationType, record.key, record.requestHash, record.result],
     );
   }
 
