@@ -43,7 +43,7 @@ Follow the user's assignment rules recorded in
 - Label pasted AI implementation blocks using a supported comment such as
   `AI-generated; human review pending.` Only add an editor's name or claim human
   review after the human confirms it. Agent-run checks are not human validation.
-- Keep the consolidated AI Use Summary as the last section of the root README.
+- Keep the consolidated AI Use Summary as the last section of the credit-service/README.md.
   Update it and the log as assistance occurs; do not claim project-wide history
   or team approval that has not been provided.
 - Credit any cited source and record any licensing information actually supplied;
