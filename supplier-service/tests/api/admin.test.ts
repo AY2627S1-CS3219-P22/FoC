@@ -22,11 +22,7 @@ Admin user tests
 
 The admin account is a token signed with the throwaway key pair from
 tests/setup-env.ts, standing in for one the user service would issue. Write
-<<<<<<< HEAD
-routes require authenticate then requireRole(ADMINISTRATOR).
-=======
 routes require authenticate + requireRole(ADMIN).
->>>>>>> 9fd95d2 (Lost this data due to git rebase forced. Redid it with Claude)
 */
 
 import request from 'supertest';
@@ -34,11 +30,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { app } from '@/app';
 import pool from '@database/db';
 import { resetDatabase } from '../helpers/reset-database';
-<<<<<<< HEAD
-import { adminBearer, userBearer } from '../helpers/auth-token';
-=======
 import { adminBearer, foreignBearer, signTestToken, userBearer } from '../helpers/auth-token';
->>>>>>> 9fd95d2 (Lost this data due to git rebase forced. Redid it with Claude)
 
 const validSupplier = {
   name: '[Admin Test] Bubble Tea Counter',
@@ -185,7 +177,6 @@ describe('admin POST /supplier', () => {
   });
 });
 
-<<<<<<< HEAD
 /*
 The writes are the whole reason this service cares who the caller is. These stay
 as todos until authenticate is on the routes and reads JWT_PUBLIC_KEY from the
@@ -202,8 +193,6 @@ describe('write routes reject a signed-in user who is not an administrator', () 
   });
 });
 
-=======
->>>>>>> 9fd95d2 (Lost this data due to git rebase forced. Redid it with Claude)
 describe('write routes reject callers who cannot prove they are an admin', () => {
   const expiredAdmin = () => `Bearer ${signTestToken({ id: 'test-admin', expiresIn: -10 })}`;
 

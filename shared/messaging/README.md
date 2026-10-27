@@ -143,6 +143,8 @@ Retries wait for a confirm before acking the original delivery. A rejected retry
 
 `@foc/messaging` is an internal npm workspace (`amqplib`). Build with `npm run build --workspace @foc/messaging`. Pass the broker URL from the environment (`RABBITMQ_URL`); do not hard-code credentials in service code.
 
+After a successful `connect()`, the client retries a lost RabbitMQ connection with capped exponential backoff. Consumers registered with `consumeFromQueue()` are retained and re-registered on the replacement channel, so application code does not need to call `consumeFromQueue()` again after a broker restart. `close()` cancels pending reconnect attempts. A connection failure during initial startup still rejects `connect()`; the service should retry startup or restart according to its process policy.
+
 **Start the broker** from this folder:
 
 ```bash

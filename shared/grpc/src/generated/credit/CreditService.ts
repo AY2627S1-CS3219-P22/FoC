@@ -1,9 +1,3 @@
-// AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
-// Scope: Regenerated the human-finalized six-RPC credit contract after removing gRPC history.
-// Author review: I reviewed and ensured the fields matched the intended design.
-// Prompts and key responses: ../../../../../credit-service/ai/usage-log.md, entries 007, 009–012, 016 and 021 and 026.
-
 // Original file: proto/credit.proto
 
 import type * as grpc from '@grpc/grpc-js'
@@ -26,7 +20,7 @@ export interface CreditServiceClient extends grpc.Client {
   getBalance(argument: _credit_GetBalanceRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
   getBalance(argument: _credit_GetBalanceRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
   getBalance(argument: _credit_GetBalanceRequest, callback: grpc.requestCallback<_credit_Balance__Output>): grpc.ClientUnaryCall;
-
+  
   GetReservation(argument: _credit_GetReservationRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   GetReservation(argument: _credit_GetReservationRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   GetReservation(argument: _credit_GetReservationRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
@@ -35,7 +29,7 @@ export interface CreditServiceClient extends grpc.Client {
   getReservation(argument: _credit_GetReservationRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   getReservation(argument: _credit_GetReservationRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   getReservation(argument: _credit_GetReservationRequest, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
-
+  
   ReleaseCredits(argument: _credit_ReleaseCreditsRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   ReleaseCredits(argument: _credit_ReleaseCreditsRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   ReleaseCredits(argument: _credit_ReleaseCreditsRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
@@ -44,7 +38,7 @@ export interface CreditServiceClient extends grpc.Client {
   releaseCredits(argument: _credit_ReleaseCreditsRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   releaseCredits(argument: _credit_ReleaseCreditsRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   releaseCredits(argument: _credit_ReleaseCreditsRequest, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
-
+  
   ReserveCredits(argument: _credit_ReserveCreditsRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   ReserveCredits(argument: _credit_ReserveCreditsRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   ReserveCredits(argument: _credit_ReserveCreditsRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
@@ -53,7 +47,7 @@ export interface CreditServiceClient extends grpc.Client {
   reserveCredits(argument: _credit_ReserveCreditsRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   reserveCredits(argument: _credit_ReserveCreditsRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   reserveCredits(argument: _credit_ReserveCreditsRequest, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
-
+  
   SettleCredits(argument: _credit_SettleCreditsRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   SettleCredits(argument: _credit_SettleCreditsRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   SettleCredits(argument: _credit_SettleCreditsRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
@@ -62,7 +56,7 @@ export interface CreditServiceClient extends grpc.Client {
   settleCredits(argument: _credit_SettleCreditsRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   settleCredits(argument: _credit_SettleCreditsRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   settleCredits(argument: _credit_SettleCreditsRequest, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
-
+  
   UpdateReservation(argument: _credit_UpdateReservationRequest, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   UpdateReservation(argument: _credit_UpdateReservationRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   UpdateReservation(argument: _credit_UpdateReservationRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
@@ -71,22 +65,22 @@ export interface CreditServiceClient extends grpc.Client {
   updateReservation(argument: _credit_UpdateReservationRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   updateReservation(argument: _credit_UpdateReservationRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
   updateReservation(argument: _credit_UpdateReservationRequest, callback: grpc.requestCallback<_credit_Reservation__Output>): grpc.ClientUnaryCall;
-
+  
 }
 
 export interface CreditServiceHandlers extends grpc.UntypedServiceImplementation {
   GetBalance: grpc.handleUnaryCall<_credit_GetBalanceRequest__Output, _credit_Balance>;
-
+  
   GetReservation: grpc.handleUnaryCall<_credit_GetReservationRequest__Output, _credit_Reservation>;
-
+  
   ReleaseCredits: grpc.handleUnaryCall<_credit_ReleaseCreditsRequest__Output, _credit_Reservation>;
-
+  
   ReserveCredits: grpc.handleUnaryCall<_credit_ReserveCreditsRequest__Output, _credit_Reservation>;
-
+  
   SettleCredits: grpc.handleUnaryCall<_credit_SettleCreditsRequest__Output, _credit_Reservation>;
-
+  
   UpdateReservation: grpc.handleUnaryCall<_credit_UpdateReservationRequest__Output, _credit_Reservation>;
-
+  
 }
 
 export interface CreditServiceDefinition extends grpc.ServiceDefinition {

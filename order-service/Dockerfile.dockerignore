@@ -1,0 +1,32 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-24.
+# Scope: Allow peer package metadata before/after teammate merges; review pending; see usage-log.md.
+**
+!package.json
+!package-lock.json
+!.npmrc
+!shared/
+!shared/grpc/**
+!shared/messaging/
+!shared/messaging/package.json
+!order-service/
+!order-service/grpc/**
+!order-service/prisma/**
+!credit-service/
+!credit-service/package.json
+!credit-service/grpc/
+!credit-service/grpc/package.json
+!supplier-service/
+!supplier-service/package.json
+!supplier-service/yarn.lock
+!supplier-service/grpc/
+!supplier-service/grpc/package.json
+!user-service/
+!user-service/package.json
+!user-service/proto/**
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+**/src/generated/prisma
+**/*.pem
+**/*.key

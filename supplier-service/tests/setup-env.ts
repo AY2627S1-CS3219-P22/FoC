@@ -2,7 +2,7 @@
 globalSetup runs in its own process, so the container URI has to be re-published
 into each worker's env. This file runs before any test module is imported, which
 matters because src/database/db.ts builds its Pool at import time, and
-src/middleware/jwt-validation.ts reads USER_SERVICE_PUBLIC_KEY_PATH at import time.
+src/middleware/jwt-validation.ts reads USER_SERVICE_PUBLIC_KEY_PATH on the first authenticated request.
 */
 
 import { generateKeyPairSync } from 'node:crypto';

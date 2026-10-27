@@ -1,7 +1,7 @@
 <!--
 AI Assistance Disclosure:
-Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-22 (Asia/Singapore).
-Scope: Documented the human-finalized six-RPC credit contract, authentication, REST-only history, generated-file attribution, and bounded Credit client retries. Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
+Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-25 (Asia/Singapore).
+Scope: Documented the human-finalized six-RPC credit contract, authentication, REST-only history, generated-file attribution, and bounded Credit client retries. Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained. Documented agreed shared client/validation integration;
 Author review: I reviewed and edited for style.
 Prompts and key responses: ../../credit-service/ai/usage-log.md, entries 007–012, 014, 016, 018, 021–022, 024–027, 029, 031, 035.
 -->
@@ -18,6 +18,25 @@ Promise clients, metadata, finite deadlines, and server lifecycle helpers.
 | Credit | 50054 | GetBalance, ReserveCredits, UpdateReservation, ReleaseCredits, SettleCredits, GetReservation | shared/grpc/proto/credit.proto |
 | Supplier | 50052 | GetSupplier, IsOpen | shared/grpc/proto/supplier.proto |
 
+# gRPC endpoint scaffolding
+
+The shared `@foc/grpc` package provides generated TypeScript contracts, Promise
+clients, deadlines, and server helpers. User and Supplier RPC handlers are
+implemented in their services. The Credit scaffold remains UNIMPLEMENTED; its
+full business runtime is in the teammate PR.
+
+| Service  | Default host port | RPCs                                                              | Contract                                   |
+| -------- | ----------------- | ----------------------------------------------------------------- | ------------------------------------------ |
+| User     | 50051             | `GetPublicProfile`                                                | `user-service/proto/user.proto` (existing) |
+| Order    | 50053             | `GetOrder`                                                        | `shared/grpc/proto/order.proto`            |
+| Credit   | 50054             | `GetBalance`, `GetReservation`, `ReserveCredits`, `UpdateReservation`, `ReleaseCredits`, `SettleCredits` | `shared/grpc/proto/credit.proto`           |
+| Supplier | 50052             | `GetSupplier`, `IsOpen`                                           | `shared/grpc/proto/supplier.proto`         |
+
+Credit contract/client/types follow the agreed teammate feature branch. Order
+uses per-call x-credit-service-token metadata and versioned receipts. Supplier
+exports grpcsupplierSchema, isOpenResponseSchema and parseSupplierId. Zod is an
+explicit shared-package dependency. No Credit ledger implementation is added here.
+
 Order remains a scaffold. Credit's six handlers are connected to its SQL business
 service and authorize only Order Service. User public-profile lookup and Supplier
 IsOpen use their existing service implementations.
@@ -27,6 +46,12 @@ IsOpen use their existing service implementations.
 Initialization is an internal user.created allocation callback; RabbitMQ startup belongs to teammates.
 Frontend balance and own-history reads use authenticated REST on port 3004.
 No gRPC history messages/client wrappers remain.
+```bash
+npm ci
+npm run build
+npm run build --workspace user-service
+npm test
+```
 
 - GetBalance takes user_id and returns user_id, total_credits, reserved_credits,
   and computed available_credits. user_id is restored at field 1; timestamp fields
@@ -52,6 +77,11 @@ No gRPC history messages/client wrappers remain.
   [Protobuf update guidance](https://protobuf.dev/programming-guides/proto3/#updating).
 
 ## Calling Credit from Order Service
+```bash
+npm run dev --workspace @foc/order-grpc
+npm run dev --workspace @foc/credit-grpc
+yarn --cwd supplier-service dev:grpc
+```
 
 Credit uses plaintext gRPC, with the same configured secret on both services:
 
@@ -204,3 +234,10 @@ scaffolding introduces no additional conflicting paths in these rehearsals.
 The supplier branch's empty root `package.json` merged with the workspace
 manifest automatically. Preserve its service-level Yarn setup. These rehearsals
 check Git compatibility; they do not validate the merged services' business logic.
+
+## AI disclosure for shared dependency integration
+
+ChatGPT (Codex), 2026-10-25: imported agreed Credit contracts/client/tests and
+Supplier validators. Added Zod to shared/grpc/package.json and regenerated the
+root lockfile. JSON attribution in this README and order-service/usage-log.md
+was approved by the human. 

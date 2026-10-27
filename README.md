@@ -1,3 +1,7 @@
+<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-21–2026-10-22.
+Scope: Maintained the final AI Use Summary section. Team review pending.
+See order-service/usage-log.md. -->
+
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
 
 ## Friend on Campus (FoC)
@@ -64,3 +68,57 @@ internal port; host processes should use `localhost` and the published host
 port. Reserved REST ports prevent future collisions when APIs are added.
 
 ---
+
+
+## AI Use Summary
+
+Tool: ChatGPT (Codex), 2026-10-21–2026-10-22. Modes: implementation, configuration and documentation generation.
+Used to install Express 5.2.1 and Prisma 6.19.3, transcribe and migrate the author-provided Order schema,
+and configure a local Order PostgreSQL container after the author selected
+PostgreSQL and Docker, following the existing User Service setup. Also generated the team-approved Express/gRPC startup, database-backed health,
+environment validation and application Docker setup.
+Also implemented author-specified creation, credit-edit recovery, cancellation
+and expiry, with tests and a durable OrderEditOperation migration. Added the
+author-approved administrator-only GET /orders listing with authorization tests.
+Verified cancellation/expiry failure recovery and applied the team's plaintext
+Order-to-Credit transport decision on order-functionality. Implemented the
+author-requested authenticated courier acceptance endpoint and concurrency tests.
+Added author-specified open/requested/assigned retrieval scopes and access/filter tests.
+Implemented the author-approved delivery endpoint and durable Credit settlement
+recovery, with real gRPC transport and PostgreSQL integration tests. Verified
+the existing editing workflow with additional funding, concurrency and crash
+recovery tests against real gRPC transport and Order PostgreSQL. The author
+supplied the schema, contracts, retry schedule and final first-lock-wins rule.
+Human decisions and superseded requirements are recorded in the service usage log;
+no decision rationales were drafted.
+
+Team review and validation remain pending. Prompts, key responses and verification
+results are recorded in [order-service/usage-log.md](order-service/usage-log.md). Add a link to this README
+to the submission slide deck. This entry covers this session only; the team must
+record other AI use and include applicable AGENTS.md/SKILLS.md files before submission.
+
+Order-only integration port, ChatGPT (Codex), 2026-10-24: transferred shared-client
+usage, missing-account recovery, Supplier compatibility and courier pickup from
+d3-demo into Order. Teammate implementations/root workspace metadata were not
+merged. Dependencies and validation limits: Order INTEGRATION_NOTES.md and usage
+log. Human review pending; normal build awaits shared contract PRs.
+
+Main merge / PR preparation, ChatGPT (Codex), 2026-10-25: merged main at 2c8a068,
+resolved root package-lock.json from main plus seven Order manifest entries,
+and included main's .npmrc in the Order Docker context. Root JSON attribution
+uses this summary and Order usage log. PR_DESCRIPTION.md documents implemented
+APIs, reproducible reviewer tests and missing teammate contract prerequisites.
+Human review pending; ordinary build is blocked until those contracts merge.
+
+Shared prerequisites completed, ChatGPT (Codex), 2026-10-25: agreed Credit shared
+contracts/client/types and Supplier validators are now tracked, with explicit
+Zod dependency and approved JSON attribution in shared README/Order usage log.
+Normal repository build and 128 shared/Order tests pass without overrides; Order
+Docker builds normally. Full Credit business runtime remains the teammate PR;
+this branch only keeps its scaffold type-compatible. Earlier build-blocker
+notes are superseded by this update. Human review pending.
+
+PR documentation refresh, ChatGPT (Codex), 2026-10-25: documented the existing
+shared Supplier validators' runtime Zod import and corrected the dependency
+summary in Order PR_DESCRIPTION.md. Prompt/checks: Order usage log. Human review
+pending; documentation-only update.

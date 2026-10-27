@@ -4,6 +4,7 @@ import { prisma } from '../db';
 import type { RegisterInput } from '../api/dto/registerDto';
 import type { LoginInput } from '../api/dto/loginDto';
 import type { UpdateProfileInput } from '../api/dto/updateProfileDto';
+import { enqueueUserCreated } from '../events/outboxStore';
 
 const SALT_ROUNDS = 10;
 
@@ -26,7 +27,7 @@ const publicProfileSelect = {
   lastName: true,
 } satisfies Prisma.UserSelect;
 
-// Shared by register and the admin bootstrap so every 
+// Shared by register and the admin bootstrap so every
 // account is built the same way.
 export async function buildNewUser(input: RegisterInput) {
   return {
@@ -61,9 +62,14 @@ export async function register(input: RegisterInput) {
   }
 
   try {
-    const user = await prisma.user.create({
-      data: await buildNewUser(input),
-      select: profileSelect,
+    //DECLARATION CHANGED
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: await buildNewUser(input),
+        select: profileSelect,
+      });
+      await enqueueUserCreated(tx, created.id);
+      return created;
     });
     return { ok: true as const, user };
   } catch (err) {
