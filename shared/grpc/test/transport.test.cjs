@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-25.
+// Scope: Keep scaffold smoke test aligned with implemented User validation and six Credit RPCs.
+// Human review pending; see order-service/usage-log.md (repository root).
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const path = require('node:path');
@@ -23,7 +26,7 @@ async function listen(t, server, createClient, config, serverCredentials) {
   return client;
 }
 
-test('every scaffold endpoint is reachable and returns UNIMPLEMENTED', async (t) => {
+test('scaffolds return UNIMPLEMENTED and implemented User validates a missing ID', async (t) => {
   const user = await listen(
     t,
     userServer.createGrpcServer(),
@@ -34,11 +37,13 @@ test('every scaffold endpoint is reachable and returns UNIMPLEMENTED', async (t)
   const order = await listen(t, orderServer.createGrpcServer(), rpc.createOrderClient);
   const credit = await listen(t, creditServer.createGrpcServer(), rpc.createCreditClient);
 
+  await assert.rejects(() => user.getPublicProfile({ userId: '' }), error => error.code === status.INVALID_ARGUMENT);
   for (const invoke of [
-    () => user.getPublicProfile({ userId: 'user-1' }),
     () => order.getOrder({ orderId: 'order-1' }),
     () => credit.getBalance({ userId: 'user-1' }),
     () => credit.reserveCredits({ orderId: 'order-1', requesterId: 'user-1', amount: 4 }),
+    () => credit.getReservation({ orderId: 'order-1' }),
+    () => credit.updateReservation({ orderId: 'order-1', amount: 3, expectedVersion: 1 }),
     () => credit.releaseCredits({ orderId: 'order-1' }),
     () => credit.settleCredits({ orderId: 'order-1', courierId: 'user-2' }),
   ]) {

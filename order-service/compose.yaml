@@ -1,0 +1,48 @@
+# AI Assistance Disclosure:
+# Tool: ChatGPT (Codex), date: 2026-10-21
+# Scope: Generated PostgreSQL Docker configuration following User Service conventions.
+# Author review: Team review and validation pending; see usage-log.md.
+name: foc-order
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: order_service
+      POSTGRES_PASSWORD: order_service
+      POSTGRES_DB: order_service
+    ports:
+      - '127.0.0.1:${ORDER_DATABASE_PORT:-5433}:5432'
+    volumes:
+      - order_service_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U order_service -d order_service']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  order-service:
+    build:
+      context: ..
+      dockerfile: order-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://order_service:order_service@postgres:5432/order_service
+      PORT: '3003'
+      GRPC_HOST: 0.0.0.0
+      GRPC_PORT: '50053'
+    ports:
+      - '127.0.0.1:${ORDER_HTTP_PORT:-3003}:3003'
+      - '127.0.0.1:${ORDER_GRPC_PORT:-50053}:50053'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3003/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  order_service_pgdata:
