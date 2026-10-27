@@ -1,7 +1,6 @@
 <!--
 AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-26 (Asia/Singapore).
 Scope: Archived the exact idempotency refactor request and actual outcomes.
-Review: Pending human review. Prompts/key responses: ../usage-log.md, entry 045.
 -->
 
 # Prompt archive — 045

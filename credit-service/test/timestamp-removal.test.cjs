@@ -1,12 +1,8 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22 (Asia/Singapore).
-// Scope: Tested timestamp-removal upgrade preservation and credit operations on the resulting schema.
-// Author review: Pending human review.
-// Prompts/key responses: ../ai/usage-log.md, entry 040.
-// AI-generated; human review pending.
-// Entry 045: OpenAI Codex (GPT-6), 2026-10-26 (Asia/Singapore).
-// Scope: Extended populated-data upgrade/replay checks to removed idempotency metadata.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 045.
+// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22-2026-10-26 (Asia/Singapore).
+// Scope: Tested timestamp-removal upgrade preservation and credit operations on the resulting schema. Extended populated-data upgrade/replay checks to removed idempotency metadata.
+// Author review: I reviewed that the test specification is correct.
+// Prompts/key responses: ../ai/usage-log.md, entry 040, 045.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

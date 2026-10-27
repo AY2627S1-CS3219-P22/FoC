@@ -1,12 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Generated callback-boundary tests for awaited initialization, unchanged failure propagation, exact user identity, and invalid event rejection.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-22 (Asia/Singapore).
+// Scope: Generated callback-boundary tests for awaited initialization, unchanged failure propagation, exact user identity, and invalid event rejection. Aligned tests with the human-edited handler and imported shared contract.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–025 (prior scopes retained).
-// Entry 037: OpenAI Codex (GPT-6), 2026-10-22 Asia/Singapore.
-// Scope: Aligned tests with the human-edited handler and imported shared contract.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 037.
+// Author review: [I reviewed that the test specification is correct.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–025, 037.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

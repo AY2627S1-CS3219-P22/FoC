@@ -1,7 +1,7 @@
 -- AI Assistance Disclosure:
 -- Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 -- Scope: Implemented the human-finalized history labels, identity paging column/indexes, and one INITIAL_GRANT per user.
--- Author review: [HUMAN-REVIEWED]
+-- Author review: I have modified the credit history table according to changing requirements.
 -- Prompts and key responses: ../ai/usage-log.md, entries 021 and 025.
 
 ALTER TABLE credit_history DROP CONSTRAINT credit_history_type_check;

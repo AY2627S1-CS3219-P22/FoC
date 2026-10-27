@@ -1,21 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Connected the human-specified credit service to authenticated gRPC/REST and transport/database lifecycle.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-22 (Asia/Singapore).
+// Scope: Connected the human-specified credit service to authenticated gRPC/REST and transport/database lifecycle. Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained. Wired nonfatal user-event consumer startup and broker cleanup using the human's helpers. Added/tested/documented startup-only listener health with database-based HTTP status as the human specified. Connected REST health to a PostgreSQL SELECT 1 probe.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–024 (prior scopes retained).
-// Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Connected REST health to a PostgreSQL SELECT 1 probe.
-// New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
-// Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
-// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
-// Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Wired nonfatal user-event consumer startup and broker cleanup using the human's helpers.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 036.
-// Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
-// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
+// Author review: 
+// Prompts and key responses: ../ai/usage-log.md, entries 005–024, 031, 035, 036, 038.
 
 import { startServer, stopServer } from '@foc/grpc';
 import { readFile } from 'node:fs/promises';

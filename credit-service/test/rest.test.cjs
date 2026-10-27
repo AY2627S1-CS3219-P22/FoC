@@ -1,19 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-21 (Asia/Singapore).
-// Scope: Tested human-specified own-data REST authentication/serialization, errors, and strict paging bookmarks.
+// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-21 - 2026-10-22 (Asia/Singapore).
+// Scope: Tested human-specified own-data REST authentication/serialization, errors, and strict paging bookmarks. Covered public health responses and omission of internal history sequence IDs. Added/tested/documented startup-only listener health with database-based HTTP status as the human specified. Tested base64url entry-ID bookmark decoding and rejection of malformed/legacy formats.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–026 (prior scopes retained).
-// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
-// Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Covered public health responses and omission of internal history sequence IDs.
-// New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
-// Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
-// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
-// Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Tested base64url entry-ID bookmark decoding and rejection of malformed/legacy formats.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 043.
+// Author review: I reviewed that the test specification is correct.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–026, 031, 038, 043.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

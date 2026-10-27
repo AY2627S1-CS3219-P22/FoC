@@ -1,12 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Generated PostgreSQL integration checks for human-specified reservation invariants and migration rollback.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
+// Scope: Generated PostgreSQL integration checks for human-specified reservation invariants and migration rollback. Updated rollback retry/history fixtures to the current migrated schema.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–024 (prior scopes retained).
-// Entry 045: OpenAI Codex (GPT-6), 2026-10-26 (Asia/Singapore).
-// Scope: Updated rollback retry/history fixtures to the current migrated schema.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 045.
+// Author review: I reviewed that the test specification is correct.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–024, 045.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

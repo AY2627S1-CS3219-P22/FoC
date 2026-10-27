@@ -1,7 +1,7 @@
 <!--
 AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-10-26 (Asia/Singapore).
 Mode/scope: Documented and checked the human-defined Credit implementation.
-Review: [HUMAN-REVIEWED]
+Review: I have reviewed the README and edited for style and updated as I made changes in the code.
 Exact prompts, key responses and checks: ai/usage-log.md, entries 003–045.
 -->
 
@@ -456,5 +456,37 @@ The human approved this attribution method for comment-free JSON in
 | shared/messaging/package.json and tsconfig.json | Original files by @sunpterodactyl/shared messaging contributors, copied byte-for-byte from 0b48f5f in exchange 037; no AI-generated source/config changes. Provenance is in shared/messaging/README.md. | Upstream authorship preserved; integration review pending. |
 
 Exact prompts/key exchanges and actual checks are archived under
-[credit-service/ai/](ai/usage-log.md). The human authors remain responsible for
-review, validation, team norms, licensing checks, and submission disclosure.
+[credit-service/ai/](ai/usage-log.md). 
+
+
+## AI Use Summary
+
+This summary covers recorded assistance on feat/credit-implementation from
+2026-10-19. 
+
+- **Tool and modes:** OpenAI Codex (GPT-6), implementation after human design
+  finalization, bounded requirements interpretation/formatting, boilerplate,
+  debugging, tests, refactoring, documentation and explanations.
+- **Scope:** Credit's PostgreSQL schema and ten migrations; domain/repository/
+  service implementation; atomic initialization, reservation, update, release and
+  settlement; gRPC contracts/client retries and service-token authentication;
+  authenticated own-balance/history REST with entry-ID bookmarks; RabbitMQ consumer
+  integration; Docker/workspace setup; health reporting; tests, local demo
+  preparation and attribution records; removal of idempotency user/timestamp
+  columns and corresponding repository/test refactoring. The [service README](credit-service/README.md)
+  documents current interfaces, behavior and setup.
+- **Human decisions:** Requirements, architecture, schema, interfaces, policies,
+  locking, pagination and security changes came from the human authors. No
+  requirements prioritization, backlog/sprint planning, design decisions or
+  decision rationales were generated.
+- **Prompts and key responses:** Exact exchanges, affected files, recorded reviews
+  and actual checks are in [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md),
+  entries 001–045. Attribution comments identify AI-influenced files. The approved
+  [JSON attribution table](credit-service/README.md#attribution-for-json-files)
+  covers formats that cannot contain comments.
+- **Provenance:** Shared messaging code belongs to @sunpterodactyl and the shared
+  messaging contributors, imported from events/data-validation commit
+  0b48f5f85be01d148176a6410c9ca22c2b8e672e. Its [provenance and original declarations](shared/messaging/README.md)
+  are retained; Credit integration assistance does not claim that authorship.
+  Official documentation consulted during implementation is cited in the usage
+  log. Human authors remain responsible for licensing and assignment validation.

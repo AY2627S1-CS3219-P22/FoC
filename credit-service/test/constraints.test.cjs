@@ -1,12 +1,8 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22 (Asia/Singapore).
-// Scope: Tested human-requested database constraints and transactional migration failure on invalid legacy rows.
-// Author review: Pending human review.
-// Prompts and key responses: ../ai/usage-log.md, entry 031.
-// AI-generated; human review pending.
-// Entry 039: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Implemented/documented the human-defined history constraints and scoped SQL/seeded concurrency checks.
-// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 039 (repository-relative).
+// Scope: Tested human-requested database constraints and transactional migration failure on invalid legacy rows. Implemented/documented the human-defined history constraints and scoped SQL/seeded concurrency checks.
+// Author review: I reviewed that the test specification is correct.
+// Prompts and key responses: ../ai/usage-log.md, entry 031, 039.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

@@ -1,8 +1,7 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Mapped the human-specified business/transient error categories to gRPC codes and reason metadata.
-// Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
+// Author review: I reviewed that all errors are mapped correctly, and have their own paths.
 // Prompts and key responses: ../../ai/usage-log.md, entries 005–025 (prior scopes retained).
 
 import { Metadata, status } from '@grpc/grpc-js';

@@ -2,8 +2,6 @@
 AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), date: 2026-10-21 (Asia/Singapore).
 Scope: Archived the exact human-finalized REST/bookmark wire definitions and key implementation response.
-Author review: Pending human review.
-Prompts and key responses: ../usage-log.md, entry 022.
 -->
 
 # Prompt archive — 022

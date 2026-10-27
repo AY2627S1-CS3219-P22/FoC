@@ -1,16 +1,8 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22 (Asia/Singapore).
-// Scope: Tested the human-selected broker package with actual Credit startup,
-// PostgreSQL allocation, duplicate delivery, dead-lettering, retry and restart.
-// Author review: Pending human review.
-// Prompts/key responses: ../ai/usage-log.md, entry 037.
-// AI-generated; human review pending.
-// Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
-// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
-// Entry 045: OpenAI Codex (GPT-6), 2026-10-26 (Asia/Singapore).
-// Scope: Scoped saved allocation checks by operation/key instead of the removed user column.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 045.
+// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22 - 2026-10-26 (Asia/Singapore).
+// Scope: Tested the human-selected broker package with actual Credit startup, PostgreSQL allocation, duplicate delivery, dead-lettering, retry and restart. Added/tested/documented startup-only listener health with database-based HTTP status as the human specified. Scoped saved allocation checks by operation/key instead of the removed user column.
+// Author review: I reviewed that the test specification is correct.
+// Prompts/key responses: ../ai/usage-log.md, entry 037, 038, 045.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

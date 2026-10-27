@@ -1,15 +1,9 @@
 <!--
 AI Assistance Disclosure:
-Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-Scope: Documented the human-finalized six-RPC credit contract, authentication, REST-only history, generated-file attribution, and bounded Credit client retries.
-Author review: Pending human review.
-Prompts and key responses: ../../credit-service/ai/usage-log.md, entries 007–012, 014, 016, 018, 021–022, 024–027 and 029.
-Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Replaced the untracked internal reference link with the retained AI prompt log.
-New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
-Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
-Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
+Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-22 (Asia/Singapore).
+Scope: Documented the human-finalized six-RPC credit contract, authentication, REST-only history, generated-file attribution, and bounded Credit client retries. Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
+Author review: I reviewed and edited for style.
+Prompts and key responses: ../../credit-service/ai/usage-log.md, entries 007–012, 014, 016, 018, 021–022, 024–027, 029, 031, 035.
 -->
 
 # Shared gRPC contracts
@@ -30,9 +24,7 @@ IsOpen use their existing service implementations.
 
 ## Credit contract alignment
 
-The [human's recorded definitions](../../credit-service/ai/usage-log.md)
-remove initialization and both history RPCs. Initialization is an internal
-user.created allocation callback; RabbitMQ startup belongs to teammates.
+Initialization is an internal user.created allocation callback; RabbitMQ startup belongs to teammates.
 Frontend balance and own-history reads use authenticated REST on port 3004.
 No gRPC history messages/client wrappers remain.
 

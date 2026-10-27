@@ -1,15 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Generated PostgreSQL integration tests for the human-specified schema and contract-alignment migrations.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
+// Scope: Generated PostgreSQL integration tests for the human-specified schema and contract-alignment migrations. Relocated the human-selected migration runner and updated references while making scripts/docs local-only. Checked current idempotency columns, operation/key uniqueness and remaining required values.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–024 (prior scopes retained).
-// Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Relocated the human-selected migration runner and updated references while making scripts/docs local-only.
-// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 034 (repository-relative).
-// Entry 045: OpenAI Codex (GPT-6), 2026-10-26 (Asia/Singapore).
-// Scope: Checked current idempotency columns, operation/key uniqueness and remaining required values.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 045.
+// Author review: I reviewed that the test specification is correct.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–024, 034, 045.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

@@ -1,9 +1,8 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22 (Asia/Singapore).
 // Scope: Loaded the shared scoped SQL oracle and asserted empty violation rows.
-// Author review: Pending human review.
+// Author review: Reviewed and ensured that functions are used as specified across the tests.
 // Prompts/key responses: ../../ai/usage-log.md, entry 039.
-// AI-generated; human review pending.
 
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');

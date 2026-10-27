@@ -1,12 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Typed the human's account/reservation/history/idempotency repository operations for core credit logic.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-22 (Asia/Singapore).
+// Scope: Typed the human's account/reservation/history/idempotency repository operations for core credit logic. Added the human-requested scoped entry-ID to internal sequence lookup.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–024 (prior scopes retained).
-// Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Added the human-requested scoped entry-ID to internal sequence lookup.
-// Changes await human review; prompts/key responses: ../../ai/usage-log.md, entry 043.
+// Author review: I ensured that the interface methods are defined correctly and that the sequence id is kept internally.
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–024, 43.
 
 import type { Balance__Output as Balance } from '@foc/grpc/dist/generated/credit/Balance';
 

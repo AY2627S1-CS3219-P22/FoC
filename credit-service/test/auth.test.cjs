@@ -1,13 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Tested human-specified service/JWT authentication, gRPC authorization/error metadata, and TLS configuration.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-22 (Asia/Singapore).
+// Scope: Tested human-specified service/JWT authentication, gRPC authorization/error metadata. Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–026 (prior scopes retained).
-// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
-// Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
-// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
+// Author review: I reviewed that the test specification is correct.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–026, 035.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

@@ -1,18 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Generated PostgreSQL tests for atomic initial grants, concurrent event duplicates, saved replay, inconsistent accounts, rollback/retry, and transaction advisory-lock release.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
+// Scope: Generated PostgreSQL tests for atomic initial grants, concurrent event duplicates, saved replay, inconsistent accounts, rollback/retry, and transaction advisory-lock release. Updated event-level permanent-error assertions for the human-edited handler. Removed the account timestamp write from the allocation-replay fixture. Refactored retry fixtures, counts and failure injection for metadata-free idempotency records.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–025 (prior scopes retained).
-// Entry 037: OpenAI Codex (GPT-6), 2026-10-22 Asia/Singapore.
-// Scope: Updated event-level permanent-error assertions for the human-edited handler.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 037.
-// Entry 040: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Removed the account timestamp write from the allocation-replay fixture.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 040.
-// Entry 045: OpenAI Codex (GPT-6), 2026-10-26 (Asia/Singapore).
-// Scope: Refactored retry fixtures, counts and failure injection for metadata-free idempotency records.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 045.
+// Author review: I reviewed that the test specification is correct.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–025, 037, 040, 045.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

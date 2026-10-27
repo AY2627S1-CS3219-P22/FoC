@@ -2,11 +2,8 @@
 AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
 Scope: Archived the human's design/request verbatim and transcribed supplied diagram labels.
-Author review: Pending human review.
-Prompts and key responses: ../usage-log.md, entry 003.
 Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Removed links to local-only requirements copies; original user prompt retained.
-New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
 -->
 
 # Prompt archive — 003
@@ -16,9 +13,9 @@ human; it is not AI-generated requirements, design, or decision rationale.
 
 ## Attached requirements
 
-- Functional attachment: `/Users/rajirajeev/.codex/attachments/bccc9d1e-b0cd-4128-9f13-1532f468de59/Pasted text.txt`.
+- Functional attachment: `/.codex/attachments/bccc9d1e-b0cd-4128-9f13-1532f468de59/Pasted text.txt`.
   The internal repository copy was untracked at the human’s request in exchange 031.
-- Nonfunctional attachment: `/Users/rajirajeev/.codex/attachments/851cd518-e9ae-431f-9730-0f6bc8e24c17/Pasted text.txt`.
+- Nonfunctional attachment: `//.codex/attachments/851cd518-e9ae-431f-9730-0f6bc8e24c17/Pasted text.txt`.
   The internal repository copy was untracked at the human’s request in exchange 031.
 
 ## Exact request text

@@ -2,9 +2,8 @@
 // Tool: OpenAI Codex (model: GPT-6), date: 2026-10-21 (Asia/Singapore).
 // Scope: Verified human-defined Credit retry limits, jitter/backoff overrides,
 // deadline budgets, exact error preservation, and real gRPC retry transport.
-// Author review: Pending human review.
+// Author review: I reviewed that the tests are correctly specified and verified.
 // Prompts and key responses: ../../../credit-service/ai/usage-log.md, entry 027.
-// AI-generated; human review pending.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
