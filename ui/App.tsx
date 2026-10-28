@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Navbar from "./components/Navbar"
 import LoginPage from "./pages/LoginPage"
 import SignupPage from "./pages/SignupPage"
@@ -9,6 +9,10 @@ import OrderDetailsPage from "./pages/OrderDetailsPage"
 import AcceptedOrderPage from "./pages/AcceptedOrderPage"
 import ProfilePage from "./pages/ProfilePage"
 import AdminPage from "./pages/AdminPage"
+import SuppliersPage from "./pages/SuppliersPage"
+import { getMe, logout, type ApiUser } from "./api/users"
+import { getBalance } from "./api/credits"
+import { refreshToken } from "./api/client"
 
 export type Page =
   | "login"
@@ -22,6 +26,7 @@ export type Page =
   | "errand-complete"
   | "profile"
   | "admin"
+  | "suppliers"
 
 export interface Order {
   id: string
@@ -31,7 +36,7 @@ export interface Order {
   description: string
   credits: number
   deadline: string
-  status: "open" | "accepted" | "picked-up" | "delivered" | "completed" | "cancelled" | "expired"
+  status: "open" | "accepted" | "picked-up" | "delivered" | "cancelled" | "expired"
   requesterId: string
   requesterName: string
   courierId?: string
@@ -43,108 +48,28 @@ export interface User {
   id: string
   name: string
   email: string
-  credits: number
+  credits: number | null  // null until credit-service answers
   memberSince: string
-  requestsCreated: number
-  errandsCompleted: number
-  creditsEarned: number
+  isAdmin: boolean
 }
 
 const CURRENT_USER: User = {
   id: "u1",
   name: "Jordan Tan",
   email: "jordan.tan@u.nus.edu",
-  credits: 12,
+  credits: null,
   memberSince: "September 2026",
-  requestsCreated: 2,
-  errandsCompleted: 2,
-  creditsEarned: 9,
+  isAdmin: false,
 }
 
-const SEED_ORDERS: Order[] = [
-  {
-    id: "o1",
-    pickupLocation: "COM3",
-    pickupStore: "CoffeeBean @ COM3",
-    deliveryLocation: "PGP",
-    description: "Pick up one iced latte, medium size. No sugar, please double-check the order.",
-    credits: 4,
-    deadline: "3:30 PM",
-    status: "open",
-    requesterId: "u2",
-    requesterName: "Aisha Lim",
-    createdAt: "2:45 PM",
-  },
-  {
-    id: "o2",
-    pickupLocation: "UTown",
-    pickupStore: "Cheers @ UTown",
-    deliveryLocation: "PGPR Block E",
-    description: "One packet of instant noodles (any flavour) and a 1.5L mineral water.",
-    credits: 3,
-    deadline: "5:00 PM",
-    status: "open",
-    requesterId: "u3",
-    requesterName: "Marcus Goh",
-    createdAt: "3:10 PM",
-  },
-  {
-    id: "o3",
-    pickupLocation: "Science Faculty",
-    pickupStore: "Science Canteen",
-    deliveryLocation: "Arts (AS7) Level 4",
-    description: "Chicken rice with drumstick and soup. No cucumber please.",
-    credits: 5,
-    deadline: "1:00 PM",
-    status: "accepted",
-    requesterId: "u4",
-    requesterName: "Priya Nair",
-    courierId: "u5",
-    courierName: "Ryan Chen",
-    createdAt: "12:10 PM",
-  },
-  {
-    id: "o4",
-    pickupLocation: "Engineering",
-    pickupStore: "Print Lab @ Engineering",
-    deliveryLocation: "E1A Room 02-06",
-    description: "Print 20 pages double-sided from USB labelled EE2024_Lab. Black and white is fine.",
-    credits: 6,
-    deadline: "4:30 PM",
-    status: "open",
-    requesterId: "u6",
-    requesterName: "Wei Lin",
-    createdAt: "3:55 PM",
-  },
-  {
-    id: "o5",
-    pickupLocation: "YST",
-    pickupStore: "YST Canteen",
-    deliveryLocation: "UTown Residence",
-    description: "Brown sugar pearl milk tea, 50% sugar, less ice, large.",
-    credits: 4,
-    deadline: "6:00 PM",
-    status: "completed",
-    requesterId: "u1",
-    requesterName: "Jordan Tan",
-    courierId: "u7",
-    courierName: "Sofia Park",
-    createdAt: "5:10 PM",
-  },
-  {
-    id: "o6",
-    pickupLocation: "Central Library",
-    pickupStore: "CLB Bookshop",
-    deliveryLocation: "PGPR Block A",
-    description: "Reserved book: Introduction to Sociology 3rd Ed. under the name Priya Nair.",
-    credits: 5,
-    deadline: "2:00 PM",
-    status: "open",
-    requesterId: "u8",
-    requesterName: "Priya Nair",
-    createdAt: "1:00 PM",
-  },
-]
+const fromApiUser = (u: ApiUser): User => ({
+  ...CURRENT_USER,
+  id: u.id,
+  name: `${u.firstName} ${u.lastName}`,
+  email: u.email,
+  memberSince: new Date(u.createdAt).toLocaleDateString("en-SG", { month: "long", year: "numeric" }),
+  isAdmin: u.roles.includes("ADMINISTRATOR"),
+})
 
 function SuccessScreen({
   title,
@@ -198,80 +123,88 @@ function SuccessScreen({
 export default function App() {
   const [page, setPage]           = useState<Page>("login")
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [user, setUser]           = useState<User>(CURRENT_USER)
-  const [orders, setOrders]       = useState<Order[]>(SEED_ORDERS)
-  const [selectedOrderId, setSelectedOrderId] = useState<string>("o1")
-  const [acceptedOrderId, setAcceptedOrderId] = useState<string | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [earnedCredits, setEarnedCredits] = useState(0)
+  const [createPending, setCreatePending] = useState(false)
+  const [loginNotice, setLoginNotice] = useState("")
 
   const [orderReturnPage, setOrderReturnPage] = useState<"orders" | "my-orders">("orders")
 
-  const navigate = (p: Page, orderId?: string) => {
+  const navigate = (p: Page, order?: Order) => {
     if (p === "order-details" && (page === "orders" || page === "my-orders")) setOrderReturnPage(page)
-    if (orderId) setSelectedOrderId(orderId)
+    if (order) setSelectedOrder(order)
     setPage(p)
     window.scrollTo({ top: 0, behavior: "instant" })
   }
 
+  // keeps the mock user if user-service isn't running
+  const loadUser = () => getMe()
+    .then((u) => setUser((prev) => ({ ...fromApiUser(u), credits: prev.credits })))
+    .catch(() => {})
+
+  // balance shows as "–" if credit-service is down or has no account for this user yet
+  const loadCredits = () => getBalance()
+    .then((b) => setUser((prev) => ({ ...prev, credits: b.availableCredits })))
+    .catch(() => setUser((prev) => ({ ...prev, credits: null })))
+
+  // creating, delivering and cancelling all move credits, so refresh on every page change
+  useEffect(() => {
+    if (isLoggedIn) loadCredits()
+  }, [page, isLoggedIn])
+
+  // Stay logged in across reloads if the refresh cookie is still valid
+  useEffect(() => {
+    refreshToken()
+      .then((token) => {
+        if (!token) return
+        setIsLoggedIn(true)
+        setPage("orders")
+        loadUser()
+      })
+      .finally(() => setCheckingSession(false))
+  }, [])
+
   const handleLogin = () => {
     setIsLoggedIn(true)
+    loadUser()
     navigate("orders")
   }
 
   const handleLogout = () => {
+    logout().catch(() => {})
+    localStorage.removeItem("token")
+    setUser(CURRENT_USER)
     setIsLoggedIn(false)
     navigate("login")
   }
 
-  const handleAcceptOrder = (orderId: string) => {
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === orderId
-          ? { ...o, status: "accepted", courierId: user.id, courierName: user.name }
-          : o
-      )
-    )
-    setAcceptedOrderId(orderId)
-    navigate("accepted-order", orderId)
-  }
-
-  const handleMarkPickedUp = (orderId: string) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: "picked-up" } : o))
-    )
-  }
-
-  const handleMarkDelivered = (orderId: string) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: "completed" } : o))
-    )
+  const handleDelivered = (order: Order) => {
+    setEarnedCredits(order.credits)
     navigate("errand-complete")
   }
 
-  const completedOrderCredits =
-    acceptedOrderId
-      ? (orders.find((o) => o.id === acceptedOrderId)?.credits ?? 4)
-      : 4
+  if (checkingSession) return null
 
   // Unauthenticated
   if (!isLoggedIn) {
-    if (page === "signup") return <SignupPage onLogin={handleLogin} onNavigate={navigate} />
-    return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
+    if (page === "signup") {
+      return (
+        <SignupPage
+          onLogin={handleLogin}
+          onRegistered={() => { setLoginNotice("Account created! Log in to continue."); navigate("login") }}
+          onNavigate={navigate}
+        />
+      )
+    }
+    return <LoginPage notice={loginNotice} onLogin={handleLogin} onNavigate={navigate} />
   }
 
   // Admin is a full-screen layout without the main Navbar
-  if (page === "admin") {
-    return (
-      <AdminPage
-        orders={orders}
-        user={user}
-        onNavigate={navigate}
-        onDeleteOrder={(id) => setOrders((prev) => prev.filter((o) => o.id !== id))}
-      />
-    )
+  if (page === "admin" && user.isAdmin) {
+    return <AdminPage user={user} onNavigate={navigate} />
   }
-
-  const selectedOrder  = orders.find((o) => o.id === selectedOrderId)
-  const acceptedOrder  = orders.find((o) => o.id === acceptedOrderId)
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -279,29 +212,19 @@ export default function App() {
 
       <main className="min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] md:pb-0">
         {page === "orders" && (
-          <OrdersPage orders={orders} onNavigate={navigate} onSelectOrder={(id) => navigate("order-details", id)} />
+          <OrdersPage onNavigate={navigate} onSelectOrder={(order) => navigate("order-details", order)} />
         )}
 
         {page === "my-orders" && (
-          <MyOrdersPage
-            orders={orders}
-            user={user}
-            onSelectOrder={(id) => navigate("order-details", id)}
-            onDeleteOrder={(id) => setOrders((prev) => prev.filter((o) => o.id !== id))}
-            onMarkPickedUp={handleMarkPickedUp}
-            onMarkDelivered={(id) => setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "picked-up" } : o))}
-            onConfirmDelivery={(id) => setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "completed" } : o))}
-            onReleaseCredits={(id) => setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "completed" } : o))}
-          />
+          <MyOrdersPage onSelectOrder={(order) => navigate("order-details", order)} />
         )}
 
         {page === "create-request" && (
           <CreateRequestPage
             user={user}
             onNavigate={navigate}
-            onSubmit={(order) => {
-              setOrders((prev) => [order, ...prev])
-              setUser((prev) => ({ ...prev, credits: prev.credits - order.credits }))
+            onCreated={(pending) => {
+              setCreatePending(pending)
               navigate("create-success")
             }}
           />
@@ -309,8 +232,10 @@ export default function App() {
 
         {page === "create-success" && (
           <SuccessScreen
-            title="Request created"
-            subtitle="Your request is now visible to available couriers."
+            title={createPending ? "Request submitted" : "Request created"}
+            subtitle={createPending
+              ? "We're still reserving your credits. It'll show up in My Orders once that's done."
+              : "Your request is now visible to available couriers."}
             primaryLabel="Back to Orders"
             secondaryLabel="View Requests"
             onPrimary={() => navigate("orders")}
@@ -318,40 +243,22 @@ export default function App() {
           />
         )}
 
-        {page === "order-details" && selectedOrder && (() => {
-          const isRequester = selectedOrder.requesterId === user.id
-          const isCourier   = selectedOrder.courierId   === user.id
-          const inProgress  = ["accepted", "picked-up", "delivered"].includes(selectedOrder.status)
-          return (
-            <OrderDetailsPage
-              order={selectedOrder}
-              currentUserId={user.id}
-              onBack={() => navigate(orderReturnPage)}
-              onAccept={handleAcceptOrder}
-              onDelete={isRequester && selectedOrder.status === "open"
-                ? () => setOrders((prev) => prev.filter((o) => o.id !== selectedOrder.id))
-                : undefined}
-              onMarkPickedUp={isCourier && selectedOrder.status === "accepted"
-                ? () => handleMarkPickedUp(selectedOrder.id)
-                : undefined}
-              onMarkDelivered={isCourier && selectedOrder.status === "picked-up"
-                ? () => { setOrders((prev) => prev.map((o) => o.id === selectedOrder.id ? { ...o, status: "completed" } : o)); navigate("orders") }
-                : undefined}
-              onConfirm={isRequester && inProgress
-                ? () => setOrders((prev) => prev.map((o) => o.id === selectedOrder.id ? { ...o, status: "completed" } : o))
-                : undefined}
-              onReleaseCredits={isRequester && inProgress
-                ? () => { setOrders((prev) => prev.map((o) => o.id === selectedOrder.id ? { ...o, status: "completed" } : o)); navigate("orders") }
-                : undefined}
-            />
-          )
-        })()}
+        {page === "order-details" && selectedOrder && (
+          <OrderDetailsPage
+            key={selectedOrder.id}
+            initialOrder={selectedOrder}
+            currentUserId={user.id}
+            onBack={() => navigate(orderReturnPage)}
+            onAccepted={(order) => navigate("accepted-order", order)}
+            onDelivered={handleDelivered}
+          />
+        )}
 
-        {page === "accepted-order" && acceptedOrder && (
+        {page === "accepted-order" && selectedOrder && (
           <AcceptedOrderPage
-            order={acceptedOrder}
-            onMarkPickedUp={handleMarkPickedUp}
-            onMarkDelivered={handleMarkDelivered}
+            key={selectedOrder.id}
+            initialOrder={selectedOrder}
+            onDelivered={handleDelivered}
             onBack={() => navigate("orders")}
           />
         )}
@@ -359,18 +266,18 @@ export default function App() {
         {page === "errand-complete" && (
           <SuccessScreen
             title="Errand completed"
-            accent={`+${completedOrderCredits} Credits`}
+            accent={`+${earnedCredits} Credits`}
             subtitle="Credits have been added to your balance."
             primaryLabel="Back to Orders"
             onPrimary={() => navigate("orders")}
           />
         )}
 
+        {page === "suppliers" && <SuppliersPage />}
 
         {page === "profile" && (
           <ProfilePage
             user={user}
-            orders={orders}
             onNavigate={navigate}
             onLogout={handleLogout}
           />
