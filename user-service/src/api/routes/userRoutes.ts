@@ -40,7 +40,8 @@ userRouter.post('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userCo
 // DELETE /users/:id/admin
 userRouter.delete('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userController.revokeAdmin);
 
+// POST /users/:id/otp/request
+userRouter.post('/:id/otp/request', authenticate, validate(otpRequestSchema),userController.sendOTPRequest);
 
-userRouter.post('/:id/otp/request', authenticate, userController.sendOTPRequest);
-
-userRouter.post('/:id/otp/verify', authenticate, userController.verifyOTP);
+// POST /users/:id/otp/verify
+userRouter.post('/:id/otp/verify',authenticate,validate(otpStringSchema),userController.verifyOTP);

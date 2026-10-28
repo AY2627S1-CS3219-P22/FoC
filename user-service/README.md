@@ -43,7 +43,7 @@ There are two ways to run this service. Choose based on what you're doing.
 > npm run keys:otp
 > ```
 >
-> This writes `keys/otp.key`, a 32-byte key the service uses to seal OTP values.
+> This writes `keys/otp.key`, a 32-byte key the service uses to HMAC OTP values.
 
 ### Path A — Quick run ("just start it") 🚀
 
@@ -426,7 +426,7 @@ npm run prisma:migrate
 | ------------------------- | --------------------------------------------- |
 | `npm run dev`             | Start REST + gRPC with hot reload (`tsx`)     |
 | `npm run keys:generate`   | Generate the RS256 JWT keypair into `keys/`   |
-| `npm run keys:otp`        | Generate the OTP sealing key into `keys/otp.key` |
+| `npm run keys:otp`        | Generate the OTP HMAC key into `keys/otp.key` |
 | `npm run build`           | `prisma generate` + compile TypeScript        |
 | `npm start`               | Run the compiled build (`dist/`)              |
 | `npm run prisma:migrate`  | Create & apply a migration (`migrate dev`)    |
@@ -450,7 +450,7 @@ Copy `.env.example` → `.env`. `.env` is gitignored — never commit real secre
 | `REFRESH_TOKEN_TTL_DAYS` | Refresh-token (session) lifetime, days | `7`                |
 | `NODE_ENV`             | `production` marks the refresh cookie `Secure` (HTTPS-only) | `development` |
 | `REDIS_URL`            | Redis connection (OTP cache)         | `redis://localhost:6379` |
-| `OTP_HMAC_KEY_PATH`    | OTP sealing key (`npm run keys:otp`) | `./keys/otp.key`     |
+| `OTP_HMAC_KEY_PATH`    | OTP HMAC key (`npm run keys:otp`)    | `./keys/otp.key`     |
 
 ## Architecture
 

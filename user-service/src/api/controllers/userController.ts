@@ -1,4 +1,4 @@
-import type { RequestHandler, Response } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import type { Roles } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
@@ -10,7 +10,7 @@ import * as userService from '../../services/userService';
 import * as sessionService from '../../services/sessionService';
 import * as adminService from '../../services/adminService';
 import * as otpService from '../../services/otpService';
-import { otpRequestSchema, type OtpRequestBody, type OtpVerifyBody } from '../dto/otpDto';
+import type { OtpRequestBody, OtpVerifyBody } from '../dto/otpDto';
 
 const REFRESH_COOKIE = 'refreshToken';
 
@@ -181,19 +181,33 @@ export const revokeAdmin: RequestHandler = async (req, res) => {
   res.status(200).json({ user: result.user });
 };
 
+function requireOwnAccount(req: Request, res: Response): string | undefined {
+  const id = String(req.params.id);
+  if (req.user!.id !== id) {
+    res.status(403).json({ error: 'Forbidden', message: 'You can only use OTP endpoints for your own account.' });
+    return;
+  }
+  return id;
+}
+
 // POST /users/:id/otp/request
 export const sendOTPRequest: RequestHandler = async (req, res) => {
-  const id = String(req.params.id);
+  const id = requireOwnAccount(req, res);
+  if (!id) return;
   const { challengeId } = req.body as OtpRequestBody;
 
   try {
-    const user = await userService.getProfileById(id);
+    const user = await userService.getProfile(id);
     if (!user) {
       res.status(404).json({ error: 'Not Found', message: 'User not found.' });
       return;
     }
 
-    const result = await otpService.sendOTPRequest({userId: user.id,email: user.email,challengeId,});
+    const result = await otpService.sendOTPRequest({
+      userId: user.id,
+      email: user.email,
+      challengeId,
+    });
 
     if (!result.ok) {
       if (result.retryAfterSeconds) {
@@ -208,16 +222,14 @@ export const sendOTPRequest: RequestHandler = async (req, res) => {
   }
 };
 
-// POST /users/:id/otp/verify 
-// takes in both the otp and challengeId body
+// POST /users/:id/otp/verify
 export const verifyOTP: RequestHandler = async (req, res) => {
-  const id = String(req.params.id);
-  const parsedOtp = otpRequestSchema.safeParse(req.body);
-
+  const id = requireOwnAccount(req, res);
+  if (!id) return;
   const { otp, challengeId } = req.body as OtpVerifyBody;
 
   try {
-    const user = await userService.getProfileById(id);
+    const user = await userService.getProfile(id);
     if (!user) {
       res.status(404).json({ error: 'Not Found', message: 'User not found.' });
       return;
