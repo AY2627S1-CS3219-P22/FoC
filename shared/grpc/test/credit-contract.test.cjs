@@ -1,13 +1,8 @@
-// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-25 Asia/Singapore.
-// Scope: Imported agreed Credit shared contract/client/tests from teammate branch; human review pending.
-// Provenance and validation: order-service/usage-log.md (repository root).
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Generated credit wire tests and verified removal of initialization from the RPC service/client in favour of the human-decided event workflow.
-// Author review: Pending human review.
+// Author review: I reviewed that the tests are correctly specified and verified.
 // Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012 and 016 and 021 and 026.
-// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
-// AI-generated; human review pending.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

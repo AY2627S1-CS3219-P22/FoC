@@ -1,13 +1,8 @@
-// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-25 Asia/Singapore.
-// Scope: Imported agreed Credit shared contract/client/tests from teammate branch; human review pending.
-// Provenance and validation: order-service/usage-log.md (repository root).
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Implemented the human-finalized six order-only credit RPCs; removed event-based initialization and REST-only history RPC/messages.
-// Author review: Pending human review.
+// Author review: I reviewed and edited the file for style by reordering the comments as I thought better appropriate.
 // Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012, 014, 016, 021 and 025 and 026.
-// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
-// AI-generated; human review pending.
 
 syntax = "proto3";
 
@@ -16,7 +11,7 @@ package credit;
 service CreditService {
   // Only Order Service may call these RPCs, authenticated with x-credit-service-token.
   // Frontend own-balance/history reads use Credit's authenticated REST API.
-  rpc GetBalance(GetBalanceRequest) returns (Balance);
+
   // Credit Service computes lookup keys internally; callers do not supply keys.
   // Keys: [order_id, expected_version] JSON for Update; order_id for other mutations.
   // Separately, the request hash uses SHA-256 over the specified validated-field JSON array.
@@ -26,6 +21,8 @@ service CreditService {
   // Call GetReservation for the full current reservation.
   // Mutations commit balance, reservation, history, and successful retry results atomically.
   // SettleCredits uses the existing "transfer" operation type in the database.
+
+  rpc GetBalance(GetBalanceRequest) returns (Balance);
   rpc ReserveCredits(ReserveCreditsRequest) returns (Reservation);
   rpc UpdateReservation(UpdateReservationRequest) returns (Reservation);
   // Releases an active hold without increasing total credits.

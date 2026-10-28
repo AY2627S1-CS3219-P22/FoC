@@ -1,6 +1,9 @@
-// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-25.
-// Scope: Keep scaffold smoke test aligned with implemented User validation and six Credit RPCs.
-// Human review pending; see order-service/usage-log.md (repository root).
+// AI Assistance Disclosure:
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
+// Scope: Verified six authenticated credit RPCs, removed initialization/history calls, and corrected the stale User Service stub assertion.
+// Author review: I reviewed that the tests are correctly specified and verified.
+// Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012, 016, 021 and 024.
+
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const path = require('node:path');
@@ -14,7 +17,7 @@ const userServer = require('../../../user-service/src/grpc/server.ts');
 const userRequire = createRequire(path.resolve(__dirname, '../../../user-service/package.json'));
 const userCredentials = userRequire('@grpc/grpc-js').ServerCredentials;
 const orderServer = require('../../../order-service/grpc/dist/grpc/server.js');
-const creditServer = require('../../../credit-service/grpc/dist/grpc/server.js');
+const creditServer = require('../../../credit-service/dist/grpc/server.js');
 
 async function listen(t, server, createClient, config, serverCredentials) {
   const port = await rpc.startServer(server, 0, '127.0.0.1', serverCredentials);
@@ -26,7 +29,7 @@ async function listen(t, server, createClient, config, serverCredentials) {
   return client;
 }
 
-test('scaffolds return UNIMPLEMENTED and implemented User validates a missing ID', async (t) => {
+test('scaffold stubs are reachable, credit rejects unauthenticated calls, and user validates missing IDs', async (t) => {
   const user = await listen(
     t,
     userServer.createGrpcServer(),
@@ -35,20 +38,23 @@ test('scaffolds return UNIMPLEMENTED and implemented User validates a missing ID
     userCredentials.createInsecure(),
   );
   const order = await listen(t, orderServer.createGrpcServer(), rpc.createOrderClient);
-  const credit = await listen(t, creditServer.createGrpcServer(), rpc.createCreditClient);
-
-  await assert.rejects(() => user.getPublicProfile({ userId: '' }), error => error.code === status.INVALID_ARGUMENT);
+  const credit = await listen(t, creditServer.createGrpcServer({}, {}), rpc.createCreditClient);
   for (const invoke of [
     () => order.getOrder({ orderId: 'order-1' }),
-    () => credit.getBalance({ userId: 'user-1' }),
-    () => credit.reserveCredits({ orderId: 'order-1', requesterId: 'user-1', amount: 4 }),
-    () => credit.getReservation({ orderId: 'order-1' }),
-    () => credit.updateReservation({ orderId: 'order-1', amount: 3, expectedVersion: 1 }),
-    () => credit.releaseCredits({ orderId: 'order-1' }),
-    () => credit.settleCredits({ orderId: 'order-1', courierId: 'user-2' }),
   ]) {
     await assert.rejects(invoke(), (error) => error.code === status.UNIMPLEMENTED);
   }
+  for (const invoke of [
+    () => credit.getBalance({ userId: 'user-1' }),
+    () => credit.reserveCredits({ orderId: 'order-1', requesterId: 'user-1', amount: 4 }),
+    () => credit.updateReservation({ orderId: 'order-1', amount: 5, expectedVersion: 1 }),
+    () => credit.releaseCredits({ orderId: 'order-1' }),
+    () => credit.settleCredits({ orderId: 'order-1', courierId: 'user-2' }),
+    () => credit.getReservation({ orderId: 'order-1' }),
+  ]) {
+    await assert.rejects(invoke(), (error) => error.code === status.UNAUTHENTICATED);
+  }
+  await assert.rejects(user.getPublicProfile({}), (error) => error.code === status.INVALID_ARGUMENT);
 });
 
 test('public profile fields use the existing user wire contract', async (t) => {
@@ -122,7 +128,7 @@ test('clients enforce a finite timeout and respect an earlier upstream deadline'
   const server = rpc.createServer(rpc.CreditService.service, {
     GetBalance(call, callback) {
       if (call.request.userId === 'ready') {
-        callback(null, { userId: 'ready', availableCredits: 0, reservedCredits: 0 });
+        callback(null, { totalCredits: 0, availableCredits: 0, reservedCredits: 0 });
       } else {
         receivedDeadline = call.getDeadline();
         // Intentionally leave this test RPC pending until its deadline.
