@@ -903,3 +903,19 @@ scope to include shared Zod alongside Order dependencies. Retained actual
 previously-run 51 shared/16 unit/61 integration and Docker results and reviewer
 commands, clearly distinguishing separate full Credit runtime. Documentation
 only; no tests rerun or new runtime verification claimed. git diff --check used.
+
+## 2026-10-26 Asia/Singapore — Terminal verification and user test commands
+Tool: ChatGPT (Codex), mode: test execution and documentation. Human review pending.
+Exact prompt:
+```text
+Could you give me some postman tests to make sure they work well? No need to commit but either that or smth to check in terminal to make sure everything works as it should.
+```
+Inspected current branch and Docker state; full live stack not running. Built
+shared grpc and Order normally, then 16/16 unit tests passed. Created disposable
+Postgres container foc-order-check-20261026 with database order_service_test_check
+on host port 55450; applied existing Order migrations and ran integrations:
+61/61 passed, including assigned-courier pickup, state/expiry/ownership rejection,
+concurrent pickups and delivery/credit recovery. No temporary dependency overrides,
+real-service database changes, or commits. Removed disposable container afterward.
+Provided reproducible terminal commands; tests use test-only peer handlers, not
+proof of currently deployed full-service connectivity. No implementation changes.

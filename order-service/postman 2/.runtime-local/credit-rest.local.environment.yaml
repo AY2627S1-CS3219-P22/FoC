@@ -1,0 +1,111 @@
+# AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23; local synthetic fixture; human review pending; see order-service/usage-log.md.
+{
+  "name": "order-service: Credit REST demo",
+  "values": [
+    {
+      "key": "userBaseUrl",
+      "value": "http://localhost:3001",
+      "enabled": true
+    },
+    {
+      "key": "creditBaseUrl",
+      "value": "http://localhost:3004",
+      "enabled": true
+    },
+    {
+      "key": "creditGrpcUrl",
+      "value": "localhost:50054",
+      "enabled": true
+    },
+    {
+      "key": "creditServiceToken",
+      "value": "local_order_credit_token",
+      "enabled": true
+    },
+    {
+      "key": "demoPassword",
+      "value": "CreditDemo!2026",
+      "enabled": true
+    },
+    {
+      "key": "AId",
+      "value": "a0644e85-9788-4359-bed1-d88cbfa3227b",
+      "enabled": true
+    },
+    {
+      "key": "AToken",
+      "value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJVU0VSIl0sImlhdCI6MTc5MjY5MjQzNCwiZXhwIjoxNzkyNjkzMzM0LCJzdWIiOiJhMDY0NGU4NS05Nzg4LTQzNTktYmVkMS1kODhjYmZhMzIyN2IiLCJqdGkiOiI1NDM2MDc0Yi1kMTBjLTQ5MTQtOWJmNy1kNWRlZTc2ZGVlZGYifQ.boPhE98OCZhohWe6S0ucyyJlikRczT3oUqyn0zTe3X4qUircbpfYW5wn7TYzziHyyM1STm5yCImVrvIn5dvODYf3Zvs96v3vnwS0TnutGOO5ym_Or1UCvrYGMqr5RkyOH58f3MYTi7G6QoyOeu6aWRmp14bLCs87MhZiE5T9TnNagHp0fCdUyDMl21wnb7m4ArAQFMpQCdQm9UeDs_t7flvhPWQScFm6UA0KhROj2rvGv5T-DUKh6UC78xa5ZB6rolXDAZPYbkat3IA-CYkeyydWlJKRPitOSxpTqB4SW8GPIw0U6SsnGpyRuPCON1wwYlL4ZUlIhec-XF8TfECVJw",
+      "enabled": true
+    },
+    {
+      "key": "AEmail",
+      "value": "credit-demo-4b836f305795-a@u.nus.edu",
+      "enabled": true
+    },
+    {
+      "key": "BId",
+      "value": "ebef65ae-43b5-418f-8415-d8df342472d3",
+      "enabled": true
+    },
+    {
+      "key": "BToken",
+      "value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJVU0VSIl0sImlhdCI6MTc5MjY5MjQzNSwiZXhwIjoxNzkyNjkzMzM1LCJzdWIiOiJlYmVmNjVhZS00M2I1LTQxOGYtODQxNS1kOGRmMzQyNDcyZDMiLCJqdGkiOiI3MjlkZWY2Ny0yYjg4LTQ4N2MtYWVkNy1hM2IzZmE2MzdiNDcifQ.UGGTckw9yUudqmOihaSiDNkPpbq1VKPV9uz_VqiDvvicyquoKCSiNZ8ClBHXtg-0JcUanj3yFEY9sVDFAjdnncYOCalbG_88Y6yxEua8D25l0Z8t0_5hQ7-8lNiZRF7YmC1nLLr1aPxcrY7zJbeDLJ0ueXnhr9r8m-NnKdC47By6gpwt6YRqtWwCmTxRNWWwI4UGbb7-W4vS4xnGreLhImvpiTgHX5YblKlxIF00RmN5Q3UzuJATUp7sLMOHQpxJKf35L8C9xpkNV37HDI26Hp0GQiHL0_J8_YJqu3ywqlkHhoVMnof9JGSP-UqvczPos0xLKJwrX2qudzvkuoG6kA",
+      "enabled": true
+    },
+    {
+      "key": "BEmail",
+      "value": "credit-demo-4b836f305795-b@u.nus.edu",
+      "enabled": true
+    },
+    {
+      "key": "CId",
+      "value": "92dfd864-a625-4703-9fbf-3c00bd76ddd4",
+      "enabled": true
+    },
+    {
+      "key": "CToken",
+      "value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJVU0VSIl0sImlhdCI6MTc5MjY5MjQzNSwiZXhwIjoxNzkyNjkzMzM1LCJzdWIiOiI5MmRmZDg2NC1hNjI1LTQ3MDMtOWZiZi0zYzAwYmQ3NmRkZDQiLCJqdGkiOiI3YzNhNGI2Yy01ZTYxLTQ3MzEtYjc0Yi03ZmZhYWFmOGRlYzAifQ.MFVJ08S0DwSEwtcDdIzjtR55iDiaxGvb_3-4S-Ux9RCdJ3CslCBGEkck0CJlUaFR6sFiX3UJXSW-ov143tLa-GMOc7YYixJgF0uZzPyDGluyPEU_gAw6yjVcQUJI5l2L16D-HmhMlgxctJOzI21PsuEvJkpquA-qXJfXbnDNF9yydsFvNxfOyovPvJrbfIfB1UMrMFtZrl1f_jEQ2BOJoVc2mZePGfkLLprLVhSjBtH5L8S0IQF1AwshtWiUvB8wCPGASNTk7o-Mo4AQemmvkPi6ZDVQN9_7Anm-jdRpNwetzOu-jTimTZhJUri0dNKItqibwiYS7Ic0w6fd0JXXZQ",
+      "enabled": true
+    },
+    {
+      "key": "CEmail",
+      "value": "credit-demo-4b836f305795-c@u.nus.edu",
+      "enabled": true
+    },
+    {
+      "key": "DId",
+      "value": "3a017ffc-3dd4-4272-8776-8149ea2e75e6",
+      "enabled": true
+    },
+    {
+      "key": "DToken",
+      "value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYTAxN2ZmYy0zZGQ0LTQyNzItODc3Ni04MTQ5ZWEyZTc1ZTYiLCJyb2xlcyI6WyJVU0VSIl0sImlhdCI6MTc5MjY5MjQzNSwiZXhwIjoxNzkyNzc4ODM1fQ.VKICIKinV9VOkWXjour_xNLfBXMBEeYIpcExr5o4q6Kl9vqthyTMaMQxR86X8RBcJ-IDBO335pM9RdvcoZA4C9lwF8hh8x4XUpV9YdoKIK_5TMFgPh8RhGCeaNr8vL8LuCacJD7qVSWnwgAYLuUWbNQ08vxJ5cdLsDlJ2ZcXua7CCXciZbtH_8SNIBLUj8Q_VrrgUbA_OcDxfjNgb5yoNRrEoQe8nCWlQ95rbRvYR66CHoJ_Ae8ewtdhuNDkV6KV6HXhd8GZ4SpLIps1tHlqq7k4aibZZG0QxBFYf-AuNLWPYjYSLS8VBWkOnrUV7PLt6Rv6cGmfaFV0TOUKq9fqrQ",
+      "enabled": true
+    },
+    {
+      "key": "ABaselineHistory",
+      "value": "{\"entries\":[{\"id\":\"0742b8d3-4e8b-4d64-a16f-633aec19ec7d\",\"userId\":\"a0644e85-9788-4359-bed1-d88cbfa3227b\",\"orderId\":null,\"reservationId\":null,\"type\":\"INITIAL_GRANT\",\"totalAmountChange\":10,\"totalReservedChange\":0,\"createdAt\":\"2026-10-22T18:07:15.822Z\"}],\"nextPageToken\":null}",
+      "enabled": true
+    },
+    {
+      "key": "grpcOrder",
+      "value": "137105db-e25e-4071-b80e-7e624c9c3b8b",
+      "enabled": true
+    },
+    {
+      "key": "grpcSettleOrder",
+      "value": "42511ab0-3e1f-4aef-b45c-2d0e973f2079",
+      "enabled": true
+    },
+    {
+      "key": "unknownOrder",
+      "value": "6784622b-47e6-4df2-8c03-14f6c9ce45d3",
+      "enabled": true
+    },
+    {
+      "key": "missingAccount",
+      "value": "b74e0ebe-a7b5-4340-8b5c-c94d0ae06fc7",
+      "enabled": true
+    }
+  ]
+}
