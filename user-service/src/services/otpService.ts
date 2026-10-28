@@ -13,22 +13,18 @@ Service requirement details
 
 import {createHash, createHmac, randomInt, randomUUID} from 'crypto'
 import fs from 'node:fs';
-import {sendEmail} from '../middleware/emailServer'
-import {redis} from '../../redis'
-import {env} from '../../env'
-import {otpRequestInput} from '../dto/otpDto'
+import {sendEmail} from '../api/middleware/emailServer'
+import {redis} from '../redis'
+import {env, otpKey} from '../env'
+import type { otpRequestInput } from '../api/dto/otpDto'
 
 const OTP_TTL_SECONDS = 120;
 const REQUEST_WINDOW_SECONDS = 600;
 const MAX_REQUESTS = 3;
 const MAX_ATTEMPTS = 3;
 
-// Shared by every instance of this service. Used only to hash OTPs, never sent out.
-const secret = fs.readFileSync(env.OTP_HMAC_KEY_PATH, 'utf8').trim(); //replaced env pointer with fs readFile
-
-//Helper Functions
 function hashOTP(input: otpRequestInput, otp: string): string {
-    return createHmac('sha256', secret!)
+    return createHmac('sha256', otpKey)
       .update(JSON.stringify([input.userId, input.challengeId, otp]))
       .digest('hex');
   }

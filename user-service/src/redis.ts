@@ -5,7 +5,7 @@ export const redis = createClient({
   url: env.REDIS_URL,
   socket: {
     reconnectStrategy(retries) {
-      if (retries > 3) return new Error('Redis unavailable');
+      // Keep retrying through temporary outages; cap delay at 1s.
       return Math.min(retries * 100, 1000);
     },
   },

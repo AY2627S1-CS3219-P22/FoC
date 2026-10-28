@@ -40,8 +40,6 @@ services:
     depends_on:
       user-db:
         condition: service_healthy
-      redis-cache:
-        condition: service_healthy
     environment:
       DATABASE_URL: 'postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@user-db:5432/${POSTGRES_DB}?schema=public'
     networks: [internal]
@@ -54,6 +52,8 @@ services:
     depends_on:
       user-migrate:
         condition: service_completed_successfully
+      redis-cache:
+        condition: service_healthy
     # /health pings the DB
     healthcheck:
       test:
@@ -79,8 +79,6 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
       REDIS_URL: redis://redis-cache:6379
       OTP_HMAC_KEY_PATH: /app/keys/otp.key
-      # Local placeholder. At least 32 characters; replace for a shared deployment.
-      OTP_HASH_SECRET: replace-with-a-random-string-at-least-32-chars
       REDIS_OTP_LUA: /app/scripts/atomic.lua
       # Mailpit is another container, so localhost:1025 is not the mail server.
       SMTP_HOST: mailpit
