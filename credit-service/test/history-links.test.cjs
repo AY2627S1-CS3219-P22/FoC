@@ -1,9 +1,8 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22 (Asia/Singapore).
 // Scope: Tested human-specified history-link CHECK, partial uniqueness and transactional migration rollback.
-// Author review: Pending human review.
+// Author review: I reviewed that the test specification is correct.
 // Prompts/key responses: ../ai/usage-log.md, entry 039.
-// AI-generated; human review pending.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

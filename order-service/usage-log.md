@@ -774,3 +774,132 @@ Final verification: all 13 unit/auth/gRPC tests also passed (68 total).
 Documentation shell syntax and git diff --check passed. Removed the disposable
 edit test database container/volume; normal Docker service/data unchanged.
 Changes remain uncommitted on order-functionality.
+
+## 2026-10-24 Asia/Singapore — Order-only port from d3-demo
+Tool: ChatGPT (Codex), mode: implementation port, debugging, tests/documentation.
+Human review pending. Exact scope steering:
+```text
+Credit would have their own PR and merge. So just include the ones that would come under what is required from me
+```
+Exact task:
+```text
+Ok, I switched branch. Could you implement what is needed please. You can do one by one or all at once
+```
+Confirmed order-functionality, initially clean tracked tree; untracked postman 2
+left intact. Ported only Order grpc source/tests from d3-demo: shared Credit
+client/options, response validation and ACCOUNT_NOT_FOUND recovery, Supplier
+shared validation/ID adapter/description placeholder and pickup route/controller/
+row-locked service. Removed duplicate Order Credit protobuf/private transport.
+No Order Prisma schema/migration differences. No teammate tracked implementation,
+shared package, root package or lock changes. Did not port demo assets.
+Updated Order Dockerfile and strict allowlist to accept peer manifest paths
+before/after relocations using directory COPY filtered to package metadata.
+Documented dependencies in INTEGRATION_NOTES.md and updated Order README/root
+AI summary. Attribution headers preserved/added for transferred files.
+Current branch's shared contracts lack GetReservation, UpdateReservation and
+Supplier validation exports. A normal build was attempted and fails on these
+missing agreed dependencies. Did not silently add teammate implementations.
+Created isolated temporary git-archive of d3-demo shared grpc/User proto and
+compiled it. Used an ignored Order-local node_modules link only for validation.
+Order build, 16 units, 61 PostgreSQL integrations passed using those agreed
+contracts. Disposable DB order_service_test_port on 55450. Docker check and
+cleanup results follow. No live service/container deployment is claimed.
+
+Final validation/cleanup: build and unit tests 16/16, PostgreSQL integrations
+61/61 passed using agreed isolated contracts. Docker builds passed in TWO
+isolated contexts: this branch's workspace layout and d3-demo's relocated peer
+package layout, both using current Order files and agreed shared contracts.
+No teammate tracked files changed in either validation. Removed temporary
+Order-local dependency symlink and disposable PostgreSQL container. Ordinary
+branch build still awaits teammate shared-contract PRs; no permanent override
+left behind. git diff --check passed. No runtime app restarted, branch switched,
+commit created, or changes pushed. Existing untracked postman 2 left untouched.
+
+## 2026-10-25 Asia/Singapore — Merge main and prepare Order PR
+Tool: ChatGPT (Codex), mode: merge/debugging, verification, PR documentation.
+Human review pending. Exact prompt:
+```text
+Can we pull main and settle any merge conflicts before we PR? Anything else missing from the PR? Also give me a markdown for my PR of what has been implemented in order-functionality that main does not, and tests to check that everything is working well so the reviewer can check
+```
+Fetched origin/main at 2c8a068. Order-only port was still uncommitted; recording
+it first to preserve work before the authorized merge. Existing untracked
+postman 2 stays excluded. Latest main still lacks agreed Credit GetReservation/
+UpdateReservation and shared Supplier schemas. These remain explicit dependent
+PRs rather than silently importing teammate implementations. Actual merge,
+conflicts, checks and reviewer instructions follow below.
+
+Merge result: only conflict package-lock.json. Seeded main's lock and regenerated
+against merged manifests; net diff from main is seven added Order dependency
+entries. Clean npm ci --ignore-scripts passed. Included main's .npmrc in Order
+Dockerfile/allowlist because main's Supplier dependency resolver requires it.
+Normal shared build passed; normal Order build blocked by missing shared Credit
+methods and Supplier exports, confirmed with compiler output. With temporary
+agreed contract package: Order build, 16/16 units, 61/61 PostgreSQL integrations
+passed after merge. Removed ignored dependency override afterwards.
+Created PR_DESCRIPTION.md covering final diff to main, explicit blockers,
+automated isolated-DB commands and live API/credit reviewer checks. No fake
+claim of green standalone branch build or deployed cross-service verification.
+Existing demo folders not included. Docker check and merge commit follow.
+
+Final checks: clean npm install lock validation passed; normal shared build
+passed, ordinary Order build remains blocked by dependency exports. With agreed
+isolated contracts, build + 16 units + 61 PostgreSQL integrations passed, and
+Order Docker image built using merged main workspace and .npmrc. Temporary
+Order dependency override and disposable test database removed. Current diff
+to origin/main has no Credit/User/Supplier/shared implementation changes.
+`git diff origin/main --check` passed. Cached merge-parent whitespace check
+reports only unchanged whitespace inherited from main; no unrelated cleanup.
+Staged resolved lock and PR documentation. Authorized merge commit follows;
+untracked postman 2 excluded. No GitHub PR created and no push performed.
+
+## 2026-10-25 Asia/Singapore — Complete tracked shared integration prerequisites
+Tool: ChatGPT (Codex), mode: contract integration, build/test fixes, documentation.
+Human review pending. Exact task:
+```text
+Complete the portions that are missing before merge
+```
+Asked: "The shared Supplier schemas need Zod declared in the existing shared/grpc/package.json. May I record that JSON file’s AI attribution in shared/grpc/README.md and order-service/usage-log.md? Your repository policy requires an approved attribution method because JSON cannot contain comments."
+Exact human approval:
+```text
+Yes, use README and usage log attribution
+```
+Fetched origin/feat/credit-implementation and origin/order-supplier-gRPC. Imported
+only agreed shared Credit protobuf/client/generated types and contract/retry
+tests from Credit commit 006d5a7; imported Supplier validator/ID helper exports
+from Supplier branch. Added explicit Zod shared dependency, regenerated lock.
+JSON attribution is recorded in shared README and this log as approved. Source
+provenance/comments preserved and added current integration headers.
+Extended existing Credit scaffold with UNIMPLEMENTED GetReservation and
+UpdateReservation entries to remain type-compatible; no Credit business logic
+or database implementation imported. Updated shared smoke test: implemented
+User validates empty ID; all six Credit scaffold calls remain UNIMPLEMENTED.
+Order private transport remains removed; no dependency overrides needed.
+Updated PR_DESCRIPTION/INTEGRATION_NOTES/Order and shared READMEs to remove
+resolved build blockers and distinguish separate full Credit runtime dependency.
+Validation directly from tracked sources: repository npm run build passed;
+existing User build passed; 51 shared gRPC tests, 16 Order units and 61 real
+PostgreSQL integration tests passed. Normal Order Docker build passed from this
+branch, without temporary source contexts. A dedicated disposable test DB was
+used; no live demo services restarted. Normal npm ci result/cleanup follow.
+Existing untracked postman 2 left untouched; no Postman assets added.
+
+Final normal npm ci (including package install scripts) passed. All checks use
+this branch's tracked shared contracts; no Order-local dependency link remains.
+Disposable PostgreSQL container removed. git diff --check passed. PR Markdown
+now documents 51 shared + 16 unit + 61 integration results and normal reviewer
+commands, with live Credit runtime explicitly separate. Commit follows; no push.
+
+## 2026-10-25 Asia/Singapore — Explain shared Zod usage and refresh PR
+Tool: ChatGPT (Codex), mode: code inspection and factual documentation.
+Human review pending. Exact prompt:
+```text
+Why is Zod needed? If you are sure, write me an updated PR
+```
+Confirmed shared Supplier schema module imports zod at runtime and Order's
+Supplier adapter invokes its parse() functions on GetSupplier/IsOpen responses.
+Explained existing direct dependency, not a new architecture choice. Updated
+PR_DESCRIPTION.md with the runtime import/validation facts and corrected lock
+scope to include shared Zod alongside Order dependencies. Retained actual
+previously-run 51 shared/16 unit/61 integration and Docker results and reviewer
+commands, clearly distinguishing separate full Credit runtime. Documentation
+only; no tests rerun or new runtime verification claimed. git diff --check used.

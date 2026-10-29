@@ -2,8 +2,6 @@
 AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
 Scope: Archived the human's proposed event-triggered initialization change verbatim and recorded the clarification response.
-Author review: Pending human review.
-Prompts and key responses: ../usage-log.md, entry 015.
 -->
 
 # Prompt archive — 015
@@ -26,4 +24,4 @@ Before implementation, you and User Service need to finalize:
 
 Your existing `GetBalance → NOT_FOUND` behaviour covers the period before the credit account has been initialized; it still must not create an account.
 
-I’ve recorded this as a **proposal** in the [credit-service usage log](/Users/rajirajeev/Documents/Karthika/NUS/Y4/CS3219/FoC/credit-service/ai/usage-log.md). Implementation and contract changes remain pending your finalized event design.
+I’ve recorded this as a **proposal** in the [credit-service usage log](/FoC/credit-service/ai/usage-log.md). Implementation and contract changes remain pending your finalized event design.

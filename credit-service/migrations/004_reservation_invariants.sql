@@ -1,7 +1,7 @@
 -- AI Assistance Disclosure:
 -- Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
 -- Scope: Implemented the human-specified lifetime order uniqueness and courier/status constraints.
--- Author review: [HUMAN-REVIEWED]
+-- Author review: I have modified the reservations table to introduce more constraints.
 -- Prompts and key responses: ../ai/usage-log.md, entry 014.
 
 ALTER TABLE reservations

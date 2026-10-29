@@ -1,9 +1,9 @@
 -- AI Assistance Disclosure:
 -- Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22 (Asia/Singapore).
 -- Scope: Shared SQL oracle for the human-defined scoped ledger invariants; empty rows means pass.
--- Author review: Pending human review.
+-- Author review: I reviewed the SQL operations and verified that they satisfy the design.
 -- Prompts/key responses: ../../ai/usage-log.md, entry 039.
--- AI-generated; human review pending.
+
 -- Parameters: $1 = scenario user IDs (text[]), $2 = scenario reservation IDs (uuid[]).
 -- Run only after every operation in the round has finished.
 

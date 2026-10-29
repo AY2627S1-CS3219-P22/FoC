@@ -1,14 +1,14 @@
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
-// Scope: Generated setup implementation following approved User Service conventions.
+// Scope: Generated approved service startup; adopted shared @foc/grpc Credit client on 2026-10-22.
 // Author review: Pending; see ../../usage-log.md.
 import { readFileSync } from 'node:fs';
-import { createCreditClient } from './dependencies/creditClient';
+import { Metadata } from '@grpc/grpc-js';
 import { createDirectories } from './dependencies/directories';
 import { createOrderCreation } from './services/orderCreation';
 import { createOrderEdits } from './services/orderEdits';
 import { createOrderLifecycle } from './services/orderLifecycle';
 import { once } from 'node:events';
-import { startServer, stopServer } from '@foc/grpc';
+import { createCreditClient, startServer, stopServer, type RpcOptions } from '@foc/grpc';
 import { env } from './env';
 import { prisma } from './db';
 import { createApp } from './api/app';
@@ -18,12 +18,15 @@ async function main(): Promise<void> {
   await prisma.$connect();
   const grpcServer = createGrpcServer();
   const publicKey = env.USER_SERVICE_PUBLIC_KEY_PATH ? readFileSync(env.USER_SERVICE_PUBLIC_KEY_PATH, 'utf8') : undefined;
-  const credit = env.CREDIT_ORDER_SERVICE_TOKEN ? createCreditClient(env.CREDIT_GRPC_ADDR, env.CREDIT_ORDER_SERVICE_TOKEN,
-    env.GRPC_TIMEOUT_MS) : undefined;
+  const credit = env.CREDIT_ORDER_SERVICE_TOKEN ? createCreditClient(env.CREDIT_GRPC_ADDR,
+    { timeoutMs: env.GRPC_TIMEOUT_MS }) : undefined;
+  const metadata = new Metadata();
+  if (env.CREDIT_ORDER_SERVICE_TOKEN) metadata.set('x-credit-service-token', env.CREDIT_ORDER_SERVICE_TOKEN);
+  const creditOptions: RpcOptions = { metadata };
   const directories = createDirectories(env.USER_GRPC_ADDR, env.SUPPLIER_GRPC_ADDR, env.GRPC_TIMEOUT_MS);
-  const creation = credit ? createOrderCreation(prisma, credit, directories) : undefined;
-  const edits = credit ? createOrderEdits(prisma, credit, directories) : undefined;
-  const lifecycle = credit ? createOrderLifecycle(prisma, credit, [() => creation!.recoverBatch(), () => edits!.recoverBatch()]) : undefined;
+  const creation = credit ? createOrderCreation(prisma, credit, directories, creditOptions) : undefined;
+  const edits = credit ? createOrderEdits(prisma, credit, directories, creditOptions) : undefined;
+  const lifecycle = credit ? createOrderLifecycle(prisma, credit, [() => creation!.recoverBatch(), () => edits!.recoverBatch()], creditOptions) : undefined;
   const httpServer = createApp(publicKey, lifecycle, creation, edits).listen(env.PORT);
   try {
     await once(httpServer, 'listening');

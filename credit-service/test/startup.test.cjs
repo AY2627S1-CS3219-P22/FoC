@@ -1,12 +1,8 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22 (Asia/Singapore).
-// Scope: Tested the human-requested entrypoint consumer startup and shutdown wiring.
-// Author review: Pending human review.
-// Prompts/key responses: ../ai/usage-log.md, entry 036.
-// AI-generated; human review pending.
-// Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
-// Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 038 (repository-relative).
+// Scope: Tested the human-requested entrypoint consumer startup and shutdown wiring. dded/tested/documented startup-only listener health with database-based HTTP status as the human specified.
+// Author review: I reviewed that the test specification is correct.
+// Prompts/key responses: ../ai/usage-log.md, entry 036, 038.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

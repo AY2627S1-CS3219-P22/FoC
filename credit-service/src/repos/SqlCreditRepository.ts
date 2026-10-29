@@ -1,14 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Implemented human-specified SQL account/reservation/history/idempotency operations and transaction-level bigint advisory/row locks.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
+// Scope: Implemented human-specified SQL account/reservation/history/idempotency operations and transaction-level bigint advisory/row locks. Removed account timestamp reads and account/reservation timestamp writes. Looked up bookmark sequence boundaries by history entry ID and authenticated user ID. Removed idempotency user-column reads/writes.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED] I decided to remove accounts and reservation timestamp fields.
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–024 (prior scopes retained).
-// Entry 040: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Removed account timestamp reads and account/reservation timestamp writes.
-// Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Looked up bookmark sequence boundaries by history entry ID and authenticated user ID.
-// Changes await human review; prompts/key responses: ../../ai/usage-log.md, entry 043.
+// Author review: I reviewed the pure SQL operations, and ultimately changed the design to remove accounts, reservation, idempotency records timestamp fields as well as user id field in idempotency records..
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–024, 040, 043, 045 (prior scopes retained).
 
 import type { PoolClient } from 'pg';
 import type {
@@ -34,7 +29,7 @@ export class SqlCreditRepository implements CreditRepository {
 
   async findIdempotencyRecord<Result>(operation: string, key: string): Promise<IdempotencyRecord<Result> | undefined> {
     const { rows } = await this.client.query<IdempotencyRecord<Result>>(
-      'SELECT operation_type AS "operationType", idempotency_key AS key, user_id AS "userId", request_hash AS "requestHash", result FROM idempotency_records WHERE operation_type = $1 AND idempotency_key = $2',
+      'SELECT operation_type AS "operationType", idempotency_key AS key, request_hash AS "requestHash", result FROM idempotency_records WHERE operation_type = $1 AND idempotency_key = $2',
       [operation, key],
     );
     return rows[0];
@@ -42,8 +37,8 @@ export class SqlCreditRepository implements CreditRepository {
 
   async saveIdempotencyRecord<Result>(record: IdempotencyRecord<Result>): Promise<void> {
     await this.client.query(
-      'INSERT INTO idempotency_records (operation_type, idempotency_key, user_id, request_hash, result) VALUES ($1, $2, $3, $4, $5)',
-      [record.operationType, record.key, record.userId, record.requestHash, record.result],
+      'INSERT INTO idempotency_records (operation_type, idempotency_key, request_hash, result) VALUES ($1, $2, $3, $4)',
+      [record.operationType, record.key, record.requestHash, record.result],
     );
   }
 

@@ -1,11 +1,9 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Generated PostgreSQL behaviour/concurrency tests for the human-specified core credit operations.
+// Scope: Generated PostgreSQL behaviour/concurrency tests for the human-specified core credit operations. Generated regression tests for settled-reservation retries without saved results.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–026 and 028 (prior scopes retained).
-// Changes in entries 026 and 028: Pending human review; prior review markers apply to earlier content.
-// Entry 028: AI-generated regression tests for settled-reservation retries without saved results.
+// Author review: I reviewed that the test specification is correct.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–026 and 028.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

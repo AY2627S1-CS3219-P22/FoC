@@ -50,7 +50,6 @@ COPY --from=build /repo/order-service/grpc/dist ./order-service/grpc/dist
 # shared/grpc and order's credit client load these proto files at runtime by relative path.
 COPY shared/grpc/proto ./shared/grpc/proto
 COPY user-service/proto ./user-service/proto
-COPY order-service/grpc/proto ./order-service/grpc/proto
 
 WORKDIR /repo/order-service/grpc
 

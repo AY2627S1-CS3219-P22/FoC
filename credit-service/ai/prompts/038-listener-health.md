@@ -2,8 +2,6 @@
 AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22 (Asia/Singapore).
 Scope: Archived the bounded health-extension request, inspection and clarification.
-Author review: Pending human review.
-Prompts/key responses: ../usage-log.md, entry 038.
 -->
 
 # Prompt archive — 038

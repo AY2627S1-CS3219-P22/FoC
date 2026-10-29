@@ -2,8 +2,6 @@
 AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22 (Asia/Singapore).
 Scope: Archived the exact entry-ID bookmark request and implementation/check outcomes.
-Author review: Pending human review.
-Prompts/key responses: ../usage-log.md, entry 043.
 -->
 
 # Prompt archive — 043

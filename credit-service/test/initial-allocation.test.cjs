@@ -1,19 +1,13 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Generated PostgreSQL tests for atomic initial grants, concurrent event duplicates, saved replay, inconsistent accounts, rollback/retry, and transaction advisory-lock release.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
+// Scope: Generated PostgreSQL tests for atomic initial grants, concurrent event duplicates, saved replay, inconsistent accounts, rollback/retry, and transaction advisory-lock release. Updated event-level permanent-error assertions for the human-edited handler. Removed the account timestamp write from the allocation-replay fixture. Refactored retry fixtures, counts and failure injection for metadata-free idempotency records.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–025 (prior scopes retained).
-// Entry 037: OpenAI Codex (GPT-6), 2026-10-22 Asia/Singapore.
-// Scope: Updated event-level permanent-error assertions for the human-edited handler.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 037.
-// Entry 040: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Removed the account timestamp write from the allocation-replay fixture.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 040.
+// Author review: I reviewed that the test specification is correct.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–025, 037, 040, 045.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { readFile } = require('node:fs/promises');
+const { readFile, readdir } = require('node:fs/promises');
 const { join } = require('node:path');
 const { randomUUID, createHash } = require('node:crypto');
 const { Client, Pool } = require('pg');
@@ -49,7 +43,7 @@ test('initial grant transaction implements the human-specified event allocation 
   const counts = async (userId) => ({
     accounts: (await client.query('SELECT count(*) FROM credit_accounts WHERE user_id = $1', [userId])).rows[0].count,
     history: (await client.query('SELECT count(*) FROM credit_history WHERE user_id = $1', [userId])).rows[0].count,
-    retries: (await client.query('SELECT count(*) FROM idempotency_records WHERE user_id = $1', [userId])).rows[0].count,
+    retries: (await client.query("SELECT count(*) FROM idempotency_records WHERE operation_type = 'init_credits' AND idempotency_key = $1", [userId])).rows[0].count,
   });
   let connected = false;
 
@@ -73,6 +67,11 @@ test('initial grant transaction implements the human-specified event allocation 
     }
     await client.query(await readFile(join(__dirname, '../migrations/006_history_types_and_paging.sql'), 'utf8'));
 
+    for (const name of (await readdir(join(__dirname, '../migrations')))
+      .filter(name => /^\d+_.+\.sql$/.test(name) && name > '006_history_types_and_paging.sql').sort()) {
+      await client.query(await readFile(join(__dirname, '../migrations', name), 'utf8'));
+    }
+
     await t.test('migration preserves legacy grant data with the confirmed history label', async () => {
       assert.equal((await client.query("SELECT type FROM credit_history WHERE user_id = 'legacy-grant'")).rows[0].type, 'INITIAL_GRANT');
       await assert.rejects(client.query("INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change) VALUES ('legacy-grant', 'init_credits', 10, 0)"), (error) => error.code === '23514');
@@ -90,7 +89,7 @@ test('initial grant transaction implements the human-specified event allocation 
       assert.equal(history.total_reserved_change, 0);
       assert.equal(history.order_id, null);
       assert.equal(history.reservation_id, null);
-      const record = (await client.query("SELECT * FROM idempotency_records WHERE user_id = 'new-user'")).rows[0];
+      const record = (await client.query("SELECT * FROM idempotency_records WHERE operation_type = 'init_credits' AND idempotency_key = 'new-user'")).rows[0];
       assert.equal(record.operation_type, 'init_credits');
       assert.equal(record.idempotency_key, 'new-user');
       assert.equal(record.request_hash, createHash('sha256').update(JSON.stringify(['INIT', 'new-user']), 'utf8').digest('hex'));
@@ -130,12 +129,12 @@ test('initial grant transaction implements the human-specified event allocation 
 
     await t.test('a changed hash under the same operation/key is rejected with no writes', async () => {
       await client.query(
-        'INSERT INTO idempotency_records (operation_type, idempotency_key, user_id, request_hash, result) VALUES ($1, $2, $3, $4, $5)',
-        ['init_credits', 'mismatch-user', 'mismatch-user', 'different-request', { totalCredits: 10, reservedCredits: 0, availableCredits: 10 }],
+        'INSERT INTO idempotency_records (operation_type, idempotency_key, request_hash, result) VALUES ($1, $2, $3, $4)',
+        ['init_credits', 'mismatch-user', 'different-request', { totalCredits: 10, reservedCredits: 0, availableCredits: 10 }],
       );
       await assert.rejects(deliver('mismatch-user'), (error) => error.cause?.code === 'FAILED_PRECONDITION');
       assert.deepEqual(await counts('mismatch-user'), { accounts: '0', history: '0', retries: '1' });
-      assert.equal((await client.query("SELECT request_hash FROM idempotency_records WHERE user_id = 'mismatch-user'")).rows[0].request_hash, 'different-request');
+      assert.equal((await client.query("SELECT request_hash FROM idempotency_records WHERE operation_type = 'init_credits' AND idempotency_key = 'mismatch-user'")).rows[0].request_hash, 'different-request');
     });
 
     await t.test('failure at history or saved-result insertion rolls back all writes and allows retry', async () => {
@@ -143,7 +142,7 @@ test('initial grant transaction implements the human-specified event allocation 
         await client.query(`
           CREATE FUNCTION fail_initial_write() RETURNS trigger LANGUAGE plpgsql AS $$
           BEGIN
-            IF NEW.user_id = '${userId}' THEN RAISE EXCEPTION 'injected allocation failure'; END IF;
+            IF NEW.${table === 'idempotency_records' ? 'idempotency_key' : 'user_id'} = '${userId}' THEN RAISE EXCEPTION 'injected allocation failure'; END IF;
             RETURN NEW;
           END $$;
           CREATE TRIGGER fail_initial_write BEFORE INSERT ON ${table}

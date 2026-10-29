@@ -1,5 +1,5 @@
-<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-21.
-Scope: Generated Order development, database and Docker setup documentation. Team review pending.
+<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-24.
+Scope: Updated Order integration/client/pickup documentation after Order-only port. Human review pending.
 See usage-log.md. -->
 
 # Order Service
@@ -177,12 +177,13 @@ that attribution refers to the same records now maintained in this service.
 
 ## Order lifecycle (2026-10-22)
 
-**Peer-service status:** this checkout still has Supplier GetSupplier and the old
-Credit handlers as stubs. Successful production creation requires the real User
+**Peer-service status:** Supplier GetSupplier/IsOpen and User outbox are inherited
+from main. The Credit runtime in this checkout remains a scaffold. Successful production creation requires the real User
 GetPublicProfile, implemented Supplier GetSupplier/IsOpen, and Credit from the
-agreed `feat/credit-implementation` contract. The local copy of that Credit wire
-contract is `grpc/proto/credit.proto`; shared contracts and teammate sources are
-unchanged. No test doubles are enabled in normal startup.
+agreed `feat/credit-implementation` contract. Order now imports that contract
+from `@foc/grpc`; the duplicate local protobuf was removed. Shared contracts
+and teammate sources are unchanged by this Order-only port. No test doubles
+are enabled in normal startup.
 
 Configure `grpc/.env` for host development:
 
@@ -482,14 +483,14 @@ attempts and retains SETTLEMENT_PENDING with a failed operation for manual
 reconciliation; neither case reports credits as settled. No schema changes.
 
 Transport remains plaintext gRPC with `x-credit-service-token` on every call.
-The copied protobuf matches local `feat/credit-implementation` except attribution.
+Order uses `createCreditClient` and the protobuf from shared `@foc/grpc`; its private Credit client/protobuf were removed.
 Verification: 13 unit/auth/gRPC tests and 48 real Order PostgreSQL integration
 tests pass (61 total). Added real gRPC transport tests with a simulated Credit
 ledger, including successful/rejected/uncertain reservations, release recovery,
 settlement, concurrent delivery, stale/wrong receipts, bounded retries, automatic
 recovery and receipt-write failure. These tests do not certify the deployed
-Credit implementation or a complete live multi-service journey. Pickup has no
-endpoint on this branch; delivery requires a PICKED_UP order.
+Credit implementation or a complete live multi-service journey. Pickup is now
+implemented as described in the integration update below; delivery requires a PICKED_UP order.
 
 
 ### Order editing with Credit integration
@@ -530,6 +531,27 @@ requests, actual acceptance races, pre/post-commit failures and receipt-write
 crash recovery. These tests use real Order PostgreSQL and test-only Credit
 ledger handlers; verification of the deployed Credit implementation is separate.
 The existing production edit implementation required no changes for this issue.
+
+## Order-only integration update (2026-10-24)
+
+See [INTEGRATION_NOTES.md](INTEGRATION_NOTES.md) for teammate dependency
+requirements and validation scope. The agreed shared Credit/Supplier contracts
+are now included; normal builds and tests no longer need temporary overrides.
+The full Credit business runtime remains in the teammate PR.
+
+Order now uses shared createCreditClient with service-token metadata on each
+RPC; creditValidation.ts retains response validation and error classification.
+Explicit ACCOUNT_NOT_FOUND is retried within the existing bounded budget.
+Supplier results use shared validation; missing locationDescription becomes "-".
+Destination remains a string; Order schema/migrations are unchanged.
+
+`POST /orders/:id/pickup` requires USER role and the assigned courier, an
+unexpired ASSIGNED order, and an empty JSON object. A row-locked transaction
+sets PICKED_UP and pickedUpAt, returning 200 with `{ "order": {...} }`. Wrong
+actor/role returns 403, missing/invalid JWT 401, malformed input 400, missing
+order 404, invalid transition/expiry 409. Repeated pickup returns 409. No credits
+move at pickup. Supplier opening is checked during creation; pickup/delivery use
+the saved snapshot without another Supplier RPC, as approved by the human.
 
 ## AI Use Summary
 

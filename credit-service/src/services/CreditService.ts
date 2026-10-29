@@ -1,14 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Implemented human-specified core credit business rules, reads, and transaction ownership.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
+// Scope: Implemented human-specified core credit business rules, reads, and transaction ownership. Resolved history-entry bookmarks to private sequence boundaries within the authenticated user's scope. Removed idempotency user metadata from saved results
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED] I edited the initial allocation to use a constant and removed the hard-coded 10 across four usages.
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–026 and 028 (prior scopes retained).
-// Changes in entries 026 and 028: Pending human review; prior review markers apply to earlier content.
-// Entry 028: AI-generated settled-reservation retry fallback; human review pending.
-// Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Resolved history-entry bookmarks to private sequence boundaries within the authenticated user's scope.
-// Changes await human review; prompts/key responses: ../../ai/usage-log.md, entry 043.
+// Author review: I reviewed and edited the initial allocation to use a constant and removed the hard-coded 10 across four usages.
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–026, 028, 043, 045.
 
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
@@ -275,7 +270,7 @@ export class CreditService {
             totalAmountChange: initAlloc, totalReservedChange: 0,
           });
           await repository.saveIdempotencyRecord({
-            operationType: operation, key: userId, userId, requestHash, result,
+            operationType: operation, key: userId, requestHash, result,
           });
         }
       }
@@ -327,7 +322,7 @@ export class CreditService {
       const { reservation, changed } = await work(repository);
       if (changed !== false) {
         await repository.saveIdempotencyRecord({
-          operationType: operation, key, userId: reservation.requesterId, requestHash, result: reservation,
+          operationType: operation, key, requestHash, result: reservation,
         });
       }
       return reservation;

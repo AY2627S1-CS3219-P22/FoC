@@ -1,10 +1,8 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Implemented the human-finalized six order-only RPC handlers, service-token authorization, and business-error metadata.
-// Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–026 (prior scopes retained).
-// Changes in entry 026: Pending human review; prior review markers apply to earlier content.
+// Author review: I reviewed that all the required authentication paths are present, and that only Order Service is allowed to call the credit RPCs via grpc.
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–026.
 
 import { CreditService as Contract, createServer, type CreditServiceHandlers } from '@foc/grpc';
 import { status, type handleUnaryCall } from '@grpc/grpc-js';

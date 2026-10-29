@@ -2,8 +2,8 @@
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Implemented the human-specified identifier and positive SQL-integer validation rules for core credit operations.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–025 (prior scopes retained).
+// Author review: I reviewed the functions and their validation logic.
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–025.
 
 export class ValidationError extends Error {
   constructor(message: string) {

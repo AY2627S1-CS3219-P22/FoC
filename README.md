@@ -185,3 +185,29 @@ Team review and validation remain pending. Prompts, key responses and verificati
 results are recorded in [order-service/usage-log.md](order-service/usage-log.md). Add a link to this README
 to the submission slide deck. This entry covers this session only; the team must
 record other AI use and include applicable AGENTS.md/SKILLS.md files before submission.
+
+Order-only integration port, ChatGPT (Codex), 2026-10-24: transferred shared-client
+usage, missing-account recovery, Supplier compatibility and courier pickup from
+d3-demo into Order. Teammate implementations/root workspace metadata were not
+merged. Dependencies and validation limits: Order INTEGRATION_NOTES.md and usage
+log. Human review pending; normal build awaits shared contract PRs.
+
+Main merge / PR preparation, ChatGPT (Codex), 2026-10-25: merged main at 2c8a068,
+resolved root package-lock.json from main plus seven Order manifest entries,
+and included main's .npmrc in the Order Docker context. Root JSON attribution
+uses this summary and Order usage log. PR_DESCRIPTION.md documents implemented
+APIs, reproducible reviewer tests and missing teammate contract prerequisites.
+Human review pending; ordinary build is blocked until those contracts merge.
+
+Shared prerequisites completed, ChatGPT (Codex), 2026-10-25: agreed Credit shared
+contracts/client/types and Supplier validators are now tracked, with explicit
+Zod dependency and approved JSON attribution in shared README/Order usage log.
+Normal repository build and 128 shared/Order tests pass without overrides; Order
+Docker builds normally. Full Credit business runtime remains the teammate PR;
+this branch only keeps its scaffold type-compatible. Earlier build-blocker
+notes are superseded by this update. Human review pending.
+
+PR documentation refresh, ChatGPT (Codex), 2026-10-25: documented the existing
+shared Supplier validators' runtime Zod import and corrected the dependency
+summary in Order PR_DESCRIPTION.md. Prompt/checks: Order usage log. Human review
+pending; documentation-only update.

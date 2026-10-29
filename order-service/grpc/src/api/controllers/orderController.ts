@@ -1,5 +1,5 @@
-// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
-// Scope: Implemented author-approved order commands and approved role-scoped retrieval.
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
+// Scope: Added approved pickup validation/controller to order commands and retrieval.
 // Author review: Pending; see ../../../../usage-log.md.
 import type { RequestHandler } from 'express';
 import type { createOrderAcceptance } from '../../services/orderAcceptance';
@@ -76,6 +76,21 @@ export function acceptOrder(acceptance?: ReturnType<typeof createOrderAcceptance
     }
     if (!acceptance) { res.status(503).json({ error: 'dependency-unavailable' }); return; }
     try { sendResult(res, await acceptance.accept(id.data, res.locals.user)); } catch (error) { next(error); }
+  };
+}
+
+export function pickupOrder(lifecycle?: ReturnType<typeof createOrderLifecycle>): RequestHandler {
+  return async (req, res, next) => {
+    const id = z.uuid().safeParse(req.params.id);
+    if (!id.success || !z.object({}).strict().safeParse(req.body ?? {}).success) {
+      res.status(400).json({ error: 'invalid-input' }); return;
+    }
+    if (!lifecycle) { res.status(503).json({ error: 'dependency-unavailable' }); return; }
+    try {
+      const result = await lifecycle.pickup(id.data, res.locals.user.id);
+      if ('error' in result) { res.status(result.status ?? 500).json({ error: result.error }); return; }
+      res.status(200).json({ order: { ...result.order, supplierId: result.order.supplierId.toString() } });
+    } catch (error) { next(error); }
   };
 }
 

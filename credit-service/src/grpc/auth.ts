@@ -1,11 +1,8 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Relocated the existing constant-time service-secret verifier into the human-specified gRPC folder.
-// Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED] I decided to remove hashing and timingSafeEqual as I felt it is beyond the scope of authentication and security required for this service.
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–024 (prior scopes retained).
-// Entry 042: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Replaced hashed constant-time service-token comparison with direct equality at the human's request.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-22 (Asia/Singapore).
+// Scope: Relocated the existing constant-time service-secret verifier into the human-specified gRPC folder. Replaced hashed constant-time service-token comparison with direct equality at the human's request.
+// Author review: I decided to remove hashing and timingSafeEqual as I felt it is beyond the scope of authentication and security required for this service.
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–024, 42.
 
 export class AuthenticationError extends Error {}
 

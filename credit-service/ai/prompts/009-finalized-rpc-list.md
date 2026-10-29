@@ -2,8 +2,6 @@
 AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), date: 2026-10-20 (Asia/Singapore).
 Scope: Archived the human's decided RPC list verbatim and the key response/clarification questions.
-Author review: Pending human review.
-Prompts and key responses: ../usage-log.md, entry 009.
 -->
 
 # Prompt archive — 009

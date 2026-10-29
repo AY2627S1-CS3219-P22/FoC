@@ -1,7 +1,7 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Verified six authenticated credit RPCs, removed initialization/history calls, and corrected the stale User Service stub assertion.
-// Author review: Pending human review.
+// Author review: I reviewed that the tests are correctly specified and verified.
 // Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 007, 009–012, 016, 021 and 024.
 
 const assert = require('node:assert/strict');

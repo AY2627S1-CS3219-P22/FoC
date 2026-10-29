@@ -1,8 +1,8 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Relocated the existing RS256 user-token verifier into the human-specified REST folder.
+// Scope: Implemented humn-provided design for frontend authentication.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
+// Author review: I revieiwed that all the paths for authentication are present and correctly implemented as the other services verify JWTs.
 // Prompts and key responses: ../../ai/usage-log.md, entries 005–024 (prior scopes retained).
 
 import { createPublicKey } from 'node:crypto';

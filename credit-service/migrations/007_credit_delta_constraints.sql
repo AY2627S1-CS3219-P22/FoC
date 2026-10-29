@@ -1,9 +1,8 @@
 -- AI Assistance Disclosure:
 -- Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22 (Asia/Singapore).
 -- Scope: Enforced human-confirmed positive reservation amount/version and exact history delta constraints.
--- Author review: Pending human review.
+-- Author review: From the gaps in earlier migrations, I have added more constraints, reviewed them and confirmed they are correctly implemented.
 -- Prompts and key responses: ../ai/usage-log.md, entry 031.
--- AI-generated; human review pending.
 
 ALTER TABLE reservations
     ADD CONSTRAINT reservations_credit_amount_positive CHECK (credit_amount > 0),

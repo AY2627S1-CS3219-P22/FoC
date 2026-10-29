@@ -1,12 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-21 (Asia/Singapore).
-// Scope: Encoded and validated the human-finalized base64url user/sequence bookmark.
+// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-21 - 2026-10-22 (Asia/Singapore).
+// Scope: Encoded and validated the human-finalized base64url user/sequence bookmark. Replaced user/sequence JSON bookmarks with base64url history-entry IDs.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–025 (prior scopes retained).
-// Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Replaced user/sequence JSON bookmarks with base64url history-entry IDs.
-// Changes await human review; prompts/key responses: ../../ai/usage-log.md, entry 043.
+// Author review: I reviewed and decided to replace the user/sequence JSON bookmarks with base64url history-entry IDs, and added validation.
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–025, 043.
 
 import { TextDecoder } from 'node:util';
 import { ValidationError } from './validation';

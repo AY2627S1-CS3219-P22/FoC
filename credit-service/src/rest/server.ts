@@ -1,13 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-21 (Asia/Singapore).
-// Scope: Implemented the human-finalized own-balance/history REST paths, query fields, JWT identity, and JSON shapes.
+// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-21-2026-10-22 (Asia/Singapore).
+// Scope: Implemented the human-finalized own-balance/history REST paths, query fields, JWT identity, and JSON shapes. Added public database health and omitted internal history sequence IDs from REST entries. Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED] I decided to remove the sequence IDs from the REST responses, configured /health for listener on top of database.
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–026 (prior scopes retained).
-// Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Added public database health and omitted internal history sequence IDs from REST entries.
-// Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-// Scope: Added/tested/documented startup-only listener health with database-based HTTP status as the human specified.
+// Author review: I decided to remove the sequence IDs from the REST responses, configured /health for listener on top of database.
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–026, 031, 038.
 
 import { createServer, type ServerResponse } from 'node:http';
 import { status } from '@grpc/grpc-js';

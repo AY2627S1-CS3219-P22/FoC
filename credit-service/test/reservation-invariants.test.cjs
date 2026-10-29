@@ -1,13 +1,13 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Generated PostgreSQL integration checks for human-specified reservation invariants and migration rollback.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
+// Scope: Generated PostgreSQL integration checks for human-specified reservation invariants and migration rollback. Updated rollback retry/history fixtures to the current migrated schema.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: [HUMAN-REVIEWED]
-// Prompts and key responses: ../ai/usage-log.md, entries 005–024 (prior scopes retained).
+// Author review: I reviewed that the test specification is correct.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–024, 045.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { readFile } = require('node:fs/promises');
+const { readFile, readdir } = require('node:fs/promises');
 const { join } = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { Client } = require('pg');
@@ -75,6 +75,9 @@ test('reservation invariants preserve lifetime identity and consistent settlemen
       assert.deepEqual((await client.query('SELECT * FROM reservations WHERE order_id = $1', [orderId])).rows[0], original);
     });
 
+    for (const name of (await readdir(join(__dirname, '../migrations')))
+      .filter(name => /^\d+_.+\.sql$/.test(name) && name > migrationNames[3]).sort()) await apply(name);
+
     await t.test('an order cannot receive a second reservation, including after release or settlement', async () => {
       const insert = 'INSERT INTO reservations (order_id, requester_id, credit_amount, version) VALUES ($1, $2, $3, $4)';
       for (const [state, courier] of [['RESERVED', null], ['RELEASED', null], ['SETTLED', 'courier']]) {
@@ -116,12 +119,12 @@ test('reservation invariants preserve lifetime identity and consistent settlemen
       try {
         await client.query('UPDATE credit_accounts SET reserved_credits = reserved_credits + 1 WHERE user_id = $1', ['requester']);
         await client.query(
-          'INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change) VALUES ($1, $2, $3, $4)',
-          ['requester', 'reserve', 0, 1],
+          'INSERT INTO credit_history (user_id, type, total_amount_change, total_reserved_change, order_id, reservation_id) VALUES ($1, $2, $3, $4, $5, $6)',
+          ['requester', 'RESERVED', 0, 1, orderId, original.reservation_id],
         );
         await client.query(
-          'INSERT INTO idempotency_records (operation_type, idempotency_key, user_id, request_hash, result) VALUES ($1, $2, $3, $4, $5)',
-          ['reserve', orderId, 'requester', 'fixture-hash', {}],
+          'INSERT INTO idempotency_records (operation_type, idempotency_key, request_hash, result) VALUES ($1, $2, $3, $4)',
+          ['reserve', orderId, 'fixture-hash', {}],
         );
         await rejectConstraint(
           'INSERT INTO reservations (order_id, requester_id, credit_amount, version) VALUES ($1, $2, $3, $4)',

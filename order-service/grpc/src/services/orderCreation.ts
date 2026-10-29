@@ -5,9 +5,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { PrismaClient, Prisma, Order } from '../generated/prisma';
 import { createOrderSchema, isAllowedExpiry } from '../api/dto/orderInput';
-import type { createCreditClient } from '../dependencies/creditClient';
+import type { createCreditClient, RpcOptions } from '@foc/grpc';
 import type { createDirectories } from '../dependencies/directories';
-import { classifyCreditError } from '../dependencies/creditClient';
+import { classifyCreditError, validateReservation, validateBalance } from '../dependencies/creditValidation';
 import { status as rpcStatus } from '@grpc/grpc-js';
 
 export type CommandResult = { status: number; order?: Order; creationId?: string; error?: string; state?: string };
@@ -24,7 +24,7 @@ function fingerprint(input: z.infer<typeof createOrderSchema>) {
 }
 function rpcCode(error: unknown) { return (error as { code?: number } | null)?.code; }
 
-export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof createCreditClient>, directories: ReturnType<typeof createDirectories>) {
+export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof createCreditClient>, directories: ReturnType<typeof createDirectories>, creditOptions: RpcOptions = {}) {
   async function result(id: string): Promise<CommandResult> {
     const creation = await db.orderCreation.findUniqueOrThrow({ where: { orderId: id }, include: { order: true } });
     if (creation.order) return { status: 200, order: creation.order };
@@ -47,7 +47,7 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
           error: rpcCode(error) === rpcStatus.NOT_FOUND || rpcCode(error) === rpcStatus.INVALID_ARGUMENT ? 'dependency-rejected' : 'dependency-unavailable' };
       }
       if (profile.userId !== requesterId || supplier.supplierId !== input.supplierId || !opening.isOpen
-        || !supplier.name.trim() || !supplier.locationDescription.trim()) return { status: 409, error: 'dependency-rejected' };
+        || !supplier.name.trim()) return { status: 409, error: 'dependency-rejected' };
       const requesterName = [profile.firstName, profile.lastName].filter((s) => s.trim()).join(' ') || profile.username;
       if (!requesterName.trim()) return { status: 409, error: 'dependency-rejected' };
       try {
@@ -103,7 +103,7 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
     let supplierRejected = false;
     try {
       let receipt;
-      try { receipt = await credit.getReservation({ orderId: id }); }
+      try { receipt = validateReservation(await credit.getReservation({ orderId: id }, creditOptions)); }
       catch (error) { if (rpcCode(error) !== rpcStatus.NOT_FOUND) throw error; }
       expiry = input.expiryTime <= await now(db);
       if (!expiry && work.row.state !== 'COMPENSATING') {
@@ -129,8 +129,8 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
             return true;
           });
           if (!ownsCompensation) return;
-          if (receipt.status === 'RESERVED') await credit.releaseCredits({ orderId: id });
-          const current = await credit.getReservation({ orderId: id });
+          if (receipt.status === 'RESERVED') validateReservation(await credit.releaseCredits({ orderId: id }, creditOptions));
+          const current = validateReservation(await credit.getReservation({ orderId: id }, creditOptions));
           compensated = current.orderId === id && current.requesterId === work.row.requesterId && current.amount === input.credits && current.status === 'RELEASED';
           if (!compensated) throw new Error('Release unconfirmed');
         } else throw new Error('Expired reservation outcome uncertain');
@@ -139,13 +139,13 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
           // Only the first attempt uses the advisory balance precheck. Recovery
           // must not reject funds already held by an earlier uncertain call.
           if (work.operation.attempts === 1) {
-            const balance = await credit.getBalance({ userId: work.row.requesterId });
+            const balance = validateBalance(await credit.getBalance({ userId: work.row.requesterId }, creditOptions));
             if (balance.userId !== work.row.requesterId) throw new Error('Balance identity mismatch');
             if (balance.availableCredits < input.credits) { failure = 'rejected'; }
           }
           if (!failure) {
-            await credit.reserveCredits({ orderId: id, requesterId: work.row.requesterId, amount: input.credits });
-            receipt = await credit.getReservation({ orderId: id });
+            validateReservation(await credit.reserveCredits({ orderId: id, requesterId: work.row.requesterId, amount: input.credits }, creditOptions));
+            receipt = validateReservation(await credit.getReservation({ orderId: id }, creditOptions));
           }
         }
         if (!failure) {
