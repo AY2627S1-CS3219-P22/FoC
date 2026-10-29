@@ -40,14 +40,19 @@ microservice (`user-service/`, `supplier-service/`, `order-service/`,
 
 ```text
 .
+├── compose.yaml          # full stack: includes each service's compose file
 ├── user-service/
 ├── supplier-service/
 ├── order-service/
 ├── credit-service/
+├── shared/               # gRPC contracts/clients, RabbitMQ messaging
+├── ui/
 ├── <n2h-service>/
 └── README.md
 ```
 
+- `shared/` holds code used by more than one service (proto contracts, gRPC
+  clients, the messaging library), so it is not tied to a single service folder.
 - Any **nice-to-have (N2H)** feature that warrants its own service should
   be added as an **additional folder** at the same level, following the
   same per-service structure.

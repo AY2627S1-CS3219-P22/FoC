@@ -44,18 +44,22 @@ it, or work on another service that calls it). Everything runs in Docker; Node
 is only needed once, to generate the JWT keys.
 
 ```bash
+cp .env.example .env    # first time only; compose reads the POSTGRES_* values
 docker compose up --build
 ```
 
-That single command starts Postgres, waits until it's healthy, then builds and
-starts the service — which **automatically applies database migrations** before
-booting. When it's ready you'll have:
+That starts Postgres and waits until it's healthy, then runs the one-off
+`user-migrate` job, which **applies database migrations**. The service starts
+only after that job succeeds. When it's ready you'll have:
 
 - REST API on <http://localhost:3001>
 - gRPC on `localhost:50051`
 
 Stop it with `Ctrl+C`, or wipe everything (including the database) with
 `docker compose down -v`.
+
+This runs User Service on its own. To run the whole FoC stack, see the
+[root README](../README.md#run-the-whole-stack-docker).
 
 On a fresh database, create the first admin next — see
 [Administrator accounts](#administrator-accounts).
@@ -86,19 +90,22 @@ cp .env.example .env
 npm run keys:generate
 
 # 4. Start ONLY the database
-docker compose up -d postgres
+docker compose up -d user-db
 
 # 5. Create + apply the database schema
 #    (first time, Prisma asks for a migration name — use "init")
 npm run prisma:migrate
 
-# 6. Run the service with hot reload (starts REST + gRPC)
+# 6. Build the shared messaging package (first time, and after it changes)
+npm run build --prefix ../shared/messaging
+
+# 7. Run the service with hot reload (starts REST + gRPC)
 npm run dev
 ```
 
 Leave `npm run dev` running; edit files and it restarts automatically. Stop with
 `Ctrl+C`. The Postgres container keeps running in the background — stop it with
-`docker compose stop postgres` when you're done for the day.
+`docker compose stop user-db` when you're done for the day.
 
 On a fresh database, create the first admin next — see
 [Administrator accounts](#administrator-accounts).
@@ -394,8 +401,9 @@ If you see a non-Docker `postgres` process, either:
   ```bash
   brew services stop postgresql@14   # adjust the version to match yours
   ```
-- **or** change the container's host port in `compose.yaml` to `"5433:5432"` and
-  update `DATABASE_URL` in `.env` to use `:5433`.
+- **or** change the database's host port in `compose.override.yaml` to
+  `"5435:5432"` and update `DATABASE_URL` in `.env` to use `:5435` (5433 and
+  5434 are taken by Credit and Order).
 
 ### `docker compose` can't connect / "Cannot connect to the Docker daemon"
 
@@ -405,7 +413,7 @@ Docker Desktop isn't running. Start it and wait for it to finish booting.
 
 ```bash
 docker compose down -v   # removes the Postgres data volume
-docker compose up -d postgres
+docker compose up -d user-db
 npm run prisma:migrate
 ```
 
@@ -439,6 +447,10 @@ Copy `.env.example` → `.env`. `.env` is gitignored — never commit real secre
 | `JWT_EXPIRES_IN`       | Access-token lifetime                | `15m`                |
 | `REFRESH_TOKEN_TTL_DAYS` | Refresh-token (session) lifetime, days | `7`                |
 | `NODE_ENV`             | `production` marks the refresh cookie `Secure` (HTTPS-only) | `development` |
+| `RABBITMQ_URL`         | Broker the outbox publishes `user.created` to | `amqp://guest:guest@localhost:5672` |
+| `OUTBOX_POLL_INTERVAL_MS` | How often the outbox dispatcher checks for unsent events | `1000` |
+| `OUTBOX_BATCH_SIZE`    | Max events the dispatcher sends per poll | `50` |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Read by `compose.yaml` to create the database (not by the app) | see `.env.example` |
 
 ## Architecture
 
@@ -476,6 +488,7 @@ user-service/
 │   ├── env.ts             # zod-validated config
 │   ├── db.ts              # Prisma client + DB ping
 │   ├── services/          # business logic shared by REST + gRPC (DB via Prisma)
+│   ├── events/            # user.created outbox: store + background dispatcher
 │   ├── scripts/           # operator commands (createAdmin.ts)
 │   ├── api/               # HTTP (REST) transport
 │   │   ├── app.ts         #   Express app + /health, mounts routers
@@ -484,6 +497,7 @@ user-service/
 │   │   ├── middleware/    #   cross-cutting (e.g. zod validation)
 │   │   └── dto/           #   zod schemas: API input/output shapes
 │   └── grpc/server.ts     # gRPC transport
-├── compose.yaml           # this service's Postgres (+ service)
+├── compose.yaml           # Postgres, migrate job and service (no published ports)
+├── compose.override.yaml  # standalone only: publishes ports to localhost
 └── Dockerfile
 ```
