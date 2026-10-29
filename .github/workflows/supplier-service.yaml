@@ -1,0 +1,73 @@
+name: Supplier Service CI
+
+on:
+  push:
+    branches: [main] #make sure this only runs when we push into main 
+    paths: #since this lives in my repo root i will define paths CLEARLY
+      - 'supplier-service/**'
+      - 'shared/grpc/**' #also bc i need to use gRPC in tests
+      - 'shared/messaging/**' #only because i will use messaging 
+      - '.github/workflows/supplier-service.yaml'  #you can add in .nprmc, package.json, package-lock.json here too
+      #also if you want CI PR checks please add in pull_request: and then paths:
+
+env:
+  REGISTRY: ghcr.io
+  # Nested under the repo name so GITHUB_TOKEN can publish (GHCR lowercases this).
+  IMAGE_NAME: ${{ github.repository }}/supplier-service
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test -w supplier-service
+
+  build-and-push-image:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      actions: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: supplier-service/Dockerfile
+          target: runtime
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
