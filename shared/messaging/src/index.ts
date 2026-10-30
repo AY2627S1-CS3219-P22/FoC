@@ -1,3 +1,8 @@
+// AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-30 (Asia/Singapore).
+// Scope: Added the human-requested live connection/recovery getter for Credit health.
+// Original broker implementation/declarations below remain credited to the shared messaging authors.
+// Review: New getter awaits human review; prompts/key responses: ../../../credit-service/ai/usage-log.md, entry 047.
+
 import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -62,6 +67,11 @@ export class RabbitMQClient {
       config.logDir ?? path.join(process.cwd(), 'logs', 'rabbitmq'),
       config.serviceName ?? 'rabbitmq',
     );
+  }
+
+  get isConnected(): boolean {
+    return !this.closing && this.connection !== undefined && this.channel !== undefined
+      && this.connectionPromise === undefined;
   }
 
   // Manages connection and consumer recovery.

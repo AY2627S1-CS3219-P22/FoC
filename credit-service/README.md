@@ -1,8 +1,8 @@
 <!--
-AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-10-22 (Asia/Singapore).
+AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-10-30 (Asia/Singapore).
 Mode/scope: Documented and checked the human-defined Credit implementation.
-Review: [HUMAN-REVIEWED]
-Exact prompts, key responses and checks: ai/usage-log.md, entries 003–044.
+Review: Prior content human-reviewed; entry 047 changes await human review.
+Exact prompts, key responses and checks: ai/usage-log.md, entries 003–047.
 -->
 
 # Credit service
@@ -126,19 +126,25 @@ retry/dead-letter handling. A successful handler finishes only after the allocat
 transaction commits or an existing grant is confirmed. Duplicate event IDs or
 different events for the same user cannot grant credits again.
 
-The [consumer startup helper](src/events/broker.ts) connects a RabbitMQClient for
-CREDIT_USER_QUEUE using serviceName credit-service and prefetch 10. It closes its
-client if connection/consumer setup throws. Configure RABBITMQ_URL: host execution
+The [consumer helper](src/events/broker.ts) creates one RabbitMQClient for
+CREDIT_USER_QUEUE using serviceName credit-service and prefetch 10. Configure
+RABBITMQ_URL: host execution
 defaults to `amqp://guest:guest@localhost:5672`; the Docker example reaches a broker
 published on the Docker host. Supply a URL reachable from your chosen deployment.
 After both API listeners start, `index.ts` attempts consumer startup in the
-background with the same CreditService instance. A failed connection,
-registration or package load is logged; the REST and gRPC APIs keep running.
-This is one startup attempt: after a failure, restart Credit once the package
-and broker are available. No consumer reconnect loop is added here. SIGINT/SIGTERM
-close both API listeners, wait for any pending consumer startup, close the broker
-if connected, then end the database pool. A broker close failure is logged and
-does not skip database cleanup.
+background with the same CreditService instance. Failed connection, registration
+or package-load attempts retry indefinitely after 1, 2, 4, 8, 16 and then 30 seconds,
+remaining capped at 30 seconds. Each failed startup attempt logs its error message
+and next delay once; the REST and gRPC APIs keep running. Connection attempts
+reuse the same client. Once connected, Credit registers its consumer and exits
+the startup retry loop. The shared client's existing reconnect loop handles later
+disconnects and restores its registered consumers.
+
+SIGINT/SIGTERM cancel a pending startup retry wait and prevent further attempts.
+Shutdown closes both API listeners, waits for an in-flight startup operation,
+closes the broker, then ends the database pool. A connection that finishes during
+shutdown is closed without registering a consumer. A broker close failure is
+logged and does not skip database cleanup.
 
 `@foc/messaging` is now included as a local workspace and Credit dependency;
 root builds, Credit predev and the Docker image build it before Credit. The
@@ -147,7 +153,8 @@ package was copied from `origin/events/data-validation` at
 are authored by @sunpterodactyl and the shared messaging contributors.** This PR
 includes their code for integration/testing and does not claim its authorship.
 The [package README](../shared/messaging/README.md) records the import and original
-AI declarations. Credit-specific work is consumer wiring and tests.
+AI declarations. Credit-specific work includes consumer wiring/tests and the
+human-requested shared-client `isConnected` getter used for live listener health.
 User Service publication remains owned by its implementer. There is no InitCredits RPC.
 
 ## gRPC authentication and errors
@@ -207,21 +214,24 @@ maxDelayMs. Other service client behavior is unchanged.
 
 ## Health
 
-Public GET `/health` on port 3004 runs `SELECT 1` and reports event-listener startup:
+Public GET `/health` on port 3004 runs `SELECT 1` and reports live listener readiness:
 
 ```json
 { "status": "ok", "db": "up", "listener": "up" }
 ```
 
-| Database | Listener startup | HTTP | Overall status |
+| Database | Listener readiness | HTTP | Overall status |
 | --- | --- | --- | --- |
 | up | up or down | 200 | ok |
 | down | up or down | 503 | degraded |
 
-The listener flag is down while starting, after startup failure or during explicit
-shutdown, and up after startup succeeds. It reports startup success only; it does
-not detect later broker disconnects or consumer cancellation. API listeners remain
-available if consumer startup fails. No token is required.
+The listener is down before initial registration, while disconnected or recovering,
+and during shutdown. It becomes up after initial registration or after the shared
+client reconnects and finishes restoring its consumers. Credit reads the shared
+client's `isConnected` getter; it does not actively probe RabbitMQ. Consumer
+cancellation on an otherwise open channel is not detected by this getter.
+Listener readiness remains informational: database health alone controls HTTP
+status and overall status. No token is required.
 
 ```sh
 curl -i http://localhost:3004/health
@@ -398,10 +408,15 @@ PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_loc
 npm test --workspace @foc/grpc
 ```
 
-The last recorded Credit build and all 103 Credit checks passed after the entry-ID
-bookmark change. The shared gRPC suite previously passed 51 checks. These are
-recorded results, not a new test run for this README update; detailed outputs and
-older Docker/live-broker runs are in [the usage log](ai/usage-log.md).
+The messaging/Credit builds and all 108 Credit checks passed after the startup
+retry change. Lifecycle tests control time to check capped retries, client reuse,
+one initial consumer, shutdown cancellation and live health. Shared-client tests
+hold consumer recovery pending to verify that readiness remains down until it
+finishes. Earlier shared gRPC, Docker and listener results remain in
+[the usage log](ai/usage-log.md).
+The updated live-listener suite also passed all 10 Node test results against a
+dedicated broker and private outage proxy, including startup recovery, later
+disconnect recovery and shutdown during backoff.
 Root `npm test` runs the shared gRPC suite; use the Credit workspace command above
 for Credit tests. Without PGDATABASE, the database integration checks skip.
 
@@ -425,8 +440,10 @@ PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_loc
 ```
 
 The separate live-listener test requires a disposable broker with no other
-consumers. It tests registration, duplicate events, retries, dead-letter handling
-and restart using a temporary database schema and actual Credit startup:
+consumers. A private TCP proxy simulates startup outages and later disconnects
+without stopping the broker. It checks health/recovery without a Credit restart,
+one restored consumer, registration delivery, duplicates, retries, dead letters,
+restart and shutdown during startup backoff using an isolated database schema:
 
 ```sh
 npm run build
@@ -456,3 +473,15 @@ The human approved this attribution method for comment-free JSON in
 Exact prompts/key exchanges and actual checks are archived under
 [credit-service/ai/](ai/usage-log.md). The human authors remain responsible for
 review, validation, team norms, licensing checks, and submission disclosure.
+
+## AI Use Summary
+
+Credit implementation, tests and documentation assistance are recorded in
+[ai/usage-log.md](ai/usage-log.md), including tools/models, exact prompts, affected
+files, actual checks and human review status. Entry 047 used OpenAI Codex (GPT-6)
+to implement/test the human-defined startup retry loop, reusable client,
+cancellable shutdown and live status getter. The shared messaging implementation
+and existing recovery logic remain credited to their authors; the added getter
+is attributed separately. Messaging/Credit builds, 108 Credit checks, Credit lint
+and 10 live-listener test results passed.
+New changes await human review; prior review markers apply to earlier content.
