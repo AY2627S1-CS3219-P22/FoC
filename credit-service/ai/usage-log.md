@@ -3,7 +3,7 @@ AI Assistance Disclosure:
 Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-26 (Asia/Singapore).
 Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–045 below and the linked prompt archives.
+Prompts and key responses: Entries 001–046 below and the linked prompt archives.
 Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Recorded the latest implementation request, changes and actual verification.
 New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
@@ -1686,12 +1686,12 @@ submission files; retained disclosure content is under this ai directory.
   only; no external source, dependency, skill, sub-agent, commit or push. Agent
   checks do not establish author validation or assignment compliance.
 
-## 045 — Migration runner for the credit-migrate job
+## 046 — Migration runner for the credit-migrate job
 
 - **Timestamp:** 2026-10-23 SGT (UTC+08:00), Asia/Singapore.
 - **Tool/model/modes:** Claude Code, Claude Opus 5.5; bounded requirements
   clarification and implementation of the human-specified design.
-- **Exact prompt/key responses:** [Migration runner prompts and outcomes](prompts/045-migration-runner.md).
+- **Exact prompt/key responses:** [Migration runner prompts and outcomes](prompts/046-migration-runner.md).
 - **Human-defined design:** Apply all migration scripts in order; track each in a
   database table (file name, time applied, success); prevent concurrent runs with
   a PostgreSQL lock; per-file transactions so no partial migration is applied;
@@ -1699,11 +1699,12 @@ submission files; retained disclosure content is under this ai directory.
   earlier AI-designed runner was deleted at the human's request before this
   specification was given. No trade-off analysis or rationale generated.
 - **Affected paths:** credit-service/migrations/run-migrations.cjs (new); this log
-  and archive 045. apply-migration.cjs and the SQL migrations are unchanged.
+  and archive 046. apply-migration.cjs and the SQL migrations are unchanged.
 - **Actual checks:** None run by the AI. A throwaway PostgreSQL test procedure was
   given to the human.
 - **Review/provenance:** Root AGENTS.md read; no external source, dependency,
-  skill, agent, commit or push. [HUMAN-REVIEWED]
+  skill, agent, commit or push. Human reviewed: specified the design, read
+  through the code line by line, and ran manual tests.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the

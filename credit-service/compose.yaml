@@ -1,7 +1,8 @@
 # AI Assistance Disclosure:
 # Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 # Scope: Configured PostgreSQL 17, authenticated credit gRPC/REST, public-key mount, and pg migration variables.
-# Author review: Pending human review.
+# Author review: Refactored by OpenAI Codex (GPT-6) to match the shared container pattern;
+# code reviewed by the human and manually tested.
 # Prompts and key responses: ai/usage-log.md, entries 003, 005 and 021–022.
 # AI-generated; human review pending.
 # Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).

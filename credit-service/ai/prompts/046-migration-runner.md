@@ -1,10 +1,11 @@
 <!--
 AI Assistance Disclosure: Claude Code (Opus 5.5), 2026-10-23 (Asia/Singapore).
 Scope: Archived the key migration-runner prompts and responses.
-Review: [HUMAN-REVIEWED] Prompts/key responses: ../usage-log.md, entry 045.
+Review: Human reviewed: specified the design, read through the code line by line,
+and ran manual tests. Prompts/key responses: ../usage-log.md, entry 046.
 -->
 
-# Prompt archive — 045
+# Prompt archive — 046
 
 ## Exact user prompts (key prompts only)
 

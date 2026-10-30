@@ -46,9 +46,10 @@ credit-service/
 ```
 
 The workspace is `credit-service/`, named `@foc/credit-grpc`. TypeScript builds
-into `dist/`; `src/index.ts` starts REST, gRPC and the event consumer. The migration
-runner is `migrations/apply-migration.cjs`. Local `scripts/` and `docs/` are not
-required by a fresh clone.
+into `dist/`; `src/index.ts` starts REST, gRPC and the event consumer.
+`migrations/run-migrations.cjs` applies all pending migrations (run by the
+`credit-migrate` job); `migrations/apply-migration.cjs` applies one file by hand.
+Local `scripts/` and `docs/` are not required by a fresh clone.
 
 ## Business operations
 

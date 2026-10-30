@@ -1,7 +1,8 @@
 // AI Assistance Disclosure: Claude Code (Opus 5.5), 2026-10-23 (Asia/Singapore).
 // Mode/scope: Implemented the human-specified migration runner design.
-// Review: [HUMAN-REVIEWED]
-// Exact prompts, key responses and checks: ai/usage-log.md, entry 045.
+// Review: Human reviewed: specified the design, read through the code line by line,
+// and ran manual tests.
+// Exact prompts, key responses and checks: ai/usage-log.md, entry 046.
 
 // Applies every migrations/*.sql in filename order. Each file runs in its own
 // transaction; on failure that file is rolled back and the run stops. The
