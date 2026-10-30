@@ -1,8 +1,8 @@
 <!--
 AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-10-30 (Asia/Singapore).
 Mode/scope: Documented and checked the human-defined Credit implementation.
-Review: Prior content human-reviewed; entry 047 changes await human review.
-Exact prompts, key responses and checks: ai/usage-log.md, entries 003–047.
+Review: Prior content human-reviewed; entries 047–048 changes await human review.
+Exact prompts, key responses and checks: ai/usage-log.md, entries 003–048.
 -->
 
 # Credit service
@@ -47,8 +47,8 @@ credit-service/
 
 The workspace is `credit-service/`, named `@foc/credit-grpc`. TypeScript builds
 into `dist/`; `src/index.ts` starts REST, gRPC and the event consumer.
-`migrations/run-migrations.cjs` applies all pending migrations (run by the
-`credit-migrate` job); `migrations/apply-migration.cjs` applies one file by hand.
+`migrations/run-migrations.cjs` is the tracked runner used by `npm run db:migrate`
+and the `credit-migrate` job. It supports an optional inclusive `--to` stop point.
 Local `scripts/` and `docs/` are not required by a fresh clone.
 
 ## Business operations
@@ -368,12 +368,31 @@ To run the same runner from the host against the published database:
 ```sh
 set -a; . ./.env; set +a                 # from credit-service/: export the PG* values
 node migrations/run-migrations.cjs
+# Or use the same runner through npm:
+npm run db:migrate
+
+# Apply pending files only through this filename, inclusive:
+node migrations/run-migrations.cjs --to 001_initial.sql
+npm run db:migrate -- --to 001_initial.sql
 ```
 
-`migrations/apply-migration.cjs` (`npm run db:migrate -- <file.sql>`) still applies
-a single file in one transaction, without recording it. Both use
-PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE; PGDATABASE must be explicit. Each
-migration runs in one transaction, following [node-postgres](https://node-postgres.com/features/transactions).
+From the repository root, the equivalent bounded command is:
+
+```sh
+npm run db:migrate --workspace @foc/credit-grpc -- --to 001_initial.sql
+```
+
+Without `--to`, the runner applies all pending files. With `--to`, it considers
+only files through the named target in sorted filename order, skipping successful
+records within that range. Use the exact filename, not a path. An unknown target
+or invalid arguments fail before connecting to the database. A stop point does
+not undo later files that were already applied. Both bounded and full runs use
+the same migration ledger, advisory lock and per-file transactions; the separate
+single-file runner has been removed.
+
+The runner uses PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE; PGDATABASE must be
+explicit. Each migration runs in one transaction, following
+[node-postgres](https://node-postgres.com/features/transactions).
 Migration 009 requires the updated service queries that omit account/reservation
 timestamps.
 Migration 004 enforces unique order_id, settled iff courier is set, and distinct
@@ -408,12 +427,16 @@ PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_loc
 npm test --workspace @foc/grpc
 ```
 
-The messaging/Credit builds and all 108 Credit checks passed after the startup
-retry change. Lifecycle tests control time to check capped retries, client reuse,
+The most recent messaging/Credit builds passed after the startup retry change.
+Lifecycle tests control time to check capped retries, client reuse,
 one initial consumer, shutdown cancellation and live health. Shared-client tests
 hold consumer recovery pending to verify that readiness remains down until it
 finishes. Earlier shared gRPC, Docker and listener results remain in
 [the usage log](ai/usage-log.md).
+After switching the migration command to the tracked runner with `--to`, all 110
+Credit tests passed. Migration tests cover inclusive boundaries, skipping already
+successful files, atomic failure and repair/resume, and concurrent-run locking.
+Schema tests exercise the npm command and historical checkpoints through `--to`.
 The updated live-listener suite also passed all 10 Node test results against a
 dedicated broker and private outage proxy, including startup recovery, later
 disconnect recovery and shutdown during backoff.
@@ -465,7 +488,7 @@ The human approved this attribution method for comment-free JSON in
 
 | File | Tool, date, and scope | Author review |
 | --- | --- | --- |
-| credit-service/package.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: pg, migration/test scripts, @types/pg, jsonwebtoken and @types/jsonwebtoken; relocated the existing workspace manifest to the service root in exchange 024; updated db:migrate to the relocated migrations/apply-migration.cjs in exchange 034 (2026-10-22); added @foc/messaging dependency and predev build in exchange 037. | Pending human review. |
+| credit-service/package.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: pg, migration/test scripts, @types/pg, jsonwebtoken and @types/jsonwebtoken; relocated the existing workspace manifest to the service root in exchange 024; relocated the migration CLI in exchange 034 (2026-10-22); added @foc/messaging dependency and predev build in exchange 037; exchange 048 (2026-10-30) points db:migrate to the tracked run-migrations.cjs runner with optional --to. | Pending human review. |
 | Root package-lock.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: corresponding dependencies/transitive packages and relocated credit workspace/link metadata; earlier npm also normalized existing flags; exchange 037 adds messaging/amqplib workspace entries and resolves the shared Zod range to 4.6.7. | Pending human review. |
 | Root package.json | OpenAI Codex (GPT-6), 2026-10-21: changed only the credit workspace path from credit-service/grpc to credit-service, using the recorded comment-free JSON attribution method; exchange 037 adds the shared/messaging workspace and prerequisite build. | Pending human review. |
 | shared/messaging/package.json and tsconfig.json | Original files by @sunpterodactyl/shared messaging contributors, copied byte-for-byte from 0b48f5f in exchange 037; no AI-generated source/config changes. Provenance is in shared/messaging/README.md. | Upstream authorship preserved; integration review pending. |
@@ -483,5 +506,9 @@ to implement/test the human-defined startup retry loop, reusable client,
 cancellable shutdown and live status getter. The shared messaging implementation
 and existing recovery logic remain credited to their authors; the added getter
 is attributed separately. Messaging/Credit builds, 108 Credit checks, Credit lint
-and 10 live-listener test results passed.
+and 10 live-listener test results passed in entry 047. Entry 048 used OpenAI Codex
+(GPT-6) to wire `db:migrate` to the existing human-designed tracked runner, add its
+inclusive `--to` option, remove the old runner, and update tests/documentation.
+All 110 Credit tests and Credit lint passed for that change; no application
+database migration or deployment was performed.
 New changes await human review; prior review markers apply to earlier content.
