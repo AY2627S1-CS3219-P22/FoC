@@ -46,6 +46,7 @@ async function main(): Promise<void> {
 
   let shuttingDown = false;
   let broker: Awaited<ReturnType<typeof import('./events/broker').startUserEventConsumer>> | undefined;
+  // eslint-disable-next-line prefer-const -- assigned after shutdown handlers are registered
   let consumerStartup: Promise<void>;
   const shutdown = async (): Promise<void> => {
     if (shuttingDown) return;
@@ -71,6 +72,7 @@ async function main(): Promise<void> {
   consumerStartup = (async () => {
     try {
       // Package loading is part of the nonfatal consumer startup attempt.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded lazily so a broken broker package doesn't stop REST/gRPC
       const { startUserEventConsumer } = require('./events/broker') as typeof import('./events/broker');
       broker = await startUserEventConsumer(service, env.RABBITMQ_URL);
       listenerStarted = !shuttingDown;
