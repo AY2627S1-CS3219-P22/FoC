@@ -3,11 +3,14 @@
 // Scope: Tested the human-selected broker package with actual Credit startup, PostgreSQL allocation, duplicate delivery, dead-lettering, retry and restart. Added/tested/documented startup-only listener health with database-based HTTP status as the human specified. Scoped saved allocation checks by operation/key instead of the removed user column.
 // Author review: I reviewed that the test specification is correct.
 // Prompts/key responses: ../ai/usage-log.md, entry 037, 038, 045.
+// Entry 047: OpenAI Codex (GPT-6), 2026-10-30 (Asia/Singapore).
+// Scope: Tested real startup outages, live disconnect health/recovery and shutdown through an isolated TCP proxy.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 047.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawn } = require('node:child_process');
-const { createServer } = require('node:net');
+const { createServer, connect: connectSocket } = require('node:net');
 const { randomUUID, generateKeyPairSync } = require('node:crypto');
 const { mkdtemp, writeFile, readFile, readdir, rm } = require('node:fs/promises');
 const { join, resolve } = require('node:path');
@@ -54,6 +57,15 @@ test('real listener initializes once and handles retries, dead letters and resta
   };
   const waitAction = (eventId, action) => waitFor(async () =>
     (await logs()).some(row => row.eventId === eventId && row.action === action), eventId + ' ' + action);
+  const receiveDeadLetter = async eventId => {
+    let delivery;
+    await waitFor(async () => {
+      delivery = await channel.get(deadLetterQueue(CREDIT_USER_QUEUE), { noAck: false });
+      return Boolean(delivery);
+    }, eventId + ' available in dead-letter queue');
+    assert.equal(delivery.properties.messageId, eventId);
+    channel.ack(delivery);
+  };
   const send = async (userId, changes = {}, messageId) => {
     const event = { type: 'user.created', eventId: randomUUID(), occurredAt: new Date().toISOString(), userId, ...changes };
     assert.equal(await publisher.publishToQueue(CREDIT_USER_QUEUE, event, messageId ?? event.eventId), true);
@@ -77,7 +89,36 @@ test('real listener initializes once and handles retries, dead letters and resta
   const httpPort = await port();
   let grpcPort;
   do { grpcPort = await port(); } while (grpcPort === httpPort);
-  const start = async () => {
+  const upstream = new URL(url);
+  let proxyPort;
+  do { proxyPort = await port(); } while (proxyPort === httpPort || proxyPort === grpcPort);
+  const proxyUrl = new URL(url);
+  proxyUrl.hostname = '127.0.0.1'; proxyUrl.port = String(proxyPort);
+  const sockets = new Set();
+  const proxy = createServer(incoming => {
+    const outgoing = connectSocket({ host: upstream.hostname, port: Number(upstream.port || 5672) });
+    for (const socket of [incoming, outgoing]) {
+      sockets.add(socket);
+      socket.on('error', () => { incoming.destroy(); outgoing.destroy(); });
+      socket.on('close', () => { sockets.delete(socket); incoming.destroy(); outgoing.destroy(); });
+    }
+    incoming.pipe(outgoing).pipe(incoming);
+  });
+  const openProxy = () => new Promise((resolve, reject) => {
+    const fail = error => { proxy.off('listening', ready); reject(error); };
+    const ready = () => { proxy.off('error', fail); resolve(); };
+    proxy.once('error', fail); proxy.once('listening', ready); proxy.listen(proxyPort, '127.0.0.1');
+  });
+  const closeProxy = async () => {
+    for (const socket of sockets) socket.destroy();
+    if (proxy.listening) await new Promise(resolve => proxy.close(resolve));
+  };
+  const health = async () => {
+    const response = await fetch('http://127.0.0.1:' + httpPort + '/health');
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+  const start = async (waitForListener = true) => {
     output = '';
     const script = `
       const { CreditService } = require(${JSON.stringify(resolve(__dirname, '../dist/services/CreditService.js'))});
@@ -102,13 +143,14 @@ test('real listener initializes once and handles retries, dead letters and resta
     `;
     child = spawn(process.execPath, ['-e', script], { cwd: folder, env: {
       ...process.env, DOTENV_CONFIG_PATH: '/dev/null', PGOPTIONS: '-c search_path=' + schema,
-      RABBITMQ_URL: url, CREDIT_ORDER_SERVICE_TOKEN: 'listener-test-token', CREDIT_JWT_PUBLIC_KEY_PATH: publicPath,
+      RABBITMQ_URL: proxyUrl.toString(), CREDIT_ORDER_SERVICE_TOKEN: 'listener-test-token', CREDIT_JWT_PUBLIC_KEY_PATH: publicPath,
       HTTP_HOST: '127.0.0.1', HTTP_PORT: String(httpPort), GRPC_HOST: '127.0.0.1', GRPC_PORT: String(grpcPort),
     }, stdio: ['ignore', 'pipe', 'pipe'] });
     childExit = new Promise(resolve => child.once('exit', (code, signal) => resolve({ code, signal })));
     child.stdout.on('data', bytes => { output += bytes; });
     child.stderr.on('data', bytes => { output += bytes; });
-    await waitFor(() => output.includes('credit user-event listener ready'), 'listener ready');
+    await waitFor(() => output.includes('credit-service REST listening'), 'REST ready');
+    if (waitForListener) await waitFor(() => output.includes('credit user-event listener ready'), 'listener ready');
   };
   try {
     await writeFile(publicPath, pair.publicKey.export({ type: 'spki', format: 'pem' }));
@@ -126,10 +168,16 @@ test('real listener initializes once and handles retries, dead letters and resta
     const before = await channel.checkQueue(CREDIT_USER_QUEUE);
     assert.equal(before.messageCount, 0, 'Use an empty dedicated test broker');
     assert.equal(before.consumerCount, 0, 'Use a dedicated test broker without existing Credit consumers');
-    await start();
-    const health = await fetch('http://127.0.0.1:' + httpPort + '/health');
-    assert.equal(health.status, 200);
-    assert.deepEqual(await health.json(), { status: 'ok', db: 'up', listener: 'up' });
+    await start(false);
+    await t.test('startup broker outage keeps health/database up and recovers without a service restart', async () => {
+      await waitFor(() => output.includes('Credit user-event consumer unavailable'), 'initial connection failure');
+      assert.deepEqual(await health(), { status: 'ok', db: 'up', listener: 'down' });
+      const pid = child.pid;
+      await openProxy();
+      await waitFor(async () => (await health()).listener === 'up', 'startup retry recovery');
+      assert.equal(child.pid, pid);
+      assert.equal((await channel.checkQueue(CREDIT_USER_QUEUE)).consumerCount, 1);
+    });
     const userId = randomUUID();
     let firstEvent;
     await t.test('registration delivery creates one 10-credit account visible through authenticated REST', async () => {
@@ -151,6 +199,22 @@ test('real listener initializes once and handles retries, dead letters and resta
       await waitAction(second, 'acked');
       assert.deepEqual(await snapshot(userId), before);
     });
+    await t.test('later disconnect reports down, recovers consumers once, and processes another registration', async () => {
+      const pid = child.pid;
+      await closeProxy();
+      await waitFor(async () => (await health()).listener === 'down', 'disconnected health');
+      await openProxy();
+      await waitFor(async () => (await health()).listener === 'up', 'restored consumer health');
+      assert.equal(child.pid, pid);
+      assert.equal((await channel.checkQueue(CREDIT_USER_QUEUE)).consumerCount, 1);
+      const recoveredUser = randomUUID();
+      const eventId = await send(recoveredUser);
+      await waitAction(eventId, 'acked');
+      assert.deepEqual(await snapshot(recoveredUser), {
+        accounts: [{ total_credits: 10, reserved_credits: 0 }],
+        history: [{ type: 'INITIAL_GRANT', total_amount_change: 10, total_reserved_change: 0 }], retryCount: '1',
+      });
+    });
     await t.test('transient handler failure retries and then allocates once', async () => {
       const eventId = await send(transientUser);
       await waitAction(eventId, 'acked');
@@ -161,10 +225,7 @@ test('real listener initializes once and handles retries, dead letters and resta
       const badUser = randomUUID();
       const eventId = await send(badUser, {}, randomUUID());
       await waitAction(eventId, 'dead-letter');
-      const delivery = await channel.get(deadLetterQueue(CREDIT_USER_QUEUE), { noAck: false });
-      assert.ok(delivery);
-      assert.equal(delivery.properties.messageId, eventId);
-      channel.ack(delivery);
+      await receiveDeadLetter(eventId);
       assert.deepEqual(await snapshot(badUser), { accounts: [], history: [], retryCount: '0' });
     });
     await t.test('inconsistent pre-existing account dead-letters without new writes', async () => {
@@ -173,10 +234,7 @@ test('real listener initializes once and handles retries, dead letters and resta
       const before = await snapshot(badUser);
       const eventId = await send(badUser);
       await waitAction(eventId, 'dead-letter');
-      const delivery = await channel.get(deadLetterQueue(CREDIT_USER_QUEUE), { noAck: false });
-      assert.ok(delivery);
-      assert.equal(delivery.properties.messageId, eventId);
-      channel.ack(delivery);
+      await receiveDeadLetter(eventId);
       assert.deepEqual(await snapshot(badUser), before);
     });
     await t.test('listener restart preserves allocation and consumes a later duplicate', async () => {
@@ -187,9 +245,17 @@ test('real listener initializes once and handles retries, dead letters and resta
       await waitAction(duplicate, 'acked');
       assert.deepEqual(await snapshot(userId), before);
     });
+    await t.test('shutdown during broker startup backoff exits without waiting for the retry', async () => {
+      await stop();
+      await closeProxy();
+      await start(false);
+      await waitFor(() => output.includes('Credit user-event consumer unavailable'), 'startup retry scheduled');
+      await stop();
+    });
   } finally {
     try { await stop(); }
     finally {
+      await closeProxy();
       await Promise.allSettled([publisher.close(), channel?.close()]);
       if (connection) await connection.close();
       await pool.end();

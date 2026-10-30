@@ -16,6 +16,6 @@ include:
   - shared/messaging/compose.yaml
   - user-service/compose.yaml
   - supplier-service/compose.yaml
-  - path: [credit-service/compose.yaml, credit-service/compose.stack.yaml]
+  - credit-service/compose.yaml
   - order-service/compose.yaml
   - ui/compose.yaml

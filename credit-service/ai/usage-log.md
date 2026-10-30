@@ -1,9 +1,9 @@
 <!--
 AI Assistance Disclosure:
-Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-26 (Asia/Singapore).
+Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-30 (Asia/Singapore).
 Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
 Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–046 below and the linked prompt archives.
+Prompts and key responses: Entries 001–047 below and the linked prompt archives.
 Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
 Recorded the latest implementation request, changes and actual verification.
 New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
@@ -1705,6 +1705,64 @@ submission files; retained disclosure content is under this ai directory.
 - **Review/provenance:** Root AGENTS.md read; no external source, dependency,
   skill, agent, commit or push. Human reviewed: specified the design, read
   through the code line by line, and ran manual tests.
+
+## 047 — RabbitMQ startup retries and live listener health
+
+- **Timestamp:** 2026-10-30 11:44 SGT (UTC+08:00), Asia/Singapore.
+- **Tool/model/modes:** OpenAI Codex, GPT-6; bounded interpretation of the human's
+  comments, implementation, tests, debugging and documentation.
+- **Exact prompts/key responses:** [Request, follow-up, saved comments and confirmed
+  reusable-client/getter direction](prompts/047-rabbitmq-startup-retries.md).
+- **Human-defined behavior:** Retry indefinitely, starting at 1 second and doubling
+  to a 30-second cap; reuse RabbitMQClient and retry connect(), then register the
+  consumer once; log each failed startup attempt's message and next delay; check
+  shuttingDown and cancel pending sleep on shutdown. Add a getter to the shared
+  messaging client to see disconnects. Keep health HTTP status database-based.
+  The human saved initially missing comments after clarification, then confirmed
+  the reusable-object/connection-first/getter direction before implementation.
+- **Implementation:** src/index.ts lazily constructs one client, retries connect
+  and registration with capped delays and an AbortController-backed wait, stops
+  retrying after success and cancels waits on shutdown. It waits for in-flight
+  startup before closing the client/pool and skips registration if connection
+  finishes during shutdown. src/events/broker.ts provides a client factory and
+  registration helper for the existing object. shared/messaging/src/index.ts adds
+  read-only isConnected, false until connection/channel and pending recovery are
+  ready, or after closure/shutdown. Health combines successful initial registration
+  with this live getter. Existing shared reconnection/consumer recovery code and
+  gRPC client retries were not changed. Original broker authors/declarations kept.
+- **Tests:** test/startup.test.cjs runs the actual entrypoint in child processes
+  with controlled waits: exact 1/2/4/8/16/30-second backoff, continued capped
+  attempts, one client, one initial successful registration, module/connection/
+  registration failures, readiness/recovery, no timer after shutdown, late connect/
+  registration races and cleanup failure handling. New broker-connection.test.cjs
+  uses the actual shared source with mocked AMQP boundaries to test disconnects,
+  pending and failed consumer restoration, later recovery and explicit close.
+  listener.integration.cjs adds a private TCP proxy over a dedicated broker to
+  verify initial outage recovery without restart, live down/up health with HTTP
+  200, exactly one restored consumer, subsequent real allocation and shutdown
+  during startup backoff. Tests use isolated schemas and do not stop real services.
+- **Actual verification:** Baseline messaging/Credit builds and eight original
+  startup tests passed. After implementation, messaging/Credit builds, all 108
+  Credit tests (zero failures/skips), and full Credit ESLint passed. Four seeded
+  ledger scenarios returned no genuine violations/deadlocks. Live tests finally
+  passed all 10 Node results, zero failures/skips. The first live run passed the
+  new recovery cases but exposed an existing DLQ visibility race through the
+  proxy: logging nack intent preceded broker delivery availability. Tests now
+  wait for a real DLQ delivery while retaining exact message-ID checks; no
+  production queue/handler behavior or ledger check was weakened. The disposable
+  broker was recreated before the successful rerun. Source, syntax, Markdown
+  references, attribution and whitespace checked. No unrelated shared gRPC suite
+  or Docker build repeated.
+- **Documentation/affected paths:** Above implementation and three test files;
+  credit-service/README.md documents startup policy, live health and checks, with
+  the AI Use Summary last; shared/messaging/README.md documents getter semantics
+  and credits original recovery code; this log/archive 047. No dependency, schema,
+  migration, external source, skill, sub-agent, commit or push.
+- **Cleanup/review:** Temporary schemas, child processes, sockets and test broker/
+  anonymous volume cleaned. Existing PostgreSQL/services untouched; no running
+  application deployment. Followed repository/service instructions and supplied
+  assignment restrictions. All new implementation/docs await human review;
+  prior review markers do not validate this exchange.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the
