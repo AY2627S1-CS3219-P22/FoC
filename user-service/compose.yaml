@@ -65,7 +65,8 @@ services:
       # Keys are mounted at runtime (see volumes), never baked into the image.
       JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
       JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
-      RABBITMQ_URL: amqp://guest:guest@host.docker.internal:5672
+      # Broker by service name on the internal network (full stack).
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     volumes:
       # Run `npm run keys:generate` first, else service exits at boot.
       - ./keys:/app/keys:ro

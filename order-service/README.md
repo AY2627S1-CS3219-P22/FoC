@@ -6,30 +6,35 @@ See usage-log.md. -->
 
 ## Local PostgreSQL
 
-Requires Docker Desktop running. From the repository root:
+Requires Docker Desktop running. Compose reads `order-service/.env`, which only
+fills the values in `compose.yaml` (database credentials and the Credit token);
+`order-service/grpc/.env` is separate and only used for host development. From
+`order-service/`:
 
 ```sh
-docker compose -f order-service/compose.yaml up -d postgres --wait
-docker compose -f order-service/compose.yaml ps
-docker compose -f order-service/compose.yaml exec postgres psql -U order_service -d order_service
+cp .env.example .env                     # once; do not overwrite an existing .env
+docker compose up -d order-db --wait
+docker compose ps
+docker compose exec order-db psql -U order_service -d order_service
 ```
 
 The stack uses PostgreSQL 16, matching User Service, with a persistent named
 volume and a readiness check. Local development credentials are
-`order_service` for both username and password. The host connection URL is:
+`order_service` for both username and password (see `.env.example`). Standalone,
+`compose.override.yaml` publishes the database on port 5434 (5433 is Credit's),
+so the host connection URL is:
 
 ```text
-postgresql://order_service:order_service@127.0.0.1:5433/order_service
+postgresql://order_service:order_service@127.0.0.1:5434/order_service
 ```
 
-If port 5433 is occupied, prefix the startup command with
-`ORDER_DATABASE_PORT=5434` and use that port in the host connection URL.
-Within this Compose network the database address is `postgres:5432`.
+Within the Compose network the database address is `order-db:5432`.
 
-Stop the stack while retaining data:
+Stop the stack while retaining data, or reset it:
 
 ```sh
-docker compose -f order-service/compose.yaml down
+docker compose down       # keep the data
+docker compose down -v    # also delete the data
 ```
 
 ## Prisma schema and migrations
@@ -42,7 +47,7 @@ been applied to the local database. Prisma 6.19.3 matches User Service.
 From the repository root, export the local database URL and run:
 
 ```sh
-export DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:5433/order_service
+export DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:5434/order_service
 npm run prisma:validate --workspace @foc/order-grpc
 npm run prisma:deploy --workspace @foc/order-grpc
 npm run prisma:generate --workspace @foc/order-grpc
@@ -55,9 +60,10 @@ For team-approved schema changes, create a migration locally with:
 npm run prisma:migrate --workspace @foc/order-grpc -- --name descriptive_name
 ```
 
-Use migration files rather than `db push`. The application container applies
-committed migrations before starting. For host development, apply them explicitly
-using the commands above. Generated client files live in `grpc/src/generated/prisma`
+Use migration files rather than `db push`. In Docker, the one-off `order-migrate`
+job applies committed migrations (`prisma migrate deploy`) on every `docker compose
+up`, and `order-service` starts only after it succeeds. For host development,
+apply them explicitly using the commands above. Generated client files live in `grpc/src/generated/prisma`
 and are ignored by Git.
 
 PostgreSQL row locks implement the author's confirmed first-lock-wins rule for
@@ -88,7 +94,8 @@ Requires Node.js 20+ and Docker Desktop. From the repository root:
 npm ci
 cp order-service/grpc/.env.example order-service/grpc/.env
 # Edit the copied file if using different database or server ports.
-docker compose -f order-service/compose.yaml up -d postgres --wait
+cp order-service/.env.example order-service/.env
+docker compose -f order-service/compose.yaml up -d order-db --wait
 ```
 
 Do not overwrite an existing `.env`; update it instead. npm workspace commands
@@ -96,7 +103,7 @@ run with `order-service/grpc` as the working directory, so dotenv loads that
 workspace's `.env`. Existing shell variables take precedence.
 
 ```sh
-export DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:5433/order_service
+export DATABASE_URL=postgresql://order_service:order_service@127.0.0.1:5434/order_service
 npm run prisma:deploy --workspace @foc/order-grpc
 npm run dev --workspace @foc/order-grpc
 ```
@@ -117,35 +124,37 @@ startup on invalid settings or an unavailable database.
 
 ## Docker application startup
 
-From the repository root:
+From `order-service/` (after `cp .env.example .env`):
 
 ```sh
-docker compose -f order-service/compose.yaml up --build -d --wait
+docker compose up --build -d --wait
 curl -i http://localhost:3003/health
-docker compose -f order-service/compose.yaml ps
-docker compose -f order-service/compose.yaml logs order-service
+docker compose ps
+docker compose logs order-service
 ```
 
-Expected: both containers healthy and HTTP 200 with `{"status":"ok","db":"up"}`.
-If the database becomes unavailable, `/health` returns HTTP 503 with
-`{"status":"degraded","db":"down"}`. Startup applies committed migrations and
-then starts both REST (3003) and gRPC (50053), running as the node user. Docker
-builds its own Linux Prisma client. The image excludes local `.env`, keys,
-node_modules and host-generated clients. Prisma CLI remains available for the
-startup migration command.
+| Service | What it is | Where (standalone dev) |
+| --- | --- | --- |
+| `order-db` | PostgreSQL 16, data in the order_service_pgdata volume | `127.0.0.1:5434` |
+| `order-migrate` | One-off job: `prisma migrate deploy`, then exits | — |
+| `order-service` | REST + gRPC, running as the node user | `http://localhost:3003`, `localhost:50053` |
 
-Stop a host-run Order process before starting the application container, or
-choose alternate published ports:
+Expected: `order-migrate` exits 0, then `order-service` becomes healthy and
+`/health` returns HTTP 200 with `{"status":"ok","db":"up"}`. If the database
+becomes unavailable, `/health` returns HTTP 503 with
+`{"status":"degraded","db":"down"}`. Docker builds its own Linux Prisma client.
+The runtime image holds production dependencies and compiled output only; it
+excludes local `.env`, keys, node_modules and host-generated clients.
 
-```sh
-ORDER_HTTP_PORT=3013 ORDER_GRPC_PORT=50063 \
-  docker compose -f order-service/compose.yaml up --build -d --wait
-```
+Ports are published by `compose.override.yaml`, which Compose loads only when run
+from this folder; the root compose does not load it, so nothing is exposed there.
+Stop a host-run Order process before starting the container, since both use
+ports 3003 and 50053.
 
-Compose supplies the container database URL explicitly using `postgres:5432`.
-The host-development `.env` is not loaded into the image. Stop both containers
-with `docker compose -f order-service/compose.yaml down`; the database volume
-is retained. Rebuild after application source changes.
+Compose supplies the container database URL explicitly using `order-db:5432`.
+The host-development `grpc/.env` is not loaded into the image. Stop with
+`docker compose down`; the database volume is retained. Rebuild after application
+source changes (`docker compose up -d --build order-service`).
 
 ## Setup issue verification (2026-10-21)
 
@@ -193,19 +202,21 @@ path fails startup. Without a public key, Order writes return 503; without a Cre
 credential, Credit-dependent writes return 503 and no recovery worker runs.
 Health continues to probe PostgreSQL independently.
 
-For Docker with host-run peer services, use the opt-in local override:
+For Docker, set `CREDIT_ORDER_SERVICE_TOKEN` in `order-service/.env` (it must
+match Credit's), then start the stack as above:
 
 ```sh
-export CREDIT_ORDER_SERVICE_TOKEN=your-order-credential
-docker compose -f order-service/compose.yaml \
-  -f order-service/compose.lifecycle.yaml up --build -d --wait
+docker compose up --build -d --wait
 ```
 
 Generate User's keys through its existing instructions if absent; do not replace
-an existing key pair. The override mounts only the public key read-only and uses
-Docker Desktop's host.docker.internal for peer RPCs. Credit uses plaintext gRPC
-with the unchanged x-credit-service-token credential. The base Compose stack
-remains usable for health and database setup without peer configuration.
+an existing key pair. Compose mounts only the public key read-only (override its
+location with `USER_PUBLIC_KEY_PATH`). Standalone, `compose.override.yaml` points
+peer RPCs at host-run services through Docker Desktop's host.docker.internal; in
+the full stack, peers are reached by service name (`user-service:50051`,
+`supplier-service:50052`, `credit-service:50054`). Credit uses plaintext gRPC
+with the unchanged x-credit-service-token credential. Without running peers,
+Order still starts and `/health` still works.
 
 ### HTTP contract
 
