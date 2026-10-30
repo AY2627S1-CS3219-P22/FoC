@@ -1,6 +1,7 @@
 <!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-24.
 Scope: Updated Order integration/client/pickup documentation after Order-only port. Human review pending.
 See usage-log.md. -->
+<!-- ChatGPT (Codex), 2026-10-30: Documented author-specified admin status filters. Human review pending. -->
 
 # Order Service
 
@@ -347,6 +348,24 @@ An administrator with USER can also use these views for their own subject.
 Listings are snapshots; acceptance still rechecks eligibility under a row lock.
 
 ### Administrator dashboard: GET /orders
+
+Omit query parameters to retrieve all orders, or filter by status:
+
+| Query | Included statuses |
+| --- | --- |
+| `?status=ONGOING` | `UNASSIGNED`, `ASSIGNED`, `PICKED_UP` |
+| `?status=UNASSIGNED` | `UNASSIGNED` |
+| `?status=ASSIGNED` | `ASSIGNED` |
+| `?status=PICKED_UP` | `PICKED_UP` |
+| `?status=DELIVERED` | `DELIVERED` |
+| `?status=CANCELLED` | `CANCELLED` |
+
+Filters use persisted status, including overdue orders awaiting expiry processing.
+Responses retain `{ "orders": [...] }`, newest first, without pagination.
+Status values are case-sensitive. Empty, unknown, repeated or structured values,
+unsupported query parameters, and combining `status` with `scope` return 400.
+The existing USER `scope` queries remain unchanged; `status` queries require
+ADMINISTRATOR, including when the caller also has USER.
 
 Requires a valid User Service bearer JWT with ADMINISTRATOR role. USER alone
 returns 403; missing/invalid credentials return 401. An administrator does not

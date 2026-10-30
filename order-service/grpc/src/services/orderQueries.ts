@@ -1,6 +1,7 @@
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Implemented author-approved administrator and authenticated relationship-based order listings.
 // Author review: Pending; see ../../usage-log.md.
+// ChatGPT (Codex), 2026-10-30: Added user-specified administrator status filters; human review pending.
 import { prisma } from '../db';
 
 const publicOrderFields = {
@@ -12,8 +13,13 @@ const publicOrderFields = {
   deliveredAt: true, cancelledAt: true,
 } as const;
 
-export function listAllOrders() {
+export type AdminOrderStatus = 'ONGOING' | 'UNASSIGNED' | 'ASSIGNED' | 'PICKED_UP' | 'DELIVERED' | 'CANCELLED';
+
+export function listAllOrders(status?: AdminOrderStatus) {
   return prisma.order.findMany({
+    ...(status ? { where: { status: status === 'ONGOING'
+      ? { in: ['UNASSIGNED', 'ASSIGNED', 'PICKED_UP'] as const }
+      : status } } : {}),
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     select: publicOrderFields,
   });

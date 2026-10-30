@@ -903,3 +903,53 @@ scope to include shared Zod alongside Order dependencies. Retained actual
 previously-run 51 shared/16 unit/61 integration and Docker results and reviewer
 commands, clearly distinguishing separate full Credit runtime. Documentation
 only; no tests rerun or new runtime verification claimed. git diff --check used.
+
+
+## 2026-10-30 (Asia/Singapore): administrator order status filters
+
+Tool: ChatGPT (Codex). Modes: implementation, tests, documentation.
+Human review and validation remain pending.
+
+Exact user prompts:
+
+> Great. Could we add another endpoint for administrator? They should be able to see all orders and also filter to currently ongoing orders.
+
+```text
+We will have one endpoint that accepts a filter as a query parameter.
+All Orders
+`GET /orders`
+Ongoing
+`GET /orders?status=ONGOING`
+Unassigned
+`GET /orders?status=UNASSIGNED`
+Assigned
+`GET /orders?status=ASSIGNED`
+Picked Up
+`GET /orders?status=PICKED_UP`
+Delivered
+`GET /orders?status=DELIVERED`
+Cancelled
+`GET /orders?status=CANCELLED`
+```
+
+Assistant clarification: “For status=ONGOING, which statuses should match, and should overdue orders awaiting expiry processing still appear?”
+
+Exact user answer: “UNASSIGNED, ASSIGNED, PICKED_UP; include overdue orders”.
+
+Key response: “ONGOING will include UNASSIGNED, ASSIGNED, and PICKED_UP, including overdue orders. I’ll verify the filters, administrator access checks, and existing user queries.”
+
+Implemented the supplied status filter on the existing administrator endpoint,
+keeping the existing USER scopes. Invalid filters and mixed scope/status queries
+return 400. Added real PostgreSQL/HTTP regression coverage for exact statuses,
+ongoing/overdue inclusion, role restrictions and query validation. Updated the
+service README and final project README AI disclosure. No UI changes.
+
+Verification: Order build passed; 16 unit/authentication/gRPC tests passed after
+rerunning outside the sandbox (local listeners were blocked inside it). Existing
+migrations applied to a temporary dedicated PostgreSQL test database.
+
+Final verification: all 62 Order PostgreSQL/HTTP/gRPC integration tests passed,
+including the new administrator filter test and existing USER scope regression
+test. The initial sandboxed integration attempt could not reach PostgreSQL;
+rerunning with local network access succeeded. `git diff --check` passed.
+Temporary PostgreSQL test container removed after verification.

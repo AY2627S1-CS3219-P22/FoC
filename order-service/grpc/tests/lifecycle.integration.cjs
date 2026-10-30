@@ -1,5 +1,6 @@
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Generated real PostgreSQL/HTTP lifecycle tests; review pending; see ../../usage-log.md.
+// ChatGPT (Codex), 2026-10-30: Administrator filter regression coverage; human review pending.
 const {test,before,after}=require('node:test');const assert=require('node:assert/strict');
 const {randomUUID,generateKeyPairSync}=require('node:crypto');const {once}=require('node:events');const jwt=require('jsonwebtoken');
 const url=process.env.TEST_DATABASE_URL;
@@ -342,6 +343,43 @@ test('USER retrieval scopes enforce ownership, expiry and historical visibility'
  // Once the only remaining unassigned rows expire, an empty open list is still successful.
  await db.order.updateMany({where:{status:'UNASSIGNED'},data:{expiryTime:new Date(Date.now()-1000)}});
  assert.deepEqual(await get('open'),[]);
+});
+
+test('administrator status filters include overdue ongoing orders and reject unauthorized or invalid queries', async t => {
+ const f=fixture();
+ const states=['UNASSIGNED','ASSIGNED','PICKED_UP','DELIVERED','CANCELLED'];
+ const seeded=[];
+ for(const status of states){
+  const order=await create(f,'admin-filter-'+status);
+  seeded.push(await db.order.update({where:{id:order.id},data:{status,expiryTime:new Date(0)}}));
+ }
+ const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+ const server=createApp(publicKey.export({type:'spki',format:'pem'})).listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(r=>server.close(r)));
+ const base='http://127.0.0.1:'+server.address().port+'/orders';
+ const headers=roles=>({Authorization:'Bearer '+jwt.sign({roles},privateKey,{algorithm:'RS256',subject:f.user,expiresIn:60})});
+ const admin=headers(['ADMINISTRATOR']);
+ const get=async(query)=>{
+  const response=await fetch(base+query,{headers:admin});assert.equal(response.status,200);
+  return (await response.json()).orders;
+ };
+ const all=await get('');for(const order of seeded)assert.ok(all.some(o=>o.id===order.id));
+ for(const status of states){
+  const orders=await get('?status='+status);
+  assert.ok(orders.every(o=>o.status===status));
+  assert.ok(orders.some(o=>o.id===seeded.find(o=>o.status===status).id));
+ }
+ const ongoing=await get('?status=ONGOING');
+ assert.ok(ongoing.every(o=>['UNASSIGNED','ASSIGNED','PICKED_UP'].includes(o.status)));
+ for(const order of seeded.slice(0,3))assert.ok(ongoing.some(o=>o.id===order.id));
+ for(const order of seeded.slice(3))assert.ok(!ongoing.some(o=>o.id===order.id));
+ assert.equal((await fetch(base+'?status=ONGOING')).status,401);
+ for(const status of ['ONGOING',...states])assert.equal((await fetch(base+'?status='+status,{headers:headers(['USER'])})).status,403);
+ for(const query of ['status=','status=ongoing','status=INVALID','status=ASSIGNED&status=DELIVERED','status[foo]=ASSIGNED','status=ONGOING&scope=requested','status=ASSIGNED&userId=someone']){
+  assert.equal((await fetch(base+'?'+query,{headers:admin})).status,400,query);
+ }
+ // Dual-role administrators retain their ordinary relationship-based listing.
+ const response=await fetch(base+'?scope=requested',{headers:headers(['ADMINISTRATOR','USER'])});assert.equal(response.status,200);
+ const requested=(await response.json()).orders;assert.ok(requested.every(o=>o.requesterId===f.user));assert.equal(requested.length,states.length);
 });
 
 // Exercise production Credit client serialization, credentials and error handling

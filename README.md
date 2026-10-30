@@ -122,3 +122,9 @@ PR documentation refresh, ChatGPT (Codex), 2026-10-25: documented the existing
 shared Supplier validators' runtime Zod import and corrected the dependency
 summary in Order PR_DESCRIPTION.md. Prompt/checks: Order usage log. Human review
 pending; documentation-only update.
+
+Administrator order filters, ChatGPT (Codex), 2026-10-30: implemented the team's
+explicit GET /orders status query contract and confirmed ONGOING membership,
+including overdue orders. Added HTTP/database regression coverage and service
+documentation. Exact prompts, key responses and verification are in
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.

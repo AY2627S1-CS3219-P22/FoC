@@ -1,6 +1,7 @@
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
 // Scope: Added approved pickup validation/controller to order commands and retrieval.
 // Author review: Pending; see ../../../../usage-log.md.
+// ChatGPT (Codex), 2026-10-30: Added user-specified administrator status queries; human review pending.
 import type { RequestHandler } from 'express';
 import type { createOrderAcceptance } from '../../services/orderAcceptance';
 import type { createOrderLifecycle } from '../../services/orderLifecycle';
@@ -56,14 +57,17 @@ export function editOrder(edits?: ReturnType<typeof createOrderEdits>): RequestH
 }
 
 export const getAllOrders: RequestHandler = async (req, res, next) => {
-  const query = z.object({ scope: z.enum(['open', 'requested', 'assigned']).optional() }).strict().safeParse(req.query);
+  const query = z.object({
+    scope: z.enum(['open', 'requested', 'assigned']).optional(),
+    status: z.enum(['ONGOING', 'UNASSIGNED', 'ASSIGNED', 'PICKED_UP', 'DELIVERED', 'CANCELLED']).optional(),
+  }).strict().refine(value => !(value.scope && value.status)).safeParse(req.query);
   if (!query.success) { res.status(400).json({ error: 'invalid-input' }); return; }
   const scope = query.data.scope;
   const user = res.locals.user;
   const role = scope ? 'USER' : 'ADMINISTRATOR';
   if (!user.roles.includes(role)) { res.status(403).json({ error: 'forbidden' }); return; }
   try {
-    const orders = scope ? await listUserOrders(scope, user.id) : await listAllOrders();
+    const orders = scope ? await listUserOrders(scope, user.id) : await listAllOrders(query.data.status);
     res.json({ orders: orders.map(order => ({ ...order, supplierId: order.supplierId.toString() })) });
   } catch (error) { next(error); }
 };
