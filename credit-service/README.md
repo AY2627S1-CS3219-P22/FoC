@@ -1,8 +1,8 @@
 <!--
 AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-10-30 (Asia/Singapore).
 Mode/scope: Documented and checked the human-defined Credit implementation.
-Review: Prior content human-reviewed; entries 047–048 changes await human review.
-Exact prompts, key responses and checks: ai/usage-log.md, entries 003–048.
+Review: Prior content human-reviewed; entries 047–049 changes await human review.
+Exact prompts, key responses and checks: ai/usage-log.md, entries 003–049.
 -->
 
 # Credit service
@@ -26,6 +26,9 @@ and deletion are deferred. The human's definitions and AI records are retained i
 [the usage log](ai/usage-log.md).
 
 ## Source layout
+
+For cluster prerequisites, Kubernetes setup and adapting the human-written Credit
+manifests for another service, see [the Kubernetes guide](../k8s/README.md).
 
 ```text
 credit-service/
@@ -511,4 +514,8 @@ and 10 live-listener test results passed in entry 047. Entry 048 used OpenAI Cod
 inclusive `--to` option, remove the old runner, and update tests/documentation.
 All 110 Credit tests and Credit lint passed for that change; no application
 database migration or deployment was performed.
+Entry 049 documents the human-written Kubernetes manifests and team conventions
+in [the Kubernetes guide](../k8s/README.md), including teammate setup and service
+adaptation. Shell syntax, links and offline resource generators were checked;
+no cluster deployment or application test run was performed for that documentation.
 New changes await human review; prior review markers apply to earlier content.

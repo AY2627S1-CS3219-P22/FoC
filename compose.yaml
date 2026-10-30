@@ -7,8 +7,6 @@
 # compose.override.yaml (standalone ports) is not loaded here. 
 # Only the UI's port 8080 is published. Everything else talks over the
 # shared internal network.
-# compose.stack.yaml (full-stack-only settings, e.g. waiting for RabbitMQ)
-# is merged on top of a service's compose.yaml here.
 
 name: foc
 
