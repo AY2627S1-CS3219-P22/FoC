@@ -112,7 +112,10 @@ test('Credit configuration needs no local/TLS settings and ignores obsolete tran
       assert.equal(Object.hasOwn(env, name), false);
     }
   `;
-  const base = { ...process.env, DOTENV_CONFIG_PATH: join(__dirname, 'not-an-env-file'), CREDIT_ORDER_SERVICE_TOKEN: 'test-order-token', GRPC_PORT: '50054' };
+  const base = { ...process.env, DOTENV_CONFIG_PATH: join(__dirname, 'not-an-env-file'),
+  CREDIT_ORDER_SERVICE_TOKEN: 'test-order-token', GRPC_PORT: '50054',
+  RABBITMQ_URL: 'amqp://test-broker:5672', PGHOST: 'localhost', PGPORT: '5432',
+  PGUSER: 'credit', PGPASSWORD: 'credit', PGDATABASE: 'credit' };
   for (const key of ['CREDIT_LOCAL_MODE', 'CREDIT_TLS_CERT_PATH', 'CREDIT_TLS_KEY_PATH']) delete base[key];
   const execute = promisify(execFile);
   await execute(process.execPath, ['-r', 'tsx/cjs', '-e', source], { env: base });
