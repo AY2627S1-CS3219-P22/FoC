@@ -35,8 +35,8 @@ is no need to switch the checkout serving Order to a different branch.
 | --- | --- | --- | --- |
 | User | 3001 | 50051 | 5432 |
 | Supplier | 3002 | 50052 | 54332 |
-| Order | 3003 | 50053 | 5433 |
-| Credit | 3004 | 50054 | choose 5434 to avoid Order's 5433 |
+| Order | 3003 | 50053 | 5434 |
+| Credit | 3004 | 50054 | 5433 |
 
 ## 2. Start services
 
@@ -78,44 +78,31 @@ Expected: a supplier list. The REST response uses a `data` property. Select an
 existing supplier whose hours make it open **now**, not just at the order deadline.
 The actual supplier ID might not be 1.
 
-For Credit, set this terminal variable to your separate working Credit checkout:
+For Credit, set this terminal variable to your separate working Credit checkout,
+then copy its `credit-service/.env.example` to `.env` if you haven't already.
+`CREDIT_ORDER_SERVICE_TOKEN` must match Order's. `DOCKER_RABBITMQ_URL` must reach
+your RabbitMQ from Docker Desktop.
 
 ```sh
 export CREDIT_REPO=/absolute/path/to/working-credit-checkout
-export CREDIT_JWT_PUBLIC_KEY_FILE="$ORDER_REPO/user-service/keys/public.pem"
-docker compose --env-file "$CREDIT_REPO/credit-service/.env.docker.example" \
-  -f "$CREDIT_REPO/credit-service/compose.yaml" up --build -d --wait
+docker compose --project-directory "$CREDIT_REPO/credit-service" up --build -d --wait
 ```
 
-The inspected Credit example supplies a RabbitMQ URL reachable from Docker
-Desktop and the same example service token. Keep them consistent if customized.
-If Credit's database is fresh, apply its committed migrations before registration:
-
-```sh
-for migration in 001_initial.sql 002_align_credit_contract.sql \
-  003_uppercase_reservation_status.sql 004_reservation_invariants.sql \
-  005_initial_grant_history_type.sql 006_history_types_and_paging.sql \
-  007_credit_delta_constraints.sql
-do
-  docker compose --env-file "$CREDIT_REPO/credit-service/.env.docker.example" \
-    -f "$CREDIT_REPO/credit-service/compose.yaml" exec -T credit-service \
-    npm run db:migrate -- "migrations/$migration"
-done
-```
-
-This sequence is for a fresh Credit database. For an existing database, follow
-Credit's own migration instructions; do not rerun initial migrations blindly.
-Use that checkout's README if its migration list has since changed.
+`--project-directory` loads Credit's `compose.yaml`, `compose.override.yaml`
+(published ports) and `.env`, as if run from that folder. The `credit-migrate`
+job applies Credit's migrations automatically before `credit-service` starts.
+Credit mounts `../user-service/keys/public.pem` by default; set
+`CREDIT_JWT_PUBLIC_KEY_PATH` in Credit's `.env` if User's keys live elsewhere.
 
 Start Order with authenticated lifecycle integration enabled:
 
 ```sh
-cd "$ORDER_REPO"
+cd "$ORDER_REPO/order-service"
 # Set this if User's keys live in a different checkout:
 # export USER_PUBLIC_KEY_PATH=/absolute/path/to/user-service/keys/public.pem
+# order-service/.env must contain CREDIT_ORDER_SERVICE_TOKEN (copy .env.example).
 
-docker compose -f order-service/compose.yaml \
-  -f order-service/compose.lifecycle.yaml up --build -d --wait
+docker compose up --build -d --wait
 curl -i http://localhost:3003/health
 ```
 
@@ -337,16 +324,14 @@ that same uncertain attempt.
 For a local recovery test, stop only your local Credit application container:
 
 ```sh
-docker compose --env-file "$CREDIT_REPO/credit-service/.env.docker.example" \
-  -f "$CREDIT_REPO/credit-service/compose.yaml" stop credit-service
+docker compose --project-directory "$CREDIT_REPO/credit-service" stop credit-service
 ```
 
 Create a new order with a new key/body, following step 5: directory checks must
 still succeed. Expected: 202 after durable recording. Restart Credit promptly:
 
 ```sh
-docker compose --env-file "$CREDIT_REPO/credit-service/.env.docker.example" \
-  -f "$CREDIT_REPO/credit-service/compose.yaml" start credit-service
+docker compose --project-directory "$CREDIT_REPO/credit-service" start credit-service
 ```
 
 The worker should publish after reconciliation; replay the same original key/body
@@ -375,8 +360,7 @@ manually changing normal service database rows.
 ## 11. Troubleshooting and shutdown
 
 ```sh
-docker compose -f order-service/compose.yaml -f order-service/compose.lifecycle.yaml \
-  logs --tail 100 order-service
+docker compose -f order-service/compose.yaml logs --tail 100 order-service
 ```
 
 - Order health 200 but writes 503: check public-key/token settings and peer RPCs.
