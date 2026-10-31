@@ -1,6 +1,7 @@
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Implemented author-approved durable edit operations and Credit UpdateReservation reconciliation.
 // Author review: Pending; see ../../usage-log.md.
+// ChatGPT (Codex), 2026-10-30: Removed current-opening-hours checks as requested; human review pending.
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { PrismaClient, Prisma } from '../generated/prisma';
@@ -43,13 +44,13 @@ export function createOrderEdits(db: PrismaClient, credit: ReturnType<typeof cre
       const input = createOrderSchema.parse({ supplierId: order.supplierId.toString(), destination: order.destination,
         requestDetails: order.requestDetails, credits: order.credits, expiryTime: order.expiryTime.toISOString(), ...request });
       if (!isAllowedExpiry(input.expiryTime, time)) return { status: 400, error: 'invalid-input' };
-      let supplier, opening, reservation;
+      let supplier, reservation;
       try {
-        [supplier, opening, reservation] = await Promise.all([
-          directories.getSupplier(input.supplierId), directories.isSupplierOpen(input.supplierId), credit.getReservation({ orderId }, creditOptions).then(validateReservation),
+        [supplier, reservation] = await Promise.all([
+          directories.getSupplier(input.supplierId), credit.getReservation({ orderId }, creditOptions).then(validateReservation),
         ]);
       } catch (error) { return classifyCreditError(error) === 'rejected' ? { status: 409, error: 'dependency-rejected' } : { status: 503, error: 'dependency-unavailable' }; }
-      if (!opening.isOpen || supplier.supplierId !== input.supplierId || !supplier.name.trim() || !supplier.locationDescription.trim()
+      if (supplier.supplierId !== input.supplierId || !supplier.name.trim() || !supplier.locationDescription.trim()
         || reservation.orderId !== orderId || reservation.requesterId !== requesterId || reservation.amount !== order.credits || reservation.status !== 'RESERVED') {
         return { status: 409, error: 'dependency-rejected' };
       }

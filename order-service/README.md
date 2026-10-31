@@ -1,3 +1,4 @@
+<!-- ChatGPT (Codex), 2026-10-30: Updated opening-hours behavior; human review pending. -->
 <!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-24.
 Scope: Updated Order integration/client/pickup documentation after Order-only port. Human review pending.
 See usage-log.md. -->
@@ -169,9 +170,9 @@ that attribution refers to the same records now maintained in this service.
 
 ## Order lifecycle (2026-10-22)
 
-**Peer-service status:** Supplier GetSupplier/IsOpen and User outbox are inherited
+**Peer-service status:** Supplier GetSupplier and User outbox are inherited
 from main. The Credit runtime in this checkout remains a scaffold. Successful production creation requires the real User
-GetPublicProfile, implemented Supplier GetSupplier/IsOpen, and Credit from the
+GetPublicProfile, implemented Supplier GetSupplier, and Credit from the
 agreed `feat/credit-implementation` contract. Order now imports that contract
 from `@foc/grpc`; the duplicate local protobuf was removed. Shared contracts
 and teammate sources are unchanged by this Order-only port. No test doubles
@@ -231,7 +232,7 @@ supplierId (positive bigint decimal string), destination, requestDetails, credit
 accepts any nonempty subset of these five fields. Unknown fields are rejected;
 requester identity, names and pickup snapshots cannot be supplied by the client.
 Required text must be nonblank; expiry must be at least one hour after database
-time at initial creation/edit validation. Supplier must currently be open.
+time at initial creation/edit validation. Supplier existence is validated; current opening hours do not block creation or editing.
 
 Newly published orders are UNASSIGNED/RESERVED. Returns use `{order: {...}}` with
 supplierId serialized as a decimal string and timestamps as ISO UTC. Internal
@@ -507,7 +508,7 @@ implemented as described in the integration update below; delivery requires a PI
 Supply a nonempty partial body containing supplierId (decimal string), destination,
 requestDetails, credits (positive int32), and/or offset-bearing ISO expiryTime.
 The resulting order must meet the existing validation rules, including expiry at
-least one hour after database time and a currently open supplier. Only the
+least one hour after database time and a valid supplier. Only the
 original requester can edit an unexpired UNASSIGNED order.
 
 The durable OrderEditOperation saves the request, complete target fields and
@@ -558,7 +559,7 @@ unexpired ASSIGNED order, and an empty JSON object. A row-locked transaction
 sets PICKED_UP and pickedUpAt, returning 200 with `{ "order": {...} }`. Wrong
 actor/role returns 403, missing/invalid JWT 401, malformed input 400, missing
 order 404, invalid transition/expiry 409. Repeated pickup returns 409. No credits
-move at pickup. Supplier opening is checked during creation; pickup/delivery use
+move at pickup. Supplier opening hours do not gate creation, editing or recovery; pickup/delivery use
 the saved snapshot without another Supplier RPC, as approved by the human.
 
 ## AI Use Summary

@@ -953,3 +953,28 @@ including the new administrator filter test and existing USER scope regression
 test. The initial sandboxed integration attempt could not reach PostgreSQL;
 rerunning with local network access succeeded. `git diff --check` passed.
 Temporary PostgreSQL test container removed after verification.
+
+
+## 2026-10-30 (Asia/Singapore): remove current supplier opening-hours restriction
+
+Tool: ChatGPT (Codex). Modes: implementation, regression tests, documentation.
+Human review remains pending.
+
+Exact user prompt: “Remove that check since it does not make sense if the supplier is not currently open but will be open in the other hours and the order can still be completed.”
+
+Key response: “I’ll remove the supplier open-status checks from order creation, recovery, and editing, then update the tests and documentation. Supplier existence validation will stay in place.”
+
+Removed calls to Supplier IsOpen from creation preflight, reservation recovery,
+final publication validation and editing. Removed the unused Order adapter.
+Supplier lookup, order expiry and credit reservation/compensation remain. Existing
+COMPENSATING operations still complete their recorded refund workflow. Updated
+regression tests: an accidental IsOpen call throws in the fixture, the real
+gRPC adapter test exposes an unimplemented IsOpen RPC, and uncertain reservation
+recovery now publishes without an opening-hours check or refund. Updated Order
+README, manual testing and integration notes, plus the root AI disclosure.
+
+Verification: Order build and all 16 unit/authentication/gRPC tests passed.
+
+All 62 PostgreSQL/HTTP/gRPC integration tests passed, including creation/editing
+with IsOpen unimplemented and recovery without current-opening-hours checks.
+`git diff --check` passed. Temporary test container removed after verification.

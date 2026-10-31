@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-10-30: Regression coverage for removal of opening-hours gates; human review pending.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Generated real PostgreSQL/HTTP lifecycle tests; review pending; see ../../usage-log.md.
 // ChatGPT (Codex), 2026-10-30: Administrator filter regression coverage; human review pending.
@@ -19,7 +20,7 @@ after(async()=>{
  await require('../dist/db').prisma.$disconnect();
 });
 function fixture() {
- const user=prefix+'-'+(++userCounter);const ledger=new Map();let calls=0;let updates=0;let releases=0;let settlements=0;let settleMode;let reserveMode;let updateMode;let releaseMode;let unavailable=false;let closed=false;let invalidSupplier=false;
+ const user=prefix+'-'+(++userCounter);const ledger=new Map();let calls=0;let updates=0;let releases=0;let settlements=0;let settleMode;let reserveMode;let updateMode;let releaseMode;let unavailable=false;let invalidSupplier=false;
  const err=(code)=>Object.assign(new Error('test RPC failure'),{code});
  const credit={
   getBalance:async({userId})=>({userId,totalCredits:20,reservedCredits:0,availableCredits:20}),
@@ -43,10 +44,10 @@ function fixture() {
  };
  const directories={getRequester:async(userId)=>({userId,username:'student',firstName:'Campus',lastName:'Friend'}),
   getSupplier:async(supplierId)=>{if(invalidSupplier)throw err(5);return {supplierId,name:'Cafe',locationDescription:'Level 1',buildingName:'NUS',floor:1}},
-  isSupplierOpen:async()=>({isOpen:!closed}),close:()=>{}};
+  isSupplierOpen:async()=>{throw new Error("Order must not call IsOpen")},close:()=>{}};
  const creation=createOrderCreation(db,credit,directories),edits=createOrderEdits(db,credit,directories),lifecycle=createOrderLifecycle(db,credit);
  const input=()=>createOrderSchema.parse({supplierId:'1',destination:'PGP',requestDetails:'Coffee',credits:4,expiryTime:new Date(Date.now()+7200000).toISOString()});
- return {user,credit,directories,creation,edits,lifecycle,input,ledger,get calls(){return calls},get updates(){return updates},get releases(){return releases},get settlements(){return settlements},set settleMode(v){settleMode=v},set reserveMode(v){reserveMode=v},set updateMode(v){updateMode=v},set releaseMode(v){releaseMode=v},set unavailable(v){unavailable=v},set closed(v){closed=v},set invalidSupplier(v){invalidSupplier=v}};
+ return {user,credit,directories,creation,edits,lifecycle,input,ledger,get calls(){return calls},get updates(){return updates},get releases(){return releases},get settlements(){return settlements},set settleMode(v){settleMode=v},set reserveMode(v){reserveMode=v},set updateMode(v){updateMode=v},set releaseMode(v){releaseMode=v},set unavailable(v){unavailable=v},set invalidSupplier(v){invalidSupplier=v}};
 }
 async function due(orderId,type='RESERVE') {await db.creditOperation.updateMany({where:{orderId,type,state:{not:'SUCCEEDED'}},data:{state:'PENDING',nextRetryAt:new Date(0),leaseExpiresAt:null}})}
 async function editDue(orderId) {await db.orderEditOperation.updateMany({where:{orderId,state:{in:['PENDING','PROCESSING']}},data:{state:'PENDING',nextRetryAt:new Date(0),leaseExpiresAt:null}})}
@@ -62,8 +63,8 @@ test('concurrent identical same-key creation publishes only one order/reservatio
  const f=fixture(),input=f.input();const results=await Promise.all(Array.from({length:5},()=>f.creation.submit(f.user,'race',input)));
  assert.equal(await db.order.count({where:{requesterId:f.user}}),1);assert.equal(f.calls,1);assert.ok(results.every(r=>[200,201,202].includes(r.status)));
 });
-test('invalid/closed supplier, short expiry, insufficient balance and explicit rejection do not publish',async()=>{
- const f=fixture();f.closed=true;assert.equal((await f.creation.submit(f.user,'closed',f.input())).status,409);f.closed=false;f.invalidSupplier=true;assert.equal((await f.creation.submit(f.user,'missing',f.input())).status,409);f.invalidSupplier=false;
+test('invalid supplier, short expiry, insufficient balance and explicit rejection do not publish',async()=>{
+ const f=fixture();f.invalidSupplier=true;assert.equal((await f.creation.submit(f.user,'missing',f.input())).status,409);f.invalidSupplier=false;
  assert.equal((await f.creation.submit(f.user,'expiry',{...f.input(),expiryTime:new Date(Date.now()+1000)})).status,400);
  assert.equal((await f.creation.submit(f.user,'insufficient',{...f.input(),credits:21})).status,409);
  f.reserveMode='reject';assert.equal((await f.creation.submit(f.user,'reject',f.input())).status,409);await f.creation.recoverBatch();assert.equal(f.calls,1);assert.equal(await db.order.count({where:{requesterId:f.user}}),0);
@@ -106,8 +107,8 @@ test('credit-edit timeout resumes against current version without applying the m
  const f=fixture(),order=await create(f);f.updateMode='after';const r=await f.edits.edit(order.id,f.user,'uncertain-edit',{credits:7});assert.equal(r.status,202);assert.equal(r.order.credits,4);await editDue(order.id);
  await createOrderEdits(db,f.credit,f.directories).recoverBatch();const updated=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(updated.credits,7);assert.equal(f.updates,1);
 });
-test('edits reject other users, accepted orders, closed suppliers and permanent credit rejection',async()=>{
- const f=fixture(),order=await create(f);assert.equal((await f.edits.edit(order.id,'other','x',{destination:'Elsewhere'})).status,403);f.closed=true;assert.equal((await f.edits.edit(order.id,f.user,'closed',{destination:'Elsewhere'})).status,409);f.closed=false;
+test('edits reject other users, accepted orders, invalid suppliers and permanent credit rejection',async()=>{
+ const f=fixture(),order=await create(f);assert.equal((await f.edits.edit(order.id,'other','x',{destination:'Elsewhere'})).status,403);f.invalidSupplier=true;assert.equal((await f.edits.edit(order.id,f.user,'invalid-supplier',{destination:'Elsewhere'})).status,409);f.invalidSupplier=false;
  f.updateMode='reject';assert.equal((await f.edits.edit(order.id,f.user,'reject',{credits:19})).status,409);assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).credits,4);
  await db.order.update({where:{id:order.id},data:{status:'ASSIGNED',courierId:'courier',acceptedAt:new Date()}});assert.equal((await f.edits.edit(order.id,f.user,'assigned',{destination:'Elsewhere'})).status,409);assert.equal((await f.lifecycle.cancel(order.id,f.user)).status,409);
 });
@@ -160,7 +161,7 @@ test('creation integrates real User/Supplier/Credit gRPC adapters with PostgreSQ
  const f=fixture();const rpc=require('@foc/grpc');const grpc=require('@grpc/grpc-js');
  const {createDirectories}=require('../dist/dependencies/directories');const {createCreditClient}=require('@foc/grpc');
  const userServer=rpc.createServer(rpc.UserService.service,{GetPublicProfile:(call,cb)=>cb(null,{userId:call.request.userId,username:'student',firstName:'Campus',lastName:'Friend'})});
- const supplierServer=rpc.createServer(rpc.SupplierService.service,{GetSupplier:(call,cb)=>cb(null,{supplierId:call.request.supplierId,name:'Cafe',buildingName:'NUS',floor:1,latitude:1.3,longitude:103.77}),IsOpen:(_call,cb)=>cb(null,{isOpen:true})});
+ const supplierServer=rpc.createServer(rpc.SupplierService.service,{GetSupplier:(call,cb)=>cb(null,{supplierId:call.request.supplierId,name:'Cafe',buildingName:'NUS',floor:1,latitude:1.3,longitude:103.77}),IsOpen:(_call,cb)=>cb({code:12,message:'IsOpen is not required'})});
  const creditServer=new grpc.Server();const CreditService=rpc.CreditService;
  const handlers={};for(const [wire,method] of [['GetBalance','getBalance'],['GetReservation','getReservation'],['ReserveCredits','reserveCredits'],['UpdateReservation','updateReservation'],['ReleaseCredits','releaseCredits'],['SettleCredits','settleCredits']])handlers[wire]=(call,cb)=>{
   if(call.metadata.get('x-credit-service-token')[0]!=='integration-token'){cb({code:16});return}
@@ -176,9 +177,9 @@ test('creation integrates real User/Supplier/Credit gRPC adapters with PostgreSQ
  const cancellation=await createOrderLifecycle(db,credit,[],creditOptions).cancel(r.order.id,f.user);assert.equal(cancellation.order.creditState,'REFUNDED');assert.equal(f.ledger.get(r.order.id).status,'RELEASED');
 });
 
-test('pending creation compensates instead of publishing when supplier is now closed',async()=>{
- const f=fixture();f.reserveMode='after';const r=await f.creation.submit(f.user,'closed-during-recovery',f.input());assert.equal(r.status,202);f.closed=true;await due(r.creationId);await f.creation.recoverBatch();
- assert.equal(await db.order.count({where:{id:r.creationId}}),0);assert.equal(f.ledger.get(r.creationId).status,'RELEASED');assert.equal((await db.orderCreation.findUniqueOrThrow({where:{orderId:r.creationId}})).state,'FAILED');
+test('pending creation recovers without checking current supplier opening hours',async()=>{
+ const f=fixture();f.reserveMode='after';const r=await f.creation.submit(f.user,'closed-during-recovery',f.input());assert.equal(r.status,202);await due(r.creationId);await f.creation.recoverBatch();
+ assert.equal(await db.order.count({where:{id:r.creationId}}),1);assert.equal(f.ledger.get(r.creationId).status,'RESERVED');assert.equal(f.releases,0);assert.equal((await db.orderCreation.findUniqueOrThrow({where:{orderId:r.creationId}})).state,'SUCCEEDED');
 });
 
 test('administrator GET /orders includes all statuses and history with role separation and public fields',async t=>{
@@ -673,10 +674,10 @@ test('pickup rejects all other states and elapsed expiry without setting timesta
  assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).pickedUpAt,null);
 });
 
-test('concurrent pickups yield one transition and use saved Supplier snapshot even if supplier closes',async()=>{
+test('concurrent pickups yield one transition and use saved Supplier snapshot',async()=>{
  const f=fixture(),order=await create(f,'pickup-race'),courier=f.user+'-courier';
  await db.order.update({where:{id:order.id},data:{status:'ASSIGNED',courierId:courier,acceptedAt:new Date()}});
- f.closed=true;
+
  const results=await Promise.all(Array.from({length:8},()=>f.lifecycle.pickup(order.id,courier)));
  assert.equal(results.filter(r=>r.order).length,1);assert.equal(results.filter(r=>r.status===409).length,7);
  const saved=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(saved.status,'PICKED_UP');assert.equal(saved.pickupStore,order.pickupStore);assert.equal(saved.pickupLocation,order.pickupLocation);

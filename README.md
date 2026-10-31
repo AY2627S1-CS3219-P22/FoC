@@ -128,3 +128,10 @@ explicit GET /orders status query contract and confirmed ONGOING membership,
 including overdue orders. Added HTTP/database regression coverage and service
 documentation. Exact prompts, key responses and verification are in
 [order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+Supplier opening-hours restriction removal, ChatGPT (Codex), 2026-10-30:
+removed current-open checks from Order creation, recovery and editing following
+the user's explicit instruction. Supplier existence, expiry and credit validation
+remain. Updated regression tests and operational documentation. Exact prompt,
+key response and verification: [order-service/usage-log.md](order-service/usage-log.md).
+Human review pending.
