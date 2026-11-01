@@ -1,4 +1,11 @@
-// Creates the initial Administrator account. 
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), date: 2026-10-19
+// Scope: AI generated the interactive admin bootstrap CLI.
+// Author review: Author specified the workflow, input handling and error
+// behaviour, reviewed the code and approved. See user-service/ai/usage-log.md,
+// entry 019.
+
+// Creates the initial Administrator account.
 // Run once per database, from an interactive terminal:
 //   docker compose exec user-service npm run admin:create
 //   kubectl exec -it deploy/user-service -- npm run admin:create

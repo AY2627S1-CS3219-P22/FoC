@@ -1,3 +1,9 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), date: 2026-09-27
+// Scope: AI generated the Zod registration schema.
+// Author review: Author specified the fields and validation rules, reviewed the
+// code line by line and approved. See user-service/ai/usage-log.md, entry 002.
+
 import { z } from 'zod';
 
 // Only NUS addresses are allowed: @nus.edu.sg (staff) or @u.nus.edu (students).

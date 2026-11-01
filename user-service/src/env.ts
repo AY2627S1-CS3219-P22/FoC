@@ -1,3 +1,10 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), dates: 2026-09-25 – 2026-10-16
+// Scope: AI generated the zod env validation, then added the JWT config and
+// key loading, the refresh-token settings and the standardised gRPC port.
+// Author review: Author reviewed the code and approved. See
+// user-service/ai/usage-log.md, entries 001, 008, 010, 016.
+
 import 'dotenv/config';
 import fs from 'node:fs';
 import { z } from 'zod';
