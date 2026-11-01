@@ -26,6 +26,9 @@ node_modules/
 # RabbitMQ client logs (broker.log plus one file per queue)
 logs/
 
+# Scraper CSVs / rejected rows
+supplier-service/data/out/
+
 supabase/.temp/start-secrets/supabase_edge_runtime_FoC/env/
 
 # Order generated Prisma client
