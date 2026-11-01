@@ -33,7 +33,7 @@ async function main() {
       try {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
-        throw new AggregateError([error, rollbackError], 'Migration and rollback failed.');
+        throw new AggregateError([error, rollbackError], 'Migration and rollback failed.', {cause: error});
       }
       throw error;
     }

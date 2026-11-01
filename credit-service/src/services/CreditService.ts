@@ -286,7 +286,7 @@ export class CreditService {
         try { await client.query('ROLLBACK'); }
         catch (rollbackError) {
           discardConnection = true;
-          throw new AggregateError([error, rollbackError], 'Initial allocation and rollback failed');
+          throw new AggregateError([error, rollbackError], 'Initial allocation and rollback failed', {cause: error});
         }
       }
       throw error;
@@ -347,7 +347,7 @@ export class CreditService {
         try { await client.query('ROLLBACK'); }
         catch (rollbackError) {
           discardConnection = true;
-          throw new AggregateError([error, rollbackError], 'Credit operation and rollback failed');
+          throw new AggregateError([error, rollbackError], 'Credit operation and rollback failed', {cause: error});
         }
       }
       throw error;
