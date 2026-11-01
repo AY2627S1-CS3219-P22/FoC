@@ -6,14 +6,21 @@ AI Declaration: Migration to drizzle for createSupplierService and updateSupplie
 */ 
 
 import { db } from '@database/db'; //drizzle-orm
-import { CreateSupplierSchema, PublicSupplier, SupplierCategory, SupplierWithHours, UpdateSupplierType, supplier, LocationSupplier} from '@data/schema';
+import { CreateSupplierSchema, PublicSupplier, SupplierCategory, SupplierWithHours, UpdateSupplierType, LocationSupplier, supplier, Supplier} from '@data/schema';
 import { UpdateOpeningHours, supplierOpeningHours} from '@data/opening-hours-schema';
 import { getTableColumns, isNull, eq, and, sql, desc} from 'drizzle-orm';
 import { BadRequestError, ConflictError, NotFoundError,  } from '@/middleware/errors';
-import { isOpenStatus } from './repository-helpers';
+import { withIsOpen } from './repository-helpers';
 
 
 const { deletedAt, ...publicSupplierColumns } = getTableColumns(supplier);
+
+//joined into list queries so isOpen is computed from one SQL round trip, not one per supplier
+const hoursForIsOpen = {
+    openingHours: {
+        columns: { dayOfWeek: true, opensAt: true, closesAt: true, isClosed: true },
+    },
+} as const;
 
 //drizzle wraps driver errors, so the postgres code sits on err.cause
 const isDuplicateName = (err: any) => err?.code === '23505' || err?.cause?.code === '23505';
@@ -191,13 +198,14 @@ export async function updateSupplierHoursByIdService(id: number, updates: Update
 
 //support soft delete
 //edited to return the deleted supplier for better response messages
-export async function deleteSupplierByIdService(id: number): Promise<PublicSupplier> {
+export async function deleteSupplierByIdService(id: number) {
     const [deleted] = await db
     .update(supplier)
     .set({ deletedAt: new Date() })
     .where(and(eq(supplier.supplierId, id), isNull(supplier.deletedAt)))
-    .returning(publicSupplierColumns);
+    .returning({ name: supplier.name, deletedAt: supplier.deletedAt });
   if (!deleted) throw new NotFoundError(`Supplier ${id} not found`);
+
   return deleted;
 }
 
@@ -205,39 +213,46 @@ export async function deleteSupplierByIdService(id: number): Promise<PublicSuppl
 //TODO: Order supplier loading based on location
 export async function getAllSuppliersService(): Promise<PublicSupplier[]>{
     
-    const suppliers = await db
-      .select(publicSupplierColumns)
-      .from(supplier)
-      .where(isNull(supplier.deletedAt));
-    return suppliers;
+    const suppliers = await db.query.supplier.findMany({
+        columns: { deletedAt: false },
+        with: hoursForIsOpen,
+        where: isNull(supplier.deletedAt),
+    });
+    return withIsOpen(suppliers);
   }
 
 
 //use drizzle-orm to standardize response to PublicSupplier type for UI integration
 export async function searchSuppliersService(text: string): Promise<PublicSupplier[]> {
     const query = sql`websearch_to_tsquery('english', ${text})`;
-    return db
-      .select({ ...publicSupplierColumns, rank: sql<number>`ts_rank(fts, ${query})` })
-      .from(supplier)
-      .where(and(isNull(supplier.deletedAt), sql`fts @@ ${query}`))
-      .orderBy(desc(sql`ts_rank(fts, ${query})`));
+    const suppliers = await db.query.supplier.findMany({
+        columns: { deletedAt: false },
+        extras: { rank: sql<number>`ts_rank(fts, ${query})`.as('rank') },
+        with: hoursForIsOpen,
+        where: and(isNull(supplier.deletedAt), sql`fts @@ ${query}`),
+        orderBy: desc(sql`ts_rank(fts, ${query})`),
+    });
+    return withIsOpen(suppliers);
   }
   
   export async function filterSuppliersByCategoryService(
     supplierType: SupplierCategory,
   ): Promise<PublicSupplier[]>{
-    return db
-      .select(publicSupplierColumns)
-      .from(supplier)
-      .where(and(isNull(supplier.deletedAt), eq(supplier.type, supplierType)));
+    const suppliers = await db.query.supplier.findMany({
+        columns: { deletedAt: false },
+        with: hoursForIsOpen,
+        where: and(isNull(supplier.deletedAt), eq(supplier.type, supplierType)),
+    });
+    return withIsOpen(suppliers);
   }
 
 
 export async function getNearbySuppliersService({ latitude, longitude, radius }: LocationSupplier): Promise<PublicSupplier[]> {
     const origin = sql`ll_to_earth(${latitude}::float8, ${longitude}::float8)`;
     const point = sql`ll_to_earth("Latitude"::float8, "Longitude"::float8)`;
-    return db.query.supplier.findMany({
+    const suppliers = await db.query.supplier.findMany({
         columns: { deletedAt: false },
+        with: hoursForIsOpen,
         where: and(
             isNull(supplier.deletedAt),
             sql`earth_box(${origin}, ${radius}) @> ${point}`,
@@ -245,4 +260,5 @@ export async function getNearbySuppliersService({ latitude, longitude, radius }:
         ),
         orderBy: sql`earth_distance(${origin}, ${point})`,
     });
+    return withIsOpen(suppliers);
 }

@@ -109,12 +109,10 @@ export const supplierRadiusQuerySchema = z.object({
 
 
 //return values 
-export type SupplierAndDate = typeof supplier.$inferSelect; //this helps with returning all days of the week
-export type PublicSupplier = Omit<SupplierAndDate, 'deletedAt'> //standardize supplier return type
+export type Supplier = typeof supplier.$inferSelect; //this helps with returning all days of the week
+export type PublicSupplier = Omit<Supplier, 'deletedAt'> & { isOpen: boolean }//standardize supplier return type
 
-export type SupplierWithHours = PublicSupplier &{openingHours: PublicOpeningHours[]}; //full list
-
-export type SearchSupplier = PublicSupplier & {openingHours: PublicOpeningHours | null};
+export type SupplierWithHours = Omit<Supplier, 'deletedAt'> &{openingHours: PublicOpeningHours[]}; //full list
 
 //for CRUD input validation
 export type CreateSupplierSchema = z.infer<typeof createSupplierSchema>;

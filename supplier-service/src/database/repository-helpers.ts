@@ -3,7 +3,7 @@ import { getSupplierByIdService } from './supplier-repository';
 
 //make sure to declare this is a boolean
 
-//NOT A REST endpoint yet. Just placed here
+//NOT A REST endpoint yet. Just placed here, for individual suppliers
 export async function isSupplierOpenService(id: number, at = new Date()): Promise<boolean> {
     const supplierRow = await getSupplierByIdService(id); // 404 if missing/deleted
     //already handles a 404 error and return never processes
@@ -11,6 +11,17 @@ export async function isSupplierOpenService(id: number, at = new Date()): Promis
     return isOpenStatus(supplierRow.openingHours, 'Asia/Singapore', at).isOpen; //unwrap the boolean
   }
   
+//for list queries: one shared `at` so every row is judged against the same clock.
+//rows arrive with their hours already joined, and leave with only the boolean.
+export function withIsOpen<T extends { openingHours: PublicOpeningHours[] }>(
+  rows: T[],
+  at = new Date(),
+): Array<Omit<T, 'openingHours'> & { isOpen: boolean }> {
+  return rows.map(({ openingHours, ...row }) => ({
+    ...row,
+    isOpen: isOpenStatus(openingHours, 'Asia/Singapore', at).isOpen,
+  }));
+}
 
 
 export function isOpenStatus(hours:PublicOpeningHours[], tz: string, at = new Date()): {isOpen: boolean} {
