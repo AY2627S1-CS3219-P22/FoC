@@ -10,7 +10,7 @@ import { CreateSupplierSchema, PublicSupplier, SupplierCategory, SupplierWithHou
 import { UpdateOpeningHours, supplierOpeningHours} from '@data/opening-hours-schema';
 import { getTableColumns, isNull, eq, and, sql, desc} from 'drizzle-orm';
 import { BadRequestError, ConflictError, NotFoundError,  } from '@/middleware/errors';
-import { withIsOpen } from './repository-helpers';
+import { isOpenStatus, withIsOpen } from './repository-helpers';
 
 
 const { deletedAt, ...publicSupplierColumns } = getTableColumns(supplier);
@@ -61,7 +61,7 @@ export async function createSupplierService(input: CreateSupplierSchema): Promis
     }
 }
 
-export async function getSupplierByIdService(id: number): Promise<SupplierWithHours>  {
+export async function getSupplierByIdService(id: number): Promise<SupplierWithHours & { isOpen: boolean }>  {
 
   const row = await db.query.supplier.findFirst({
     columns: {deletedAt: false},
@@ -78,7 +78,7 @@ export async function getSupplierByIdService(id: number): Promise<SupplierWithHo
     //case error: No Suppliers Listed in DB 
     throw new NotFoundError(`Error 404: Supplier ${id} Not Found`);
   }
-  return row;
+  return { ...row, isOpen: isOpenStatus(row.openingHours, 'Asia/Singapore').isOpen };
 }
 
 export async function updateSupplierByIdService(id: number, updates: UpdateSupplierType, expectedUpdatedAt: Date): Promise<UpdateSupplierType>  {
