@@ -210,7 +210,7 @@ export async function deleteSupplierByIdService(id: number) {
     .update(supplier)
     .set({ deletedAt: new Date() })
     .where(and(eq(supplier.supplierId, id), isNull(supplier.deletedAt)))
-    .returning({ name: supplier.name, deletedAt: supplier.deletedAt });
+    .returning({ ...publicSupplierColumns, deletedAt });
   if (!deleted) throw new NotFoundError(`Supplier ${id} not found`);
 
   return deleted;

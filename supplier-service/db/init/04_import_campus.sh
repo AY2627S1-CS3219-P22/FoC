@@ -29,19 +29,19 @@ fi
 
 echo "04_import_campus: loading $json_file"
 
-# One row, no tabs/newlines, so COPY text format stays a single field.
+# One row; CSV delimiter/quote are ASCII controls that cannot appear in JSON.
 one_line=$(mktemp)
 tr -d '\n\t\r' < "$json_file" > "$one_line"
 
 if [ -n "${DATABASE_URL:-}" ]; then
   set -- psql "$DATABASE_URL" -v ON_ERROR_STOP=1
 else
-  set -- psql -v ON_ERROR_STOP=1 --username "${PGUSER:-postgres}"
+  set -- psql -v ON_ERROR_STOP=1 --username "${PGUSER:-postgres}" --dbname "${POSTGRES_DB:-postgres}"
 fi
 
 "$@" <<SQL
 CREATE TEMP TABLE campus_raw (doc text);
-\\copy campus_raw FROM '$one_line'
+\\copy campus_raw FROM '$one_line' WITH (FORMAT csv, DELIMITER E'\\x1e', QUOTE E'\\x1f')
 
 WITH payload AS (
   SELECT doc::jsonb AS doc FROM campus_raw

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { categoryLabel, getSupplier, supplierLocation, type SupplierDetail } from "../api/suppliers"
 import LoadMessage from "./LoadMessage"
 import OpenBadge from "./OpenBadge"
@@ -20,6 +20,8 @@ export default function SupplierCard({ supplierId, onClose }: { supplierId: numb
   const [supplier, setSupplier] = useState<SupplierDetail | null>(null)
   const [error, setError] = useState("")
   const [attempt, setAttempt] = useState(0)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cardButtonRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     let stale = false
@@ -31,10 +33,54 @@ export default function SupplierCard({ supplierId, onClose }: { supplierId: numb
   }, [supplierId, attempt])
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [onClose])
+    const opener = document.activeElement
+    cardButtonRef.current = opener instanceof HTMLElement ? opener : null
+    return () => {
+      cardButtonRef.current?.focus()
+    }
+  }, [])
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    const focusable = () =>
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      )
+
+    const nodes = focusable()
+    ;(nodes[0] ?? dialog).focus()
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        onClose()
+        return
+      }
+      if (e.key !== "Tab") return
+      const cycle = focusable()
+      if (cycle.length === 0) {
+        e.preventDefault()
+        dialog.focus()
+        return
+      }
+      const first = cycle[0]
+      const last = cycle[cycle.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
+    dialog.addEventListener("keydown", onKey)
+    return () => dialog.removeEventListener("keydown", onKey)
+  }, [onClose, supplier, error])
 
   const today = singaporeDay()
   const hasImage = supplier?.imageURL?.startsWith("http")
@@ -45,10 +91,12 @@ export default function SupplierCard({ supplierId, onClose }: { supplierId: numb
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={supplier?.name ?? "Supplier"}
-        className="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto"
+        tabIndex={-1}
+        className="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {!supplier || error ? (

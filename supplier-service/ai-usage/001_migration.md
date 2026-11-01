@@ -2,10 +2,10 @@
 
 
 ### Why did I choose to use AI? 
-- Because applying migration requires many checks, verification with postgres libraries, writing some new sql migration files possibly, removing supabase etc. 
+- Because applying migration requires many checks, verification with postgres libraries, writing some new SQL migration files possibly, removing supabase etc. 
 - I feel this is a lot of manual work and did not fit my timeline. Hence I used AI to optimize it
 - Also grok is amazing, it updates my documentation too! 
-- I instructed and revied the chat based on 
+- I instructed and reviewed the chat based on 
     - Change dockerfile image from postgres 17 to postgres 16 to match user service
     - Specifically mentioned to update runtime and my dependencies in package.json
     - Specifically mentioned to keep testcontainers config, since this helps me with my CI
