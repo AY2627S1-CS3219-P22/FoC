@@ -59,7 +59,7 @@ describe('GET /suppliers', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(2);
     //getAllSuppliersService has no ORDER BY, so compare as a set
-    expect(res.body.data.map((s: any) => s.name).sort()).toEqual([
+    expect(res.body.data.map((s: { name: string }) => s.name).sort()).toEqual([
       'Central Print Shop',
       'The Coffee Roaster',
     ]);
@@ -105,21 +105,21 @@ describe('isOpen on supplier lists', () => {
     const res = await request(app).get('/suppliers');
 
     expect(res.status).toBe(200);
-    expect(res.body.data.map((s: any) => s.isOpen)).toEqual([true, true]);
+    expect(res.body.data.map((s: { isOpen: boolean }) => s.isOpen)).toEqual([true, true]);
   });
 
   it('marks suppliers closed after closing time', async () => {
     at(MONDAY_8PM_SGT);
     const res = await request(app).get('/suppliers');
 
-    expect(res.body.data.map((s: any) => s.isOpen)).toEqual([false, false]);
+    expect(res.body.data.map((s: { isOpen: boolean }) => s.isOpen)).toEqual([false, false]);
   });
 
   it('marks suppliers closed on a day with no hours row', async () => {
     at(SUNDAY_10AM_SGT);
     const res = await request(app).get('/suppliers');
 
-    expect(res.body.data.map((s: any) => s.isOpen)).toEqual([false, false]);
+    expect(res.body.data.map((s: { isOpen: boolean }) => s.isOpen)).toEqual([false, false]);
   });
 
   it('is included on search, category and radius results', async () => {
@@ -136,7 +136,7 @@ describe('isOpen on supplier lists', () => {
 
     expect(search.body.data[0]).toMatchObject({ name: 'The Coffee Roaster', isOpen: true });
     expect(category.body.data[0]).toMatchObject({ name: 'Central Print Shop', isOpen: true });
-    expect(nearby.body.data.map((s: any) => s.isOpen)).toEqual([true, true]);
+    expect(nearby.body.data.map((s: { isOpen: boolean }) => s.isOpen)).toEqual([true, true]);
     for (const res of [search, category, nearby]) {
       expect(res.body.data[0]).not.toHaveProperty('openingHours');
     }
@@ -249,7 +249,7 @@ describe('POST /supplier', () => {
     );
 
     expect(rows).toHaveLength(7);
-    expect(rows.map((r: any) => r.day_of_week)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(rows.map((r: { day_of_week: number }) => r.day_of_week)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(rows[0]).toMatchObject({ opens_at: '09:00:00', closes_at: '17:00:00', is_closed: false });
   });
 
@@ -566,7 +566,7 @@ describe('GET /suppliers/search', () => {
     const res = await request(app).get('/suppliers/search').query({ q: 'AS8' });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.map((s: any) => s.name)).toEqual(['Central Print Shop']);
+    expect(res.body.data.map((s: { name: string }) => s.name)).toEqual(['Central Print Shop']);
   });
 
   it('returns the same camelCase shape as the rest of the API', async () => {
