@@ -51,7 +51,7 @@ export const supplier = pgTable('Supplier_Database', {
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     //precision 3 keeps updated_at at millisecond precision so the concurrency check can match a JS Date
     updatedAt: timestamp('updated_at', { withTimezone: true, precision: 3 }).defaultNow(),
-    //location is a generated geography column in postgres, queried only in getNearbySuppliersService
+    //radius search uses earthdistance on Latitude/Longitude, not a stored geography column
 },(table) => [
     uniqueIndex('unique_active_supplier_name').on(table.name).where(sql`${table.deletedAt} IS NULL`),
 ]);
@@ -98,7 +98,7 @@ type: SUPPLIER_CATEGORY,
 
 /*
 Query params arrive as strings, so coerce before the range checks.
-radius is in metres to match ST_DWithin on a geography column.
+radius is in metres to match earth_distance.
 */
 export const supplierRadiusQuerySchema = z.object({
     latitude: z.coerce.number().min(-90).max(90),
