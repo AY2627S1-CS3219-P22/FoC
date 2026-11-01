@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import db from '@database/db';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const seedPath = path.resolve(here, '../../supabase/schemas/seed.sql');
+const seedPath = path.resolve(here, '../../db/init/03_seed.sql');
 
 let seedSql: string | undefined;
 

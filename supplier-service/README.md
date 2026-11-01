@@ -23,19 +23,18 @@ supplier-service is a root npm workspace member, so install from the repo root
    docker compose up -d --build
    ```
 
-This starts three containers:
+This starts two containers:
 
 | Service            | What it is                                        | Where (standalone dev)                        |
 | ------------------ | ------------------------------------------------- | --------------------------------------------- |
-| `supplier-db`      | Supabase Postgres 17                              | `127.0.0.1:54332`                             |
-| `supplier-migrate` | One-off job: applies migrations + seed, then exits | —                                            |
+| `supplier-db`      | Official Postgres 17 (`postgres:17`)              | `127.0.0.1:54332`                             |
 | `supplier-service` | Express REST + gRPC (`IsOpen` for order)          | `http://localhost:3002`, `localhost:50052`    |
 
-On every `up`, `supplier-migrate` runs `supabase db push --include-seed`: it
-applies any new file in `supabase/migrations/` and loads
-`supabase/schemas/seed.sql` (three sample suppliers, one soft-deleted, so it is
-excluded from list responses). Applied migrations and the seed are tracked, so
-nothing runs twice. `supplier-service` starts only after the job succeeds.
+On first start of an empty volume, `supplier-db` runs every file in `db/init/`
+(`01_schema.sql`, `02_opening_hours.sql`, `03_seed.sql`, `04_import_campus.sh`).
+`03` is three fixtures (one soft-deleted). `04` parses `data/campus_suppliers.json`.
+Init scripts do not run again until you wipe the volume. `supplier-service`
+starts once Postgres is healthy. Tests copy `01`–`03` only.
 
 Ports are published by `compose.override.yaml`, which Compose loads only when
 you run from this folder. The root compose does not load it, so nothing is
@@ -88,9 +87,9 @@ docker compose down -v   # also delete the data
 # Testing
 
 Tests do not use the Compose stack above. `npm test` starts its own throwaway
-Supabase Postgres through Testcontainers, applies the same migrations and
-`supabase/schemas/seed.sql` that `supplier-migrate` uses, and stops the container
-when the run finishes. You do not run `docker compose` for this.
+Postgres 16 through Testcontainers, applies `db/init/` `01`–`03` (not the campus scrape) that
+compose uses, and stops the container when the run finishes. You do not run
+`docker compose` for this.
 
 Docker Desktop has to be running, because Testcontainers talks to the Docker
 daemon. Install from the repo root, then run from `supplier-service/`:
@@ -100,10 +99,9 @@ npm install          # from the repo root
 npm test             # from supplier-service/
 ```
 
-`npm test` runs `tests/api`. The first run pulls
-`public.ecr.aws/supabase/postgres:17.6.1.167`, which can take a couple of
-minutes; later runs reuse the image. The container gets a random host port, so
-it never collides with the Compose database on `54332`.
+`npm test` runs `tests/api`. The first run pulls `postgres:17`, which can take a
+couple of minutes; later runs reuse the image. The container gets a random host
+port, so it never collides with the Compose database on `54332`.
 
 The scalability run is separate, because it measures throughput rather than
 correctness and takes about ten seconds:
@@ -117,7 +115,7 @@ That starts the Express app on a free port and drives `GET /suppliers` and
 
 # Implementation Details
 
-Tech Stack = Express.js, Node, Supabase, Drizzle, JWT(in-progress)
+Tech Stack = Express.js, Node, PostgreSQL 17, Drizzle, JWT(in-progress)
 
 ## Database Connection
 
@@ -130,8 +128,9 @@ port **54332** (see the commented line in `.env.example`):
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres
 ```
 
-Do not use a production pooler URL for local compose, `npm test`, or host
-`npm run dev`.
+Do not use a hosted pooler URL for local compose, `npm test`, or host
+`npm run dev`. If you previously ran the Supabase image, wipe the volume
+(`docker compose down -v`) so init scripts can apply on official Postgres.
 
 TODO: Set up docker secrets for seamless deployment across different devices
 
@@ -155,7 +154,8 @@ TODO: Set up docker secrets for seamless deployment across different devices
 other value is a `409` and nothing is written.
 
 To start run `docker compose up -d --build` and the app should run on port `3002`.
-All seed data (3) are specified in `supplier-service/supabase/schemas/seed.sql`.
+Test fixtures (3) are in `db/init/03_seed.sql`. Campus scrape rows are parsed
+from `data/campus_suppliers.json` by `db/init/04_import_campus.sh`.
 
 Write routes need an RS256 Bearer token signed with `keys/private.pem`. The user
 service puts `roles` on the token as an **array** (`USER` or `ADMINISTRATOR`),

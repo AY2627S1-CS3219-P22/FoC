@@ -234,13 +234,15 @@ export async function searchSuppliersService(text: string): Promise<PublicSuppli
 
 
 export async function getNearbySuppliersService({ latitude, longitude, radius }: LocationSupplier): Promise<PublicSupplier[]> {
-    const origin = sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography`;
+    const origin = sql`ll_to_earth(${latitude}::float8, ${longitude}::float8)`;
+    const point = sql`ll_to_earth("Latitude"::float8, "Longitude"::float8)`;
     return db.query.supplier.findMany({
         columns: { deletedAt: false },
         where: and(
             isNull(supplier.deletedAt),
-            sql`ST_DWithin(location, ${origin}, ${radius})`,
+            sql`earth_box(${origin}, ${radius}) @> ${point}`,
+            sql`earth_distance(${origin}, ${point}) <= ${radius}`,
         ),
-        orderBy: sql`ST_Distance(location, ${origin})`,
+        orderBy: sql`earth_distance(${origin}, ${point})`,
     });
 }

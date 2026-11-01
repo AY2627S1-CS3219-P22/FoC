@@ -15,8 +15,7 @@ supplier-service has two `package.json` files. Use the one that will compile the
 
 ```json
 "dependencies": {
-  "@foc/messaging": "0.1.0",
-  "@supabase/supabase-js": "^2.117.1",
+  "@foc/messaging": "file:../shared/messaging",
   ...
 }
 ```
