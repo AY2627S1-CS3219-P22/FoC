@@ -6,6 +6,8 @@ Prompt:
 Ok now in @supplier-repository.ts  update each of the functions searchSuppliersService, getNearbySuppliersService,  filterSuppliersByCategoryService, getAllSuppliersService to include the isOpen query. Add in a new function to support multiple row queries instead of running it one by one in the supplier-service/src/database/repository-helpers.ts
 
 Update the relevant test in supplier.test.ts or test.supplier.ts i forgot the name
+
+Please also refer to the instructions written in `data\HANDOFF.md`
 ```
 
 Why I find this relevant 

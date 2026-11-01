@@ -1,4 +1,4 @@
-import {OpeningHours, PublicOpeningHours} from '@data/opening-hours-schema'
+import {PublicOpeningHours} from '@data/opening-hours-schema'
 import { getSupplierByIdService } from './supplier-repository';
 
 //make sure to declare this is a boolean

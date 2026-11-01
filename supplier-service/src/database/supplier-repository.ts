@@ -6,7 +6,7 @@ AI Declaration: Migration to drizzle for createSupplierService and updateSupplie
 */ 
 
 import { db } from '@database/db'; //drizzle-orm
-import { CreateSupplierSchema, PublicSupplier, SupplierCategory, SupplierWithHours, UpdateSupplierType, LocationSupplier, supplier, Supplier} from '@data/schema';
+import { CreateSupplierSchema, PublicSupplier, SupplierCategory, SupplierWithHours, UpdateSupplierType, LocationSupplier, supplier} from '@data/schema';
 import { UpdateOpeningHours, supplierOpeningHours} from '@data/opening-hours-schema';
 import { getTableColumns, isNull, eq, and, sql, desc} from 'drizzle-orm';
 import { BadRequestError, ConflictError, NotFoundError,  } from '@/middleware/errors';
@@ -23,8 +23,15 @@ const hoursForIsOpen = {
 } as const;
 
 //drizzle wraps driver errors, so the postgres code sits on err.cause
-const isDuplicateName = (err: any) => err?.code === '23505' || err?.cause?.code === '23505';
-const isCheckViolation = (err: any) => err?.code === '23514' || err?.cause?.code === '23514';
+const pgErrorCode = (err: unknown): string | undefined => {
+    if (typeof err !== 'object' || err === null) return undefined;
+    const rec = err as { code?: unknown; cause?: { code?: unknown } };
+    if (typeof rec.code === 'string') return rec.code;
+    if (typeof rec.cause?.code === 'string') return rec.cause.code;
+    return undefined;
+};
+const isDuplicateName = (err: unknown) => pgErrorCode(err) === '23505';
+const isCheckViolation = (err: unknown) => pgErrorCode(err) === '23514';
 
 export async function createSupplierService(input: CreateSupplierSchema): Promise<SupplierWithHours>  {
     const { openingHours, ...newSupplier } = input;

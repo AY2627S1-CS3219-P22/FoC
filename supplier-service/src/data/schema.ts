@@ -68,8 +68,7 @@ export const createSupplierSchema = createInsertSchema(supplier).omit ({
                                     createdAt: true, 
                                     updatedAt: true,
                                     deletedAt: true,
-                                }).extend
-                                ({openingHours: 
+                                }).extend({openingHours:
                                     z.array(createOpeningHoursSchema).length(7, 'Opening hours must span 7 days of the week')
                                 }).refine(
                                     (s) => new Set(s.openingHours.map((h) => h.dayOfWeek)).size == 7, //validate!
