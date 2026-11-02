@@ -1,3 +1,4 @@
+<!-- ChatGPT (Codex), 2026-11-02: Destination catalogue setup and API contract; review pending; see usage-log.md. -->
 <!-- ChatGPT (Codex), 2026-10-30: Updated opening-hours behavior; human review pending. -->
 <!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-24.
 Scope: Updated Order integration/client/pickup documentation after Order-only port. Human review pending.
@@ -571,3 +572,62 @@ recovery and author-approved delivery. Prompts, key exchanges, affected files
 and verification are recorded in [usage-log.md](usage-log.md). Human review and
 validation remain pending. See the root README final AI Use Summary for the
 consolidated project disclosure and submission slide-deck link requirement.
+
+
+## Destination catalogue
+
+Order owns a PostgreSQL `DestinationLocation` catalogue populated from the
+206-row [CSV](data/nus_kent_ridge_locations.csv). All supplied columns are retained;
+blank coordinates are SQL NULL and the verification flag is a boolean. CSV IDs
+(such as `kr_001`) are unique. The migration
+`20261102000000_destination_catalogue` creates and populates the table automatically
+when `prisma:deploy` runs; no separate import command is needed. The supplied
+source/verification metadata is preserved; importing does not independently
+verify the locations or fill missing coordinates.
+
+Search (also used by the UI through its Vite proxy):
+
+```sh
+curl 'http://localhost:3003/api/locations?query=COM%201&limit=20'
+```
+
+`GET /api/locations` searches names and aliases using case-insensitive substring
+matching. Results have `{ "locations": [{ "id": "kr_001", "name": "COM1", "code": "COM1" }] }`.
+No login is required to search this non-personal building catalogue. Results are
+sorted by name, then ID. `limit` defaults to 20 and must be an integer from 1
+through 50. No matches returns 200 with an empty array. Missing/blank query returns
+400 with `{ "error": { "message": "Search query must not be empty." } }`.
+Invalid limits, duplicate parameters and unknown parameters return 400.
+
+The create form replaces its fixed dropdown with debounced search results. Users
+must select a building from those results; additional room/meeting-point details
+belong in request instructions. The UI submits these fields with the usual order
+body and Idempotency-Key:
+
+```json
+{
+  "destinationLocationId": "kr_001",
+  "destination": "COM1"
+}
+```
+
+The server verifies the ID/name combination before credit reservation and stores
+both on the Order. Unlisted destinations and ID/name mismatches return 400
+`invalid-destination`. Existing clients may submit an exact catalogue display
+name without an ID; the backend resolves and stores its catalogue ID. Arbitrary
+free text is no longer accepted for new destinations. Names/aliases in search
+are suggestions; submit the selected name, not the alias.
+
+`PATCH /orders/:id` can change destination using `destinationLocationId` alone,
+or with its matching `destination` name. Exact-name-only edits remain supported.
+Destination changes are validated before credit adjustments; the ID/name are
+stored in the durable edit target and applied together during recovery.
+
+Historical orders retain their existing destination text and a NULL ID. Already
+recorded pending creations/edits without a catalogue ID can still recover using
+their original snapshot. No historical destination is guessed or overwritten.
+Changes to the CSV after deployment require an explicit data migration; editing
+the CSV does not update an existing database or a previously applied migration.
+Apply migrations and rebuild/restart Order before testing the updated UI. The
+existing Docker startup already runs `prisma:deploy`, including this catalogue
+migration.

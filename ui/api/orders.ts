@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-02: Selected destination ID contract; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import type { Order } from "../App"
 import { api, ApiError } from "./client"
@@ -12,6 +13,7 @@ export type ApiOrder = {
   pickupLocation: string
   requesterName: string
   courierName: string | null
+  destinationLocationId: string | null
   destination: string
   requestDetails: string
   credits: number
@@ -70,6 +72,7 @@ export const updateOrder = (id: string, action: OrderAction) =>
     .then((r) => toOrder(r.order))
 
 export type NewOrder = {
+  destinationLocationId: string
   supplierId: string
   destination: string
   requestDetails: string
@@ -90,6 +93,7 @@ export const createOrder = (order: NewOrder, idempotencyKey: string) =>
 // order-service sends back short codes like "invalid-transition", so turn
 // those into something readable
 const ERRORS: Record<string, string> = {
+  "invalid-destination": "Select a building from the destination search results.",
   "dependency-unavailable": "This isn't available yet, order-service can't reach the other services.",
   "dependency-rejected": "That supplier isn't taking orders right now.",
   "invalid-transition": "This order has already changed. Refresh to see the latest.",

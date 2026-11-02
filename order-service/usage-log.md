@@ -978,3 +978,108 @@ Verification: Order build and all 16 unit/authentication/gRPC tests passed.
 All 62 PostgreSQL/HTTP/gRPC integration tests passed, including creation/editing
 with IsOpen unimplemented and recovery without current-opening-hours checks.
 `git diff --check` passed. Temporary test container removed after verification.
+
+
+## 2026-11-02: account deletion eligibility preparation (incomplete)
+
+Tool: ChatGPT (Codex). Mode: implementation. Human review pending.
+
+Exact user replies:
+
+> For a race condition, prioritise the row lock to standardise across different operations. But also, if the user has any active orders (unassigned, assigned, picked_up) or is currently assigned as a supplier (order is assigned, picked_up), both will block the user from account deletion as they have an order in progress. Ensure that settlement is completed.
+
+> That will be implemented by the user microservice owner. I only have infomration within the text given, any additional, i can check.
+
+> DeletedUser. It is an async work flow so sub for the event
+
+Relevant original requirement (verbatim):
+
+> Block deletion if the user is requester or courier on an order with status UNASSIGNED, ASSIGNED, or PICKED_UP.
+> Also block if an order has creditState of RESERVED, SETTLEMENT_PENDING, or REFUND_PENDING.
+
+Key response: “I’ll use `DeletedUser` for scrubbed text and check the existing gRPC and messaging setup. Row locks will serialize Order operations, but the `user.deleted` handler still needs a defined outcome if it finds an active order after User has already deleted the account. I’ll confirm that gap while working on the eligibility check.”
+
+Implemented only the internal blocking-order query in
+`grpc/src/services/deletionEligibility.ts`. It matches either participant and
+blocks active status OR unresolved credit state, including pending settlement on
+a delivered order. It rejects a blank user ID. This is a point-in-time query,
+not a deletion fence. It is not exposed over gRPC yet. No event consumer,
+tombstone schema, scrubbing or lifecycle changes have been implemented.
+
+Pending human confirmation: deletion-event race outcome; Order-local durable
+marker/event tracking; exact gRPC response and access contract. No User or Credit
+implementation changed. Verification: Order Prisma generation and TypeScript
+build passed. Database/runtime behavior has not yet been tested.
+
+
+## 2026-11-02: searchable destination catalogue
+
+Tool: ChatGPT (Codex). Modes: implementation, tests and documentation. Human
+review pending. File attribution for the unchanged CSV is in data/README.md.
+
+Exact user prompts/replies for this work:
+
+1. “Could we build a database with this for the destination and the user can type and it can find from this database when creating the order?”
+   File: `/Users/euniceng/Downloads/nus_kent_ridge_locations.csv`.
+2. “Postgres. Yes, for now, retain and use the format within the csv file. It can be changed later right?”
+3. “It should be one of the buildings within this csv file. any additional details can be specified in their description”
+4. “Order owns it. The order itself should store the display name and the locationID which should be unique. The search should also search aliases and names.”
+5. Search contract supplied by the user (verbatim formatting):
+
+```
+GET /api/locations?query={searchTerm}&limit={limit}
+`limit`: Optional, defaults to `20`, maximum `50`.
+{\
+&#x20; "locations": [\
+&#x20;   {\
+&#x20;     "id": "nus-com1",\
+&#x20;     "name": "COM1",\
+&#x20;     "code": "COM1"\
+&#x20;   },\
+&#x20;   {\
+&#x20;     "id": "kr_002",\
+&#x20;     "name": "COM2",\
+&#x20;   }\
+&#x20; ]\
+}
+
+bad request:
+{\
+&#x20; "error": {\
+&#x20;   "message": "Search query must not be empty."\
+&#x20; }\
+}
+```
+
+Key assistant responses:
+- “I’ll inspect the CSV and the current destination selector. A searchable list is possible; I’ll check what fields the file contains so you can confirm the storage and API choices required by your course policy.”
+- “Confirmed: Order owns the PostgreSQL catalogue, each order stores the unique location ID and display name, and search matches names and aliases.”
+- “I’ll add the CSV-backed catalogue, the agreed search endpoint, and a searchable selector in the create form. I’ll also validate the selected location on create and edit, then save its ID and catalogue name on the order.”
+
+Implementation: preserved all 206 user-supplied CSV rows/columns in Order-owned
+DestinationLocation; migration creates/seeds the catalogue and adds nullable
+Order.destinationLocationId for historical compatibility. Names and aliases are
+searched case-insensitively; literal wildcard characters are escaped. Query and
+limit validation, stable ordering, empty results and the specified error shape
+are implemented. UI searches are debounced and obsolete results are discarded;
+users must select a result. Catalogue ID/name validation runs before reservation
+or edit adjustment; durable creation/edit payloads retain the selected pair.
+Exact catalogue names remain supported for existing clients and resolve to IDs.
+Historical text and previously recorded recovery payloads are preserved. Updated
+setup/API and manual test documentation. No changes to Supplier/Credit contracts.
+
+Verification:
+- Order Prisma generation and TypeScript build passed.
+- UI production build and TypeScript check passed.
+- All 16 Order unit/authentication/gRPC tests passed. Initial sandbox attempt
+  could not bind test servers; rerun with local network permission passed.
+- All 66 PostgreSQL/HTTP/gRPC integration tests passed, including CSV import,
+  search defaults/max/validation, names/aliases, literal wildcards, invalid
+  ID/name rejection before credit calls, stored IDs, durable edit recovery and
+  pre-catalogue creation recovery.
+- First migration attempt found an empty leftover directory from the user's
+  reverted supplier snapshot rename. Removed that empty directory and applied
+  migrations successfully. The premature integration run failed because the
+  catalogue migration had not applied; subsequent full suites passed.
+- Used a disposable dedicated PostgreSQL database, not the development database.
+  UI interaction in a browser and a full Docker application build were not run.

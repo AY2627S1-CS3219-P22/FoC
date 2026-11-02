@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-02: Catalogue destination validation coverage; review pending; see ../../usage-log.md.
 // ChatGPT (Codex), 2026-10-30: Regression coverage for removal of opening-hours gates; human review pending.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Generated real PostgreSQL/HTTP lifecycle tests; review pending; see ../../usage-log.md.
@@ -46,7 +47,7 @@ function fixture() {
   getSupplier:async(supplierId)=>{if(invalidSupplier)throw err(5);return {supplierId,name:'Cafe',locationDescription:'Level 1',buildingName:'NUS',floor:1}},
   isSupplierOpen:async()=>{throw new Error("Order must not call IsOpen")},close:()=>{}};
  const creation=createOrderCreation(db,credit,directories),edits=createOrderEdits(db,credit,directories),lifecycle=createOrderLifecycle(db,credit);
- const input=()=>createOrderSchema.parse({supplierId:'1',destination:'PGP',requestDetails:'Coffee',credits:4,expiryTime:new Date(Date.now()+7200000).toISOString()});
+ const input=()=>createOrderSchema.parse({supplierId:'1',destination:'COM1',destinationLocationId:'kr_001',requestDetails:'Coffee',credits:4,expiryTime:new Date(Date.now()+7200000).toISOString()});
  return {user,credit,directories,creation,edits,lifecycle,input,ledger,get calls(){return calls},get updates(){return updates},get releases(){return releases},get settlements(){return settlements},set settleMode(v){settleMode=v},set reserveMode(v){reserveMode=v},set updateMode(v){updateMode=v},set releaseMode(v){releaseMode=v},set unavailable(v){unavailable=v},set invalidSupplier(v){invalidSupplier=v}};
 }
 async function due(orderId,type='RESERVE') {await db.creditOperation.updateMany({where:{orderId,type,state:{not:'SUCCEEDED'}},data:{state:'PENDING',nextRetryAt:new Date(0),leaseExpiresAt:null}})}
@@ -98,7 +99,7 @@ test('expiry cancels all three active states including PICKED_UP and returns cre
  const rows=await db.order.findMany({where:{requesterId:f.user}});assert.equal(rows.length,3);for(const r of rows){assert.equal(r.status,'CANCELLED');assert.equal(r.cancellationReason,'EXPIRY');assert.equal(r.creditState,'REFUNDED')}
 });
 test('edit adjusts reservation, updates fields and replays without duplicate credit updates',async()=>{
- const f=fixture(),order=await create(f);const patch=editOrderSchema.parse({credits:6,destination:'Utown'});const r=await f.edits.edit(order.id,f.user,'edit-one',patch);assert.equal(r.status,200,String(r.error));assert.equal(r.order.credits,6);assert.equal(r.order.destination,'Utown');assert.equal(f.updates,1);
+ const f=fixture(),order=await create(f);const patch=editOrderSchema.parse({credits:6,destination:'COM2'});const r=await f.edits.edit(order.id,f.user,'edit-one',patch);assert.equal(r.status,200,String(r.error));assert.equal(r.order.credits,6);assert.equal(r.order.destination,'COM2');assert.equal(f.updates,1);
  assert.equal((await f.edits.edit(order.id,f.user,'edit-one',patch)).status,200);assert.equal(f.updates,1);
  assert.equal((await f.edits.edit(order.id,f.user,'edit-one',{credits:7})).status,409);
  const lower=await f.edits.edit(order.id,f.user,'lower',{credits:2});assert.equal(lower.status,200);assert.equal(f.ledger.get(order.id).amount,2);
@@ -108,9 +109,9 @@ test('credit-edit timeout resumes against current version without applying the m
  await createOrderEdits(db,f.credit,f.directories).recoverBatch();const updated=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(updated.credits,7);assert.equal(f.updates,1);
 });
 test('edits reject other users, accepted orders, invalid suppliers and permanent credit rejection',async()=>{
- const f=fixture(),order=await create(f);assert.equal((await f.edits.edit(order.id,'other','x',{destination:'Elsewhere'})).status,403);f.invalidSupplier=true;assert.equal((await f.edits.edit(order.id,f.user,'invalid-supplier',{destination:'Elsewhere'})).status,409);f.invalidSupplier=false;
+ const f=fixture(),order=await create(f);assert.equal((await f.edits.edit(order.id,'other','x',{destination:'COM2'})).status,403);f.invalidSupplier=true;assert.equal((await f.edits.edit(order.id,f.user,'invalid-supplier',{destination:'COM2'})).status,409);f.invalidSupplier=false;
  f.updateMode='reject';assert.equal((await f.edits.edit(order.id,f.user,'reject',{credits:19})).status,409);assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).credits,4);
- await db.order.update({where:{id:order.id},data:{status:'ASSIGNED',courierId:'courier',acceptedAt:new Date()}});assert.equal((await f.edits.edit(order.id,f.user,'assigned',{destination:'Elsewhere'})).status,409);assert.equal((await f.lifecycle.cancel(order.id,f.user)).status,409);
+ await db.order.update({where:{id:order.id},data:{status:'ASSIGNED',courierId:'courier',acceptedAt:new Date()}});assert.equal((await f.edits.edit(order.id,f.user,'assigned',{destination:'COM2'})).status,409);assert.equal((await f.lifecycle.cancel(order.id,f.user)).status,409);
 });
 test('recovery stops after initial attempt plus five retries and retains unresolved state',async()=>{
  const f=fixture();f.unavailable=true;const r=await f.creation.submit(f.user,'exhaust',f.input());assert.equal(r.status,202);
@@ -123,7 +124,7 @@ test('HTTP create/edit/cancel uses JWT identity, validates input and serializes 
  const headers={Authorization:'Bearer '+token,'Content-Type':'application/json','Idempotency-Key':'http'};
  assert.equal((await fetch(base,{method:'POST',headers,body:JSON.stringify({})})).status,400);
  let response=await fetch(base,{method:'POST',headers,body:JSON.stringify(f.input())});assert.equal(response.status,201);let body=await response.json();assert.equal(body.order.supplierId,'1');assert.equal(body.order.requesterId,f.user);assert.ok(body.order.createdAt.endsWith('Z'));const id=body.order.id;
- response=await fetch(base+'/'+id,{method:'PATCH',headers:{...headers,'Idempotency-Key':'http-edit'},body:JSON.stringify({destination:'Library'})});assert.equal(response.status,200);
+ response=await fetch(base+'/'+id,{method:'PATCH',headers:{...headers,'Idempotency-Key':'http-edit'},body:JSON.stringify({destination:'COM2'})});assert.equal(response.status,200);
  response=await fetch(base+'/'+id+'/cancel',{method:'POST',headers,body:'{}'});assert.equal(response.status,200);assert.equal((await response.json()).order.creditState,'REFUNDED');
 });
 
@@ -143,7 +144,7 @@ test('editing is blocked by a courier assignment that acquired the row lock firs
 });
 test('durable in-progress edit excludes another edit and cancellation until recovery completes',async()=>{
  const f=fixture(),order=await create(f);f.updateMode='after';assert.equal((await f.edits.edit(order.id,f.user,'pending-edit',{credits:6})).status,202);
- assert.equal((await f.edits.edit(order.id,f.user,'other-edit',{destination:'Elsewhere'})).status,409);assert.equal((await f.lifecycle.cancel(order.id,f.user)).status,409);
+ assert.equal((await f.edits.edit(order.id,f.user,'other-edit',{destination:'COM2'})).status,409);assert.equal((await f.lifecycle.cancel(order.id,f.user)).status,409);
  await editDue(order.id);await f.edits.recoverBatch();assert.equal((await f.lifecycle.cancel(order.id,f.user)).order.creditState,'REFUNDED');
 });
 test('expiry releases the updated hold even if edit persistence has not completed',async()=>{
@@ -173,7 +174,7 @@ test('creation integrates real User/Supplier/Credit gRPC adapters with PostgreSQ
  t.after(()=>{dirs.close();credit.close();userServer.forceShutdown();supplierServer.forceShutdown();creditServer.forceShutdown()});
  const service=createOrderCreation(db,credit,dirs,creditOptions);const r=await service.submit(f.user,'real-grpc',f.input());assert.equal(r.status,201);assert.equal(r.order.status,'UNASSIGNED');assert.equal(f.ledger.get(r.order.id).status,'RESERVED');
  assert.equal(r.order.pickupLocation,'-');const snapshot=await dirs.getSupplier('1');assert.equal(snapshot.buildingName,'NUS');assert.equal(snapshot.floor,1);assert.equal(snapshot.latitude,1.3);assert.equal(snapshot.locationDescription,'-');
- const edited=await createOrderEdits(db,credit,dirs,creditOptions).edit(r.order.id,f.user,'real-grpc-edit',editOrderSchema.parse({destination:'Library'}));assert.equal(edited.order.pickupLocation,'-');
+ const edited=await createOrderEdits(db,credit,dirs,creditOptions).edit(r.order.id,f.user,'real-grpc-edit',editOrderSchema.parse({destination:'COM2'}));assert.equal(edited.order.pickupLocation,'-');
  const cancellation=await createOrderLifecycle(db,credit,[],creditOptions).cancel(r.order.id,f.user);assert.equal(cancellation.order.creditState,'REFUNDED');assert.equal(f.ledger.get(r.order.id).status,'RELEASED');
 });
 
@@ -533,12 +534,12 @@ test('real gRPC edits increase/decrease the held amount, reject insufficient fun
  const balance=()=>{const reserved=[...f.ledger.values()].filter(r=>r.status==='RESERVED').reduce((sum,r)=>sum+r.amount,0);return {reserved,available:20-reserved}};
  assert.deepEqual(balance(),{reserved:4,available:16});
  const increased=await edits.edit(order.id,f.user,'edit-all-funds',{credits:20});assert.equal(increased.status,200);assert.equal(increased.order.credits,20);assert.deepEqual(balance(),{reserved:20,available:0});
- const rejected=await edits.edit(order.id,f.user,'edit-insufficient',{credits:21,destination:'must-not-persist'});assert.equal(rejected.status,409);
+ const rejected=await edits.edit(order.id,f.user,'edit-insufficient',{credits:21,destination:'COM2'});assert.equal(rejected.status,409);
  assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).destination,order.destination);assert.equal(f.ledger.get(order.id).amount,20);
  assert.equal((await db.orderEditOperation.findFirstOrThrow({where:{orderId:order.id,targetCredits:21}})).state,'FAILED');
  const lower=await edits.edit(order.id,f.user,'edit-lower',{credits:2});assert.equal(lower.status,200);assert.deepEqual(balance(),{reserved:2,available:18});
  const updates=f.updates,version=f.ledger.get(order.id).version;
- const plain=await edits.edit(order.id,f.user,'edit-text',{destination:'Utown',requestDetails:'Tea',credits:2});assert.equal(plain.status,200);assert.equal(plain.order.destination,'Utown');assert.equal(f.updates,updates);assert.equal(f.ledger.get(order.id).version,version);
+ const plain=await edits.edit(order.id,f.user,'edit-text',{destination:'COM2',requestDetails:'Tea',credits:2});assert.equal(plain.status,200);assert.equal(plain.order.destination,'COM2');assert.equal(f.updates,updates);assert.equal(f.ledger.get(order.id).version,version);
  const replay=await edits.edit(order.id,f.user,'edit-lower',{credits:2});assert.equal(replay.status,200);assert.equal(f.updates,updates);
 });
 
@@ -682,4 +683,60 @@ test('concurrent pickups yield one transition and use saved Supplier snapshot',a
  assert.equal(results.filter(r=>r.order).length,1);assert.equal(results.filter(r=>r.status===409).length,7);
  const saved=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(saved.status,'PICKED_UP');assert.equal(saved.pickupStore,order.pickupStore);assert.equal(saved.pickupLocation,order.pickupLocation);
  const delivered=await f.lifecycle.deliver(order.id,courier);assert.equal(delivered.order.status,'DELIVERED');assert.equal(delivered.order.creditState,'SETTLED');assert.equal(f.settlements,1);
+});
+
+// Destination catalogue: migrated real CSV, HTTP query contract and workflow validation.
+test('location search imports the CSV and searches names/aliases with bounded literal input',async t=>{
+ const app=createApp(),server=app.listen(0,'127.0.0.1');await once(server,'listening');
+ t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const base=`http://127.0.0.1:${server.address().port}/api/locations`;
+ assert.equal(await db.destinationLocation.count(),206);
+ const get=async query=>{const r=await fetch(base+query);return {status:r.status,body:await r.json()}};
+ const names=await get('?query=com1');assert.equal(names.status,200);assert.ok(names.body.locations.some(l=>l.id==='kr_001'&&l.name==='COM1'&&l.code==='COM1'));
+ const aliases=await get('?query=COM%201');assert.ok(aliases.body.locations.some(l=>l.id==='kr_001'));
+ for(const query of ['', '?query=', '?query=%20', '?query=x&limit=0', '?query=x&limit=51', '?query=x&limit=1.2', '?query=x&limit=abc', '?query=x&limit=', '?query=x&limit=2&limit=3', '?query=x&other=1'])assert.equal((await get(query)).status,400,query);
+ assert.deepEqual((await get('?query=')).body,{error:{message:'Search query must not be empty.'}});
+ assert.deepEqual((await get('?query=no-such-building-abcdef')).body,{locations:[]});
+ assert.deepEqual((await get('?query=%25')).body,{locations:[]});
+ assert.deepEqual((await get('?query=_')).body,{locations:[]});
+ const defaultLimit=await get('?query=a');assert.equal(defaultLimit.body.locations.length,20);
+ const fifty=await get('?query=a&limit=50');assert.equal(fifty.body.locations.length,50);
+ const limited=await get('?query=a&limit=2');assert.equal(limited.body.locations.length,2);
+ assert.deepEqual(limited.body.locations,(await get('?query=a&limit=2')).body.locations);
+});
+
+test('create validates catalogue ID/name before reserving and persists the selected snapshot',async()=>{
+ const f=fixture(),input=f.input();
+ for(const patch of [{destination:'Unlisted building'}, {destinationLocationId:'not-a-location'}, {destinationLocationId:'kr_002'}]) {
+  const result=await f.creation.submit(f.user,randomUUID(),{...input,...patch});assert.equal(result.status,400);assert.equal(result.error,'invalid-destination');
+ }
+ assert.equal(f.calls,0);assert.equal(await db.orderCreation.count({where:{requesterId:f.user}}),0);
+ const result=await f.creation.submit(f.user,'catalogue',input);assert.equal(result.status,201);
+ assert.equal(result.order.destination,'COM1');assert.equal(result.order.destinationLocationId,'kr_001');
+ const replay=await f.creation.submit(f.user,'catalogue',input);assert.equal(replay.order.id,result.order.id);assert.equal(f.calls,1);
+ const {destinationLocationId,...nameOnly}=input;
+ const exactName=await f.creation.submit(f.user,'name-only',nameOnly);assert.equal(exactName.status,201);assert.equal(exactName.order.destinationLocationId,'kr_001');
+});
+
+test('edits validate catalogue selections, preserve IDs and recover credit-changing location edits',async()=>{
+ const f=fixture(),order=await create(f);
+ for(const patch of [{destination:'Unlisted'}, {destinationLocationId:'missing'}, {destination:'COM2',destinationLocationId:'kr_001'}]) {
+  const result=await f.edits.edit(order.id,f.user,randomUUID(),patch);assert.equal(result.status,400);assert.equal(result.error,'invalid-destination');
+ }
+ assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).destinationLocationId,'kr_001');
+ const edit=await f.edits.edit(order.id,f.user,'location-only',{destinationLocationId:'kr_002'});assert.equal(edit.status,200);assert.equal(edit.order.destination,'COM2');assert.equal(edit.order.destinationLocationId,'kr_002');assert.equal(f.updates,0);
+ f.updateMode='after';const pending=await f.edits.edit(order.id,f.user,'location-credit',{destination:'COM3',destinationLocationId:'kr_003',credits:6});assert.equal(pending.status,202);
+ await editDue(order.id);await createOrderEdits(db,f.credit,f.directories).recoverBatch();
+ const updated=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(updated.destination,'COM3');assert.equal(updated.destinationLocationId,'kr_003');assert.equal(updated.credits,6);assert.equal(f.updates,1);
+ const unchanged=await f.edits.edit(order.id,f.user,'instructions',{requestDetails:'Meet at lobby'});assert.equal(unchanged.order.destinationLocationId,'kr_003');
+});
+
+test('pre-catalogue pending creations recover without discarding historical destination text',async()=>{
+ const f=fixture();f.reserveMode='after';const pending=await f.creation.submit(f.user,'legacy-pending',f.input());assert.equal(pending.status,202);
+ const creation=await db.orderCreation.findUniqueOrThrow({where:{orderId:pending.creationId}});
+ const {destinationLocationId,...payload}=creation.payload;
+ await db.orderCreation.update({where:{orderId:pending.creationId},data:{payload:{...payload,destination:'Historical destination'}}});
+ await due(pending.creationId);await f.creation.recoverBatch();
+ const order=await db.order.findUniqueOrThrow({where:{id:pending.creationId}});assert.equal(order.destination,'Historical destination');assert.equal(order.destinationLocationId,null);assert.equal(f.calls,1);
+ const edited=await f.edits.edit(order.id,f.user,'select-building',{destinationLocationId:'kr_001'});assert.equal(edited.status,200);assert.equal(edited.order.destination,'COM1');assert.equal(edited.order.destinationLocationId,'kr_001');
 });

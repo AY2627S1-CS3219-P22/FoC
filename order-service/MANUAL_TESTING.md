@@ -1,3 +1,4 @@
+<!-- ChatGPT (Codex), 2026-11-02: Use catalogue destinations in manual tests; review pending; see usage-log.md. -->
 <!-- ChatGPT (Codex), 2026-10-30: Updated opening-hours behavior; human review pending. -->
 <!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 Scope: Generated manual integration instructions from the existing service contracts.
@@ -192,7 +193,7 @@ Generate the key and body once, then keep both for retries:
 
 ```sh
 export CREATE_KEY="$(node -p 'require("node:crypto").randomUUID()')"
-node -e 'console.log(JSON.stringify({supplierId:process.env.SUPPLIER_ID,destination:"PGP",requestDetails:"One iced latte",credits:4,expiryTime:new Date(Date.now()+2*60*60*1000).toISOString()}))' \
+node -e 'console.log(JSON.stringify({supplierId:process.env.SUPPLIER_ID,destination:"COM1",destinationLocationId:"kr_001",requestDetails:"One iced latte",credits:4,expiryTime:new Date(Date.now()+2*60*60*1000).toISOString()}))' \
   > "$MANUAL_DIR/create.json"
 curl -sS -o "$MANUAL_DIR/create-response.json" -w 'HTTP %{http_code}\n' \
   -X POST http://localhost:3003/orders \
@@ -232,7 +233,7 @@ Edit the unassigned order using a new key:
 
 ```sh
 export EDIT_KEY="$(node -p 'require("node:crypto").randomUUID()')"
-printf '%s\n' '{"destination":"UTown", "credits":6}' > "$MANUAL_DIR/edit.json"
+printf '%s\n' '{"destination":"COM2", "destinationLocationId":"kr_002", "credits":6}' > "$MANUAL_DIR/edit.json"
 curl -i -X PATCH "http://localhost:3003/orders/$ORDER_ID" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -H "Idempotency-Key: $EDIT_KEY" --data-binary @"$MANUAL_DIR/edit.json"

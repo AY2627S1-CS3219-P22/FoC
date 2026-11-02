@@ -135,3 +135,17 @@ the user's explicit instruction. Supplier existence, expiry and credit validatio
 remain. Updated regression tests and operational documentation. Exact prompt,
 key response and verification: [order-service/usage-log.md](order-service/usage-log.md).
 Human review pending.
+
+
+Order deletion eligibility preparation, ChatGPT (Codex), 2026-11-02: implemented
+the supplied requester/courier active-order and unresolved-credit blocking query.
+The asynchronous deletion flow and gRPC exposure are not yet complete. Exchanges
+and validation: [order-service/usage-log.md](order-service/usage-log.md).
+Human review pending.
+
+
+Destination catalogue, ChatGPT (Codex), 2026-11-02: implemented the user-approved
+PostgreSQL catalogue, supplied CSV import, search API, order destination validation
+and UI type-to-search selection. Added migration/recovery/search tests and setup
+documentation. Exact prompts, key exchanges and verification:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.

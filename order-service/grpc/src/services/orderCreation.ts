@@ -2,6 +2,8 @@
 // Scope: Implemented author-approved durable creation, same-key replay, recovery and compensation.
 // Author review: Pending; see ../../usage-log.md.
 // ChatGPT (Codex), 2026-10-30: Removed current-opening-hours checks as requested; human review pending.
+// ChatGPT (Codex), 2026-11-02: Catalogue validation and saved ID/name; review pending.
+import { resolveDestination } from './destinationLocations';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { PrismaClient, Prisma, Order } from '../generated/prisma';
@@ -18,7 +20,8 @@ async function now(tx: Prisma.TransactionClient) {
 }
 function canonical(input: z.infer<typeof createOrderSchema>) {
   return { supplierId: input.supplierId, destination: input.destination, requestDetails: input.requestDetails,
-    credits: input.credits, expiryTime: input.expiryTime.toISOString() };
+    credits: input.credits, expiryTime: input.expiryTime.toISOString(),
+    ...(input.destinationLocationId ? { destinationLocationId: input.destinationLocationId } : {}) };
 }
 function fingerprint(input: z.infer<typeof createOrderSchema>) {
   return createHash('sha256').update(JSON.stringify(canonical(input))).digest('hex');
@@ -38,6 +41,8 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
     let creation = await db.orderCreation.findUnique({ where: { requesterId_idempotencyKey: { requesterId, idempotencyKey: key } } });
     let created = false;
     if (!creation) {
+      const destination = await resolveDestination(db, input.destination, input.destinationLocationId);
+      if (!destination) return { status: 400, error: 'invalid-destination' };
       let profile, supplier;
       try {
         [profile, supplier] = await Promise.all([
@@ -55,7 +60,7 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
         creation = await db.$transaction(async (tx) => {
           if (!isAllowedExpiry(input.expiryTime, await now(tx))) return null;
           const row = await tx.orderCreation.create({ data: { orderId: randomUUID(), requesterId, idempotencyKey: key,
-            requestFingerprint: hash, payload: { ...canonical(input), requesterName, pickupStore: supplier.name,
+            requestFingerprint: hash, payload: { ...canonical(input), destinationLocationId: destination.id, requesterName, pickupStore: supplier.name,
               pickupLocation: supplier.locationDescription } } });
           await tx.creditOperation.create({ data: { orderId: row.orderId, type: 'RESERVE', payload: { requesterId, amount: input.credits } } });
           return row;
@@ -96,7 +101,7 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
     if (!work) return;
     const data = work.row.payload as Record<string, string | number>;
     const input = createOrderSchema.parse({ supplierId: data.supplierId, destination: data.destination,
-      requestDetails: data.requestDetails, credits: data.credits, expiryTime: data.expiryTime });
+      requestDetails: data.requestDetails, credits: data.credits, expiryTime: data.expiryTime, destinationLocationId: data.destinationLocationId });
     let failure: 'rejected' | 'uncertain' | 'unavailable' | undefined;
     let confirmed = false;
     let compensated = false;
@@ -161,7 +166,7 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
       if (confirmed && creationState === 'PENDING' && input.expiryTime > time) {
         await tx.order.create({ data: { id, requesterId: work.row.requesterId, supplierId: BigInt(input.supplierId),
           requesterName: String(data.requesterName), pickupStore: String(data.pickupStore), pickupLocation: String(data.pickupLocation),
-          destination: input.destination, requestDetails: input.requestDetails, credits: input.credits, expiryTime: input.expiryTime,
+          destination: input.destination, destinationLocationId: input.destinationLocationId, requestDetails: input.requestDetails, credits: input.credits, expiryTime: input.expiryTime,
           status: 'UNASSIGNED', creditState: 'RESERVED' } });
         await tx.orderCreation.update({ where: { orderId: id }, data: { state: 'SUCCEEDED' } });
         await tx.creditOperation.update({ where: { id: currentOp.id }, data: { state: 'SUCCEEDED', leaseExpiresAt: null, lastError: null } });

@@ -1,6 +1,8 @@
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Generated setup implementation following approved User Service conventions.
 // Author review: Pending; see ../../../usage-log.md.
+// ChatGPT (Codex), 2026-11-02: Added catalogue search; review pending.
+import { searchLocations } from '../services/destinationLocations';
 import express, { type Express } from 'express';
 import { pingDatabase, prisma } from '../db';
 import { createOrderAcceptance } from '../services/orderAcceptance';
@@ -19,6 +21,7 @@ export function createApp(publicKey?: string, lifecycle?: ReturnType<typeof crea
       db: dbUp ? 'up' : 'down',
     });
   });
+  app.get('/api/locations', searchLocations(prisma));
   app.use('/orders', createOrderRouter(publicKey, lifecycle, creation, edits, createOrderAcceptance(prisma)));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const badJson = error instanceof SyntaxError && 'status' in error && error.status === 400;

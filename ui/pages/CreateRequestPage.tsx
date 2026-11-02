@@ -1,15 +1,11 @@
+// ChatGPT (Codex), 2026-11-02: Catalogue-backed destination selector; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import { useEffect, useState } from "react"
+import { DestinationSearch } from "../components/DestinationSearch"
 import type { User, Page } from "../App"
 import { CATEGORIES, categoryLabel, supplierLocation, type Category } from "../api/suppliers"
 import { createOrder, orderError, type NewOrder } from "../api/orders"
 import { useSuppliers } from "../hooks/useSuppliers"
-
-const DELIVERY_LOCATIONS = [
-  "PGP", "PGPR Block A", "PGPR Block B", "PGPR Block E",
-  "UTown Residence", "KEVII Hall", "Kent Ridge Hall",
-  "Raffles Hall", "Eusoff Hall", "Sheares Hall",
-]
 
 function localDateValue(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
@@ -79,6 +75,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
     supplierId: "",
     supplier: "",
     deliveryLocation: "",
+    destinationLocationId: "",
     description: "",
     credits: 4,
   })
@@ -94,10 +91,12 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
   const [lastAttempt, setLastAttempt] = useState<{ body: string; key: string } | null>(null)
 
   const handleSubmit = async () => {
+    if (!form.destinationLocationId) { setStep(2); return }
     if (!validateDeadline()) { setStep(2); return }
     const order: NewOrder = {
       supplierId: form.supplierId,
       destination: form.deliveryLocation,
+      destinationLocationId: form.destinationLocationId,
       requestDetails: form.description.trim(),
       credits: form.credits,
       expiryTime: new Date(deadlineTimestamp).toISOString(),
@@ -119,7 +118,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
   }
 
   const step1Valid = !!form.pickupLocation && !!form.supplier
-  const step2Valid = !!form.deliveryLocation && form.description.trim().length > 0 && deadlineValid
+  const step2Valid = !!form.destinationLocationId && form.description.trim().length > 0 && deadlineValid
 
   return (
     <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6 sm:py-8">
@@ -235,19 +234,9 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
       {step === 2 && (
         <div className="space-y-5">
           <h2 className="text-base font-semibold text-[#162A46]">Delivery details</h2>
-          <div>
-            <label className="block text-xs font-medium text-[#1B2522] mb-1.5">Delivery location</label>
-            <select
-              value={form.deliveryLocation}
-              onChange={(e) => set("deliveryLocation", e.target.value)}
-              className={inputCls}
-            >
-              <option value="">Select delivery location</option>
-              {DELIVERY_LOCATIONS.map((l) => (
-                <option key={l} value={l}>{l}</option>
-              ))}
-            </select>
-          </div>
+          <DestinationSearch value={form.destinationLocationId ? { id: form.destinationLocationId, name: form.deliveryLocation, code: "" } : null} onSelect={location => setForm(current => ({ ...current,
+            destinationLocationId: location?.id ?? '', deliveryLocation: location?.name ?? '',
+          }))} />
           <div>
             <label className="block text-xs font-medium text-[#1B2522] mb-1.5">
               Request details / instructions
