@@ -1,6 +1,8 @@
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Implemented author-requested courier eligibility and first-lock-wins acceptance.
 // Author review: Pending; see ../../usage-log.md.
+// ChatGPT (Codex), 2026-11-02: Verify courier existence through shared User gRPC; review pending.
+import { status as rpcStatus } from '@grpc/grpc-js';
 import type { Order, PrismaClient } from '../generated/prisma';
 import type { CommandResult } from './orderCreation';
 
@@ -18,7 +20,9 @@ export function acceptanceFailure(order: AcceptanceOrder, actor: Actor, now: Dat
   return undefined;
 }
 
-export function createOrderAcceptance(db: PrismaClient) {
+type UserLookup = { getPublicProfile: (request: { userId: string }) => Promise<{ userId: string }> };
+
+export function createOrderAcceptance(db: PrismaClient, users: UserLookup) {
   async function accept(orderId: string, actor: Actor): Promise<CommandResult> {
     return db.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId}::uuid FOR UPDATE`;
@@ -32,8 +36,20 @@ export function createOrderAcceptance(db: PrismaClient) {
         orderId, state: { in: ['PENDING', 'PROCESSING', 'RECONCILIATION_REQUIRED'] },
       }, select: { id: true } });
       if (editing) return { status: 409, error: 'conflict' };
+      try {
+        const profile = await users.getPublicProfile({ userId: actor.id });
+        if (profile.userId !== actor.id) return { status: 503, error: 'dependency-unavailable' };
+      } catch (error) {
+        if ((error as { code?: number } | null)?.code === rpcStatus.NOT_FOUND) {
+          return { status: 403, error: 'forbidden' };
+        }
+        return { status: 503, error: 'dependency-unavailable' };
+      }
+      // User lookup can take time; an order must still be unexpired at assignment.
+      const acceptedAt = (await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`)[0].now;
+      if (order.expiryTime <= acceptedAt) return { status: 409, error: 'expired' };
       const assigned = await tx.order.update({ where: { id: orderId }, data: {
-        status: 'ASSIGNED', courierId: actor.id, courierName: null, acceptedAt: time,
+        status: 'ASSIGNED', courierId: actor.id, courierName: null, acceptedAt,
       } });
       return { status: 200, order: assigned };
     });

@@ -631,3 +631,25 @@ the CSV does not update an existing database or a previously applied migration.
 Apply migrations and rebuild/restart Order before testing the updated UI. The
 existing Docker startup already runs `prisma:deploy`, including this catalogue
 migration.
+
+
+## Courier existence during acceptance
+
+AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02. Implemented the author's
+explicit courier existence requirement; review pending; see usage-log.md.
+
+Before assigning an eligible order, Order calls User Service's existing
+`GetPublicProfile` RPC through the shared gRPC client, using the courier ID from
+the verified JWT. User NOT_FOUND returns 403 `forbidden`; timeout, unavailable
+User Service or mismatched profile ID returns 503 `dependency-unavailable`.
+Neither failure assigns the courier or changes the order. The order row remains
+locked during the check, and expiry is checked again before assignment.
+
+Existing role, self-acceptance, status, credit-state and pending-edit checks
+remain. This checks User existence, not Credit account initialization. It also
+is not an atomic cross-service deletion protocol; asynchronous deletion handling
+remains separate work.
+
+Rebuild/restart the Order container with the lifecycle Compose override to use
+this change; USER_GRPC_ADDR continues to supply the User endpoint. No new
+configuration or database migration is required for this acceptance check.

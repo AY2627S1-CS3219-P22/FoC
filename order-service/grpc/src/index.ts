@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-02: Wire mandatory shared User lookup for acceptance; review pending; see ../../usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Generated approved service startup; adopted shared @foc/grpc Credit client on 2026-10-22.
 // Author review: Pending; see ../../usage-log.md.
@@ -7,6 +8,7 @@ import { createDirectories } from './dependencies/directories';
 import { createOrderCreation } from './services/orderCreation';
 import { createOrderEdits } from './services/orderEdits';
 import { createOrderLifecycle } from './services/orderLifecycle';
+import { createOrderAcceptance } from './services/orderAcceptance';
 import { once } from 'node:events';
 import { createCreditClient, startServer, stopServer, type RpcOptions } from '@foc/grpc';
 import { env } from './env';
@@ -27,7 +29,10 @@ async function main(): Promise<void> {
   const creation = credit ? createOrderCreation(prisma, credit, directories, creditOptions) : undefined;
   const edits = credit ? createOrderEdits(prisma, credit, directories, creditOptions) : undefined;
   const lifecycle = credit ? createOrderLifecycle(prisma, credit, [() => creation!.recoverBatch(), () => edits!.recoverBatch()], creditOptions) : undefined;
-  const httpServer = createApp(publicKey, lifecycle, creation, edits).listen(env.PORT);
+  const acceptance = createOrderAcceptance(prisma, {
+    getPublicProfile: ({ userId }) => directories.getRequester(userId),
+  });
+  const httpServer = createApp(publicKey, lifecycle, creation, edits, acceptance).listen(env.PORT);
   try {
     await once(httpServer, 'listening');
     await startServer(grpcServer, env.GRPC_PORT, env.GRPC_HOST);

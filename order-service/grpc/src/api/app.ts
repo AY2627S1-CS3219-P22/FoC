@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-02: Wire mandatory shared User lookup for acceptance; review pending; see ../../../usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Generated setup implementation following approved User Service conventions.
 // Author review: Pending; see ../../../usage-log.md.
@@ -5,13 +6,13 @@
 import { searchLocations } from '../services/destinationLocations';
 import express, { type Express } from 'express';
 import { pingDatabase, prisma } from '../db';
-import { createOrderAcceptance } from '../services/orderAcceptance';
+import type { createOrderAcceptance } from '../services/orderAcceptance';
 import { createOrderRouter } from './routes/orderRoutes';
 import type { createOrderCreation } from '../services/orderCreation';
 import type { createOrderEdits } from '../services/orderEdits';
 import type { createOrderLifecycle } from '../services/orderLifecycle';
 
-export function createApp(publicKey?: string, lifecycle?: ReturnType<typeof createOrderLifecycle>, creation?: ReturnType<typeof createOrderCreation>, edits?: ReturnType<typeof createOrderEdits>): Express {
+export function createApp(publicKey?: string, lifecycle?: ReturnType<typeof createOrderLifecycle>, creation?: ReturnType<typeof createOrderCreation>, edits?: ReturnType<typeof createOrderEdits>, acceptance?: ReturnType<typeof createOrderAcceptance>): Express {
   const app = express();
   app.use(express.json());
   app.get('/health', async (_req, res) => {
@@ -22,7 +23,7 @@ export function createApp(publicKey?: string, lifecycle?: ReturnType<typeof crea
     });
   });
   app.get('/api/locations', searchLocations(prisma));
-  app.use('/orders', createOrderRouter(publicKey, lifecycle, creation, edits, createOrderAcceptance(prisma)));
+  app.use('/orders', createOrderRouter(publicKey, lifecycle, creation, edits, acceptance));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const badJson = error instanceof SyntaxError && 'status' in error && error.status === 400;
     res.status(badJson ? 400 : 500).json({ error: badJson ? 'invalid-input' : 'internal-error' });

@@ -156,3 +156,10 @@ on the active errand page, aligned detail-page controls with existing backend
 requester exclusion and added UI/HTTP regression tests. Backend authorization
 was already enforced. Exact prompt and verification:
 [order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+
+Courier existence validation, ChatGPT (Codex), 2026-11-02: implemented the user's
+explicit requirement to check User GetPublicProfile before acceptance, fail
+closed on RPC failures and recheck expiry before assignment. Added real gRPC/HTTP
+regression coverage. Exact prompts, key response and verification:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.

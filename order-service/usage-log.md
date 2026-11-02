@@ -1120,3 +1120,41 @@ a disposable dedicated database. The initial tsx CLI attempt was blocked from
 opening its IPC socket; node --import tsx ran the same tests successfully without
 that socket. No live user orders or balances were modified. No manual browser
 interaction testing performed. Changes remain uncommitted.
+
+
+## 2026-11-02: validate courier still exists before acceptance
+
+Tool: ChatGPT (Codex). Modes: implementation, debugging and tests. Human review
+pending.
+
+Exact user prompt: “Check for this and if not present, implement that "Validate courier still exists before accepting an order"”
+
+Key response: “Acceptance previously relied on the JWT and local order state; it didn’t check whether the courier still existed. I’ve added a User Service lookup before assignment. A missing user is rejected, and an unavailable or timed-out lookup leaves the order unassigned.”
+
+Acceptance now uses User GetPublicProfile through the existing shared gRPC client
+and existing startup-owned User connection (via directories). JWT determines the
+queried user ID. NOT_FOUND returns 403 forbidden. Other RPC failures/timeouts or
+a mismatched returned ID return 503 dependency-unavailable. Lookup occurs under
+the existing order row lock after local eligibility checks; database expiry is
+sampled again before assignment. No Credit account check or balance mutation was
+added. This point-in-time existence check is not an atomic cross-service deletion
+protocol, and does not replace the pending asynchronous deletion work.
+
+App receives the configured acceptance service explicitly. Without that service,
+the existing route returns 503 rather than bypassing lookup. Existing acceptance
+fixtures now explicitly inject the test User lookup. Added live User gRPC + HTTP
+coverage for deleted/missing courier, unavailable service, deadline expiry,
+response identity mismatch, successful assignment and no mutations on rejection.
+Added expiry-during-lookup coverage. Existing concurrent acceptance, cancellation
+and edit race tests remain.
+
+Verification: Order generation/build passed after rerunning with Prisma cache
+access (initial sandbox attempt failed with EPERM touching the cached engine).
+All 16 unit/authentication/gRPC tests passed. First full integration run had four
+creation/recovery fixture failures (one new acceptance test failed during its
+creation setup); the isolated acceptance run passed all 9 tests. A subsequent
+complete run passed all 68 PostgreSQL/HTTP/gRPC integration tests. No claim is
+made that the initial intermittent fixture failures were fixed. Tests used a
+disposable dedicated PostgreSQL database, removed afterward. Existing demo
+accounts/orders/credits and running containers were not modified. No migration
+is needed for the acceptance check. Rebuild Order to activate it. Uncommitted.

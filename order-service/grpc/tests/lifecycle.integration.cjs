@@ -13,6 +13,7 @@ const {createOrderCreation}=require('../dist/services/orderCreation');const {cre
 const {createOrderLifecycle}=require('../dist/services/orderLifecycle');const {createOrderSchema,editOrderSchema}=require('../dist/api/dto/orderInput');
 const {createApp}=require('../dist/api/app');
 const {createOrderAcceptance}=require('../dist/services/orderAcceptance');
+const existingUsers={getPublicProfile:async({userId})=>({userId})};
 const prefix='lifecycle-'+randomUUID();let userCounter=0;
 before(()=>db.$connect());
 after(async()=>{
@@ -263,37 +264,37 @@ test('automatic expiry worker ignores future and delivered orders and refunds ov
 });
 
 test('acceptance persists courier identity, timestamp and ASSIGNED without new credit mutations',async()=>{
- const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db);const actor={id:'courier-'+randomUUID(),roles:['USER']};
+ const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db,existingUsers);const actor={id:'courier-'+randomUUID(),roles:['USER']};
  const response=await acceptance.accept(order.id,actor);assert.equal(response.status,200);assert.equal(response.order.status,'ASSIGNED');assert.equal(response.order.courierId,actor.id);assert.ok(response.order.acceptedAt instanceof Date);assert.ok(response.order.acceptedAt>=response.order.createdAt);assert.equal(response.order.creditState,'RESERVED');
  const stored=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(stored.courierId,actor.id);assert.equal(stored.status,'ASSIGNED');assert.equal(f.calls,1);assert.equal(f.updates,0);assert.equal(f.releases,0);
  assert.equal((await acceptance.accept(order.id,actor)).status,409);assert.equal((await acceptance.accept(order.id,{id:'another',roles:['USER']})).status,409);
 });
 test('twelve concurrent couriers yield exactly one successful acceptance and one persisted winner',async()=>{
- const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db);const actors=Array.from({length:12},(_,i)=>({id:'courier-'+i+'-'+randomUUID(),roles:['USER']}));
+ const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db,existingUsers);const actors=Array.from({length:12},(_,i)=>({id:'courier-'+i+'-'+randomUUID(),roles:['USER']}));
  const results=await Promise.all(actors.map(actor=>acceptance.accept(order.id,actor)));assert.equal(results.filter(r=>r.status===200).length,1);assert.equal(results.filter(r=>r.status===409).length,11);
  const winner=results.findIndex(r=>r.status===200);const stored=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(stored.courierId,actors[winner].id);assert.equal(stored.status,'ASSIGNED');assert.equal(f.calls,1);
 });
 test('acceptance and cancellation races commit only one eligible transition',async()=>{
- const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db);
+ const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db,existingUsers);
  const [accepted,cancelled]=await Promise.all([acceptance.accept(order.id,{id:'courier',roles:['USER']}),f.lifecycle.cancel(order.id,f.user)]);
  const stored=await db.order.findUniqueOrThrow({where:{id:order.id}});
  if(accepted.status===200){assert.equal(cancelled.status,409);assert.equal(stored.status,'ASSIGNED');assert.equal(stored.courierId,'courier');assert.equal(f.releases,0)}
  else{assert.equal(accepted.status,409);assert.equal(cancelled.order.status,'CANCELLED');assert.equal(stored.courierId,null);assert.equal(stored.creditState,'REFUNDED');assert.equal(f.releases,1)}
 });
 test('pending durable edit blocks acceptance until credit reconciliation completes',async()=>{
- const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db);const actor={id:'courier',roles:['USER']};f.updateMode='after';assert.equal((await f.edits.edit(order.id,f.user,'accept-edit',{credits:6})).status,202);
+ const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db,existingUsers);const actor={id:'courier',roles:['USER']};f.updateMode='after';assert.equal((await f.edits.edit(order.id,f.user,'accept-edit',{credits:6})).status,202);
  const blocked=await acceptance.accept(order.id,actor);assert.equal(blocked.status,409);assert.equal(blocked.error,'conflict');await editDue(order.id);await f.edits.recoverBatch();
  const accepted=await acceptance.accept(order.id,actor);assert.equal(accepted.status,200);assert.equal(accepted.order.credits,6);
 });
 test('acceptance rechecks database expiry after waiting for the row lock',async()=>{
  const f=fixture(),order=await create(f);let locked;const ready=new Promise(r=>locked=r);let release;const gate=new Promise(r=>release=r);
  const blocker=db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM "Order" WHERE id=${order.id}::uuid FOR UPDATE`;await tx.order.update({where:{id:order.id},data:{expiryTime:new Date(Date.now()+100)}});locked();await gate});
- await ready;const pending=createOrderAcceptance(db).accept(order.id,{id:'courier',roles:['USER']});await new Promise(r=>setTimeout(r,150));release();await blocker;
+ await ready;const pending=createOrderAcceptance(db,existingUsers).accept(order.id,{id:'courier',roles:['USER']});await new Promise(r=>setTimeout(r,150));release();await blocker;
  const result=await pending;assert.equal(result.status,409);assert.equal(result.error,'expired');assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).courierId,null);
  await f.lifecycle.expireBatch();await f.lifecycle.refundBatch();
 });
 test('acceptance HTTP derives courier from JWT and enforces eligibility without Credit configuration',async t=>{
- const f=fixture(),order=await create(f);const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});const app=createApp(publicKey.export({type:'spki',format:'pem'}));
+ const f=fixture(),order=await create(f);const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});const app=createApp(publicKey.export({type:'spki',format:'pem'}),undefined,undefined,undefined,createOrderAcceptance(db,existingUsers));
  const server=app.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(r=>server.close(r)));const base='http://127.0.0.1:'+server.address().port+'/orders';
  const actor='courier-'+randomUUID();const headers=(id=actor,roles=['USER'])=>({Authorization:'Bearer '+jwt.sign({roles},privateKey,{algorithm:'RS256',subject:id,expiresIn:60}),'Content-Type':'application/json'});
  const accept=(id,h=headers(),body='{}')=>fetch(base+'/'+id+'/accept',{method:'POST',headers:h,body});
@@ -552,7 +553,7 @@ for(const mode of ['before','after'])test('credit edit '+mode+'-commit gRPC fail
  const result=await edits.edit(order.id,f.user,'edit-grpc-'+mode,{credits:7});assert.equal(result.status,202);assert.equal(result.order.credits,4);
  const op=await db.orderEditOperation.findFirstOrThrow({where:{orderId:order.id}});assert.equal(op.expectedVersion,1);assert.equal(op.targetCredits,7);
  assert.equal((await edits.edit(order.id,f.user,'another-pending-edit',{credits:8})).status,409);
- assert.equal((await createOrderAcceptance(db).accept(order.id,{id:f.user+'-courier',roles:['USER']})).status,409);
+ assert.equal((await createOrderAcceptance(db,existingUsers).accept(order.id,{id:f.user+'-courier',roles:['USER']})).status,409);
  await editDue(order.id);const restarted=createOrderEdits(db,wire.client,f.directories,wire.options);await restarted.recoverBatch();
  assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).credits,7);assert.equal(f.ledger.get(order.id).amount,7);assert.equal(f.ledger.get(order.id).version,2);assert.equal(f.updates,mode==='after'?1:2);
  assert.equal((await restarted.edit(order.id,f.user,'edit-grpc-'+mode,{credits:7})).status,200);assert.equal(f.ledger.get(order.id).version,2);
@@ -568,7 +569,7 @@ test('concurrent same-key edits over gRPC produce one operation and one reservat
 
 test('edit and actual acceptance racing over the same row leave matching order and credit state',async t=>{
  for(let n=0;n<4;n++){
-  const f=fixture(),order=await create(f),wire=await grpcCreditFixture(t,f),edits=createOrderEdits(db,wire.client,f.directories,wire.options),acceptance=createOrderAcceptance(db);
+  const f=fixture(),order=await create(f),wire=await grpcCreditFixture(t,f),edits=createOrderEdits(db,wire.client,f.directories,wire.options),acceptance=createOrderAcceptance(db,existingUsers);
   const [edit,accept]=await Promise.all([edits.edit(order.id,f.user,'edit-accept-race',{credits:6}),acceptance.accept(order.id,{id:f.user+'-courier',roles:['USER']})]);
   const stored=await db.order.findUniqueOrThrow({where:{id:order.id}}),receipt=f.ledger.get(order.id);
   assert.equal(stored.credits,receipt.amount);
@@ -743,4 +744,36 @@ test('pre-catalogue pending creations recover without discarding historical dest
  await due(pending.creationId);await f.creation.recoverBatch();
  const order=await db.order.findUniqueOrThrow({where:{id:pending.creationId}});assert.equal(order.destination,'Historical destination');assert.equal(order.destinationLocationId,null);assert.equal(f.calls,1);
  const edited=await f.edits.edit(order.id,f.user,'select-building',{destinationLocationId:'kr_001'});assert.equal(edited.status,200);assert.equal(edited.order.destination,'COM1');assert.equal(edited.order.destinationLocationId,'kr_001');
+});
+
+// ChatGPT (Codex), 2026-11-02: Live User gRPC existence checks before courier assignment; review pending.
+test('acceptance verifies the JWT courier via User gRPC and fails closed without mutation',async t=>{
+ const f=fixture(),order=await create(f),rpc=require('@foc/grpc');let mode='missing',calls=0,lastUser;
+ const server=rpc.createServer(rpc.UserService.service,{GetPublicProfile:(call,cb)=>{
+  calls++;lastUser=call.request.userId;
+  if(mode==='missing')return cb({code:5,details:'User not found'});
+  if(mode==='unavailable')return cb({code:14,details:'Unavailable'});
+  if(mode==='timeout')return;
+  cb(null,{userId:mode==='mismatch'?'different-user':call.request.userId,username:'courier',firstName:'Campus',lastName:'Courier'});
+ }});
+ const port=await rpc.startServer(server,0,'127.0.0.1'),user=rpc.createUserClient('127.0.0.1:'+port,{timeoutMs:100});
+ t.after(()=>{user.close();server.forceShutdown()});
+ const acceptance=createOrderAcceptance(db,user);
+ const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+ const http=createApp(publicKey.export({type:'spki',format:'pem'}),undefined,undefined,undefined,acceptance).listen(0,'127.0.0.1');await once(http,'listening');t.after(()=>new Promise(r=>http.close(r)));
+ const actor=f.user+'-courier';const post=(id=actor)=>fetch(`http://127.0.0.1:${http.address().port}/orders/${order.id}/accept`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+jwt.sign({roles:['USER']},privateKey,{algorithm:'RS256',subject:id,expiresIn:60})},body:'{}'});
+ assert.equal((await post(f.user)).status,403);assert.equal(calls,0);
+ for(const [nextMode,expected] of [['missing',403],['unavailable',503],['timeout',503],['mismatch',503]]){
+  mode=nextMode;assert.equal((await post()).status,expected,nextMode);assert.equal(lastUser,actor);
+  const current=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(current.status,'UNASSIGNED');assert.equal(current.courierId,null);assert.equal(current.acceptedAt,null);
+ }
+ mode='exists';const accepted=await post();assert.equal(accepted.status,200);assert.equal((await accepted.json()).order.courierId,actor);assert.equal(f.calls,1);
+});
+
+test('acceptance rechecks expiry after User lookup and does not assign an expired order',async()=>{
+ const f=fixture(),order=await create(f);
+ await db.order.update({where:{id:order.id},data:{expiryTime:new Date(Date.now()+100)}});
+ const users={getPublicProfile:async({userId})=>{await new Promise(r=>setTimeout(r,150));return {userId}}};
+ const result=await createOrderAcceptance(db,users).accept(order.id,{id:'courier',roles:['USER']});
+ assert.equal(result.status,409);assert.equal(result.error,'expired');assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).courierId,null);
 });
