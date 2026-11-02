@@ -113,7 +113,7 @@ export async function getProfile(id: string) {
 
 export async function getPublicProfile(id: string) {
   return prisma.user.findUnique({
-    where: { id, isDeleted: false },
+    where: { id },
     select: publicProfileSelect,
   });
 }

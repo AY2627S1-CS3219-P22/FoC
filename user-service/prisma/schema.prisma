@@ -40,7 +40,6 @@ model User {
   email        String   @unique
   passwordHash String // bcrypt hash
   roles        Roles[]  @default([USER])
-  isDeleted    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

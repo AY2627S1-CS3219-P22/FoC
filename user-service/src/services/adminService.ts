@@ -17,7 +17,6 @@ const ADMIN_LOCK_KEY = 32190001;
 
 export const activeAdminWhere = {
   roles: { has: 'ADMINISTRATOR' },
-  isDeleted: false,
 } satisfies Prisma.UserWhereInput;
 
 // Call first in any transaction that changes who is an admin, so those run one
@@ -70,7 +69,7 @@ async function checkActorAndTarget(tx: Prisma.TransactionClient, actorId: string
   if (!actor) return { ok: false as const, reason: 'forbidden' as const };
 
   const target = await tx.user.findFirst({
-    where: { id: targetId, isDeleted: false },
+    where: { id: targetId },
     select: profileSelect,
   });
   if (!target) return { ok: false as const, reason: 'not_found' as const };
