@@ -1,5 +1,17 @@
 # AI usage log: User Service
 
+## 030: Archived user purge job
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified scheduled cleanup job.
+- **Prompts:** [prompts/030-archived-user-purge-job.md](prompts/030-archived-user-purge-job.md).
+- **Key response:** Added expired `ArchivedUser` deletion at startup and on a 24-hour interval, with no `user.purged` event.
+- **Affected locations:** `user-service/src/jobs/archivePurge.ts`, `user-service/src/index.ts`.
+- **Checks:** Pending.
+- **Human review/edits:** Pending human review; no human approval is claimed.
+- **External sources:** None.
+
 ## 027: User restoration workflow
 
 - **Timestamp:** 2026-11-02 (Asia/Singapore).

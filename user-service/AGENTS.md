@@ -64,6 +64,8 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 
 **Folder layout:**
 - `src/api/` = HTTP (REST) transport; `src/grpc/` = gRPC transport.
+- `src/jobs/` = background timers (e.g. the daily archive purge). Services never
+  start timers themselves.
 - Shared building blocks (`env.ts`, `db.ts`) live at `src/` root.
 - Services live in `src/services/`, shared by both transports (moved out of
   `src/api/` once gRPC needed them). Transports import services; services never

@@ -2,8 +2,9 @@
 // Tool: Claude Code (Claude Opus), date: 2026-09-25
 // Scope: AI generated the original entry point (start REST and gRPC servers,
 // shutdown). Messaging wiring was added later by a teammate.
-// Author review: Author reviewed the code and approved. See
-// user-service/ai/usage-log.md, entry 001.
+// Author review: Author reviewed the code and approved. OpenAI Codex added
+// the author-specified ArchivedUser purge scheduling; entry 030 is pending
+// review. See user-service/ai/usage-log.md.
 
 import { RabbitMQClient, CREDIT_USER_QUEUE, QUEUES } from '@foc/messaging';
 import { env } from './env';
@@ -12,9 +13,18 @@ import { createApp } from './api/app';
 import { startGrpcServer } from './grpc/server';
 import { OutboxStore } from './events/outboxStore';
 import { startDispatcher } from './events/outboxDispatcher';
+import { purgeExpiredArchivedUsers, startArchivePurgeJob } from './jobs/archivePurge';
 
 // Boots both servers: Express (REST) and gRPC (internal RPC).
 async function main(): Promise<void> {
+  // Catches up after downtime; a failure here must not stop the service booting.
+  try {
+    const purgedAtStartup = await purgeExpiredArchivedUsers();
+    console.log(`ArchivedUser purge removed ${purgedAtStartup} expired row(s) at startup`);
+  } catch (err) {
+    console.error('ArchivedUser purge at startup failed', err instanceof Error ? err.message : String(err));
+  }
+
   const app = createApp();
   const httpServer = app.listen(env.PORT, () => {
     console.log(`REST server listening on http://localhost:${env.PORT}`);
@@ -68,11 +78,13 @@ async function main(): Promise<void> {
     intervalMs: env.OUTBOX_POLL_INTERVAL_MS,
     batchSize: env.OUTBOX_BATCH_SIZE,
   });
+  const stopArchivePurge = startArchivePurgeJob();
 
   // Close servers and the DB pool.
   const shutdown = async (signal: string): Promise<void> => {
     console.log(`\n${signal} received — shutting down...`);
     stopDispatcher();
+    stopArchivePurge();
     httpServer.close();
     grpcServer.forceShutdown();
     try {
