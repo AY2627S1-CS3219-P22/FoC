@@ -1,5 +1,24 @@
 # AI usage log: User Service
 
+## 023: Archived user retention schema
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified Prisma schema model.
+- **Exact prompt:**
+
+  > ok, I need to implement user deletion, let's start with defining the schema. Can you implement this please: ArchivedUser, email String (PK), userId String, deletedAt (DateTime, now), purgeAfter datetime
+  >
+  > index on purgeAfter
+  >
+  > this archival is for keeping up to 4 years after user account deletion, to prevent a returning user from resetting their credits. Note that it only holds the email and old user id, and no other personal data
+
+- **Key response:** Added the author-specified `ArchivedUser` Prisma model with `email` as the primary key, `userId`, `deletedAt` defaulting to `now()`, `purgeAfter`, and an index on `purgeAfter`. No additional personal data was added.
+- **Affected locations:** `prisma/schema.prisma`.
+- **Checks:** `npx prisma validate --schema user-service/prisma/schema.prisma` passed. `prisma migrate dev --name add_archived_user` could not generate a migration because the configured PostgreSQL database at `127.0.0.1:54322` was unavailable; no migration file was created.
+- **Human review/edits:** Author reviewed and approved the schema change.
+- **External sources:** None.
+
 ## 001: Initial user-service scaffolding (setup)
 
 - **Timestamp:** 2026-09-24 – 2026-09-25 (Asia/Singapore).

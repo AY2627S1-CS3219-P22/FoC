@@ -5,7 +5,13 @@
 // in-place rotation, and the SystemBootstrap and AdminRoleChange models.
 // Author review: Author specified the models, fields and the previous-hash
 // approach, reviewed and approved. See user-service/ai/usage-log.md, entries
-// 001, 010, 017, 018.
+// 001, 010, 017, 018, 023.
+//
+// AI Assistance Disclosure:
+// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
+// Scope: AI added the author-specified ArchivedUser retention model containing
+// only email, the old user id, deletion time, and purge time, with an index on
+// purgeAfter. Author review: Pending. See user-service/ai/usage-log.md, entry 023.
 
 // Prisma schema for the User Service.
 // Schema changes go through `prisma migrate dev`, never `db push`.
@@ -39,6 +45,17 @@ model User {
   updatedAt    DateTime @updatedAt
 
   refreshTokens RefreshToken[]
+}
+
+// Kept for up to 4 years after deletion, so a returning user can't reset their
+// credits. Holds only the email and old id; no other personal data.
+model ArchivedUser {
+  email      String   @id
+  userId     String
+  deletedAt  DateTime @default(now())
+  purgeAfter DateTime
+
+  @@index([purgeAfter])
 }
 
 // Transactional outbox: sign-up writes a user.created row in the same
