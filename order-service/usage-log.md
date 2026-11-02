@@ -1083,3 +1083,40 @@ Verification:
   catalogue migration had not applied; subsequent full suites passed.
 - Used a disposable dedicated PostgreSQL database, not the development database.
   UI interaction in a browser and a full Docker application build were not run.
+
+
+## 2026-11-02: requester versus courier pickup/delivery authorization
+
+Tool: ChatGPT (Codex). Modes: debugging, implementation, regression tests.
+Human review pending.
+
+Exact user prompt: “Can you check if there is a bug where the requester is able to mark picked up, delivered, which is only supposed to be done from the courier's side both frontend and backend?”
+
+Key response: “The backend already rejects pickup and delivery unless the authenticated user is the assigned courier. I found a UI gap: the ‘Active Errand’ page shows those buttons without checking the viewer’s identity. I’ll fix that and add regression tests.”
+
+Inspection: backend OrderLifecycle.pickup/deliver already compare JWT-derived
+actor ID against courierId and explicitly exclude requesterId, within row-locked
+transactions. Both routes require USER role. No backend authorization change was
+needed. Same-origin tabs share localStorage tokens, so a stale requester UI can
+send a courier token after another tab logs in; this is not evidence that the
+backend authorized the requester identity. Session storage behavior is unchanged.
+
+Changes: pass currentUserId from App to AcceptedOrderPage; hide and guard pickup
+and delivery for non-couriers, explicitly excluding requesters even if both IDs
+match. Mirror that exclusion and handler checks on OrderDetailsPage. Restrict the
+courier credit-earned message on the active errand page to the courier.
+
+Tests: added actual React server-rendered page checks for requester, outsider,
+unknown viewer, requester/courier ID collision, eligible courier and status
+transitions. Run from the repository root:
+`TSX_TSCONFIG_PATH=ui/tsconfig.json node --import tsx --test ui/tests/courierActions.test.cjs`.
+Added authenticated HTTP requester/outsider delivery assertions with checks that
+status stays PICKED_UP and no settlement intent or Credit call is made. Existing
+pickup HTTP test already verifies requester/outsider rejection and courier success.
+
+Verification: all 4 UI rendering tests passed; UI production build and TypeScript
+check passed. All 66 Order PostgreSQL/HTTP/gRPC integration tests passed against
+a disposable dedicated database. The initial tsx CLI attempt was blocked from
+opening its IPC socket; node --import tsx ran the same tests successfully without
+that socket. No live user orders or balances were modified. No manual browser
+interaction testing performed. Changes remain uncommitted.

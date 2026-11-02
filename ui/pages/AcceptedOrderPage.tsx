@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-02: Enforce courier-only action visibility/handlers; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import type { Order } from "../App"
 import StatusBadge from "../components/StatusBadge"
@@ -5,6 +6,7 @@ import { useOrder } from "../hooks/useOrder"
 
 interface Props {
   initialOrder: Order
+  currentUserId: string
   onDelivered: (order: Order) => void
   onBack: () => void
 }
@@ -18,12 +20,19 @@ function stepIndex(status: Order["status"]): number {
   return 0
 }
 
-export default function AcceptedOrderPage({ initialOrder, onDelivered, onBack }: Props) {
+export default function AcceptedOrderPage({ initialOrder, currentUserId, onDelivered, onBack }: Props) {
   const { order, actionError, busy, run } = useOrder(initialOrder)
 
   const current = stepIndex(order.status)
+  const isCourier = order.courierId === currentUserId && order.requesterId !== currentUserId
+
+  const pickup = async () => {
+    if (!isCourier || order.status !== "accepted") return
+    await run("pickup")
+  }
 
   const deliver = async () => {
+    if (!isCourier || order.status !== "picked-up") return
     const updated = await run("deliver")
     if (updated) onDelivered(updated)
   }
@@ -113,16 +122,16 @@ export default function AcceptedOrderPage({ initialOrder, onDelivered, onBack }:
       )}
 
       {/* Contextual action */}
-      {order.status === "accepted" && (
+      {isCourier && order.status === "accepted" && (
         <button
-          onClick={() => run("pickup")}
+          onClick={pickup}
           disabled={busy}
           className="w-full py-3 bg-[#1A4A36] text-white text-sm font-medium rounded-xl hover:bg-[#163D2C] disabled:opacity-50 transition-colors"
         >
           Mark as Picked Up
         </button>
       )}
-      {order.status === "picked-up" && (
+      {isCourier && order.status === "picked-up" && (
         <div className="space-y-3">
           <div className="bg-[#E8F1ED] border border-[#1A4A36]/10 rounded-lg px-4 py-3 text-xs text-[#1A4A36] font-medium text-center">
             Item has been picked up. Head to {order.deliveryLocation}.
@@ -139,7 +148,7 @@ export default function AcceptedOrderPage({ initialOrder, onDelivered, onBack }:
       {order.status === "delivered" && (
         <div className="bg-[#E8F1ED] border border-[#1A4A36]/10 rounded-xl px-5 py-4 text-center">
           <p className="text-sm font-semibold text-[#1A4A36] mb-0.5">Errand completed</p>
-          <p className="text-xs text-[#3F6B5A]">+{order.credits} credits added to your balance</p>
+          {isCourier && <p className="text-xs text-[#3F6B5A]">+{order.credits} credits added to your balance</p>}
         </div>
       )}
     </div>

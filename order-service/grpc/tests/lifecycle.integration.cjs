@@ -500,6 +500,10 @@ test('delivery validates caller, transition, expiry and HTTP body before settlem
  const base='http://127.0.0.1:'+server.address().port+'/orders';
  const headers=(sub,roles=['USER'])=>({'Content-Type':'application/json',Authorization:'Bearer '+jwt.sign({roles},privateKey,{algorithm:'RS256',subject:sub,expiresIn:60})});
  const post=(id,h,body={})=>fetch(base+'/'+id+'/deliver',{method:'POST',headers:h,body:JSON.stringify(body)});
+ // ChatGPT (Codex), 2026-11-02: HTTP-level requester/outsider rejection; review pending.
+ for(const actor of [f.user,'outsider'])assert.equal((await post(order.id,headers(actor))).status,403);
+ assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).status,'PICKED_UP');
+ assert.equal(await db.creditOperation.count({where:{orderId:order.id,type:'SETTLE'}}),0);assert.equal(f.settlements,0);
  assert.equal((await post(order.id,{})).status,401);assert.equal((await post(order.id,headers(order.courierId,['ADMINISTRATOR']))).status,403);
  assert.equal((await post('bad-id',headers(order.courierId))).status,400);assert.equal((await post(order.id,headers(order.courierId),{courierId:'forged'})).status,400);
  assert.equal((await post(randomUUID(),headers(order.courierId))).status,404);

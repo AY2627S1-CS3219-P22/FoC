@@ -149,3 +149,10 @@ PostgreSQL catalogue, supplied CSV import, search API, order destination validat
 and UI type-to-search selection. Added migration/recovery/search tests and setup
 documentation. Exact prompts, key exchanges and verification:
 [order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+
+Courier-only UI controls, ChatGPT (Codex), 2026-11-02: fixed missing viewer checks
+on the active errand page, aligned detail-page controls with existing backend
+requester exclusion and added UI/HTTP regression tests. Backend authorization
+was already enforced. Exact prompt and verification:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.

@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-02: Mirror backend requester exclusion for courier actions; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import { useState } from "react"
 import type { Order } from "../App"
@@ -18,7 +19,7 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
   const [showCancelModal, setShowCancelModal] = useState(false)
 
   const isRequester = order.requesterId === currentUserId
-  const isCourier   = order.courierId   === currentUserId
+  const isCourier   = !isRequester && order.courierId === currentUserId
   const isOpen      = order.status === "open"
   const canAccept   = !isRequester && !isCourier && isOpen
 
@@ -29,8 +30,14 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
   }
 
   const deliver = async () => {
+    if (!isCourier || order.status !== "picked-up") return
     const updated = await run("deliver")
     if (updated) onDelivered(updated)
+  }
+
+  const pickup = async () => {
+    if (!isCourier || order.status !== "accepted") return
+    await run("pickup")
   }
 
   const cancel = async () => {
@@ -178,7 +185,7 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
         <div className="space-y-3">
           {order.status === "accepted" && (
             <button
-              onClick={() => run("pickup")}
+              onClick={pickup}
               disabled={busy}
               className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-50 transition-colors"
             >

@@ -1,3 +1,5 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02.
+// Scope: Pass authenticated viewer identity to courier page; review pending; see ../order-service/usage-log.md.
 import { useEffect, useState } from "react"
 import Navbar from "./components/Navbar"
 import LoginPage from "./pages/LoginPage"
@@ -258,6 +260,7 @@ export default function App() {
           <AcceptedOrderPage
             key={selectedOrder.id}
             initialOrder={selectedOrder}
+            currentUserId={user.id}
             onDelivered={handleDelivered}
             onBack={() => navigate("orders")}
           />
