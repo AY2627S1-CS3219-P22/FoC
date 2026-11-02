@@ -13,6 +13,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ChatGPT (Codex), 2026-11-02: Approved durable event IDs/deleted-user detection; review pending.
+// Receipt only: presence does not mean history scrubbing/lifecycle work completed.
+model UserDeletionEvent {
+  eventId    String   @id
+  userId     String
+  occurredAt DateTime @db.Timestamptz(3)
+  deletedAt  DateTime @db.Timestamptz(3)
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
+}
+
 enum OrderStatus {
   UNASSIGNED
   ASSIGNED

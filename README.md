@@ -163,3 +163,11 @@ explicit requirement to check User GetPublicProfile before acceptance, fail
 closed on RPC failures and recheck expiry before assignment. Added real gRPC/HTTP
 regression coverage. Exact prompts, key response and verification:
 [order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+
+Order user.deleted subscription, ChatGPT (Codex), 2026-11-02: implemented the
+requested shared RabbitMQ consumer, durable repeat-safe event receipts,
+configuration and Docker wiring. This does not complete deletion lifecycle
+processing. Added real broker/database and message validation tests. JSON and
+root lockfile attribution, exact prompts, key exchanges and verification:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.

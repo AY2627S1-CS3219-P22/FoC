@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-02: Optional User-event subscription URL; review pending; see ../../usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Generated setup implementation following approved User Service conventions.
 // Author review: Pending; see ../../usage-log.md.
@@ -13,6 +14,7 @@ const schema = z.object({
   GRPC_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   USER_SERVICE_PUBLIC_KEY_PATH: z.string().min(1).optional(),
   CREDIT_ORDER_SERVICE_TOKEN: z.string().trim().min(1).optional(),
+  RABBITMQ_URL: z.string().min(1).optional(),
   USER_GRPC_ADDR: z.string().min(1).default('localhost:50051'),
   ORDER_GRPC_ADDR: z.string().min(1).default('localhost:50053'),
   CREDIT_GRPC_ADDR: z.string().min(1).default('localhost:50054'),

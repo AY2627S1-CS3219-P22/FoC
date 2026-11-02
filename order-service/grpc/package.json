@@ -1,12 +1,12 @@
 {
-  "_aiAssistance": "ChatGPT (Codex), 2026-10-22: Order dependencies, scripts and implementation; author review pending; see ../usage-log.md",
+  "_aiAssistance": "ChatGPT (Codex), 2026-10-22: Order dependencies, scripts and implementation; author review pending; see ../usage-log.md; 2026-11-02: shared messaging subscription dependency/build; review pending",
   "name": "@foc/order-grpc",
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",
   "main": "dist/index.js",
   "scripts": {
-    "predev": "npm run build --workspace @foc/grpc && npm run prisma:generate",
+    "predev": "npm run build --workspace @foc/grpc --workspace @foc/messaging && npm run prisma:generate",
     "dev": "tsx watch src/index.ts",
     "build": "npm run prisma:generate && tsc -p tsconfig.json && node -e \"require('node:fs').cpSync('src/generated/prisma', 'dist/generated/prisma', { recursive: true })\"",
     "start": "node dist/index.js",
@@ -16,7 +16,8 @@
     "prisma:deploy": "prisma migrate deploy --schema ../prisma/schema.prisma",
     "prisma:status": "prisma migrate status --schema ../prisma/schema.prisma",
     "test": "node --test tests/*.test.cjs",
-    "test:integration": "node --test tests/*.integration.cjs"
+    "test:integration": "node --test tests/*.integration.cjs",
+    "prebuild": "npm run build --workspace @foc/messaging"
   },
   "dependencies": {
     "@foc/grpc": "0.1.0",
@@ -26,7 +27,8 @@
     "express": "^5.2.1",
     "zod": "^4.6.5",
     "jsonwebtoken": "^9.0.3",
-    "@grpc/proto-loader": "^0.8.1"
+    "@grpc/proto-loader": "^0.8.1",
+    "@foc/messaging": "0.1.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

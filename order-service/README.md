@@ -653,3 +653,22 @@ remains separate work.
 Rebuild/restart the Order container with the lifecycle Compose override to use
 this change; USER_GRPC_ADDR continues to supply the User endpoint. No new
 configuration or database migration is required for this acceptance check.
+
+
+## RabbitMQ user.deleted subscription
+
+AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02. Subscription, durable
+receipt and tests; review pending; see usage-log.md.
+
+Order now uses the shared RabbitMQ client to consume `order.user-events` when
+RABBITMQ_URL is configured. The lifecycle Compose override enables this using
+the Docker host broker. Start RabbitMQ first. Valid deletion events are recorded
+in UserDeletionEvent before ACK; event IDs prevent duplicate receipt across
+restarts. Invalid/conflicting messages are dead-lettered; storage failures use
+the shared retry/DLQ behavior. The new migration runs during Docker startup.
+
+This is subscription/receipt only, not completion of account deletion handling.
+No orders are cancelled, scrubbed or reassigned by this handler. The User
+publisher must send deletion events to Order's queue; publishing only to Credit
+will not reach Order. Exact payload, startup, inspection, test instructions and
+remaining lifecycle work: [messaging/README.md](messaging/README.md).

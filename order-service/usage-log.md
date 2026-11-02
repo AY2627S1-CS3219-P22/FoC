@@ -1158,3 +1158,65 @@ made that the initial intermittent fixture failures were fixed. Tests used a
 disposable dedicated PostgreSQL database, removed afterward. Existing demo
 accounts/orders/credits and running containers were not modified. No migration
 is needed for the acceptance check. Rebuild Order to activate it. Uncommitted.
+
+
+## 2026-11-02: subscribe to user.deleted through RabbitMQ
+
+Tool: ChatGPT (Codex). Modes: implementation, debugging, tests and documentation.
+Human review pending. JSON/lockfile attribution is recorded here and in the
+project README; Order package.json also has _aiAssistance metadata.
+
+Exact user prompt: “Subscribe to `user.deleted` events through RabbitMQ”
+
+Relevant prior human approval (verbatim): “if user.deleted arrives and an active order still exists, we will notify the user service that the user is unable to be deleted. so keep it active for completion. yes, we can store that.”
+The storage approval answered the question about Order-local deleted-user markers
+and processed event IDs surviving restarts. The notification contract remains
+unconfirmed; no notification schema or endpoint was invented.
+
+Key assistant responses:
+- “I’ll check the existing RabbitMQ client and User event format, then wire Order to consume `user.deleted`. I’ll keep the subscription separate from deletion-conflict notifications, since their contract is still unconfirmed.”
+- “Order’s shared User queue is `order.user-events`. I’m wiring the shared RabbitMQ client to record each deletion event durably before acknowledging it, using the event ID to make redelivery safe. Invalid deletion messages will go to the queue’s dead-letter queue.”
+- “This step records receipt of deletion events. It does not yet scrub history or resolve deletion races.”
+
+Implementation: added @foc/messaging dependency and builds, optional RABBITMQ_URL
+configuration, shared-client startup/cleanup, handler validation and PostgreSQL
+UserDeletionEvent receipts keyed by eventId, plus migration. Match broker
+messageId when present. Duplicate deliveries do not duplicate receipts, and
+conflicting reused IDs are rejected. Database failures propagate into the shared
+three-retry/DLQ flow; ACK follows durable receipt. Created/restored messages have
+no Order action. Shared user.deleted schema now matches the supplied contract:
+no required purgeAfter, nonblank IDs and ISO timestamps. Added Docker source
+allowlisting so the messaging package is actually built/included. Root lockfile
+change is only the new Order messaging dependency; no Credit entries removed.
+
+Scope: receipt/subscription only. No scrubbing, old-token rejection based on the
+inbox, active-order cancellation, Credit mutation, eligibility RPC or conflict
+notification added. User's direct-to-queue outbox publisher must target
+order.user-events; publishing only to credit.user-events does not fan out to
+Order. The consumer does not invent an exchange binding or modify User/Credit
+business functionality. Documentation explicitly distinguishes receipt from
+completed deletion processing.
+
+Verification:
+- Shared messaging and Order generation/build passed; Credit TypeScript build
+  checked for shared contract compatibility.
+- All 19 Order unit/authentication/gRPC tests passed, including malformed
+  events, event-ID mismatch, ignored unrelated events and propagated DB errors.
+- Final complete suite: all 69 PostgreSQL/HTTP/gRPC/RabbitMQ integration tests
+  passed, zero skipped. Live broker tests cover five concurrent duplicates,
+  restart/offline queued redelivery, invalid/conflicting events in DLQ and a
+  simulated database outage exhausting retries without a receipt.
+- Initial suite had a legacy recovery fixture count failure. Scoped the two
+  catalogue recovery tests to their saved operation IDs, avoiding unrelated
+  fixture work. A subsequent run had widespread transient creation failures;
+  no production creation behavior was changed and no root cause is claimed.
+  Final full run passed. Synthetic diagnostic creation used only the disposable
+  test database and fake credits.
+- Built foc-order-events-test Docker image successfully. Started an isolated
+  Order container with the disposable database/broker; startup logged its
+  subscription, and a synthetic user.deleted reached UserDeletionEvent through
+  the startup-wired consumer. Stopped that consumer before the final broker
+  integration run to avoid a second consumer on the test queue.
+- git diff --check passed. All runtime tests used disposable containers on
+  PostgreSQL port 55450 and RabbitMQ port 5679; no demo queues, accounts or
+  balances were changed. Test containers removed afterward.

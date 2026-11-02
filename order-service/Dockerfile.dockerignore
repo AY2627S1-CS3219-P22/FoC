@@ -1,3 +1,4 @@
+# ChatGPT (Codex), 2026-11-02: Include messaging source in Order build context; review pending; see usage-log.md.
 # AI Assistance Disclosure: ChatGPT (Codex), 2026-10-24.
 # Scope: Allow peer package metadata before/after teammate merges; review pending; see usage-log.md.
 **
@@ -7,7 +8,7 @@
 !shared/
 !shared/grpc/**
 !shared/messaging/
-!shared/messaging/package.json
+!shared/messaging/**
 !order-service/
 !order-service/grpc/**
 !order-service/prisma/**

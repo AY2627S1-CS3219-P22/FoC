@@ -1,7 +1,9 @@
+// ChatGPT (Codex), 2026-11-02: Start/close the shared User-event consumer; review pending; see ../../usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Wire mandatory shared User lookup for acceptance; review pending; see ../../usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Generated approved service startup; adopted shared @foc/grpc Credit client on 2026-10-22.
 // Author review: Pending; see ../../usage-log.md.
+import { startUserDeletedConsumer } from './events/userDeleted';
 import { readFileSync } from 'node:fs';
 import { Metadata } from '@grpc/grpc-js';
 import { createDirectories } from './dependencies/directories';
@@ -33,9 +35,12 @@ async function main(): Promise<void> {
     getPublicProfile: ({ userId }) => directories.getRequester(userId),
   });
   const httpServer = createApp(publicKey, lifecycle, creation, edits, acceptance).listen(env.PORT);
+  let broker: Awaited<ReturnType<typeof startUserDeletedConsumer>> | undefined;
   try {
     await once(httpServer, 'listening');
     await startServer(grpcServer, env.GRPC_PORT, env.GRPC_HOST);
+    if (env.RABBITMQ_URL) broker = await startUserDeletedConsumer(prisma, env.RABBITMQ_URL);
+    else console.info("Order user.deleted subscription disabled: RABBITMQ_URL not configured");
   } catch (error) {
     httpServer.close();
     grpcServer.forceShutdown();
@@ -51,6 +56,7 @@ async function main(): Promise<void> {
   const shutdown = async (): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
+    await broker?.close();
     await lifecycle?.stopWorker();
     await Promise.all([
       new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve())),

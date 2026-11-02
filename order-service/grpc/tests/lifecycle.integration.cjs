@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-02: Isolate catalogue recovery fixtures from other tests’ pending work; review pending; see ../../usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Catalogue destination validation coverage; review pending; see ../../usage-log.md.
 // ChatGPT (Codex), 2026-10-30: Regression coverage for removal of opening-hours gates; human review pending.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
@@ -731,7 +732,7 @@ test('edits validate catalogue selections, preserve IDs and recover credit-chang
  assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).destinationLocationId,'kr_001');
  const edit=await f.edits.edit(order.id,f.user,'location-only',{destinationLocationId:'kr_002'});assert.equal(edit.status,200);assert.equal(edit.order.destination,'COM2');assert.equal(edit.order.destinationLocationId,'kr_002');assert.equal(f.updates,0);
  f.updateMode='after';const pending=await f.edits.edit(order.id,f.user,'location-credit',{destination:'COM3',destinationLocationId:'kr_003',credits:6});assert.equal(pending.status,202);
- await editDue(order.id);await createOrderEdits(db,f.credit,f.directories).recoverBatch();
+ await editDue(order.id);const pendingEdit=await db.orderEditOperation.findFirstOrThrow({where:{orderId:order.id,state:'PENDING'}});await createOrderEdits(db,f.credit,f.directories).recoverOne(pendingEdit.id);
  const updated=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(updated.destination,'COM3');assert.equal(updated.destinationLocationId,'kr_003');assert.equal(updated.credits,6);assert.equal(f.updates,1);
  const unchanged=await f.edits.edit(order.id,f.user,'instructions',{requestDetails:'Meet at lobby'});assert.equal(unchanged.order.destinationLocationId,'kr_003');
 });
@@ -741,7 +742,7 @@ test('pre-catalogue pending creations recover without discarding historical dest
  const creation=await db.orderCreation.findUniqueOrThrow({where:{orderId:pending.creationId}});
  const {destinationLocationId,...payload}=creation.payload;
  await db.orderCreation.update({where:{orderId:pending.creationId},data:{payload:{...payload,destination:'Historical destination'}}});
- await due(pending.creationId);await f.creation.recoverBatch();
+ await due(pending.creationId);await f.creation.recoverOne(pending.creationId);
  const order=await db.order.findUniqueOrThrow({where:{id:pending.creationId}});assert.equal(order.destination,'Historical destination');assert.equal(order.destinationLocationId,null);assert.equal(f.calls,1);
  const edited=await f.edits.edit(order.id,f.user,'select-building',{destinationLocationId:'kr_001'});assert.equal(edited.status,200);assert.equal(edited.order.destination,'COM1');assert.equal(edited.order.destinationLocationId,'kr_001');
 });

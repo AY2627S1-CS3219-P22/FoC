@@ -1,3 +1,4 @@
+# ChatGPT (Codex), 2026-11-02: Include shared messaging source/build; review pending; see usage-log.md.
 # AI Assistance Disclosure: ChatGPT (Codex), 2026-10-24.
 # Scope: Order-only package metadata copies support current and merged workspace layouts; review pending; see usage-log.md.
 FROM node:22-slim AS build
@@ -13,6 +14,7 @@ COPY credit-service/ credit-service/
 COPY supplier-service/ supplier-service/
 COPY user-service/ user-service/
 RUN npm ci
+COPY shared/messaging shared/messaging
 COPY shared/grpc shared/grpc
 COPY user-service/proto user-service/proto
 COPY order-service/grpc order-service/grpc
