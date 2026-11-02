@@ -1,3 +1,10 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), dates: 2026-09-27, 2026-10-14
+// Scope: AI generated the validation middleware (09-27); later pointed out
+// dropped formErrors and suggested the fix (10-14).
+// Author review: Author specified the requirements, reviewed and approved, and
+// accepted the bug fix. See user-service/ai/usage-log.md, entries 003 and 015.
+
 import type { RequestHandler } from 'express';
 import { z } from 'zod';
 
