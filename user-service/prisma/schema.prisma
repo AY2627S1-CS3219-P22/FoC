@@ -57,9 +57,10 @@ model ArchivedUser {
   @@index([purgeAfter])
 }
 
-// Transactional outbox: sign-up writes a user.created row in the same
-// transaction as the User insert. A background dispatcher is the only
-// process that talks to RabbitMQ, so a broker outage cannot fail register.
+// Transactional outbox: each user event row is written in the same transaction
+// as the change it reports (sign-up, deletion, restore). A background
+// dispatcher is the only process that talks to RabbitMQ, so a broker outage
+// cannot fail those requests.
 model UserOutbox {
   eventId     String    @id @map("event_id") @db.Uuid
   queue       String
@@ -68,6 +69,8 @@ model UserOutbox {
   publishedAt DateTime? @map("published_at")
   attempts    Int       @default(0)
   lastError   String?   @map("last_error")
+  // Set for rows whose body must not outlive delivery (user.restored links old and new ids).
+  deleteOnPublish Boolean @default(false) @map("delete_on_publish")
 
   @@map("user_outbox")
 }

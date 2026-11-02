@@ -35,6 +35,9 @@ export class OutboxStore {
   }
 
   async markPublished(eventId: string): Promise<void> {
+    // Rows flagged deleteOnPublish are removed instead of kept as history.
+    const { count } = await this.db.userOutbox.deleteMany({ where: { eventId, deleteOnPublish: true } });
+    if (count === 1) return;
     await this.db.userOutbox.update({
       where: { eventId },
       data: { publishedAt: new Date() },
@@ -82,6 +85,7 @@ export async function enqueueUserDeleted(
   });
 }
 
+// Credit only: it moves the old balance to the new id. Order keeps old records unlinked.
 export async function enqueueUserRestored(
   tx: Prisma.TransactionClient,
   userId: string,
@@ -93,6 +97,8 @@ export async function enqueueUserRestored(
       eventId: event.eventId,
       queue: CREDIT_USER_QUEUE,
       body: JSON.stringify(event),
+      // The body links the old and new ids, so don't keep it once delivered.
+      deleteOnPublish: true,
     },
   });
 }

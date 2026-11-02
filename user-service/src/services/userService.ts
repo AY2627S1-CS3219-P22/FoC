@@ -86,7 +86,6 @@ export async function register(input: RegisterInput) {
   }
 
   try {
-    //DECLARATION CHANGED
     const user = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: await buildNewUser(input),

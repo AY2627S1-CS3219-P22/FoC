@@ -34,8 +34,10 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 - **User events are published through the transactional outbox, never from the
   HTTP/gRPC handler.** The change and its `user_outbox` row go in one
   `prisma.$transaction`: `register` / `bootstrapAdmin` queue `user.created` to
-  `CREDIT_USER_QUEUE`, and `deleteAccount` queues `user.deleted` to
-  `QUEUES.orderUser`. Only the background dispatcher calls
+  `CREDIT_USER_QUEUE`, `deleteAccount` queues `user.deleted` to
+  `QUEUES.orderUser`, and a restoring `register` queues `user.restored` to
+  `CREDIT_USER_QUEUE` with `deleteOnPublish`, so the row linking old and new
+  ids is deleted once delivered. Only the background dispatcher calls
   `RabbitMQClient.publishToQueue`. A broker outage must not fail sign-up or
   deletion. Delivery is at-least-once: the same `eventId` is retried until
   `published_at` is set.
