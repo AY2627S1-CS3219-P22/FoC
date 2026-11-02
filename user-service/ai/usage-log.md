@@ -1,5 +1,17 @@
 # AI usage log: User Service
 
+## 025: User account deletion workflow
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified account deletion workflow.
+- **Prompts:** [prompts/025-user-account-deletion.md](prompts/025-user-account-deletion.md).
+- **Key response:** Added the Order Service eligibility stub, administrator last-admin protection under the advisory lock, `ArchivedUser` creation, hard deletion of the `User` row, and `DELETE /users/me` error mappings. Event handling was intentionally excluded.
+- **Affected locations:** `user-service/src/services/adminGuards.ts`, `user-service/src/services/adminService.ts`, `user-service/src/services/userService.ts`, `user-service/src/api/controllers/userController.ts`, `user-service/src/api/routes/userRoutes.ts`.
+- **Checks:** `npm run build --workspace user-service` and `git diff --check` passed. Author also manually tested the account deletion workflow.
+- **Human review/edits:** Author checked all affected files, manually tested the implementation, and approved it.
+- **External sources:** None.
+
 ## 023: Archived user retention schema
 
 - **Timestamp:** 2026-11-02 (Asia/Singapore).

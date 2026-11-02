@@ -9,6 +9,13 @@
 // approved. See user-service/ai/usage-log.md, entries 004, 008, 009, 013, 015,
 // 019.
 
+// AI Assistance Disclosure:
+// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
+// Scope: Added the author-specified account deletion eligibility stub,
+// archival and hard-delete workflow. Author review: Reviewed, manually tested,
+// and approved. See
+// user-service/ai/usage-log.md, entry 025.
+
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
@@ -16,8 +23,10 @@ import type { RegisterInput } from '../api/dto/registerDto';
 import type { LoginInput } from '../api/dto/loginDto';
 import type { UpdateProfileInput } from '../api/dto/updateProfileDto';
 import { enqueueUserCreated } from '../events/outboxStore';
+import { ensureNotLastAdmin, lockAdminSet } from './adminGuards';
 
 const SALT_ROUNDS = 10;
+const RETENTION_YEARS = 4;
 
 // Profile: everything except secrets — for the user themselves or an admin.
 export const profileSelect = {
@@ -141,4 +150,46 @@ export async function updateProfile(id: string, input: UpdateProfileInput) {
 
 export async function listProfiles() {
   return prisma.user.findMany({ select: profileSelect });
+}
+
+// Temporary stub for the future Order Service eligibility gRPC.
+export async function checkDeletionEligibility(_userId: string) {
+  return { eligible: true as const, activeOrders: 0 };
+}
+
+function addRetentionYears(date: Date, years: number): Date {
+  const result = new Date(date);
+  result.setFullYear(result.getFullYear() + years);
+  return result;
+}
+
+export async function deleteAccount(userId: string) {
+  const eligibility = await checkDeletionEligibility(userId);
+  if (!eligibility.eligible) {
+    return { ok: false as const, reason: 'active_orders' as const, activeOrders: eligibility.activeOrders };
+  }
+
+  return prisma.$transaction(async (tx) => {
+    await lockAdminSet(tx);
+
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, roles: true },
+    });
+    if (!user) return { ok: false as const, reason: 'not_found' as const };
+
+    // The guard only counts other admins, so it must not run for a non-admin.
+    if (user.roles.includes('ADMINISTRATOR')) {
+      const guard = await ensureNotLastAdmin(tx, user.id);
+      if (!guard.ok) return guard;
+    }
+
+    const deletedAt = new Date();
+    const purgeAfter = addRetentionYears(deletedAt, RETENTION_YEARS);
+
+    await tx.archivedUser.create({ data: { email: user.email, userId: user.id, deletedAt, purgeAfter } });
+    await tx.user.delete({ where: { id: user.id } });
+
+    return { ok: true as const, deletedAt, purgeAfter };
+  });
 }

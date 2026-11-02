@@ -8,6 +8,12 @@
 // session settings, wrote the logout handler, reviewed the code and approved.
 // See user-service/ai/usage-log.md, entries 004, 008, 009, 010, 011, 013, 015,
 // 017, 020.
+//
+// AI Assistance Disclosure:
+// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
+// Scope: Added the author-specified DELETE /users/me handler and error
+// mappings. Author review: Reviewed, manually tested, and approved. See
+// user-service/ai/usage-log.md, entry 025.
 
 import type { RequestHandler, Response } from 'express';
 import type { Roles } from '@prisma/client';
@@ -136,6 +142,26 @@ export const updateMe: RequestHandler = async (req, res) => {
   }
 
   res.status(200).json({ user: result.user });
+};
+
+// DELETE /users/me
+export const deleteMe: RequestHandler = async (req, res) => {
+  const result = await userService.deleteAccount(req.user!.id);
+  if (!result.ok) {
+    if (result.reason === 'not_found') {
+      res.status(404).json({ error: 'Not Found', message: 'User no longer exists.' });
+    } else if (result.reason === 'last_admin') {
+      res.status(409).json({ error: 'Conflict', message: 'Cannot delete the last remaining active administrator.' });
+    } else {
+      res.status(409).json({ error: 'Conflict', message: `Cannot delete an account with ${result.activeOrders} active orders.` });
+    }
+    return;
+  }
+
+  clearRefreshCookie(res);
+  res.status(200).json({
+    message: 'Account deleted. Re-registering with the same email within 4 years will restore your previous credit balance, but not your other account information.',
+  });
 };
 
 // GET /users
