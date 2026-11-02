@@ -1,5 +1,29 @@
 # AI usage log: User Service
 
+## 032: Deletion eligibility service disclosure
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Added the disclosure header to the moved Order Service service-layer logic.
+- **Prompts:** [prompts/032-deletion-eligibility-service-header.md](prompts/032-deletion-eligibility-service-header.md).
+- **Key response:** Added a comprehensive AI disclosure header to `deletionEligibility.ts`.
+- **Affected locations:** `order-service/grpc/src/services/deletionEligibility.ts`.
+- **Checks:** `git diff --check` pending.
+- **Human review/edits:** Pending human review; no human approval is claimed.
+- **External sources:** None.
+
+## 031: Order deletion eligibility gRPC
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified cross-service gRPC eligibility check.
+- **Prompts:** [prompts/031-order-deletion-eligibility-grpc.md](prompts/031-order-deletion-eligibility-grpc.md).
+- **Key response:** Added the Order Service gRPC contract, database-backed blocked-order count, User Service client wiring, and missing-argument/internal-error mappings. Existing stub behavior was replaced; no event behavior was changed.
+- **Affected locations:** `shared/grpc/proto/order.proto`, `shared/grpc/src/clients.ts`, `order-service/grpc/src/grpc/server.ts`, `user-service/src/env.ts`, `user-service/src/services/userService.ts`, `user-service/package.json`.
+- **Checks:** `npm run grpc:generate`, shared gRPC build, Order Service build, User Service build, `npm install --package-lock-only --ignore-scripts`, and `git diff --check` passed.
+- **Human review/edits:** Pending human review; no human approval is claimed.
+- **External sources:** None.
+
 ## 030: Archived user purge job
 
 - **Timestamp:** 2026-11-02 (Asia/Singapore).

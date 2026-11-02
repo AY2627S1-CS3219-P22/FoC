@@ -158,6 +158,8 @@ export const deleteMe: RequestHandler = async (req, res) => {
       res.status(404).json({ error: 'Not Found', message: 'User no longer exists.' });
     } else if (result.reason === 'last_admin') {
       res.status(409).json({ error: 'Conflict', message: 'Cannot delete the last remaining active administrator.' });
+    } else if (result.reason === 'eligibility_unavailable') {
+      res.status(503).json({ error: 'Service Unavailable', message: "Can't delete your account right now. Please try again later." });
     } else {
       res.status(409).json({ error: 'Conflict', message: `Cannot delete an account with ${result.activeOrders} active orders.` });
     }

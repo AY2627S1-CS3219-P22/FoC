@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
+// Scope: Added the author-specified Order Service deletion-eligibility RPC.
+// Author review: Pending. See user-service/ai/usage-log.md, entry 031.
+
 syntax = "proto3";
 
 package order;
@@ -7,6 +12,16 @@ import "google/protobuf/timestamp.proto";
 // Internal lookup; order creation/lifecycle will be owned by Order Service.
 service OrderService {
   rpc GetOrder(GetOrderRequest) returns (Order);
+  rpc CheckDeletionEligibility(CheckDeletionEligibilityRequest) returns (CheckDeletionEligibilityResponse);
+}
+
+message CheckDeletionEligibilityRequest {
+  string user_id = 1;
+}
+
+message CheckDeletionEligibilityResponse {
+  bool eligible = 1;
+  int32 blocked_order_count = 2;
 }
 
 message GetOrderRequest {

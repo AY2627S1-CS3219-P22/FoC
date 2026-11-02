@@ -10,7 +10,8 @@
 // fields, update rules, deletion workflow, and restore behavior. Entries
 // 004, 008, 009, 013, 015, 019, 025, and 026 were reviewed, manually tested,
 // and approved. Author also reviewed, manually tested, and approved entry 027.
-// See user-service/ai/usage-log.md.
+// See user-service/ai/usage-log.md. OpenAI Codex added the author-specified
+// Order Service eligibility client; entry 031 is pending review.
 
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
@@ -20,6 +21,8 @@ import type { LoginInput } from '../api/dto/loginDto';
 import type { UpdateProfileInput } from '../api/dto/updateProfileDto';
 import { enqueueUserCreated, enqueueUserDeleted, enqueueUserRestored } from '../events/outboxStore';
 import { ensureNotLastAdmin, lockAdminSet } from './adminGuards';
+import { createOrderClient } from '@foc/grpc';
+import { env } from '../env';
 
 const SALT_ROUNDS = 10;
 const RETENTION_YEARS = 4;
@@ -161,9 +164,17 @@ export async function listProfiles() {
   return prisma.user.findMany({ select: profileSelect });
 }
 
-// Temporary stub for the future Order Service eligibility gRPC.
-export async function checkDeletionEligibility(_userId: string) {
-  return { eligible: true as const, activeOrders: 0 };
+const orderClient = createOrderClient(env.ORDER_GRPC_ADDR);
+
+export async function checkDeletionEligibility(userId: string) {
+  try {
+    const result = await orderClient.checkDeletionEligibility({ userId });
+    return { ok: true as const, eligible: result.eligible, activeOrders: result.blockedOrderCount };
+  } catch (err) {
+    // Can't confirm there are no active orders, so don't delete.
+    console.error('Order eligibility check failed:', err instanceof Error ? err.message : String(err));
+    return { ok: false as const };
+  }
 }
 
 function addRetentionYears(date: Date, years: number): Date {
@@ -174,6 +185,7 @@ function addRetentionYears(date: Date, years: number): Date {
 
 export async function deleteAccount(userId: string) {
   const eligibility = await checkDeletionEligibility(userId);
+  if (!eligibility.ok) return { ok: false as const, reason: 'eligibility_unavailable' as const };
   if (!eligibility.eligible) {
     return { ok: false as const, reason: 'active_orders' as const, activeOrders: eligibility.activeOrders };
   }
