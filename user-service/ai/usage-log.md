@@ -1,5 +1,17 @@
 # AI usage log: User Service
 
+## 033: README update for recent workflows
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Documentation update for recent author-specified account and cross-service workflows.
+- **Prompts:** [prompts/033-readme-recent-changes.md](prompts/033-readme-recent-changes.md).
+- **Key response:** Documented account deletion, archived-account restoration, archive purging, and Order Service deletion eligibility in the User Service README and root AI summary.
+- **Affected locations:** `user-service/README.md`, `README.md`.
+- **Checks:** `git diff --check` passed.
+- **Human review/edits:** Pending human review; no human approval is claimed.
+- **External sources:** None.
+
 ## 032: Deletion eligibility service disclosure
 
 - **Timestamp:** 2026-11-02 (Asia/Singapore).

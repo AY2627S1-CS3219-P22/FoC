@@ -163,6 +163,7 @@ not allowed). Roles: `USER` (default) and `ADMINISTRATOR`.
 | POST   | `/users/logout`    | refresh cookie        | End this browser's session (F2.2) → `204`       |
 | GET    | `/users/me`        | any authenticated     | Own profile (F2.3)                              |
 | PATCH  | `/users/me`        | any authenticated     | Update own first/last name, username (F2.4)     |
+| DELETE | `/users/me`        | any authenticated     | Delete own account after eligibility checks      |
 | GET    | `/users`           | `ADMINISTRATOR`       | List all users                                  |
 | GET    | `/users/:id`       | `ADMINISTRATOR`       | View a specific user                            |
 | POST   | `/users/:id/admin` | `ADMINISTRATOR`       | Grant the Administrator role (F3.3)             |
@@ -181,6 +182,37 @@ curl -i localhost:3001/users    -H "Authorization: Bearer $TOKEN"   # USER    �
 
 Responses only ever include public fields — `passwordHash` is never returned.
 To get an admin account, see [Administrator accounts](#administrator-accounts).
+
+### Account deletion and restoration
+
+`DELETE /users/me` first asks Order Service (`CheckDeletionEligibility` gRPC)
+whether the user has any blocking orders as requester or courier: orders that
+are `UNASSIGNED`, `ASSIGNED` or `PICKED_UP`, whose credit state is not
+`SETTLED` or `REFUNDED`, or that are still being created.
+
+| Result | Status |
+| ------ | ------ |
+| Deleted | `200` + a notice that credits are restored on re-registration within 4 years |
+| Blocking orders | `409` with the number of orders |
+| Last remaining administrator | `409` |
+| Order Service unreachable | `503`; nothing is deleted, try again later |
+| User already deleted | `404` |
+
+When deletion is allowed, one transaction stores only the email, old user ID,
+deletion time and four-year `purgeAfter` time in `ArchivedUser`, deletes the
+`User` row (ending every session; the refresh cookie is cleared) and queues
+`user.deleted` to `order.user-events` so Order Service can scrub personal
+details. Access tokens already issued stay valid until they expire (≤15 min).
+Expired archive rows are purged at startup and every 24 hours; no event is
+published for that.
+
+If a new registration uses an unexpired archived email, the first request
+returns `409` asking for confirmation. Retrying with `"confirmRestore": true`
+creates a new account and publishes `user.restored` with the new and previous
+user IDs. Only the credit balance is eligible for restoration; profile and
+authentication data are not restored. Registrations with no archive row, or
+with one past its `purgeAfter` (which is then deleted), publish `user.created`
+as usual.
 
 ### Administrator accounts
 
@@ -457,7 +489,8 @@ Copy `.env.example` → `.env`. `.env` is gitignored — never commit real secre
 | `JWT_EXPIRES_IN`       | Access-token lifetime                | `15m`                |
 | `REFRESH_TOKEN_TTL_DAYS` | Refresh-token (session) lifetime, days | `7`                |
 | `NODE_ENV`             | `production` marks the refresh cookie `Secure` (HTTPS-only) | `development` |
-| `RABBITMQ_URL`         | Broker the outbox publishes `user.created` to | `amqp://guest:guest@localhost:5672` |
+| `RABBITMQ_URL`         | Broker the outbox publishes user events to | `amqp://guest:guest@localhost:5672` |
+| `ORDER_GRPC_ADDR`      | Order Service gRPC, asked before an account is deleted | `localhost:50053` |
 | `OUTBOX_POLL_INTERVAL_MS` | How often the outbox dispatcher checks for unsent events | `1000` |
 | `OUTBOX_BATCH_SIZE`    | Max events the dispatcher sends per poll | `50` |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Read by `compose.yaml` to create the database (not by the app) | see `.env.example` |
@@ -498,7 +531,8 @@ user-service/
 │   ├── env.ts             # zod-validated config
 │   ├── db.ts              # Prisma client + DB ping
 │   ├── services/          # business logic shared by REST + gRPC (DB via Prisma)
-│   ├── events/            # user.created outbox: store + background dispatcher
+│   ├── events/            # user event builders + outbox store and dispatcher
+│   ├── jobs/              # background timers (daily archive purge)
 │   ├── scripts/           # operator commands (createAdmin.ts)
 │   ├── api/               # HTTP (REST) transport
 │   │   ├── app.ts         #   Express app + /health, mounts routers
