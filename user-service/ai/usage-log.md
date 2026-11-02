@@ -1,5 +1,17 @@
 # AI usage log: User Service
 
+## 027: User restoration workflow
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified registration restore workflow.
+- **Prompts:** [prompts/027-user-restored-workflow.md](prompts/027-user-restored-workflow.md).
+- **Key response:** Added `confirmRestore`, archived-email detection after duplicate checks, restore confirmation response, `buildUserRestored`, `enqueueUserRestored`, and transactional selection between `user.created` and `user.restored`.
+- **Affected locations:** `user-service/src/api/dto/registerDto.ts`, `user-service/src/api/controllers/userController.ts`, `user-service/src/services/userService.ts`, `user-service/src/events/userRestored.ts`, `user-service/src/events/outboxStore.ts`.
+- **Checks:** `npm run build --workspace user-service` and `git diff --check` passed. Author manually tested the user restoration behavior.
+- **Human review/edits:** Author reviewed the changes line by line, manually tested the behavior successfully, and approved the implementation.
+- **External sources:** None.
+
 ## 026: Enqueue user.deleted event
 
 - **Timestamp:** 2026-11-02 (Asia/Singapore).

@@ -1,7 +1,8 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
 // Scope: Extracted the existing admin lock and last-admin guard for reuse by
-// account deletion. Author review: Reviewed, manually tested, and approved.
+// account deletion. Author review: Author specified the locking and
+// last-admin requirements; reviewed, manually tested, and approved.
 // See user-service/ai/usage-log.md, entry 025.
 
 import { Prisma } from '@prisma/client';

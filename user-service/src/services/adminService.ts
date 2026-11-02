@@ -1,16 +1,12 @@
 // AI Assistance Disclosure:
-// Tool: Claude Code (Claude Opus), dates: 2026-10-19
+// Tool: Claude Code (Claude Opus), 2026-10-19; OpenAI Codex,
+// 2026-11-02 (Asia/Singapore).
 // Scope: AI generated bootstrapAdmin (advisory lock, single transaction, audit
-// record), grantAdmin, revokeAdmin and ensureNotLastAdmin.
-// Author review: Author specified the bootstrap steps, both endpoints, the
-// transaction, the lock and last-admin protection, reviewed the code and
-// approved. See user-service/ai/usage-log.md, entries 019, 020.
-//
-// AI Assistance Disclosure:
-// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
-// Scope: Extracted the existing admin lock and last-admin guard for reuse by
-// account deletion. Author review: Reviewed, manually tested, and approved.
-// See user-service/ai/usage-log.md, entry 025.
+// record), grantAdmin, revokeAdmin and ensureNotLastAdmin, then extracted the
+// advisory-lock guard for account deletion.
+// Author review: Author specified the bootstrap, role-management, locking,
+// and last-admin requirements; reviewed, manually tested, and approved. See
+// user-service/ai/usage-log.md, entries 019, 020, and 025.
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db';

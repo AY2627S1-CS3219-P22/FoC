@@ -8,13 +8,12 @@
 // session settings, wrote the logout handler, reviewed the code and approved.
 // See user-service/ai/usage-log.md, entries 004, 008, 009, 010, 011, 013, 015,
 // 017, 020.
+// Author specified the layers, endpoint behavior, JWT and session settings,
+// and wrote the logout handler. OpenAI Codex also added DELETE /users/me and
+// restore-confirmation registration handling.
+// registration handling (entries 025 and 027); both were reviewed, manually
+// tested, and approved.
 //
-// AI Assistance Disclosure:
-// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
-// Scope: Added the author-specified DELETE /users/me handler and error
-// mappings. Author review: Reviewed, manually tested, and approved. See
-// user-service/ai/usage-log.md, entry 025.
-
 import type { RequestHandler, Response } from 'express';
 import type { Roles } from '@prisma/client';
 import jwt from 'jsonwebtoken';
@@ -60,6 +59,13 @@ export const register: RequestHandler = async (req, res) => {
   const result = await userService.register(req.body as RegisterInput);
 
   if (!result.ok) {
+    if (result.reason === 'restore_confirmation_required') {
+      res.status(409).json({
+        error: 'Restore Confirmation Required',
+        message: 'A deleted account exists for this email. Confirm to restore only the previous credit balance; other account data will not be restored.',
+      });
+      return;
+    }
     res.status(409).json({
       error: 'Conflict',
       message: `An account with this ${result.field} already exists.`,

@@ -1,15 +1,18 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
-// Scope: Added the author-specified user.deleted outbox enqueue helper,
-// following the existing user.created pattern. Author review: Reviewed line
-// by line, manually tested, and approved. See user-service/ai/usage-log.md,
-// entry 026.
+// Scope: Added the author-specified user.deleted and user.restored outbox
+// enqueue helpers, following the existing user.created pattern.
+// Author review: Author specified the event flow; entry 026 was reviewed,
+// manually tested, and approved.
+// Author reviewed, manually tested, and approved entry 027. See
+// user-service/ai/usage-log.md.
 
 import { Prisma } from '@prisma/client';
 import { CREDIT_USER_QUEUE, QUEUES } from '@foc/messaging';
 import { prisma } from '../db';
 import { buildUserCreated } from './userCreated';
 import { buildUserDeleted } from './userDeleted';
+import { buildUserRestored } from './userRestored';
 
 export type OutboxClient = Prisma.TransactionClient | typeof prisma;
 
@@ -74,6 +77,21 @@ export async function enqueueUserDeleted(
     data: {
       eventId: event.eventId,
       queue: QUEUES.orderUser,
+      body: JSON.stringify(event),
+    },
+  });
+}
+
+export async function enqueueUserRestored(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  previousUserId: string,
+): Promise<void> {
+  const event = buildUserRestored(userId, previousUserId);
+  await tx.userOutbox.create({
+    data: {
+      eventId: event.eventId,
+      queue: CREDIT_USER_QUEUE,
       body: JSON.stringify(event),
     },
   });

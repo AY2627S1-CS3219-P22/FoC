@@ -1,26 +1,16 @@
 // AI Assistance Disclosure:
-// Tool: Claude Code (Claude Opus), dates: 2026-09-27 – 2026-10-19
+// Tool: Claude Code (Claude Opus), 2026-09-27 – 2026-10-19; OpenAI Codex,
+// 2026-11-02 (Asia/Singapore).
 // Scope: AI generated the register logic (duplicate check, P2002 handling,
-// bcryptjs hashing), the login credential check, profile lookups, the
-// profile/public profile selects, the profile update, and the shared
-// buildNewUser/duplicateField helpers.
-// Author review: Author specified the requirements, how to handle concurrent
-// duplicates, the select fields and the update rules, reviewed the code and
-// approved. See user-service/ai/usage-log.md, entries 004, 008, 009, 013, 015,
-// 019.
-
-// AI Assistance Disclosure:
-// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
-// Scope: Added the author-specified account deletion eligibility stub,
-// archival and hard-delete workflow. Author review: Reviewed, manually tested,
-// and approved. See
-// user-service/ai/usage-log.md, entry 025.
-//
-// AI Assistance Disclosure:
-// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
-// Scope: Added transactional user.deleted outbox enqueueing to account
-// deletion. Author review: Reviewed line by line, manually tested, and
-// approved. See user-service/ai/usage-log.md, entry 026.
+// bcryptjs hashing), login credential checks, profile/public-profile selects,
+// profile update, shared buildNewUser/duplicateField helpers, account
+// deletion, user.deleted enqueueing, and archived-account restoration with
+// user.restored enqueueing.
+// Author review: Author specified the requirements, duplicate handling,
+// fields, update rules, deletion workflow, and restore behavior. Entries
+// 004, 008, 009, 013, 015, 019, 025, and 026 were reviewed, manually tested,
+// and approved. Author also reviewed, manually tested, and approved entry 027.
+// See user-service/ai/usage-log.md.
 
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
@@ -28,7 +18,7 @@ import { prisma } from '../db';
 import type { RegisterInput } from '../api/dto/registerDto';
 import type { LoginInput } from '../api/dto/loginDto';
 import type { UpdateProfileInput } from '../api/dto/updateProfileDto';
-import { enqueueUserCreated, enqueueUserDeleted } from '../events/outboxStore';
+import { enqueueUserCreated, enqueueUserDeleted, enqueueUserRestored } from '../events/outboxStore';
 import { ensureNotLastAdmin, lockAdminSet } from './adminGuards';
 
 const SALT_ROUNDS = 10;
@@ -87,6 +77,14 @@ export async function register(input: RegisterInput) {
     return { ok: false as const, field };
   }
 
+  const archived = await prisma.archivedUser.findUnique({ where: { email: input.email } });
+  const now = new Date();
+  // Past its 4 years, the row is ignored and deleted below: a normal signup.
+  const restoreFrom = archived && archived.purgeAfter > now ? archived : null;
+  if (restoreFrom && !input.confirmRestore) {
+    return { ok: false as const, reason: 'restore_confirmation_required' as const };
+  }
+
   try {
     //DECLARATION CHANGED
     const user = await prisma.$transaction(async (tx) => {
@@ -94,7 +92,13 @@ export async function register(input: RegisterInput) {
         data: await buildNewUser(input),
         select: profileSelect,
       });
-      await enqueueUserCreated(tx, created.id);
+      if (restoreFrom) {
+        await enqueueUserRestored(tx, created.id, restoreFrom.userId);
+        await tx.archivedUser.delete({ where: { email: restoreFrom.email } });
+      } else {
+        await tx.archivedUser.deleteMany({ where: { email: input.email, purgeAfter: { lte: now } } });
+        await enqueueUserCreated(tx, created.id);
+      }
       return created;
     });
     return { ok: true as const, user };
