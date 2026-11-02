@@ -1,5 +1,17 @@
 # AI usage log: User Service
 
+## 026: Enqueue user.deleted event
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified outbox event workflow.
+- **Prompts:** [prompts/026-user-deleted-event.md](prompts/026-user-deleted-event.md).
+- **Key response:** Added `buildUserDeleted`, `enqueueUserDeleted`, and transactional enqueueing from `deleteAccount`, following the existing `user.created` pattern. No contract or consumer changes were made.
+- **Affected locations:** `user-service/src/events/userDeleted.ts`, `user-service/src/events/outboxStore.ts`, `user-service/src/services/userService.ts`.
+- **Checks:** `npm run build --workspace user-service` and `git diff --check` passed. Author manually tested the user.deleted enqueue behavior.
+- **Human review/edits:** Author reviewed the changes line by line, manually tested the behavior successfully, and approved the implementation.
+- **External sources:** None.
+
 ## 025: User account deletion workflow
 
 - **Timestamp:** 2026-11-02 (Asia/Singapore).

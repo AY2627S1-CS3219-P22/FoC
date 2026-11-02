@@ -15,6 +15,12 @@
 // archival and hard-delete workflow. Author review: Reviewed, manually tested,
 // and approved. See
 // user-service/ai/usage-log.md, entry 025.
+//
+// AI Assistance Disclosure:
+// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
+// Scope: Added transactional user.deleted outbox enqueueing to account
+// deletion. Author review: Reviewed line by line, manually tested, and
+// approved. See user-service/ai/usage-log.md, entry 026.
 
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
@@ -22,7 +28,7 @@ import { prisma } from '../db';
 import type { RegisterInput } from '../api/dto/registerDto';
 import type { LoginInput } from '../api/dto/loginDto';
 import type { UpdateProfileInput } from '../api/dto/updateProfileDto';
-import { enqueueUserCreated } from '../events/outboxStore';
+import { enqueueUserCreated, enqueueUserDeleted } from '../events/outboxStore';
 import { ensureNotLastAdmin, lockAdminSet } from './adminGuards';
 
 const SALT_ROUNDS = 10;
@@ -189,6 +195,7 @@ export async function deleteAccount(userId: string) {
 
     await tx.archivedUser.create({ data: { email: user.email, userId: user.id, deletedAt, purgeAfter } });
     await tx.user.delete({ where: { id: user.id } });
+    await enqueueUserDeleted(tx, user.id, deletedAt);
 
     return { ok: true as const, deletedAt, purgeAfter };
   });

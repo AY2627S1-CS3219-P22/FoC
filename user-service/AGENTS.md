@@ -31,12 +31,14 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 - **Schema changes go through `prisma migrate dev`, never `db push`.**
 - **No cross-service database access.** This service owns its own DB/schema; talk
   to other services over gRPC/REST only.
-- **`user.created` is published through the transactional outbox, never from the
-  HTTP/gRPC handler.** `register` / `bootstrapAdmin` insert `User` and a
-  `user_outbox` row in one `prisma.$transaction`. Only the background dispatcher
-  calls `RabbitMQClient.publishToQueue`, and only to `CREDIT_USER_QUEUE`. A
-  broker outage must not fail sign-up. Delivery is at-least-once: the same
-  `eventId` is retried until `published_at` is set.
+- **User events are published through the transactional outbox, never from the
+  HTTP/gRPC handler.** The change and its `user_outbox` row go in one
+  `prisma.$transaction`: `register` / `bootstrapAdmin` queue `user.created` to
+  `CREDIT_USER_QUEUE`, and `deleteAccount` queues `user.deleted` to
+  `QUEUES.orderUser`. Only the background dispatcher calls
+  `RabbitMQClient.publishToQueue`. A broker outage must not fail sign-up or
+  deletion. Delivery is at-least-once: the same `eventId` is retried until
+  `published_at` is set.
 - **Passwords are hashed (bcryptjs), never encrypted/decrypted.**
 - **All Administrator-role changes go through `adminService`:** one transaction
   that calls `lockAdminSet` first and writes an `AdminRoleChange` row. Never

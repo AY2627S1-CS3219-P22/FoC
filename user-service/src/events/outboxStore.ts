@@ -1,7 +1,15 @@
+// AI Assistance Disclosure:
+// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
+// Scope: Added the author-specified user.deleted outbox enqueue helper,
+// following the existing user.created pattern. Author review: Reviewed line
+// by line, manually tested, and approved. See user-service/ai/usage-log.md,
+// entry 026.
+
 import { Prisma } from '@prisma/client';
-import { CREDIT_USER_QUEUE } from '@foc/messaging';
+import { CREDIT_USER_QUEUE, QUEUES } from '@foc/messaging';
 import { prisma } from '../db';
 import { buildUserCreated } from './userCreated';
+import { buildUserDeleted } from './userDeleted';
 
 export type OutboxClient = Prisma.TransactionClient | typeof prisma;
 
@@ -50,6 +58,22 @@ export async function enqueueUserCreated(
     data: {
       eventId: event.eventId,
       queue: CREDIT_USER_QUEUE,
+      body: JSON.stringify(event),
+    },
+  });
+}
+
+// Order only: it scrubs personal details. Credit keeps the balance and needs no event.
+export async function enqueueUserDeleted(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  deletedAt: Date,
+): Promise<void> {
+  const event = buildUserDeleted(userId, deletedAt);
+  await tx.userOutbox.create({
+    data: {
+      eventId: event.eventId,
+      queue: QUEUES.orderUser,
       body: JSON.stringify(event),
     },
   });

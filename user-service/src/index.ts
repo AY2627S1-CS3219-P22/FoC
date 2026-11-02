@@ -5,7 +5,7 @@
 // Author review: Author reviewed the code and approved. See
 // user-service/ai/usage-log.md, entry 001.
 
-import { RabbitMQClient, CREDIT_USER_QUEUE } from '@foc/messaging';
+import { RabbitMQClient, CREDIT_USER_QUEUE, QUEUES } from '@foc/messaging';
 import { env } from './env';
 import { prisma } from './db';
 import { createApp } from './api/app';
@@ -26,7 +26,7 @@ async function main(): Promise<void> {
   const broker = new RabbitMQClient({
     url: env.RABBITMQ_URL,
     serviceName: 'user-service',
-    queues: [CREDIT_USER_QUEUE],
+    queues: [CREDIT_USER_QUEUE, QUEUES.orderUser],
     prefetch: 10,
   });
   let brokerReady = false;
