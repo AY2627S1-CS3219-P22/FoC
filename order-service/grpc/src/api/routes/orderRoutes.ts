@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-23.
 // Scope: Added approved pickup route to order commands and scoped retrieval.
 // Author review: Pending; see ../../../../usage-log.md.
@@ -7,13 +8,15 @@ import { createAuthenticate, requireUser } from '../../auth/authenticate';
 import type { createOrderCreation } from '../../services/orderCreation';
 import type { createOrderEdits } from '../../services/orderEdits';
 import type { createOrderAcceptance } from '../../services/orderAcceptance';
-import { getOrderLocations, pickupOrder, deliverOrder, acceptOrder, cancelOrder, createOrder, editOrder, getAllOrders } from '../controllers/orderController';
+import { getOrderById, getOrderLocations, pickupOrder, deliverOrder, acceptOrder, cancelOrder, createOrder, editOrder, getAllOrders } from '../controllers/orderController';
 
 export function createOrderRouter(publicKey?: string, lifecycle?: ReturnType<typeof createOrderLifecycle>, creation?: ReturnType<typeof createOrderCreation>, edits?: ReturnType<typeof createOrderEdits>, acceptance?: ReturnType<typeof createOrderAcceptance>) {
   const router = Router();
   const unavailable: RequestHandler = (_req, res) => { res.status(503).json({ error: 'dependency-unavailable' }); };
   router.use(publicKey ? createAuthenticate(publicKey) : unavailable);
   router.get('/', getAllOrders);
+  router.get('/locations', requireUser, getOrderLocations);
+  router.get('/:id', getOrderById);
   router.use(requireUser);
   router.post('/', createOrder(creation));
   router.patch('/:id', editOrder(edits));
@@ -21,6 +24,5 @@ export function createOrderRouter(publicKey?: string, lifecycle?: ReturnType<typ
   router.post('/:id/cancel', cancelOrder(lifecycle));
   router.post('/:id/pickup', pickupOrder(lifecycle));
   router.post('/:id/deliver', deliverOrder(lifecycle));
-  router.get('/locations', getOrderLocations);
   return router;
 }

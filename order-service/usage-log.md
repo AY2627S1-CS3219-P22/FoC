@@ -1386,3 +1386,40 @@ Tool: ChatGPT (Codex). Mode: debug/test/document.
 Exact prompt: “Check and make sure code works and let me know how to term my latest commit.”
 Updated location integration test to use an authenticated USER JWT after the human moved the endpoint into the existing authenticated Order router; added unauthenticated 401 assertion.
 Verification in /Users/euniceng/Desktop/FoC: shared gRPC/messaging and Order builds passed; Order unit tests passed; shared gRPC 51 tests passed. UI build and TypeScript check passed with installed Node 22.22.0 (default Node 20.10.0 is too old for this Vite version). Fresh disposable PostgreSQL migration and integration run: 80 passed, 0 failed, 1 RabbitMQ-dependent test skipped because no test broker configured. No live database touched. Test container removed. No commit or staging performed; test/log edits remain unstaged over the user's existing staged changes.
+
+
+### 2026-11-03 — Align deletion eligibility with User PR #101
+Tool: ChatGPT (Codex). Mode: implementation/refactor/test/document.
+Exact prompts: “Can we follow the convention in my teammate's PR?”; clarification: “Do you mean the User deletion PR #101 convention, specifically changing CheckDeletionEligibility to return { eligible, blocked_order_count } instead of { eligible, blocking_orders }?”; answer: “Yes”.
+Implementation: proto field 2 is now int32 blocked_order_count; TypeScript response uses blockedOrderCount. Handler counts existing blocker results. Existing active-order, requester/courier, unresolved credit/edit and pending creation checks retained. Generated response type, RPC integration expectations and current docs aligned. This supersedes earlier ID-list contract log entries; deploy matching clients/server together because field 2 wire type changed. Author review pending.
+
+Verification: shared gRPC/messaging and Order builds passed; shared gRPC 51 tests passed; fresh PostgreSQL migration + Order integration suite 80 passed, 0 failed, 1 broker-dependent test skipped. Real gRPC integration assertions cover count 0/1, requester/courier blockers, pending creations, invalid IDs and unavailable database fail-closed behaviour. Disposable database removed; no live records touched. git diff --check passed. Nothing staged or committed.
+
+
+### 2026-11-03 — Postman deletion eligibility checks
+Tool: ChatGPT (Codex). Mode: documentation/test instructions.
+Exact prompt: “can we have some postman tests for this?”
+Added order-service/postman/deletion-eligibility.md: manual gRPC request setup, zero/count response, invalid IDs, requester/courier active states, idempotent creation, settlement/refund eligibility and fail-closed downtime. Does not change existing demo collections or invoke account deletion. Current User checkout lacks DELETE /users/me; full User integration explicitly deferred until that PR is integrated. Reviewed against current handlers and DTO; these manual steps were not executed in Postman. Author review pending.
+
+
+### 2026-11-03 — Single-order API and frontend details
+Tool: ChatGPT (Codex). Modes: implement/refactor/test/document. Author review pending.
+Exact initial prompt: “Lets implement a GET /orders/:id for the api with frontend/”
+Initial clarification answer: “Requester, assigned courier, or administrator only; existing order fields”. This was superseded before implementation by the following exact prompt:
+
+Please implement `GET /orders/:id` with these access rules:
+
+1. Authentication is required.
+2. The requester, assigned courier and administrator may retrieve the order.
+3. Other authenticated users may retrieve an `UNASSIGNED` order, but only with the same limited fields exposed by the existing `scope=open` listing.
+4. Other authenticated users cannot retrieve orders in `ASSIGNED`, `PICKED_UP`, `DELIVERED` or `CANCELLED` states unless they are the requester, assigned courier or administrator.
+5. Return `{ "order": {...} }`, reusing the existing order-listing field names, types and serializers.
+6. Do not expose internal credit operations, creation payloads, edit-operation records or other sensitive metadata.
+7. Use the existing authorization conventions. Return 401 for missing/invalid authentication, 403 for unauthorized access and 404 for nonexistent orders.
+8. Add tests for requester, assigned courier, admin, unrelated authenticated user viewing an open order, unrelated user viewing a non-open order, missing authentication and nonexistent order.
+
+Please keep the implementation consistent with our existing `GET /orders?scope=open`, `requested` and `assigned` behaviour.
+
+Key implementation: existing single router, locations route before parameter route, authentication before lookup; controller validation and serialization; service uses existing singleton and listing projection. Unrelated users cannot view overdue UNASSIGNED orders, matching open listing. No internal relation payloads selected. UI API client and useOrder fetch latest details on open, disable actions until loaded and show load errors instead of stale controls. No new router, database, Prisma instance, public proxy or gRPC GetOrder implementation.
+
+Validation: Order build and 20 unit tests passed. UI build, TypeScript check and 4 existing courier-control render tests passed using Node 22. Fresh PostgreSQL migrations applied to isolated order_service_test_details. Initial full run had 34 creation-related failures returning pending, while the new single-order test passed. Isolated creation check passed; full reruns under default Node 20 and Node 22 each passed 81 tests, 0 failures, 1 RabbitMQ-dependent test skipped. Initial issue did not reproduce; no unrelated creation source was changed. Temporary diagnostic instrumentation was applied only to generated dist output and restored immediately. Test container removed. No live data, commits or staging changes. Full browser interaction not exercised. git diff --check passed.

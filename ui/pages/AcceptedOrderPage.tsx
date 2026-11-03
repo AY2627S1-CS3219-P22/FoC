@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Enforce courier-only action visibility/handlers; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import type { Order } from "../App"
@@ -21,7 +22,7 @@ function stepIndex(status: Order["status"]): number {
 }
 
 export default function AcceptedOrderPage({ initialOrder, currentUserId, onDelivered, onBack }: Props) {
-  const { order, actionError, busy, run } = useOrder(initialOrder)
+  const { order, actionError, busy, loadError, run } = useOrder(initialOrder)
 
   const current = stepIndex(order.status)
   const isCourier = order.courierId === currentUserId && order.requesterId !== currentUserId
@@ -36,6 +37,13 @@ export default function AcceptedOrderPage({ initialOrder, currentUserId, onDeliv
     const updated = await run("deliver")
     if (updated) onDelivered(updated)
   }
+
+  if (loadError) return (
+    <div className="mx-auto max-w-lg p-6">
+      <p role="alert">{loadError}</p>
+      <button onClick={onBack}>Back to Orders</button>
+    </div>
+  )
 
   return (
     <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6 sm:py-8">

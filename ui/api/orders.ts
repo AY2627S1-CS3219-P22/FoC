@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Selected destination ID contract; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import type { Order } from "../App"
@@ -66,6 +67,10 @@ const toOrder = (o: ApiOrder): Order => ({
 
 export const listOrders = (scope: OrderScope) =>
   api<{ orders: ApiOrder[] }>(`/orders?scope=${scope}`).then((r) => r.orders.map(toOrder))
+
+export const getOrder = (id: string, signal?: AbortSignal) =>
+  api<{ order: ApiOrder }>(`/orders/${encodeURIComponent(id)}`, { signal })
+    .then((r) => toOrder(r.order))
 
 export const updateOrder = (id: string, action: OrderAction) =>
   api<{ order: ApiOrder }>(`/orders/${id}/${action}`, { method: "POST", body: "{}" })

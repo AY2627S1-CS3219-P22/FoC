@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Implemented author-approved administrator and authenticated relationship-based order listings.
 // Author review: Pending; see ../../usage-log.md.
@@ -39,4 +40,22 @@ export async function listUserOrders(scope: OrderScope, userId: string) {
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     select: publicOrderFields,
   });
+}
+
+
+export async function findVisibleOrder(id: string, user: { id: string; roles: string[] }) {
+  const order = await prisma.order.findUnique({ where: { id }, select: publicOrderFields });
+  if (!order) return { error: 'not-found' as const, status: 404 };
+  const participant = order.requesterId === user.id || order.courierId === user.id;
+  if (!participant && !user.roles.includes('ADMINISTRATOR')) {
+    const now = (await prisma.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`)[0].now;
+    if (!user.roles.includes('USER') || order.status !== 'UNASSIGNED' || order.expiryTime <= now) {
+      return { error: 'forbidden' as const, status: 403 };
+    }
+  }
+  return { order };
+}
+
+export function serializeListedOrder<T extends { supplierId: bigint }>(order: T) {
+  return { ...order, supplierId: order.supplierId.toString() };
 }

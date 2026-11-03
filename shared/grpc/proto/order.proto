@@ -18,7 +18,7 @@ message CheckDeletionEligibilityRequest {
 
 message CheckDeletionEligibilityResponse {
   bool eligible = 1;
-  repeated string blocking_orders = 2;
+  int32 blocked_order_count = 2;
 }
 
 message GetOrderRequest {

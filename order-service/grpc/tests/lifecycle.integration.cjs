@@ -851,13 +851,13 @@ test('deletion processing rolls back partial scrubbing and leaves RECEIVED for b
 test('CheckDeletionEligibility uses real gRPC and blocks both relationships, terminal unresolved credits and pending creations',async t=>{
  const f=fixture(),order=await create(f),rpc=require('@foc/grpc'),{createGrpcServer}=require('../dist/grpc/server');
  const server=createGrpcServer(db),port=await rpc.startServer(server,0,'127.0.0.1'),client=rpc.createOrderClient('127.0.0.1:'+port);t.after(()=>{client.close();server.forceShutdown()});
- assert.deepEqual(await client.checkDeletionEligibility({userId:f.user}),{eligible:false,blockingOrders:[order.id]});
- assert.deepEqual(await client.checkDeletionEligibility({userId:f.user+'-unrelated'}),{eligible:true,blockingOrders:[]});
- const courier=f.user+'-courier';await db.order.update({where:{id:order.id},data:{status:'ASSIGNED',courierId:courier}});assert.deepEqual(await client.checkDeletionEligibility({userId:courier}),{eligible:false,blockingOrders:[order.id]});
+ assert.deepEqual(await client.checkDeletionEligibility({userId:f.user}),{eligible:false,blockedOrderCount:1});
+ assert.deepEqual(await client.checkDeletionEligibility({userId:f.user+'-unrelated'}),{eligible:true,blockedOrderCount:0});
+ const courier=f.user+'-courier';await db.order.update({where:{id:order.id},data:{status:'ASSIGNED',courierId:courier}});assert.deepEqual(await client.checkDeletionEligibility({userId:courier}),{eligible:false,blockedOrderCount:1});
  await db.order.update({where:{id:order.id},data:{status:'DELIVERED',creditState:'SETTLEMENT_PENDING'}});assert.equal((await client.checkDeletionEligibility({userId:courier})).eligible,false);
- await db.order.update({where:{id:order.id},data:{creditState:'SETTLED'}});assert.deepEqual(await client.checkDeletionEligibility({userId:courier}),{eligible:true,blockingOrders:[]});
+ await db.order.update({where:{id:order.id},data:{creditState:'SETTLED'}});assert.deepEqual(await client.checkDeletionEligibility({userId:courier}),{eligible:true,blockedOrderCount:0});
  await assert.rejects(client.checkDeletionEligibility({userId:' '}),e=>e.code===3);
- f.reserveMode='after';const pending=await f.creation.submit(f.user,'rpc-pending',f.input());assert.equal(pending.status,202);assert.deepEqual(await client.checkDeletionEligibility({userId:f.user}),{eligible:false,blockingOrders:[pending.creationId]});
+ f.reserveMode='after';const pending=await f.creation.submit(f.user,'rpc-pending',f.input());assert.equal(pending.status,202);assert.deepEqual(await client.checkDeletionEligibility({userId:f.user}),{eligible:false,blockedOrderCount:1});
  const unavailable=createGrpcServer({order:{findMany:async()=>{throw new Error('DB down')}}}),downPort=await rpc.startServer(unavailable,0,'127.0.0.1'),downClient=rpc.createOrderClient('127.0.0.1:'+downPort);t.after(()=>{downClient.close();unavailable.forceShutdown()});
  await assert.rejects(downClient.checkDeletionEligibility({userId:f.user}),e=>e.code===14);
 });
@@ -879,4 +879,33 @@ test('deletion waits for an in-flight lifecycle row lock and preserves the commi
  try{await new Promise(r=>setTimeout(r,40));assert.equal(finished,false)}finally{release()}
  await lifecycle;const result=await processing;assert.equal(result.state,'MANUAL_REVIEW_REQUIRED');assert.deepEqual(result.blockingOrderIds,[order.id]);
  const saved=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(saved.status,'PICKED_UP');assert.equal(saved.creditState,'RESERVED');assert.equal(saved.requesterName,'Campus Friend');assert.equal(f.releases,0);assert.equal(f.settlements,0);
+});
+
+// ChatGPT (Codex), 2026-11-03: Single-order visibility and response safety regression coverage; review pending.
+test('single-order GET enforces relationships, open visibility, authentication and listing projection',async t=>{
+ const f=fixture(),order=await create(f,'single-order');
+ const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+ const app=createApp(publicKey.export({type:'spki',format:'pem'})),server=app.listen(0,'127.0.0.1');await once(server,'listening');
+ t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const base=`http://127.0.0.1:${server.address().port}/orders`;
+ const headers=(id,roles=['USER'])=>({Authorization:'Bearer '+jwt.sign({roles},privateKey,{algorithm:'RS256',subject:id,expiresIn:60})});
+ const get=async(path,auth)=>{const r=await fetch(base+path,{headers:auth});return {status:r.status,body:await r.json()}};
+ const requester=headers(f.user),courierId=f.user+'-courier',courier=headers(courierId),outsider=headers(f.user+'-other'),admin=headers('admin',['ADMINISTRATOR']);
+ assert.equal((await get('/'+order.id)).status,401);
+ assert.equal((await get('/'+order.id,{Authorization:'Bearer invalid'})).status,401);
+ assert.equal((await get('/'+randomUUID(),requester)).status,404);
+ assert.equal((await get('/invalid',requester)).status,400);
+ const open=await get('/'+order.id,outsider);assert.equal(open.status,200);
+ const listing=await get('?scope=open',outsider);assert.deepEqual(open.body.order,listing.body.orders.find(o=>o.id===order.id));
+ assert.equal(typeof open.body.order.supplierId,'string');
+ for(const field of ['creation','payload','creditOperations','editOperations','requestFingerprint','idempotencyKey'])assert.equal(field in open.body.order,false);
+ for(const auth of [requester,admin])assert.equal((await get('/'+order.id,auth)).status,200);
+ await db.order.update({where:{id:order.id},data:{expiryTime:new Date(0)}});
+ assert.equal((await get('/'+order.id,outsider)).status,403);assert.equal((await get('/'+order.id,requester)).status,200);
+ for(const status of ['ASSIGNED','PICKED_UP','DELIVERED','CANCELLED']){
+  await db.order.update({where:{id:order.id},data:{status,courierId}});
+  assert.equal((await get('/'+order.id,outsider)).status,403,status);
+  for(const auth of [requester,courier,admin])assert.equal((await get('/'+order.id,auth)).status,200,status);
+ }
+ const location=await get('/locations?query=COM1',requester);assert.equal(location.status,200);assert.ok(Array.isArray(location.body.locations));
 });

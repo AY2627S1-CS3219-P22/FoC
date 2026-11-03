@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Mirror backend requester exclusion for courier actions; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import { useState } from "react"
@@ -14,7 +15,7 @@ interface Props {
 }
 
 export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, onAccepted, onDelivered }: Props) {
-  const { order, actionError, busy, run } = useOrder(initialOrder)
+  const { order, actionError, busy, loadError, run } = useOrder(initialOrder)
   const [showAcceptModal, setShowAcceptModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
 
@@ -44,6 +45,13 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
     setShowCancelModal(false)
     if (await run("cancel")) onBack()
   }
+
+  if (loadError) return (
+    <div className="mx-auto max-w-lg p-6">
+      <p role="alert">{loadError}</p>
+      <button onClick={onBack}>Back to Orders</button>
+    </div>
+  )
 
   return (
     <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6 sm:py-8">

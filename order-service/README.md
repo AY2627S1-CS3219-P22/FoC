@@ -696,3 +696,26 @@ fence: preventing new order activity during deletion and recovering unexpected
 active orders still require agreement with User Service. No notification or
 restoration contract was invented. Contract, state definitions, race explanation
 and operational queries: [messaging/README.md](messaging/README.md).
+
+
+### Single-order details
+
+`GET /orders/:id` requires a User Service bearer token and returns `{ "order": {...} }`
+using the same fields and serialization as the existing listings. The requester,
+assigned courier and administrator may read their permitted order in any state.
+Other authenticated USERs may read only UNASSIGNED, unexpired orders, matching
+`scope=open`. Internal creation payloads, edit records and credit-operation records
+are excluded. Missing/invalid tokens return 401; denied access returns 403;
+unknown UUIDs return 404; malformed UUIDs return 400.
+
+The existing UI details and active-errand pages fetch this endpoint when opened.
+Actions remain disabled during loading; access/load errors replace the details.
+Both development and Docker UI use the existing `/backend/orders` proxy. This
+does not introduce URL-based navigation or preserve the selected page on reload.
+
+```sh
+curl -H 'Authorization: Bearer <token>' http://localhost:3003/orders/<order-uuid>
+```
+
+AI assistance: ChatGPT (Codex), 2026-11-03; implementation, refactoring, tests and
+documentation following the confirmed contract. Human review pending; see usage-log.md.

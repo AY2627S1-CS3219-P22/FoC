@@ -250,9 +250,9 @@ contract and added the shared client; author review pending. Exact exchanges:
 [Order usage log](../../order-service/usage-log.md).
 
 `order.OrderService/CheckDeletionEligibility` takes proto field `user_id` and
-returns `eligible` plus repeated `blocking_orders` UUIDs. The shared Promise
+returns `eligible` plus `blocked_order_count` (the number of blocking orders). The shared Promise
 client uses `createOrderClient(address).checkDeletionEligibility({ userId })`
-and returns `{ eligible, blockingOrders }`. It preserves the shared deadline and
+and returns `{ eligible, blockedOrderCount }`. It preserves the shared deadline and
 metadata options. User Service must reject deletion on a non-eligible result or
 any RPC failure. No new service token or network exposure was added. Order's
 GetOrder stub and existing wire enum were not changed. More details:

@@ -20,7 +20,7 @@ export function createGrpcServer(db?: PrismaClient) {
       }
       try {
         const orders = await findDeletionBlockingOrders(db, userId);
-        callback(null, { eligible: orders.length === 0, blockingOrders: orders.map(order => order.id) });
+        callback(null, { eligible: orders.length === 0, blockedOrderCount: orders.length });
       } catch {
         // Never return eligible=true when the lookup failed.
         callback({ code: status.UNAVAILABLE, details: 'Unable to verify deletion eligibility' });

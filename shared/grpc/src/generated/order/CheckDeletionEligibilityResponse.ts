@@ -4,10 +4,10 @@
 
 export interface CheckDeletionEligibilityResponse {
   'eligible'?: (boolean);
-  'blockingOrders'?: (string)[];
+  'blockedOrderCount'?: (number);
 }
 
 export interface CheckDeletionEligibilityResponse__Output {
   'eligible': (boolean);
-  'blockingOrders': (string)[];
+  'blockedOrderCount': (number);
 }

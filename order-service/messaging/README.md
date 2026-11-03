@@ -10,8 +10,8 @@ Order uses `@foc/messaging`'s existing RabbitMQClient and the durable
 ## Before deletion: synchronous eligibility
 
 The internal RPC `order.OrderService/CheckDeletionEligibility` takes `user_id`
-and returns `eligible` and repeated `blocking_orders` (Order UUIDs). Shared
-TypeScript clients use camelCase `userId` and `blockingOrders`:
+and returns `eligible` and `blocked_order_count` (number of blocking orders). Shared
+TypeScript clients use camelCase `userId` and `blockedOrderCount`:
 
 ```js
 const { createOrderClient } = require('@foc/grpc');
