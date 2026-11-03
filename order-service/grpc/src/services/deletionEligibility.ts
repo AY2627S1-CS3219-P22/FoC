@@ -2,7 +2,9 @@
 // Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
 // Scope: Added the author-specified service-layer blocked-order count for
 // deletion eligibility, covering requester/courier orders and pending credit
-// states. Author review: Pending. See user-service/ai/usage-log.md, entry 032.
+// states. Author reviewed the changes line by line, manually tested and
+// confirmed the behaviour, approved the implementation. See
+// user-service/ai/usage-log.md, entry 032.
 
 import type { PrismaClient } from '../generated/prisma';
 

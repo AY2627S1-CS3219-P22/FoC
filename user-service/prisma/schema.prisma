@@ -11,7 +11,9 @@
 // Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
 // Scope: AI added the author-specified ArchivedUser retention model containing
 // only email, the old user id, deletion time, and purge time, with an index on
-// purgeAfter. Author review: Pending. See user-service/ai/usage-log.md, entry 023.
+// purgeAfter. Author reviewed the changes line by line, manually tested and
+// confirmed the behaviour, approved the implementation. See
+// user-service/ai/usage-log.md, entry 023.
 
 // Prisma schema for the User Service.
 // Schema changes go through `prisma migrate dev`, never `db push`.

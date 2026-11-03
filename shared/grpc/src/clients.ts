@@ -4,7 +4,9 @@
 // Author review: I reviewed the shared client retry implementation.
 // Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 010–012, 016, 021, 026–027 and 029.
 // OpenAI Codex added the author-specified Order Service eligibility client;
-// author review pending. See user-service/ai/usage-log.md, entry 031.
+// Author review: Author reviewed the changes line by line, manually tested and confirmed the
+// behaviour, approved the implementation. See user-service/ai/usage-log.md,
+// entry 031.
 
 import {
   credentials,

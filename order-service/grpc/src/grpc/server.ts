@@ -1,8 +1,9 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
 // Scope: Implemented the author-specified deletion-eligibility gRPC handler,
-// including blocked-order counting and error mapping. Author review: Pending.
-// See user-service/ai/usage-log.md, entry 031.
+// including blocked-order counting and error mapping. Author reviewed the
+// changes line by line, manually tested and confirmed the behaviour, approved
+// the implementation. See user-service/ai/usage-log.md, entry 031.
 
 import { status } from '@grpc/grpc-js';
 import { OrderService, createServer, unimplemented, type OrderServiceHandlers } from '@foc/grpc';

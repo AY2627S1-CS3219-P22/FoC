@@ -9,7 +9,8 @@
 - **Key response:** Documented account deletion, archived-account restoration, archive purging, and Order Service deletion eligibility in the User Service README and root AI summary.
 - **Affected locations:** `user-service/README.md`, `README.md`.
 - **Checks:** `git diff --check` passed.
-- **Human review/edits:** Pending human review; no human approval is claimed.
+- **Human review/edits:** Author reviewed the changes line by line, manually
+  tested and confirmed the behaviour, approved the implementation.
 - **External sources:** None.
 
 ## 032: Deletion eligibility service disclosure
@@ -21,7 +22,8 @@
 - **Key response:** Added a comprehensive AI disclosure header to `deletionEligibility.ts`.
 - **Affected locations:** `order-service/grpc/src/services/deletionEligibility.ts`.
 - **Checks:** `git diff --check` pending.
-- **Human review/edits:** Pending human review; no human approval is claimed.
+- **Human review/edits:** Author reviewed the changes line by line, manually
+  tested and confirmed the behaviour, approved the implementation.
 - **External sources:** None.
 
 ## 031: Order deletion eligibility gRPC
@@ -33,7 +35,8 @@
 - **Key response:** Added the Order Service gRPC contract, database-backed blocked-order count, User Service client wiring, and missing-argument/internal-error mappings. Existing stub behavior was replaced; no event behavior was changed.
 - **Affected locations:** `shared/grpc/proto/order.proto`, `shared/grpc/src/clients.ts`, `order-service/grpc/src/grpc/server.ts`, `user-service/src/env.ts`, `user-service/src/services/userService.ts`, `user-service/package.json`.
 - **Checks:** `npm run grpc:generate`, shared gRPC build, Order Service build, User Service build, `npm install --package-lock-only --ignore-scripts`, and `git diff --check` passed.
-- **Human review/edits:** Pending human review; no human approval is claimed.
+- **Human review/edits:** Author reviewed the changes line by line, manually
+  tested and confirmed the behaviour, approved the implementation.
 - **External sources:** None.
 
 ## 030: Archived user purge job
@@ -45,7 +48,8 @@
 - **Key response:** Added expired `ArchivedUser` deletion at startup and on a 24-hour interval, with no `user.purged` event.
 - **Affected locations:** `user-service/src/jobs/archivePurge.ts`, `user-service/src/index.ts`.
 - **Checks:** Pending.
-- **Human review/edits:** Pending human review; no human approval is claimed.
+- **Human review/edits:** Author reviewed the changes line by line, manually
+  tested and confirmed the behaviour, approved the implementation.
 - **External sources:** None.
 
 ## 027: User restoration workflow

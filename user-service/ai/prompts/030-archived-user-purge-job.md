@@ -2,7 +2,6 @@
 AI Assistance Disclosure:
 Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
 Scope: Formatted the author's prompt into this archive file.
-Author review: Pending.
 -->
 
 # Prompt archive: 030
