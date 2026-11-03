@@ -21,8 +21,19 @@ model UserDeletionEvent {
   occurredAt DateTime @db.Timestamptz(3)
   deletedAt  DateTime @db.Timestamptz(3)
   receivedAt DateTime @default(now()) @db.Timestamptz(3)
+  state UserDeletionState @default(RECEIVED)
+  blockingOrderIds String[] @default([])
+  lastError String?
+  processedAt DateTime? @db.Timestamptz(3)
 
   @@index([userId])
+  @@index([state, receivedAt])
+}
+
+enum UserDeletionState {
+  RECEIVED
+  PROCESSED
+  MANUAL_REVIEW_REQUIRED
 }
 
 enum OrderStatus {

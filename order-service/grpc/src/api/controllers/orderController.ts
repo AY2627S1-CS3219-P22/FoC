@@ -2,6 +2,7 @@
 // Scope: Added approved pickup validation/controller to order commands and retrieval.
 // Author review: Pending; see ../../../../usage-log.md.
 // ChatGPT (Codex), 2026-10-30: Added user-specified administrator status queries; human review pending.
+import { searchDestinationLocations } from '../../services/destinationLocations';
 import type { RequestHandler } from 'express';
 import type { createOrderAcceptance } from '../../services/orderAcceptance';
 import type { createOrderLifecycle } from '../../services/orderLifecycle';
@@ -114,3 +115,20 @@ export function deliverOrder(lifecycle?: ReturnType<typeof createOrderLifecycle>
     } catch (error) { next(error); }
   };
 }
+
+// ChatGPT (Codex), 2026-11-03: Separate location HTTP validation from database queries; review pending.
+export const getOrderLocations: RequestHandler = async (req, res, next) => {
+  const parsed = z.object({
+    query: z.string().trim().min(1),
+    limit: z.string().regex(/^[0-9]+$/).transform(Number).pipe(z.number().int().min(1).max(50)).optional(),
+  }).strict().safeParse(req.query);
+  if (!parsed.success) {
+    const missingQuery = typeof req.query.query !== 'string' || !req.query.query.trim();
+    res.status(400).json({ error: { message: missingQuery
+      ? 'Search query must not be empty.' : 'Limit must be an integer between 1 and 50, with no unknown parameters.' } });
+    return;
+  }
+  try {
+    res.json({ locations: await searchDestinationLocations(parsed.data.query, parsed.data.limit ?? 20) });
+  } catch (error) { next(error); }
+};

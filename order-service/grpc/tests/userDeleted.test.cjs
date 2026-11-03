@@ -20,3 +20,12 @@ test('database failures propagate so RabbitMQ cannot acknowledge an unrecorded d
  const handler=createUserDeletedHandler({userDeletionEvent:{createMany:async()=>{throw failure}}});
  await assert.rejects(handler(envelope(event)),error=>error===failure);
 });
+
+const {scrubDeletionJson}=require('../dist/services/userDeletion');
+test('JSON scrubbing removes nested free text and referenced destinations while preserving financial IDs and the other participant',()=>{
+ const value={requesterName:'Requester',courierName:'Courier',request:{destination:'Private address',destinationLocationId:'kr_001',requestDetails:'Private notes'},nested:[{contact:'Private contact'}],orderId:'order',requesterId:'requester',courierId:'courier',amount:4,expiryTime:'2026-11-02T00:00:00Z',pickupStore:'Public supplier',pickupLocation:'Public location'};
+ const scrubbed=scrubDeletionJson(value,{requester:true,courier:false});
+ assert.equal(scrubbed.requesterName,'DeletedUser');assert.equal(scrubbed.courierName,'Courier');assert.equal(scrubbed.request.destination,'DeletedUser');assert.equal(scrubbed.request.destinationLocationId,null);assert.equal(scrubbed.request.requestDetails,'DeletedUser');assert.deepEqual(scrubbed.nested,[{contact:'DeletedUser'}]);assert.equal(scrubbed.orderId,'order');assert.equal(scrubbed.amount,4);assert.equal(scrubbed.pickupStore,'Public supplier');
+ assert.equal(scrubDeletionJson(value,{requester:false,courier:true}).courierName,'DeletedUser');
+ assert.equal(scrubDeletionJson(null,{requester:true,courier:true}),null);
+});

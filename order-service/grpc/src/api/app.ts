@@ -3,9 +3,8 @@
 // Scope: Generated setup implementation following approved User Service conventions.
 // Author review: Pending; see ../../../usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Added catalogue search; review pending.
-import { searchLocations } from '../services/destinationLocations';
 import express, { type Express } from 'express';
-import { pingDatabase, prisma } from '../db';
+import { pingDatabase } from '../db';
 import type { createOrderAcceptance } from '../services/orderAcceptance';
 import { createOrderRouter } from './routes/orderRoutes';
 import type { createOrderCreation } from '../services/orderCreation';
@@ -22,7 +21,6 @@ export function createApp(publicKey?: string, lifecycle?: ReturnType<typeof crea
       db: dbUp ? 'up' : 'down',
     });
   });
-  app.get('/api/locations', searchLocations(prisma));
   app.use('/orders', createOrderRouter(publicKey, lifecycle, creation, edits, acceptance));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const badJson = error instanceof SyntaxError && 'status' in error && error.status === 400;

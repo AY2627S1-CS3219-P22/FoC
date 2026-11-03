@@ -171,3 +171,19 @@ configuration and Docker wiring. This does not complete deletion lifecycle
 processing. Added real broker/database and message validation tests. JSON and
 root lockfile attribution, exact prompts, key exchanges and verification:
 [order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+
+Order deletion consistency handling, ChatGPT (Codex), 2026-11-02: implemented the
+human-confirmed eligibility RPC, manual-review handling for active/unresolved
+work and transactional personal-data scrubbing for safe history. No notification,
+account restoration or active-order recovery contract was invented. Cross-service
+deletion coordination remains pending agreement with User Service. Exact prompts,
+key exchanges, JSON/generated-file attribution and verification:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+
+User deletion PR integration review, ChatGPT (Codex), 2026-11-03: reviewed PR #101
+at 6ffe05ff for Order/shared-contract compatibility and ran focused isolated
+wire/event-schema and archive-purge race checks. No service code merged or changed
+by this review. Exact prompt, findings and validation limits:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.

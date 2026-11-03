@@ -20,7 +20,7 @@ import { createGrpcServer } from './grpc/server';
 
 async function main(): Promise<void> {
   await prisma.$connect();
-  const grpcServer = createGrpcServer();
+  const grpcServer = createGrpcServer(prisma);
   const publicKey = env.USER_SERVICE_PUBLIC_KEY_PATH ? readFileSync(env.USER_SERVICE_PUBLIC_KEY_PATH, 'utf8') : undefined;
   const credit = env.CREDIT_ORDER_SERVICE_TOKEN ? createCreditClient(env.CREDIT_GRPC_ADDR,
     { timeoutMs: env.GRPC_TIMEOUT_MS }) : undefined;

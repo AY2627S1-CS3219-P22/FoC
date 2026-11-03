@@ -19,7 +19,7 @@ test('Order consumes deletion events durably, deduplicates after restart and dea
  async function until(check){const deadline=Date.now()+5000;while(Date.now()<deadline){if(await check())return;await new Promise(r=>setTimeout(r,25))}throw new Error('Timed out waiting for consumer')}
  await Promise.all(Array.from({length:5},()=>publisher.publishToQueue(QUEUES.orderUser,event,event.eventId)));
  await until(async()=>await db.userDeletionEvent.count({where:{eventId:event.eventId}})===1);
- const stored=await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:event.eventId}});assert.equal(stored.userId,userId);assert.equal(stored.deletedAt.toISOString(),event.deletedAt);
+ const stored=await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:event.eventId}});assert.equal(stored.userId,userId);await until(async()=>(await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:event.eventId}})).state==='PROCESSED');assert.equal(stored.deletedAt.toISOString(),event.deletedAt);
  await consumer.close();consumer=undefined;
  // Publish while Order is offline, then restart the consumer against the durable queue.
  await publisher.publishToQueue(QUEUES.orderUser,event,event.eventId);
@@ -36,7 +36,7 @@ test('Order consumes deletion events durably, deduplicates after restart and dea
  assert.equal(await db.userDeletionEvent.count({where:{userId}}),1);
  // Storage outage must exhaust shared retries into DLQ, never ACK as successful.
  await consumer.close();consumer=undefined;
- const unavailable={userDeletionEvent:{createMany:async()=>{throw new Error('Simulated database outage')}}};
+ const unavailable={userDeletionEvent:{findMany:args=>db.userDeletionEvent.findMany(args),createMany:async()=>{throw new Error('Simulated database outage')}}};
  consumer=await startUserDeletedConsumer(unavailable,brokerUrl);
  const retry={...event,eventId:randomUUID()};await publisher.publishToQueue(QUEUES.orderUser,retry,retry.eventId);
  await until(async()=>(await channel.checkQueue(dlq)).messageCount>=1);

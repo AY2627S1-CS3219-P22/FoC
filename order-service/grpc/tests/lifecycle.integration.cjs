@@ -19,7 +19,7 @@ const prefix='lifecycle-'+randomUUID();let userCounter=0;
 before(()=>db.$connect());
 after(async()=>{
  const ids=(await db.orderCreation.findMany({where:{requesterId:{startsWith:prefix}},select:{orderId:true}})).map(r=>r.orderId);
- await db.orderEditOperation.deleteMany({where:{orderId:{in:ids}}});await db.creditOperation.deleteMany({where:{orderId:{in:ids}}});await db.order.deleteMany({where:{id:{in:ids}}});await db.orderCreation.deleteMany({where:{orderId:{in:ids}}});await db.$disconnect();
+ await db.orderEditOperation.deleteMany({where:{orderId:{in:ids}}});await db.creditOperation.deleteMany({where:{orderId:{in:ids}}});await db.order.deleteMany({where:{id:{in:ids}}});await db.orderCreation.deleteMany({where:{orderId:{in:ids}}});await db.userDeletionEvent.deleteMany({where:{userId:{startsWith:prefix}}});await db.$disconnect();
  await require('../dist/db').prisma.$disconnect();
 });
 function fixture() {
@@ -695,7 +695,7 @@ test('concurrent pickups yield one transition and use saved Supplier snapshot',a
 test('location search imports the CSV and searches names/aliases with bounded literal input',async t=>{
  const app=createApp(),server=app.listen(0,'127.0.0.1');await once(server,'listening');
  t.after(()=>new Promise(resolve=>server.close(resolve)));
- const base=`http://127.0.0.1:${server.address().port}/api/locations`;
+ const base=`http://127.0.0.1:${server.address().port}/orders/locations`;
  assert.equal(await db.destinationLocation.count(),206);
  const get=async query=>{const r=await fetch(base+query);return {status:r.status,body:await r.json()}};
  const names=await get('?query=com1');assert.equal(names.status,200);assert.ok(names.body.locations.some(l=>l.id==='kr_001'&&l.name==='COM1'&&l.code==='COM1'));
@@ -777,4 +777,103 @@ test('acceptance rechecks expiry after User lookup and does not assign an expire
  const users={getPublicProfile:async({userId})=>{await new Promise(r=>setTimeout(r,150));return {userId}}};
  const result=await createOrderAcceptance(db,users).accept(order.id,{id:'courier',roles:['USER']});
  assert.equal(result.status,409);assert.equal(result.error,'expired');assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).courierId,null);
+});
+
+// ChatGPT (Codex), 2026-11-02: Confirmed deletion consistency policy; review pending; see ../../usage-log.md.
+const {processUserDeletion,processReceivedUserDeletions}=require('../dist/services/userDeletion');
+const {createUserDeletedHandler}=require('../dist/events/userDeleted');
+async function deletionEvent(userId) {
+ const event={type:'user.deleted',eventId:randomUUID(),userId,occurredAt:new Date().toISOString(),deletedAt:new Date().toISOString()};
+ await db.userDeletionEvent.create({data:{eventId:event.eventId,userId,occurredAt:new Date(event.occurredAt),deletedAt:new Date(event.deletedAt)}});
+ return event;
+}
+for(const [participant,status] of [['requester','UNASSIGNED'],['requester','ASSIGNED'],['requester','PICKED_UP'],['courier','ASSIGNED'],['courier','PICKED_UP']])test(`deleted ${participant} on ${status}: preserve order and credits, record manual intervention without retry`,async()=>{
+ const f=fixture(),order=await create(f),courier=f.user+'-courier';
+ await db.order.update({where:{id:order.id},data:{status,...(status!=='UNASSIGNED'?{courierId:courier,courierName:'Courier Private',acceptedAt:new Date()}:{}),...(status==='PICKED_UP'?{pickedUpAt:new Date()}: {})}});
+ const userId=participant==='requester'?f.user:courier,event=await deletionEvent(userId);
+ const before=await db.order.findUniqueOrThrow({where:{id:order.id}}),ops=await db.creditOperation.findMany({where:{orderId:order.id}}),reservation={...f.ledger.get(order.id)};
+ const handler=createUserDeletedHandler(db);await Promise.all(Array.from({length:4},()=>handler({payload:event,eventId:event.eventId,retryCount:0})));
+ const record=await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:event.eventId}});assert.equal(record.state,'MANUAL_REVIEW_REQUIRED');assert.deepEqual(record.blockingOrderIds,[order.id]);assert.match(record.lastError,/active-or-unresolved/);
+ assert.deepEqual(await db.order.findUniqueOrThrow({where:{id:order.id}}),before);assert.deepEqual(await db.creditOperation.findMany({where:{orderId:order.id}}),ops);assert.deepEqual(f.ledger.get(order.id),reservation);assert.equal(f.releases,0);assert.equal(f.settlements,0);
+ const processedAt=record.processedAt.getTime();await processReceivedUserDeletions(db);assert.equal((await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:event.eventId}})).processedAt.getTime(),processedAt);
+});
+
+test('deletion scrubs safe requester history and all JSON copies, preserves public snapshots and unresolved orders',async()=>{
+ const f=fixture(),safe=await create(f,'safe'),active=await create(f,'active');
+ await f.edits.edit(safe.id,f.user,'edit-before-delete',{destinationLocationId:'kr_002',requestDetails:'Private requester instructions'});
+ const courier=f.user+'-courier';await createOrderAcceptance(db,existingUsers).accept(safe.id,{id:courier,roles:['USER']});await f.lifecycle.pickup(safe.id,courier);await f.lifecycle.deliver(safe.id,courier);
+ await db.order.update({where:{id:safe.id},data:{courierName:'Other Participant'}});
+ const creation=await db.orderCreation.findUniqueOrThrow({where:{orderId:safe.id}});
+ await db.orderCreation.update({where:{orderId:safe.id},data:{payload:{...creation.payload,nested:{requesterName:'Private requester name',destination:'Private address',destinationLocationId:'kr_001',notes:['Private message']}}}});
+ const event=await deletionEvent(f.user),beforeActive=await db.order.findUniqueOrThrow({where:{id:active.id}}),settlements=f.settlements;
+ await processUserDeletion(db,event.eventId);
+ const result=await db.order.findUniqueOrThrow({where:{id:safe.id}});assert.equal(result.status,'DELIVERED');assert.equal(result.creditState,'SETTLED');assert.equal(result.requesterId,f.user);assert.equal(result.courierId,courier);assert.equal(result.requesterName,'DeletedUser');assert.equal(result.courierName,'Other Participant');assert.equal(result.destination,'DeletedUser');assert.equal(result.destinationLocationId,null);assert.equal(result.requestDetails,'DeletedUser');assert.equal(result.pickupStore,safe.pickupStore);assert.equal(result.pickupLocation,safe.pickupLocation);
+ const payload=(await db.orderCreation.findUniqueOrThrow({where:{orderId:safe.id}})).payload;assert.equal(payload.nested.requesterName,'DeletedUser');assert.equal(payload.nested.destinationLocationId,null);assert.deepEqual(payload.nested.notes,['DeletedUser']);assert.equal(payload.requesterName,'DeletedUser');
+ const edits=await db.orderEditOperation.findMany({where:{orderId:safe.id}});assert.equal(edits[0].proposedChanges.request.requestDetails,'DeletedUser');assert.equal(edits[0].proposedChanges.target.destination,'DeletedUser');assert.equal(edits[0].proposedChanges.target.destinationLocationId,null);
+ assert.deepEqual(await db.order.findUniqueOrThrow({where:{id:active.id}}),beforeActive);assert.equal(f.settlements,settlements);assert.equal(f.releases,0);
+ const record=await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:event.eventId}});assert.deepEqual(record.blockingOrderIds,[active.id]);assert.equal(record.state,'MANUAL_REVIEW_REQUIRED');
+});
+
+test('deletion scrubs cancelled courier history while preserving requester identity and row IDs',async()=>{
+ const f=fixture(),order=await create(f),courier=f.user+'-courier';
+ await db.order.update({where:{id:order.id},data:{status:'PICKED_UP',courierId:courier,courierName:'Courier Private',pickedUpAt:new Date(),expiryTime:new Date(0)}});
+ await f.lifecycle.expireBatch();await f.lifecycle.refundBatch();
+ const before=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(before.creditState,'REFUNDED');
+ const event=await deletionEvent(courier);await processUserDeletion(db,event.eventId);
+ const result=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(result.courierName,'DeletedUser');assert.equal(result.requesterName,order.requesterName);assert.equal(result.requesterId,order.requesterId);assert.equal(result.courierId,courier);assert.equal(result.status,'CANCELLED');assert.equal(result.creditState,'REFUNDED');assert.equal(result.cancellationReason,'EXPIRY');assert.equal(result.destination,'DeletedUser');assert.equal(result.destinationLocationId,null);
+ assert.equal((await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:event.eventId}})).state,'PROCESSED');
+ const beforeReplay={...result};await processUserDeletion(db,event.eventId);assert.deepEqual(await db.order.findUniqueOrThrow({where:{id:order.id}}),beforeReplay);
+});
+
+test('pending creation, settlement, refund and edit reconciliation block eligibility and deletion scrubbing',async()=>{
+ const f=fixture();f.reserveMode='after';const pending=await f.creation.submit(f.user,'pending-deletion',f.input());assert.equal(pending.status,202);
+ const {findDeletionBlockingOrders}=require('../dist/services/deletionEligibility');assert.ok((await findDeletionBlockingOrders(db,f.user)).some(o=>o.id===pending.creationId));
+ const event=await deletionEvent(f.user);await processUserDeletion(db,event.eventId);assert.equal((await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:event.eventId}})).state,'MANUAL_REVIEW_REQUIRED');assert.equal((await db.orderCreation.findUniqueOrThrow({where:{orderId:pending.creationId}})).payload.requesterName,'Campus Friend');
+ for(const state of ['SETTLEMENT_PENDING','REFUND_PENDING']){
+  const other=fixture(),order=await create(other),status=state==='SETTLEMENT_PENDING'?'DELIVERED':'CANCELLED';await db.order.update({where:{id:order.id},data:{status,creditState:state}});
+  assert.ok((await findDeletionBlockingOrders(db,other.user)).some(o=>o.id===order.id));const e=await deletionEvent(other.user);await processUserDeletion(db,e.eventId);assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).requesterName,'Campus Friend');
+ }
+ const edited=fixture(),order=await create(edited);edited.updateMode='after';await edited.edits.edit(order.id,edited.user,'pending-edit',{credits:6});
+ await db.order.update({where:{id:order.id},data:{status:'DELIVERED',creditState:'SETTLED'}});
+ assert.ok((await findDeletionBlockingOrders(db,edited.user)).some(o=>o.id===order.id));
+});
+
+test('deletion processing rolls back partial scrubbing and leaves RECEIVED for bounded broker retry',async()=>{
+ const f=fixture(),order=await create(f);await f.lifecycle.cancel(order.id,f.user);const event=await deletionEvent(f.user),before=await db.order.findUniqueOrThrow({where:{id:order.id}});
+ const failing=new Proxy(db,{get(target,key){if(key==='$transaction')return(fn,...rest)=>target.$transaction(tx=>fn(new Proxy(tx,{get(t,k){if(k==='orderCreation')return new Proxy(t.orderCreation,{get(o,m){if(m==='update')return async()=>{throw new Error('Simulated scrub write failure')};const v=o[m];return typeof v==='function'?v.bind(o):v}});return t[k]}})),...rest);const v=target[key];return typeof v==='function'?v.bind(target):v}});
+ await assert.rejects(processUserDeletion(failing,event.eventId),/Simulated scrub/);assert.deepEqual(await db.order.findUniqueOrThrow({where:{id:order.id}}),before);assert.equal((await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:event.eventId}})).state,'RECEIVED');
+ await processReceivedUserDeletions(db);assert.equal((await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:event.eventId}})).state,'PROCESSED');
+});
+
+test('CheckDeletionEligibility uses real gRPC and blocks both relationships, terminal unresolved credits and pending creations',async t=>{
+ const f=fixture(),order=await create(f),rpc=require('@foc/grpc'),{createGrpcServer}=require('../dist/grpc/server');
+ const server=createGrpcServer(db),port=await rpc.startServer(server,0,'127.0.0.1'),client=rpc.createOrderClient('127.0.0.1:'+port);t.after(()=>{client.close();server.forceShutdown()});
+ assert.deepEqual(await client.checkDeletionEligibility({userId:f.user}),{eligible:false,blockingOrders:[order.id]});
+ assert.deepEqual(await client.checkDeletionEligibility({userId:f.user+'-unrelated'}),{eligible:true,blockingOrders:[]});
+ const courier=f.user+'-courier';await db.order.update({where:{id:order.id},data:{status:'ASSIGNED',courierId:courier}});assert.deepEqual(await client.checkDeletionEligibility({userId:courier}),{eligible:false,blockingOrders:[order.id]});
+ await db.order.update({where:{id:order.id},data:{status:'DELIVERED',creditState:'SETTLEMENT_PENDING'}});assert.equal((await client.checkDeletionEligibility({userId:courier})).eligible,false);
+ await db.order.update({where:{id:order.id},data:{creditState:'SETTLED'}});assert.deepEqual(await client.checkDeletionEligibility({userId:courier}),{eligible:true,blockingOrders:[]});
+ await assert.rejects(client.checkDeletionEligibility({userId:' '}),e=>e.code===3);
+ f.reserveMode='after';const pending=await f.creation.submit(f.user,'rpc-pending',f.input());assert.equal(pending.status,202);assert.deepEqual(await client.checkDeletionEligibility({userId:f.user}),{eligible:false,blockingOrders:[pending.creationId]});
+ const unavailable=createGrpcServer({order:{findMany:async()=>{throw new Error('DB down')}}}),downPort=await rpc.startServer(unavailable,0,'127.0.0.1'),downClient=rpc.createOrderClient('127.0.0.1:'+downPort);t.after(()=>{downClient.close();unavailable.forceShutdown()});
+ await assert.rejects(downClient.checkDeletionEligibility({userId:f.user}),e=>e.code===14);
+});
+
+test('terminal labels do not bypass unfinished durable credit operations; failed creations without holds can be scrubbed',async()=>{
+ const f=fixture(),order=await create(f);await db.order.update({where:{id:order.id},data:{status:'DELIVERED',creditState:'SETTLED'}});
+ await db.creditOperation.updateMany({where:{orderId:order.id},data:{state:'PROCESSING'}});
+ const event=await deletionEvent(f.user);await processUserDeletion(db,event.eventId);assert.equal((await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:event.eventId}})).state,'MANUAL_REVIEW_REQUIRED');assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).requestDetails,'Coffee');
+ const other=fixture();other.reserveMode='reject';const rejected=await other.creation.submit(other.user,'failed-before-deletion',other.input());assert.equal(rejected.status,409);
+ const deleted=await deletionEvent(other.user);await processUserDeletion(db,deleted.eventId);assert.equal((await db.userDeletionEvent.findUniqueOrThrow({where:{eventId:deleted.eventId}})).state,'PROCESSED');
+ const creation=await db.orderCreation.findUniqueOrThrow({where:{orderId:rejected.creationId}});assert.equal(creation.payload.requestDetails,'DeletedUser');assert.equal(creation.payload.requesterName,'DeletedUser');assert.equal(creation.payload.destinationLocationId,null);
+});
+
+test('deletion waits for an in-flight lifecycle row lock and preserves the committed active state',async()=>{
+ const f=fixture(),order=await create(f),courier=f.user+'-courier';await db.order.update({where:{id:order.id},data:{status:'ASSIGNED',courierId:courier,acceptedAt:new Date()}});
+ const event=await deletionEvent(f.user);let release,locked;const gate=new Promise(r=>release=r),ready=new Promise(r=>locked=r);
+ const lifecycle=db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM "Order" WHERE id=${order.id}::uuid FOR UPDATE`;locked();await gate;await tx.order.update({where:{id:order.id},data:{status:'PICKED_UP',pickedUpAt:new Date()}})});
+ await ready;let finished=false;const processing=processUserDeletion(db,event.eventId).then(result=>{finished=true;return result});
+ try{await new Promise(r=>setTimeout(r,40));assert.equal(finished,false)}finally{release()}
+ await lifecycle;const result=await processing;assert.equal(result.state,'MANUAL_REVIEW_REQUIRED');assert.deepEqual(result.blockingOrderIds,[order.id]);
+ const saved=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(saved.status,'PICKED_UP');assert.equal(saved.creditState,'RESERVED');assert.equal(saved.requesterName,'Campus Friend');assert.equal(f.releases,0);assert.equal(f.settlements,0);
 });

@@ -1220,3 +1220,162 @@ Verification:
 - git diff --check passed. All runtime tests used disposable containers on
   PostgreSQL port 55450 and RabbitMQ port 5679; no demo queues, accounts or
   balances were changed. Test containers removed afterward.
+
+
+## 2026-11-02: active-order deletion consistency and safe-history scrubbing
+
+Tool: ChatGPT (Codex). Modes: implementation, debugging, tests and documentation.
+Human review pending. JSON package-script attribution is recorded here and in
+README. Generated gRPC files are attributed and trace to the approved proto.
+
+Exact user prompt: “Handle deletion of requester/courier on active orders.”
+
+Exact clarification question:
+“Your earlier rule was to keep raced active orders for completion and notify User Service that deletion is blocked. I still found no notification contract. What event name, payload and destination queue—or RPC—has the User owner agreed to receive? Since user.deleted means the account is already deleted, please also confirm how User will restore access so an affected courier can finish their order.”
+
+Exact human answer:
+
+> Thanks for flagging this. You're correct that we have not agreed on a notification contract or account-restoration mechanism with the User Service owner.
+> Please do not invent an event, queue, RPC or restoration workflow.
+> For now, follow these decisions:
+> 1. CheckDeletionEligibility is the synchronous pre-deletion safeguard. User Service must reject deletion when Order Service reports blocking orders.
+> 2. The user.deleted event is a post-deletion notification, not a request for Order Service to approve or reject deletion.
+> 3. If a user.deleted event arrives while the deleted user still has an active order, treat this as an exceptional consistency failure. Preserve the affected order and its credit state rather than automatically completing, reassigning or cancelling it without an agreed recovery contract.
+> 4. Do not assume User Service can restore the deleted account or reactivate its JWT. No such mechanism has been confirmed.
+> 5. Implement the confirmed functionality first: courier existence validation on acceptance, RabbitMQ consumption, idempotent processing and personal-data scrubbing for safely completed/cancelled orders.
+> 6. For unexpected active orders, ensure the failure is recorded and observable, and use the existing retry/dead-letter mechanisms where appropriate. Do not endlessly retry an inconsistency that requires manual intervention.
+> 7. Identify the deletion-versus-order-creation/acceptance race and document that User Service and Order Service must coordinate to prevent new order activity while deletion is in progress.
+> Please leave the active-order recovery workflow pending agreement with the User Service owner rather than implementing speculative behaviour.
+
+Previously approved RPC contract:
+`CheckDeletionEligibility(user_id) -> { eligible: boolean, blocking_orders: string[] }`,
+blocking requester/courier active orders and unresolved credits, with existing
+internal gRPC access conventions and failure closed. No new endpoint token.
+
+Key assistant responses:
+- “I’ll follow that contract: preserve active orders and unresolved credits, record them for manual review, and acknowledge the event without endlessly retrying it. Safely completed or cancelled orders can have their personal data scrubbed using `DeletedUser`.”
+- “The cross-service race remains as you specified: User and Order still need an agreed way to prevent new activity between the eligibility check and deletion.”
+
+Implementation:
+- Added the approved eligibility RPC/shared client and wired the existing Prisma
+  connection. Includes both participants, active/credit states, unresolved durable
+  operations/edits and preallocated pending/compensating creation IDs. Blank input
+  gives INVALID_ARGUMENT; unavailable database gives UNAVAILABLE, never eligible.
+- Added recorded RECEIVED/PROCESSED/MANUAL_REVIEW_REQUIRED outcomes with blocker
+  IDs, error code and completion timestamp. Locks event and Order rows; active
+  and unresolved work is preserved without deletion-triggered Credit/lifecycle
+  mutations. Logs the consistency failure and ACKs the recorded manual-review
+  result instead of endlessly retrying it.
+- Scrubs only confirmed DELIVERED/SETTLED or CANCELLED/REFUNDED history without
+  unresolved intents. Deleted participant name, destination, request details,
+  referenced destination ID and free-text JSON copies are scrubbed. Counterpart
+  name, public Supplier snapshots, original IDs, status and financial audit data
+  remain. Resolved error text is replaced. Confirmed failed creations without
+  unresolved funds are also scrubbed. Related JSON request/target shapes remain
+  valid objects. No cascades or restoration/reassignment behavior added.
+- Scrubbing and processing outcome commit atomically. Storage failure rolls back
+  the scrub and propagates to existing broker retry/DLQ behavior. Old receipt-only
+  events are processed at subscriber startup. Manual-review rows are not
+  automatically replayed. Existing ordinary lifecycle/recovery workers remain.
+- Integration files run sequentially because subscriber startup scans the shared
+  test inbox; independent test processes must not process one another's fixtures.
+- Documented User's required synchronous call and pending coordination to stop
+  new create/accept activity during deletion. This implementation is not an
+  atomic cross-service deletion fence, a User restoration mechanism, or an active
+  recovery contract. No notification event/queue/RPC invented.
+
+Verification:
+- Shared gRPC generation/build and Order Prisma generation/build passed.
+- All 20 Order unit/authentication/gRPC tests passed.
+- All 51 shared gRPC regression tests passed. Initial shared run could not load
+  an ungenerated local User Prisma client; generated it and built Credit test
+  modules, then reran successfully. No User/Credit database changes were made.
+- Final complete run: all 81 PostgreSQL/HTTP/gRPC/RabbitMQ integration tests
+  passed, zero skipped. Covers each active requester/courier case, duplicate and
+  replay handling, partial-history scrubbing, nested JSON, destination reference
+  removal, pending creation/settlement/refund/edit work, rollback on write failure,
+  saved-inbox recovery, fail-closed eligibility transport and waiting for an
+  in-flight lifecycle row lock. Initial full run passed 80 before adding the
+  final explicit row-lock test.
+- Docker image foc-order-deletion-test built. An isolated runtime smoke test
+  exercised the startup-wired RPC and actual RabbitMQ consumer with synthetic
+  active/history orders: eligibility=false; MANUAL_REVIEW_REQUIRED persisted;
+  active order/name/RESERVED credits unchanged; cancelled/refunded history
+  scrubbed and destination reference removed.
+- Used only disposable PostgreSQL (55450), RabbitMQ (5679) and an isolated runtime
+  container (HTTP 33014). No live demo orders, users, balances or queues changed.
+  Test containers removed after verification. git diff --check passed.
+
+
+## 2026-11-03: review User deletion PR #101 for Order integration
+
+Tool: ChatGPT (Codex). Modes: code review, debugging and documentation.
+Human review pending. No User/Order service implementation was modified or merged
+as part of this review. Existing local changes were preserved.
+
+Exact user prompt: “Lets start by reviewing my teammate's PR on user delete so we can also get any relevant information we need for it”
+
+Reviewed source: https://github.com/AY2627S1-CS3219-P22/FoC/pull/101,
+branch origin/F2.7-user-account-deletion, fetched head
+6ffe05ff4a4f1b560b07abeef924815f934ab454. Compared its diff against origin/main
+and the current uncommitted Order implementation. Attached PR to this chat.
+
+Key responses:
+- “I found PR #101, on F2.7-user-account-deletion. Its code does publish user.deleted directly to Order’s queue, which matches our consumer.”
+- “I confirmed the protobuf mismatch with a focused check: decoding our ID-list response using their count contract fails. I also reproduced an edge case where the archive purge removes a row during restoration; registration then throws an unhandled P2025 instead of returning a controlled response.”
+
+Findings / integration facts:
+- Shared field 2 differs: PR int32 blocked_order_count versus our approved repeated
+  string blocking_orders. The User client reads blockedOrderCount, so retaining
+  our generated types requires corresponding User-side alignment. The two wire
+  types are not interchangeable. Direct serializer/deserializer checks showed
+  ID-list response -> count contract throws a decoding error; count response ->
+  ID-list contract produced a bogus empty-string list item.
+- PR Order eligibility helper checks active statuses, top-level credit states
+  and pending/compensating creations. It does not inspect separate unresolved
+  credit/edit records. Integration must preserve the stronger existing checks
+  from the confirmed Order requirements rather than taking the incoming helper
+  wholesale. This is an integration coverage difference, not a claim that the
+  PR fails to compile independently.
+- Restoration reads ArchivedUser before its transaction and later unconditionally
+  deletes that snapshot's email row. A focused test of the actual PR register
+  function, transpiled in a sandbox with mocked Prisma and clock, let the archive
+  expire and be purged between those steps. It threw uncaught P2025; fake user and
+  event were rolled back. The catch handles duplicate P2002 only. No live database
+  reproduction or automatic fix was performed.
+- PR user.deleted builder emits the exact required IDs/ISO timestamps, omits
+  purgeAfter and enqueues directly to order.user-events inside the deletion
+  transaction. Its generated payload was accepted by the current Order schema.
+- Hard deletion means User GetPublicProfile returns NOT_FOUND, compatible with
+  the existing courier-existence validation before acceptance.
+- PR user.restored adds previousUserId and routes only to Credit; Order should
+  keep its no-op behavior. A focused schema check confirmed our old restored
+  schema currently strips previousUserId, so retain that PR field while merging
+  shared messaging and our stronger deletion validation.
+- User uses ORDER_GRPC_ADDR, with order-service:50053 for the shared network and
+  host.docker.internal:50053 in the standalone Compose override. No new service
+  token is introduced.
+- Existing known limitations remain: User/Order check-then-delete race needs
+  agreed coordination; active orders remain manual review on Order. Restoration
+  lacks ownership verification and Credit restoration support is required. These
+  acknowledged limitations were not treated as newly discovered bugs.
+
+Validation limits: no new automated deletion/restoration test files are included
+in the PR diff (existing User tests are outbox/user.created). Ran focused wire,
+event-schema and mocked archive-purge race checks only, using temporary files
+under /tmp/foc-pr101-review. No production accounts/credits/events were touched.
+CI tool requested a GitHub account connection; CI results could not be inspected.
+The combined User+Order full-stack deletion flow was not run during this review.
+
+
+### 2026-11-03 — Order destination route and database separation
+Tool: ChatGPT (Codex). Mode: refactor/debug/document.
+Exact prompt: “it is an order call. rename the route to /order also make sure the abstraction between db query and route is enforced. also double check that i am not creating a second db or prisma client”
+Key response/implementation: Moved lookup to GET /order/locations through an Order router; controller validates HTTP query and formats response; destination service performs Prisma queries using existing src/db.ts singleton. Updated UI client, Vite proxy, nginx proxy, README and existing integration request path. Existing /orders lifecycle endpoints unchanged. No new database, schema or Prisma client.
+Verification: Temporary isolated HTTP test exercised actual router/controller/service with mocked singleton storage: success, empty/invalid queries, limits, alias configuration, literal wildcard escaping and old route 404 passed. git diff --check passed. Production source has one new PrismaClient, in src/db.ts. Full PostgreSQL integration suite and full builds were not rerun (worktree dependencies absent). Author review pending.
+
+
+### 2026-11-03 — Match the single Order router from the UI
+Tool: ChatGPT (Codex). Mode: refactor.
+Exact prompt: “I changed it to orders/locations instead and i mounted it to the existing router. I ONLY WANT ONE ROUTER. Can you make sure the UI changes its route accordingly? Preserve the proxy”
+Implementation: UI search now calls /orders/locations through /backend/orders/locations. Preserved Vite proxy target/rewrite and nginx Order proxy, aligned both prefixes to /backend/orders. Backend router files unchanged. Checked client-to-proxy URL matching and git diff whitespace; no full build rerun. Human review pending.

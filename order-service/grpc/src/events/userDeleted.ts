@@ -1,8 +1,9 @@
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02.
-// Scope: Shared RabbitMQ subscription and durable, repeat-safe deletion-event receipt.
+// Scope: Shared subscription, repeat-safe receipt and human-confirmed deletion processing.
 // Author review: Pending; see ../../../usage-log.md.
 import { NonRetryableError, QUEUES, RabbitMQClient, userDeletedSchema, type QueueHandler } from '@foc/messaging';
 import type { PrismaClient } from '../generated/prisma';
+import { processReceivedUserDeletions, processUserDeletion } from '../services/userDeletion';
 
 export function createUserDeletedHandler(db: PrismaClient): QueueHandler<unknown> {
   return async ({ payload, eventId }) => {
@@ -15,7 +16,7 @@ export function createUserDeletedHandler(db: PrismaClient): QueueHandler<unknown
     const event = parsed.data;
     if (eventId && eventId !== event.eventId) throw new NonRetryableError('Delivery eventId does not match payload');
     // ACK follows the durable write. Re-delivery after a crash cannot create a
-    // second receipt. Deletion lifecycle processing is separate from receipt.
+    // second receipt. Lifecycle processing has its own durable outcome below.
     await db.userDeletionEvent.createMany({
       data: { eventId: event.eventId, userId: event.userId,
         occurredAt: new Date(event.occurredAt), deletedAt: new Date(event.deletedAt) },
@@ -26,6 +27,9 @@ export function createUserDeletedHandler(db: PrismaClient): QueueHandler<unknown
       || stored.occurredAt.getTime() !== new Date(event.occurredAt).getTime()) {
       throw new NonRetryableError('Conflicting user.deleted eventId');
     }
+    // Manual-review outcomes are durable and ACKed, not retried endlessly.
+    // A storage failure throws so the shared retry/DLQ policy still applies.
+    await processUserDeletion(db, event.eventId);
   };
 }
 
@@ -33,6 +37,8 @@ export async function startUserDeletedConsumer(db: PrismaClient, url: string) {
   const broker = new RabbitMQClient({ url, serviceName: 'order-service', queues: [QUEUES.orderUser], prefetch: 10 });
   try {
     await broker.connect();
+    // Finish receipts ACKed by the earlier receipt-only consumer before upgrade.
+    await processReceivedUserDeletions(db);
     await broker.consumeFromQueue(QUEUES.orderUser, createUserDeletedHandler(db));
     console.info('Order user.deleted subscription ready', { queue: QUEUES.orderUser });
     return broker;

@@ -588,10 +588,10 @@ verify the locations or fill missing coordinates.
 Search (also used by the UI through its Vite proxy):
 
 ```sh
-curl 'http://localhost:3003/api/locations?query=COM%201&limit=20'
+curl 'http://localhost:3003/orders/locations?query=COM%201&limit=20'
 ```
 
-`GET /api/locations` searches names and aliases using case-insensitive substring
+`GET /orders/locations` searches names and aliases using case-insensitive substring
 matching. Results have `{ "locations": [{ "id": "kr_001", "name": "COM1", "code": "COM1" }] }`.
 No login is required to search this non-personal building catalogue. Results are
 sorted by name, then ID. `limit` defaults to 20 and must be an integer from 1
@@ -667,8 +667,32 @@ in UserDeletionEvent before ACK; event IDs prevent duplicate receipt across
 restarts. Invalid/conflicting messages are dead-lettered; storage failures use
 the shared retry/DLQ behavior. The new migration runs during Docker startup.
 
-This is subscription/receipt only, not completion of account deletion handling.
-No orders are cancelled, scrubbed or reassigned by this handler. The User
+Deletion processing now scrubs safely completed/cancelled history and records
+active or unresolved work for manual review. No orders are cancelled or reassigned
+because of deletion. The internal CheckDeletionEligibility RPC is implemented. The User
 publisher must send deletion events to Order's queue; publishing only to Credit
 will not reach Order. Exact payload, startup, inspection, test instructions and
 remaining lifecycle work: [messaging/README.md](messaging/README.md).
+
+
+## Deletion consistency handling update
+
+AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02. Implemented the team's
+confirmed manual-review policy and safe-history scrubbing; review pending;
+see usage-log.md.
+
+User deletion does not trigger speculative cancellation, refunds or account
+restoration. Active/unresolved work is preserved and recorded as
+MANUAL_REVIEW_REQUIRED with blocker UUIDs. Confirmed historical orders retain
+rows/IDs and financial outcomes while the deleted participant's name, destination,
+request details and JSON copies are scrubbed. The destination catalogue reference
+is cleared. Processing and its recorded outcome commit atomically; duplicate
+events are safe. Older receipt-only events are processed on subscriber startup.
+
+The internal CheckDeletionEligibility RPC checks both participant relationships,
+active statuses and unresolved credit/edit/creation work. User Service must call
+it before deletion and fail closed on errors. This is not an atomic deletion
+fence: preventing new order activity during deletion and recovering unexpected
+active orders still require agreement with User Service. No notification or
+restoration contract was invented. Contract, state definitions, race explanation
+and operational queries: [messaging/README.md](messaging/README.md).

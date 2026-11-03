@@ -4,5 +4,5 @@ import { api } from './client'
 
 export type DestinationLocation = { id: string; name: string; code: string }
 export const searchLocations = (query: string, signal: AbortSignal) =>
-  api<{ locations: DestinationLocation[] }>(`/api/locations?query=${encodeURIComponent(query)}&limit=20`, { signal })
+  api<{ locations: DestinationLocation[] }>(`/orders/locations?query=${encodeURIComponent(query)}&limit=20`, { signal })
     .then(body => body.locations)
