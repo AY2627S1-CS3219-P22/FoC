@@ -693,11 +693,14 @@ test('concurrent pickups yield one transition and use saved Supplier snapshot',a
 
 // Destination catalogue: migrated real CSV, HTTP query contract and workflow validation.
 test('location search imports the CSV and searches names/aliases with bounded literal input',async t=>{
- const app=createApp(),server=app.listen(0,'127.0.0.1');await once(server,'listening');
+ const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+ const token=jwt.sign({roles:['USER']},privateKey,{algorithm:'RS256',subject:prefix+'-location-reader',expiresIn:60});
+ const app=createApp(publicKey.export({type:'spki',format:'pem'})),server=app.listen(0,'127.0.0.1');await once(server,'listening');
  t.after(()=>new Promise(resolve=>server.close(resolve)));
  const base=`http://127.0.0.1:${server.address().port}/orders/locations`;
+ assert.equal((await fetch(base+'?query=COM1')).status,401);
  assert.equal(await db.destinationLocation.count(),206);
- const get=async query=>{const r=await fetch(base+query);return {status:r.status,body:await r.json()}};
+ const get=async query=>{const r=await fetch(base+query,{headers:{Authorization: 'Bearer '+token}});return {status:r.status,body:await r.json()}};
  const names=await get('?query=com1');assert.equal(names.status,200);assert.ok(names.body.locations.some(l=>l.id==='kr_001'&&l.name==='COM1'&&l.code==='COM1'));
  const aliases=await get('?query=COM%201');assert.ok(aliases.body.locations.some(l=>l.id==='kr_001'));
  for(const query of ['', '?query=', '?query=%20', '?query=x&limit=0', '?query=x&limit=51', '?query=x&limit=1.2', '?query=x&limit=abc', '?query=x&limit=', '?query=x&limit=2&limit=3', '?query=x&other=1'])assert.equal((await get(query)).status,400,query);

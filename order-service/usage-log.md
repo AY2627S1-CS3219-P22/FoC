@@ -1379,3 +1379,10 @@ Verification: Temporary isolated HTTP test exercised actual router/controller/se
 Tool: ChatGPT (Codex). Mode: refactor.
 Exact prompt: “I changed it to orders/locations instead and i mounted it to the existing router. I ONLY WANT ONE ROUTER. Can you make sure the UI changes its route accordingly? Preserve the proxy”
 Implementation: UI search now calls /orders/locations through /backend/orders/locations. Preserved Vite proxy target/rewrite and nginx Order proxy, aligned both prefixes to /backend/orders. Backend router files unchanged. Checked client-to-proxy URL matching and git diff whitespace; no full build rerun. Human review pending.
+
+
+### 2026-11-03 — Validate existing worktree before commit
+Tool: ChatGPT (Codex). Mode: debug/test/document.
+Exact prompt: “Check and make sure code works and let me know how to term my latest commit.”
+Updated location integration test to use an authenticated USER JWT after the human moved the endpoint into the existing authenticated Order router; added unauthenticated 401 assertion.
+Verification in /Users/euniceng/Desktop/FoC: shared gRPC/messaging and Order builds passed; Order unit tests passed; shared gRPC 51 tests passed. UI build and TypeScript check passed with installed Node 22.22.0 (default Node 20.10.0 is too old for this Vite version). Fresh disposable PostgreSQL migration and integration run: 80 passed, 0 failed, 1 RabbitMQ-dependent test skipped because no test broker configured. No live database touched. Test container removed. No commit or staging performed; test/log edits remain unstaged over the user's existing staged changes.
