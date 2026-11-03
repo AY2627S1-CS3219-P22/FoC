@@ -1,3 +1,14 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), dates: 2026-09-27 – 2026-10-19
+// Scope: AI generated the register logic (duplicate check, P2002 handling,
+// bcryptjs hashing), the login credential check, profile lookups, the
+// profile/public profile selects, the profile update, and the shared
+// buildNewUser/duplicateField helpers.
+// Author review: Author specified the requirements, how to handle concurrent
+// duplicates, the select fields and the update rules, reviewed the code and
+// approved. See user-service/ai/usage-log.md, entries 004, 008, 009, 013, 015,
+// 019.
+
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db';

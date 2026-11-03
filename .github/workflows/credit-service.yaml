@@ -31,7 +31,6 @@ on:
         - 'user-service/proto/**'
         - 'eslint.config.mjs'
 
-
 env:
   REGISTRY: ghcr.io
   # Nested under the repo name so GITHUB_TOKEN can publish (GHCR lowercases this).

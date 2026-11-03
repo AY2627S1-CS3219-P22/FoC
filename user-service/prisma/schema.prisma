@@ -1,3 +1,12 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), dates: 2026-09-25 – 2026-10-19
+// Scope: AI generated the author-specified User model and Roles enum, then
+// the RefreshToken model and User relation, the previousTokenHash column for
+// in-place rotation, and the SystemBootstrap and AdminRoleChange models.
+// Author review: Author specified the models, fields and the previous-hash
+// approach, reviewed and approved. See user-service/ai/usage-log.md, entries
+// 001, 010, 017, 018.
+
 // Prisma schema for the User Service.
 // Schema changes go through `prisma migrate dev`, never `db push`.
 
