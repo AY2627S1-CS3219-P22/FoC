@@ -1,42 +1,9 @@
 <!--
 AI Assistance Disclosure:
-Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-30 (Asia/Singapore).
+Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-11-04 (Asia/Singapore).
 Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
-Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–048 below and the linked prompt archives.
-Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Recorded the latest implementation request, changes and actual verification.
-New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
-Entry 032: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded the human-requested move to local Git exclusions; review pending.
-Entry 033: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded source-based README verification and documentation corrections; review pending.
-Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded whole-folder local exclusions and the approved migration-runner relocation; review pending.
-Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
-Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
-Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded event-startup integration request, pending lifecycle/package decisions and independent configuration work; review pending.
-Entry 037: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded authorized upstream messaging import, broker authorship and actual integration checks; human review pending.
-Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded the confirmed startup-only listener field and database-based health response; review pending.
-Entry 039: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Implemented/documented the human-defined history constraints and scoped SQL/seeded concurrency checks.
-Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 039 (repository-relative).
-Entry 040: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded human-requested account/reservation timestamp removal and actual checks.
-Changes await human review; prompts/key responses: entry 040 below and its archive.
-Entry 041: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Applied the requested local migration and recorded rebuild/restart/runtime checks.
-Changes await human review; prompts/key responses: entry 041 below and its archive.
-Entry 042: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded the human-requested direct service-token comparison and targeted checks.
-Changes await human review; prompts/key responses: entry 042 below and its archive.
-Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded the human-defined entry-ID history token and paging implementation/checks.
-Changes await human review; prompts/key responses: entry 043 below and its archive.
+Author review: 
+Prompts and key responses: Entries 001–049 below and the linked prompt archives.
 -->
 
 # AI usage log
@@ -1810,6 +1777,74 @@ submission files; retained disclosure content is under this ai directory.
   container was changed. Existing instructions and local code only; no external
   source, skill, sub-agent, commit or push. New work awaits human review; original
   runner's human-review/Claude attribution is retained for its earlier scope.
+
+## 049 — Implement user deletion and balance restoration
+
+- **Timestamp:** 2026-11-04, Asia/Singapore (SGT, UTC+08:00); work began before
+  13:54, progress recorded at 14:00.
+- **Tool/model/modes:** OpenAI Codex, GPT-6; implementation, debugging, regression
+  tests and documentation of human-finalized requirements and architecture.
+- **Exact prompts/key responses:** [Full request and follow-up replies](prompts/049-user-lifecycle.md).
+  The human specified schema, interfaces, status rules, transaction/lock ordering,
+  replay behavior, privacy requirements and error cases. No additional AI-use
+  rules were added. Followed credit-service/AGENTS.md; root AGENTS.md was empty.
+  No skill, sub-agent or external source was used.
+- **Clarifications:** The human declined temporary local event-schema adaptation
+  and requested waiting for the User service update. Shared user.ts remains
+  untouched; consumer lifecycle wiring is pending that update. The human clarified
+  ACTIVE without opening-allocation history is non-retryable. The human described
+  delayed creation as adding 10 to the placeholder's zero balance; explained the
+  allowed courier-settlement overlap and implemented an additive grant that
+  preserves any received credits while leaving the placeholder DELETED.
+  At 14:03 SGT the human explicitly confirmed granting by adding +10 to the
+  existing total, including TRANSFER_IN funds, with no 0/0 requirement. Source
+  inspection confirmed that the implementation already matches: it adds 10,
+  preserves reserved credits and status, and has no zero-balance precondition.
+  Recorded the exact follow-up in archive 049 and clarified the README. No
+  implementation or test changed for this confirmation. Existing coverage checks
+  a placeholder receiving 3 credits, initialization to 13 and duplicate replay.
+  No tests were rerun for the documentation-only confirmation; git diff --check
+  passed. This confirmation does not establish human review of all implementation.
+- **Implementation:** Migration 011 adds ACTIVE/DELETED/CLOSED with CLOSED 0/0,
+  BALANCE_RESTORED delta/link checks, and exclusive INITIAL_GRANT/BALANCE_RESTORED
+  allocation uniqueness. Repository reads status, creates DELETED placeholders,
+  updates only ACTIVE on deletion, and closes eligible accounts atomically;
+  saveAccount retains status. Service status gates follow the request; saved
+  reserve/update results still replay first. markDeleted uses account advisory
+  and row locks and preserves existing balances/history/reservations.
+  restoreCredits validates both IDs, locks both resources/rows in sorted order,
+  follows the supplied retry/repeat decisions, moves the balance once and writes
+  only a destination history row with no source ID or restore idempotency record.
+  initCredits grants once to a DELETED placeholder and preserves its status.
+  Removed unused Credit archive/restore confirmation contracts and RESTORED reason.
+  Courier-not-found messages now omit the ID, following the latest error rule;
+  the historical test expecting an ID was updated.
+- **Affected paths:** src/domains/types.ts; src/repos/CreditRepository.ts and
+  SqlCreditRepository.ts; src/services/CreditService.ts;
+  migrations/011_account_lifecycle.sql; shared/messaging/src/contracts/credit.ts;
+  test/user-lifecycle.test.cjs, core-credit.test.cjs, history.test.cjs and
+  timestamp-removal.test.cjs; README.md; this log and prompt archive 049.
+- **Actual checks:** Shared Messaging and Credit TypeScript builds passed.
+  Credit source/tests and the changed shared contract passed ESLint. Targeted
+  lifecycle/history/upgrade tests passed 25 results after correcting a new fixture
+  that omitted required total_credits. The first full suite passed 122/124 results;
+  the failure and parent failure were the historical courier-ID expectation.
+  After updating that assertion and adding REST coverage, all 125 results passed
+  with zero failures/skips. After the additive-grant and inconsistent-ACTIVE
+  changes, both builds, ESLint and whitespace checks passed again; the full
+  Credit suite passed all 126 results with zero failures/skips. No live RabbitMQ
+  lifecycle test has run.
+- **Test environment:** The documented local PostgreSQL endpoint was offline;
+  Docker was also unavailable. With sandbox escalation, initialized and started
+  a temporary PostgreSQL 14 cluster under /private/tmp/foc-credit-lifecycle-pg
+  on local port 55439. Tests use isolated schemas, clean them afterward, and leave
+  application databases untouched. PostgreSQL 17 is the documented production
+  version; these local checks use the installed PostgreSQL 14 binaries.
+- **Review/status:** Implementation and disclosures await human review. Consumer
+  integration remains pending the external schema update. No dependency, commit,
+  push, application migration or deployment was performed. All isolated test
+  schemas were cleaned by the tests, and the temporary PostgreSQL server was
+  stopped after final verification. Its data/log files remain under /private/tmp.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the

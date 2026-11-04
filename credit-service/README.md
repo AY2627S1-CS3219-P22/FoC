@@ -1,8 +1,8 @@
 <!--
-AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-10-30 (Asia/Singapore).
+AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-11-04 (Asia/Singapore).
 Mode/scope: Documented and checked the human-defined Credit implementation.
-Review: Prior content human-reviewed; entries 047–048 changes await human review.
-Exact prompts, key responses and checks: ai/usage-log.md, entries 003–048.
+Review: I edited for style and conciseness.
+Exact prompts, key responses and checks: ai/usage-log.md, entries 003–049.
 -->
 
 # Credit service
@@ -21,8 +21,10 @@ uses JWT-authenticated REST for each user's own balance and history.
 | User events | RabbitMQ queue `credit.user-events` | `user.created` consumer |
 
 The current implementation has entry-ID page tokens, direct service-token
-comparison, and no account/reservation timestamp columns. Archival, restoration
-and deletion are deferred. The human's definitions and AI records are retained in
+comparison, and no account/reservation timestamp columns. Deletion/restoration
+service methods and migration 011 are implemented. Lifecycle consumer integration
+awaits the User service's shared event schema update, as requested by the human.
+The human's definitions and AI records are retained in
 [the usage log](ai/usage-log.md).
 
 ## Source layout
@@ -57,8 +59,12 @@ Local `scripts/` and `docs/` are not required by a fresh clone.
   callback. New accounts receive 10 total/0 reserved credits exactly once per
   userId, with an `INITIAL_GRANT` history row and saved result in one transaction.
   Matching saved successes replay; confirmed prior grants without saved results
-  succeed without writes. An existing account lacking grant evidence fails with
-  `ALREADY_EXISTS` and no changes.
+  succeed without writes. A DELETED placeholder without `INITIAL_GRANT` or
+  `BALANCE_RESTORED` receives its 10-credit grant and remains DELETED. The grant
+  adds 10 to the existing total, including any `TRANSFER_IN` credits received
+  through settlement. It preserves reserved credits and does not require 0/0.
+  Other existing
+  accounts lacking grant evidence fail with `ALREADY_EXISTS` and no changes.
 - `getBalance` returns userId, total, reserved, and computed available credits. A missing
   account fails; reads never initialize an account.
 - `reserveCredits` creates a lifetime-unique reservation per order, holds credits,
@@ -82,12 +88,39 @@ Local `scripts/` and `docs/` are not required by a fresh clone.
   FAILED_PRECONDITION/REQUEST_CONFLICT. RELEASED reservations fail with INVALID_STATE.
 - `getReservation` reads the full current reservation, including its IDs, amount,
   status, courier and version. Missing reservations fail with `NOT_FOUND`.
+- `markDeleted({ userId })` changes ACTIVE to DELETED without changing balances,
+  reservations or history. Missing accounts become DELETED 0/0 placeholders;
+  DELETED and CLOSED accounts remain unchanged.
+- `restoreCredits({ previousUserId, userId })` locks both account resources and
+  rows in sorted order in one READ COMMITTED transaction. It creates an ACTIVE
+  destination with the source balance, closes and zeroes the source in one SQL
+  update, and writes one `BALANCE_RESTORED` history row on the destination, even
+  for zero credits. It grants no starter credits and writes no source history
+  or restore idempotency record. Destination records contain no source ID.
+
+Balance/history reads, new reserves and reservation updates require ACTIVE
+accounts; otherwise they return `ACCOUNT_NOT_FOUND`. Release and settlement
+allow ACTIVE or DELETED accounts, including the courier in settlement.
+GetReservation accepts every account status. Saved reserve/update successes
+replay before status checks, including after deletion.
+
+Restoration acknowledges an existing destination when the source is CLOSED.
+An existing destination with a missing or non-CLOSED source, a CLOSED source
+with no destination, equal IDs, or an ACTIVE source lacking allocation history
+raises `RestoreError`. Missing sources, DELETED placeholders awaiting their
+grant, and sources with reserved credits remain retryable and move no credits.
+The source must have `INITIAL_GRANT` or `BALANCE_RESTORED` history before transfer.
+Migration [011](migrations/011_account_lifecycle.sql) adds the status and CLOSED
+0/0 checks, restored history constraints, and one opening allocation per user
+across `INITIAL_GRANT` and `BALANCE_RESTORED`.
 
 Mutations own one READ COMMITTED transaction. Lock order is retry key, order
 resource (account resource for initialization), then account rows in ascending
 user-ID order. Accounts remain locked through history insertion and commit.
 The repository never commits or rolls back. Any failure rolls back account,
 reservation, history, and retry-result changes together.
+Deletion takes the account resource lock before its row lock; restoration takes
+both account resource locks in sorted order before locking both rows.
 
 Saved successful retries replay before current-state checks. Mutation replies
 are snapshots of the state immediately after that operation. An identical reserve
@@ -501,14 +534,4 @@ review, validation, team norms, licensing checks, and submission disclosure.
 
 Credit implementation, tests and documentation assistance are recorded in
 [ai/usage-log.md](ai/usage-log.md), including tools/models, exact prompts, affected
-files, actual checks and human review status. Entry 047 used OpenAI Codex (GPT-6)
-to implement/test the human-defined startup retry loop, reusable client,
-cancellable shutdown and live status getter. The shared messaging implementation
-and existing recovery logic remain credited to their authors; the added getter
-is attributed separately. Messaging/Credit builds, 108 Credit checks, Credit lint
-and 10 live-listener test results passed in entry 047. Entry 048 used OpenAI Codex
-(GPT-6) to wire `db:migrate` to the existing human-designed tracked runner, add its
-inclusive `--to` option, remove the old runner, and update tests/documentation.
-All 110 Credit tests and Credit lint passed for that change; no application
-database migration or deployment was performed.
-New changes await human review; prior review markers apply to earlier content.
+files, actual checks and human review status. 
