@@ -1,0 +1,33 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: foc
+  region: ap-southeast-1
+  version: "1.34"
+
+iam:
+  withOIDC: true  # pods get AWS roles via OIDC (NUS SCP blocks Pod Identity)
+
+vpc:
+  nat:
+    gateway: Disable # for cost-saving
+
+managedNodeGroups:
+  - name: workers
+    instanceType: t3.medium # 2 vCPU, 4 GiB
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 2 # fixed node count, no node scaling
+    volumeSize: 20 # 20 GiB root disk per worker node
+
+addons:
+  - name: vpc-cni
+  - name: coredns
+  - name: kube-proxy
+  - name: metrics-server
+  - name: aws-ebs-csi-driver
+    wellKnownPolicies:
+      ebsCSIController: true
+    configurationValues: '{"defaultStorageClass":{"enabled":true}}'
+
+
