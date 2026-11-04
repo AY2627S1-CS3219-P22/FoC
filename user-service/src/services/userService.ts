@@ -1,12 +1,29 @@
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
+import { redis } from '../redis';
 import type { RegisterInput } from '../api/dto/registerDto';
 import type { LoginInput } from '../api/dto/loginDto';
+import type { RegisterVerifyInput } from '../api/dto/otpDto';
 import type { UpdateProfileInput } from '../api/dto/updateProfileDto';
 import { enqueueUserCreated } from '../events/outboxStore';
+import { otpKeyPrefix, sendOTPRequest, verifyOTP } from './otpService';
 
 const SALT_ROUNDS = 10;
+const REGISTER_CHALLENGE = 'register'; //hardcoded, resend keeps three fail lock
+const PENDING_TTL_SECONDS = 120;
+
+type PendingRegistration = {
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  passwordHash: string;
+};
+
+function pendingKey(email: string) {
+  return `${otpKeyPrefix(REGISTER_CHALLENGE, email)}:pending`;
+}
 
 // Profile: everything except secrets — for the user themselves or an admin.
 export const profileSelect = {
@@ -27,7 +44,7 @@ const publicProfileSelect = {
   lastName: true,
 } satisfies Prisma.UserSelect;
 
-// Shared by register and the admin bootstrap so every
+// Shared by initiateRegister and the admin bootstrap so every
 // account is built the same way.
 export async function buildNewUser(input: RegisterInput) {
   return {
@@ -50,22 +67,71 @@ export function duplicateField(err: unknown): 'email' | 'username' | null {
   return null;
 }
 
-export async function register(input: RegisterInput) {
-  // Check duplicate email or username
+//a check before starting registration process instead of just parsing prisma output
+async function findDuplicate(email: string, username: string) {
   const existing = await prisma.user.findFirst({
-    where: { OR: [{ email: input.email }, { username: input.username }] },
+    where: { OR: [{ email }, { username }] },
     select: { email: true, username: true },
   });
-  if (existing) {
-    const field = existing.email === input.email ? 'email' : 'username';
-    return { ok: false as const, field };
-  }
+  if (!existing) return null;
+  return existing.email === email ? ('email' as const) : ('username' as const);
+}
+
+// HTTP register start: stash the form in Redis and email an OTP. No User row yet.
+export async function initiateRegister(input: RegisterInput) {
+  const field = await findDuplicate(input.email, input.username); //extra check to make sure user doesn't exist
+  if (field) return { ok: false as const, field };
+
+  const pending = await buildNewUser(input); //standardize
+  const key = pendingKey(input.email); //lock into redis so we dont create the user just yet
+  await redis.set(key, JSON.stringify(pending), { EX: PENDING_TTL_SECONDS });
 
   try {
-    //DECLARATION CHANGED
-    const user = await prisma.$transaction(async (tx) => {
+    const otpResult = await sendOTPRequest({
+      email: input.email,
+      challengeId: REGISTER_CHALLENGE,
+    });
+    if (!otpResult.ok) {
+      await redis.del(key);
+      return otpResult;
+    }
+  } catch (err) {
+    await redis.del(key).catch(() => undefined);
+    throw err;
+  }
+
+  return { ok: true as const };
+}
+
+// HTTP register verify: consume the OTP, load pending info, then create the account.
+//skips buildNewUser logic because password hashing happens in initiateRegister
+export async function completeRegister(input: RegisterVerifyInput) {
+  const otpResult = await verifyOTP({
+    email: input.email,
+    challengeId: REGISTER_CHALLENGE,
+    otp: input.otp,
+    pendingKey: pendingKey(input.email),
+  });
+  if (!otpResult.ok) return otpResult;
+  if (!otpResult.pending) return { ok: false as const, reason: 'missing' as const };
+
+  const pending = JSON.parse(otpResult.pending) as PendingRegistration;
+
+  const field = await findDuplicate(pending.email, pending.username);
+  if (field) return { ok: false as const, field };
+
+  // TODO(F2.7): refuse or restore a soft-deleted account with this email.
+
+  try {
+    const user = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const created = await tx.user.create({
-        data: await buildNewUser(input),
+        data: {
+          firstName: pending.firstName,
+          lastName: pending.lastName,
+          username: pending.username,
+          email: pending.email,
+          passwordHash: pending.passwordHash,
+        },
         select: profileSelect,
       });
       await enqueueUserCreated(tx, created.id);
@@ -73,10 +139,8 @@ export async function register(input: RegisterInput) {
     });
     return { ok: true as const, user };
   } catch (err) {
-    // Safety net for the check-then-insert race: the DB's @unique constraint
-    // rejects a duplicate that slipped past the pre-check (Prisma code P2002).
-    const field = duplicateField(err);
-    if (field) return { ok: false as const, field };
+    const taken = duplicateField(err);
+    if (taken) return { ok: false as const, field: taken };
     throw err;
   }
 }
