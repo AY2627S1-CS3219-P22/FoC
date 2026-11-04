@@ -25,8 +25,13 @@ import type { UpdateProfileInput } from '../dto/updateProfileDto';
 import * as userService from '../../services/userService';
 import * as sessionService from '../../services/sessionService';
 import * as adminService from '../../services/adminService';
-import * as otpService from '../../services/otpService';
-import type { OtpRequestBody, OtpVerifyBody } from '../dto/otpDto';
+import * as passwordService from '../../services/passwordService';
+import type {
+  CompleteForgotPasswordInput,
+  CompleteResetPasswordInput,
+  ForgotPasswordInput,
+  RegisterVerifyInput,
+} from '../dto/otpDto';
 
 const REFRESH_COOKIE = 'refreshToken';
 
@@ -57,26 +62,54 @@ function clearRefreshCookie(res: Response) {
 }
 
 
-// POST /users/register
-export const register: RequestHandler = async (req, res) => {
-  const result = await userService.register(req.body as RegisterInput);
+function sendRegisterConflict(res: Response, field: 'email' | 'username') {
+  res.status(409).json({
+    error: 'Conflict',
+    message: `An account with this ${field} already exists.`,
+  });
+}
 
-  if (!result.ok) {
-    if (result.reason === 'restore_confirmation_required') {
-      res.status(409).json({
-        error: 'Restore Confirmation Required',
-        message: 'A deleted account exists for this email. Confirm to restore only the previous credit balance; other account data will not be restored.',
-      });
+// POST /users/register — stash pending signup and email an OTP. No User row yet.
+export const register: RequestHandler = async (req, res) => {
+  try {
+    const result = await userService.initiateRegister(req.body as RegisterInput);
+    if (!result.ok) {
+      if ('reason' in result && result.reason === 'restore_confirmation_required') {
+        res.status(409).json({
+          error: 'Restore Confirmation Required',
+          message: 'A deleted account exists for this email. Confirm to restore only the previous credit balance; other account data will not be restored.',
+        });
+        return;
+      }
+      if ('field' in result) {
+        sendRegisterConflict(res, result.field);
+        return;
+      }
+      sendOtpFailure(res, result);
       return;
     }
-    res.status(409).json({
-      error: 'Conflict',
-      message: `An account with this ${result.field} already exists.`,
-    });
-    return;
+    res.status(200).json({ message: 'OTP sent' });
+  } catch {
+    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to send OTP.' });
   }
+};
 
-  res.status(201).json({ user: result.user });
+// POST /users/register/verify — consume OTP and create the account from pending info.
+export const verifyRegister: RequestHandler = async (req, res) => {
+  try {
+    const result = await userService.completeRegister(req.body as RegisterVerifyInput);
+    if (!result.ok) {
+      if ('field' in result) {
+        sendRegisterConflict(res, result.field);
+        return;
+      }
+      sendOtpFailure(res, result);
+      return;
+    }
+    res.status(201).json({ user: result.user });
+  } catch {
+    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to verify registration.' });
+  }
 };
 
 // POST /users/login
@@ -226,39 +259,67 @@ export const revokeAdmin: RequestHandler = async (req, res) => {
   res.status(200).json({ user: result.user });
 };
 
-function requireOwnAccount(req: Request, res: Response): string | undefined {
-  const id = String(req.params.id);
-  if (req.user!.id !== id) {
-    res.status(403).json({ error: 'Forbidden', message: 'You can only use OTP endpoints for your own account.' });
+function sendOtpFailure(
+  res: Response,
+  result: { reason: string; retryAfterSeconds?: number },
+) {
+  if (result.retryAfterSeconds) {
+    res.setHeader('Retry-After', String(result.retryAfterSeconds));
+  }
+  if (result.reason === 'throttled' || result.reason === 'locked') {
+    res.status(429).json({ error: 'Too Many Requests', message: 'Try again after some time.' });
     return;
   }
-  return id;
+  if (result.reason === 'not_found') {
+    res.status(404).json({ error: 'Not Found', message: 'User not found.' });
+    return;
+  }
+  if (result.reason === 'challenge') {
+    res.status(400).json({ error: 'Bad Request', message: 'This OTP is no longer valid.' });
+    return;
+  }
+  if (result.reason === 'missing') {
+    res.status(400).json({ error: 'Bad Request', message: 'OTP expired or not found.' });
+    return;
+  }
+  res.status(400).json({ error: 'Bad Request', message: 'Invalid OTP.' });
 }
 
-// POST /users/:id/otp/request
-export const sendOTPRequest: RequestHandler = async (req, res) => {
-  const id = requireOwnAccount(req, res);
-  if (!id) return;
-  const { challengeId } = req.body as OtpRequestBody;
-
+// POST /users/forgot-password/request
+//user inputs an email to trigger an otp request
+export const requestForgotPassword: RequestHandler = async (req, res) => {
   try {
-    const user = await userService.getProfile(id);
-    if (!user) {
-      res.status(404).json({ error: 'Not Found', message: 'User not found.' });
+    const result = await passwordService.requestForgotPassword(req.body as ForgotPasswordInput);
+    if (!result.ok) {
+      sendOtpFailure(res, result);
       return;
     }
+    res.status(200).json({ message: 'If an account exists for this email, an OTP has been sent.' });
+  } catch {
+    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to send OTP.' });
+  }
+};
 
-    const result = await otpService.sendOTPRequest({
-      userId: user.id,
-      email: user.email,
-      challengeId,
-    });
-
+// POST /users/forgot-password
+export const completeForgotPassword: RequestHandler = async (req, res) => {
+  try {
+    const result = await passwordService.completeForgotPassword(req.body as CompleteForgotPasswordInput);
     if (!result.ok) {
-      if (result.retryAfterSeconds) {
-        res.setHeader('Retry-After', String(result.retryAfterSeconds));
-      }
-      res.status(429).json({ error: 'Too Many Requests', message: 'Try again after some time.' });
+      sendOtpFailure(res, result);
+      return;
+    }
+    res.status(200).json({ message: 'Password updated.' });
+  } catch {
+    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to reset password.' });
+  }
+};
+
+// POST /users/reset-password/request
+export const requestResetPassword: RequestHandler = async (req, res) => {
+  try {
+    const result = await passwordService.requestResetPassword(req.user!.id);
+    if (!result.ok) {
+      sendOtpFailure(res, result);
       return;
     }
     res.status(200).json({ message: 'OTP sent' });
@@ -267,44 +328,28 @@ export const sendOTPRequest: RequestHandler = async (req, res) => {
   }
 };
 
-// POST /users/:id/otp/verify
-export const verifyOTP: RequestHandler = async (req, res) => {
-  const id = requireOwnAccount(req, res);
-  if (!id) return;
-  const { otp, challengeId } = req.body as OtpVerifyBody;
+// POST /users/reset-password/verify
+export const completeResetPassword: RequestHandler = async (req, res) => {
+  const user = await userService.getProfile(req.user!.id);
+  if (!user) {
+    res.status(404).json({ error: 'Not Found', message: 'User not found.' });
+    return;
+  }
 
+  const { otp, newPassword } = req.body as CompleteResetPasswordInput;
   try {
-    const user = await userService.getProfile(id);
-    if (!user) {
-      res.status(404).json({ error: 'Not Found', message: 'User not found.' });
-      return;
-    }
-
-    const result = await otpService.verifyOTP({
-      userId: user.id,
-      challengeId,
+    const result = await passwordService.completeForgotPassword({
+      email: user.email,
       otp,
+      password: newPassword,
     });
-
     if (!result.ok) {
-      if (result.reason === 'locked') {
-        res.status(429).json({ error: 'Too Many Requests', message: 'Try again after some time.' });
-        return;
-      }
-      if (result.reason === 'challenge') {
-        res.status(400).json({ error: 'Bad Request', message: 'This OTP is no longer valid.' });
-        return;
-      }
-      if (result.reason === 'missing') {
-        res.status(400).json({ error: 'Bad Request', message: 'OTP expired or not found.' });
-        return;
-      }
-      res.status(400).json({ error: 'Bad Request', message: 'Invalid OTP.' });
+      sendOtpFailure(res, result);
       return;
     }
-
-    res.status(200).json({ message: 'OTP valid for login' });
+    clearRefreshCookie(res);
+    res.status(200).json({ message: 'Password updated.' });
   } catch {
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to verify OTP.' });
+    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to reset password.' });
   }
 };
