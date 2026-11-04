@@ -1,3 +1,10 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), date: 2026-09-28
+// Scope: AI asked which error codes to use, then generated the role check
+// middleware.
+// Author review: Author specified the behaviour, confirmed the error codes,
+// reviewed the code and approved. See user-service/ai/usage-log.md, entry 007.
+
 import type { RequestHandler } from 'express';
 import type { Roles } from '@prisma/client';
 

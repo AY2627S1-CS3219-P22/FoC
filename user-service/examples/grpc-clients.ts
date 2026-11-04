@@ -1,3 +1,10 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), date: 2026-10-16
+// Scope: AI updated the default ports to the author's port map. The file was
+// created by a teammate.
+// Author review: Author decided the port map, reviewed and approved. See
+// user-service/ai/usage-log.md, entry 016.
+
 import { createPeerClients } from '@foc/grpc';
 
 // Opt-in example only: this is not imported by the existing User Service.

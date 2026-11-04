@@ -1,3 +1,10 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), dates: 2026-09-25, 2026-10-14
+// Scope: AI generated the gRPC server scaffold, then the GetPublicProfile
+// handler and its error mapping.
+// Author review: Author specified the endpoint and error behaviour, reviewed
+// the code and approved. See user-service/ai/usage-log.md, entries 001, 013.
+
 import path from 'node:path';
 import {
   Server,

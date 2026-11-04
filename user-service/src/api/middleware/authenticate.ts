@@ -1,3 +1,10 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), date: 2026-09-28
+// Scope: AI generated the JWT authentication middleware and confirmed 401 for
+// failures.
+// Author review: Author specified the requirements and behaviour, reviewed the
+// code line by line and approved. See user-service/ai/usage-log.md, entry 006.
+
 import type { RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 import type { Roles } from '@prisma/client';

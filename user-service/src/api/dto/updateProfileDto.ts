@@ -1,3 +1,11 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), date: 2026-10-14
+// Scope: AI generated the profile update schema and suggested reusing the
+// register rules.
+// Author review: Author specified the requirements, approved the reuse,
+// reviewed the code line by line and approved. See
+// user-service/ai/usage-log.md, entry 014.
+
 import { z } from 'zod';
 import { registerSchema } from './registerDto';
 

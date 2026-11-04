@@ -7,6 +7,9 @@ Exact prompts, key responses and checks: credit-service/ai/usage-log.md, entries
 <!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-21–2026-10-22.
 Scope: Maintained the final AI Use Summary section. Team review pending.
 See order-service/usage-log.md. -->
+<!-- AI Assistance Disclosure: Claude Code (Claude Opus), 2026-11-01.
+Scope: Drafted the User service part of the AI Use Summary; author reviewed and
+approved. See user-service/ai/usage-log.md. -->
 
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
 
@@ -216,3 +219,29 @@ PR documentation refresh, ChatGPT (Codex), 2026-10-25: documented the existing
 shared Supplier validators' runtime Zod import and corrected the dependency
 summary in Order PR_DESCRIPTION.md. Prompt/checks: Order usage log. Human review
 pending; documentation-only update.
+
+### User service
+
+- **Tool and modes:** Claude Code (Anthropic, Claude Opus). Code generation
+  from author-specified requirements, boilerplate and scaffolding, code
+  review, debugging, documentation and code explanations.
+- **Scope:** Express + Prisma + gRPC scaffold; registration, login with RS256
+  JWTs and RBAC; refresh-token sessions with rotation and logout; profile
+  update; the internal `GetPublicProfile` gRPC endpoint; admin bootstrap CLI,
+  grant/revoke endpoints with last-admin protection and audit records;
+  cross-service port standardisation; setup and API documentation.
+- **Human decisions:** The author chose the stack and specified the schemas,
+  endpoints, access rules, error behaviour, session design and admin
+  bootstrap approach. Some design points (for example SHA-256 token hashing,
+  cookie flags and the caller re-check) were raised by AI and accepted by the
+  author; these are marked in the log.
+- **Review comments:** Two rounds of Codex automated review on GitHub (PR #56,
+  PR #64) are quoted in the log, with the fixes made using Claude.
+- **Prompts and key responses:** [user-service/ai/usage-log.md](user-service/ai/usage-log.md).
+  AI-influenced files carry header comments; JSON files and migrations are
+  listed in the [service README](user-service/README.md#ai-attribution-for-files-without-comments).
+- **Sources:** Course material on bootstrapping the first admin
+  (https://sds-edu.github.io/resource-bootstrap-first-admin/); official
+  Docker images.
+- **Verification:** The author reviewed all AI-assisted code and tested the
+  endpoints manually.

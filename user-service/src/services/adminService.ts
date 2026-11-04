@@ -1,3 +1,11 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), dates: 2026-10-19
+// Scope: AI generated bootstrapAdmin (advisory lock, single transaction, audit
+// record), grantAdmin, revokeAdmin and ensureNotLastAdmin.
+// Author review: Author specified the bootstrap steps, both endpoints, the
+// transaction, the lock and last-admin protection, reviewed the code and
+// approved. See user-service/ai/usage-log.md, entries 019, 020.
+
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import type { RegisterInput } from '../api/dto/registerDto';
