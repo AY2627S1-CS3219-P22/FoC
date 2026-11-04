@@ -198,7 +198,7 @@ export function createOrderClient(target: string, config: ClientConfig = {}) {
 export function createCreditClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 1300);
   const retries = creditRetryOptions(creditRetryDefaults, config);
-  const client = new CreditService(target, config.credentials ?? credentials.createInsecure());
+  const client = new CreditService(target, config.credentials ?? credentials.createInsecure(), { 'grpc.service_config': JSON.stringify({ loadBalancingConfig: [{ round_robin: {} }] }) },);
   return {
     getBalance(request: GetBalanceRequest, options: RpcOptions = {}): Promise<Balance> {
       return creditUnary(timeoutMs, retries, options, (attemptOptions, callback) =>
