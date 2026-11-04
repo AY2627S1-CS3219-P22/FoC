@@ -1,3 +1,5 @@
+// AI declaration: Route map and OTP/password flow design are the author's.
+// AI only implemented the wiring (handlers, schemas, middleware).
 import { Router } from 'express';
 import { validate } from '../middleware/validate';
 import { authenticate } from '../middleware/authenticate';
@@ -5,13 +7,21 @@ import { requireRole } from '../middleware/requireRole';
 import { registerSchema } from '../dto/registerDto';
 import { loginSchema } from '../dto/loginDto';
 import { updateProfileSchema } from '../dto/updateProfileDto';
-import { otpRequestSchema, otpStringSchema } from '../dto/otpDto';
+import {
+  completeForgotPasswordSchema,
+  completeResetPasswordSchema,
+  forgotPasswordSchema,
+  registerVerifySchema,
+} from '../dto/otpDto';
 import * as userController from '../controllers/userController';
 
 export const userRouter = Router();
 
-// POST /users/register
+// POST /users/register — public send: stash pending signup and email an OTP
 userRouter.post('/register', validate(registerSchema), userController.register);
+
+// POST /users/register/verify — public complete: consume OTP and create the account
+userRouter.post('/register/verify',validate(registerVerifySchema),userController.verifyRegister);
 
 // POST /users/login
 userRouter.post('/login', validate(loginSchema), userController.login);
@@ -28,6 +38,18 @@ userRouter.get('/me', authenticate, userController.getMe);
 // PATCH /users/me
 userRouter.patch('/me', authenticate, validate(updateProfileSchema), userController.updateMe);
 
+// POST /users/forgot-password/request — public send; challenge is fixed as 'reset'
+userRouter.post('/forgot-password/request',validate(forgotPasswordSchema),userController.requestForgotPassword,);
+
+// POST /users/forgot-password — public complete (OTP + new password)
+userRouter.post('/forgot-password',validate(completeForgotPasswordSchema),userController.completeForgotPassword,);
+
+// POST /users/reset-password/request — logged-in send; email comes from the session, not the OTP layer
+userRouter.post('/reset-password/request', authenticate, userController.requestResetPassword);
+
+// POST /users/reset-password/verify — logged-in complete; reuses completeForgotPassword
+userRouter.post('/reset-password/verify',authenticate,validate(completeResetPasswordSchema),userController.completeResetPassword,);
+
 // GET /users
 userRouter.get('/', authenticate, requireRole('ADMINISTRATOR'), userController.listUsers);
 
@@ -39,9 +61,3 @@ userRouter.post('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userCo
 
 // DELETE /users/:id/admin
 userRouter.delete('/:id/admin', authenticate, requireRole('ADMINISTRATOR'), userController.revokeAdmin);
-
-// POST /users/:id/otp/request
-userRouter.post('/:id/otp/request', authenticate, validate(otpRequestSchema),userController.sendOTPRequest);
-
-// POST /users/:id/otp/verify
-userRouter.post('/:id/otp/verify',authenticate,validate(otpStringSchema),userController.verifyOTP);
