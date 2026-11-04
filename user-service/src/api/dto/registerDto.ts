@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Only NUS addresses are allowed: @nus.edu.sg (staff) or @u.nus.edu (students).
-const NUS_EMAIL = /@(u\.nus\.edu|nus\.edu\.sg)$/i;
+export const NUS_EMAIL = /@(u\.nus\.edu|nus\.edu\.sg)$/i; //no changes, just added in export
 
 // Validates the POST /users/register body. 
 export const registerSchema = z.object({
