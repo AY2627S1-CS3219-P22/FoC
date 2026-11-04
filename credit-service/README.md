@@ -27,9 +27,6 @@ and deletion are deferred. The human's definitions and AI records are retained i
 
 ## Source layout
 
-For cluster prerequisites, Kubernetes setup and adapting the human-written Credit
-manifests for another service, see [the Kubernetes guide](../k8s/README.md).
-
 ```text
 credit-service/
   src/
@@ -504,18 +501,4 @@ review, validation, team norms, licensing checks, and submission disclosure.
 
 Credit implementation, tests and documentation assistance are recorded in
 [ai/usage-log.md](ai/usage-log.md), including tools/models, exact prompts, affected
-files, actual checks and human review status. Entry 047 used OpenAI Codex (GPT-6)
-to implement/test the human-defined startup retry loop, reusable client,
-cancellable shutdown and live status getter. The shared messaging implementation
-and existing recovery logic remain credited to their authors; the added getter
-is attributed separately. Messaging/Credit builds, 108 Credit checks, Credit lint
-and 10 live-listener test results passed in entry 047. Entry 048 used OpenAI Codex
-(GPT-6) to wire `db:migrate` to the existing human-designed tracked runner, add its
-inclusive `--to` option, remove the old runner, and update tests/documentation.
-All 110 Credit tests and Credit lint passed for that change; no application
-database migration or deployment was performed.
-Entry 049 documents the human-written Kubernetes manifests and team conventions
-in [the Kubernetes guide](../k8s/README.md), including teammate setup and service
-adaptation. Shell syntax, links and offline resource generators were checked;
-no cluster deployment or application test run was performed for that documentation.
-New changes await human review; prior review markers apply to earlier content.
+files, actual checks and human review status.
