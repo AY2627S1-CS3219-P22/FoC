@@ -1,0 +1,13 @@
+# used to manage non sensitive configuration data so they aren't hardcoded in image
+# after applying a change, run kubectl rollout restart deployment/user-service -n foc
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-config
+  namespace: foc
+  labels: { app.kubernetes.io/name: user-service, app.kubernetes.io/part-of: foc }
+data: # ports here need to match containerPort and probes in *-service.yaml file
+  PORT: "3001"
+  PGDATABASE: user_service
+  JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+  JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
