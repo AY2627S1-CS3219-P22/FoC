@@ -78,6 +78,7 @@ metadata:
   namespace: foc
   labels: { app.kubernetes.io/name: credit-service, app.kubernetes.io/part-of: foc }
 spec:
+  clusterIP: None # headless: DNS returns every pod IP so gRPC clients can balance across pods
   selector: { app.kubernetes.io/name: credit-service }
   ports:
     - { name: grpc, port: 50054, targetPort: grpc, appProtocol: grpc }
