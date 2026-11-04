@@ -8,6 +8,13 @@ metadata:
 iam:
   withOIDC: true  # pods get AWS roles via OIDC (NUS SCP blocks Pod Identity)
 
+accessConfig:
+  accessEntries:
+    - principalARN: arn:aws:iam::200340799641:role/foc-github-deploy  # GitHub Actions CD
+      accessPolicies:
+        - policyARN: arn:aws:eks::aws:cluster-access-policy/AmazonEKSEditPolicy
+          accessScope: { type: namespace, namespaces: [foc] }
+
 vpc:
   nat:
     gateway: Disable # for cost-saving
