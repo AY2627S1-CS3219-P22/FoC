@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-04: Save Supplier coordinate-string pickup snapshots; review pending; see ../../../usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Implemented author-approved durable creation, same-key replay, recovery and compensation.
 // Author review: Pending; see ../../usage-log.md.
@@ -61,7 +62,7 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
           if (!isAllowedExpiry(input.expiryTime, await now(tx))) return null;
           const row = await tx.orderCreation.create({ data: { orderId: randomUUID(), requesterId, idempotencyKey: key,
             requestFingerprint: hash, payload: { ...canonical(input), destinationLocationId: destination.id, requesterName, pickupStore: supplier.name,
-              pickupLocation: supplier.locationDescription } } });
+              pickupLocation: supplier.pickupLocation } } });
           await tx.creditOperation.create({ data: { orderId: row.orderId, type: 'RESERVE', payload: { requesterId, amount: input.credits } } });
           return row;
         });

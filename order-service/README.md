@@ -552,7 +552,7 @@ The full Credit business runtime remains in the teammate PR.
 Order now uses shared createCreditClient with service-token metadata on each
 RPC; creditValidation.ts retains response validation and error classification.
 Explicit ACCOUNT_NOT_FOUND is retried within the existing bounded budget.
-Supplier results use shared validation; missing locationDescription becomes "-".
+Supplier results use shared validation; pickupLocation stores "latitude, longitude" from the validated Supplier coordinates. Existing saved history is unchanged.
 Destination remains a string; Order schema/migrations are unchanged.
 
 `POST /orders/:id/pickup` requires USER role and the assigned courier, an

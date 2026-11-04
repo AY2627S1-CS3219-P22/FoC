@@ -46,7 +46,7 @@ function fixture() {
   settleCredits:async({orderId,courierId})=>{settlements++;if(settleMode==='reject')throw err(9);if(settleMode==='before'){settleMode=undefined;throw err(14)}const r=ledger.get(orderId);if(!r)throw err(5);if(settleMode==='stale')return {...r,status:'SETTLED',courierId};if(r.status==='RELEASED')throw err(9);if(r.status==='SETTLED'&&r.courierId!==courierId)throw err(9);if(r.status!=='SETTLED'){r.status='SETTLED';r.courierId=courierId;r.version++}if(settleMode==='after'){settleMode=undefined;throw err(4)}return {...r}},close:()=>{},
  };
  const directories={getRequester:async(userId)=>({userId,username:'student',firstName:'Campus',lastName:'Friend'}),
-  getSupplier:async(supplierId)=>{if(invalidSupplier)throw err(5);return {supplierId,name:'Cafe',locationDescription:'Level 1',buildingName:'NUS',floor:1}},
+  getSupplier:async(supplierId)=>{if(invalidSupplier)throw err(5);return {supplierId,name:'Cafe',pickupLocation:'1.3, 103.77',latitude:1.3,longitude:103.77,buildingName:'NUS',floor:1}},
   isSupplierOpen:async()=>{throw new Error("Order must not call IsOpen")},close:()=>{}};
  const creation=createOrderCreation(db,credit,directories),edits=createOrderEdits(db,credit,directories),lifecycle=createOrderLifecycle(db,credit);
  const input=()=>createOrderSchema.parse({supplierId:'1',destination:'COM1',destinationLocationId:'kr_001',requestDetails:'Coffee',credits:4,expiryTime:new Date(Date.now()+7200000).toISOString()});
@@ -175,8 +175,8 @@ test('creation integrates real User/Supplier/Credit gRPC adapters with PostgreSQ
  const dirs=createDirectories('127.0.0.1:'+ports[0],'127.0.0.1:'+ports[1],1000);const credit=createCreditClient('127.0.0.1:'+ports[2],{timeoutMs:1000});const metadata=new grpc.Metadata();metadata.set('x-credit-service-token','integration-token');const creditOptions={metadata};
  t.after(()=>{dirs.close();credit.close();userServer.forceShutdown();supplierServer.forceShutdown();creditServer.forceShutdown()});
  const service=createOrderCreation(db,credit,dirs,creditOptions);const r=await service.submit(f.user,'real-grpc',f.input());assert.equal(r.status,201);assert.equal(r.order.status,'UNASSIGNED');assert.equal(f.ledger.get(r.order.id).status,'RESERVED');
- assert.equal(r.order.pickupLocation,'-');const snapshot=await dirs.getSupplier('1');assert.equal(snapshot.buildingName,'NUS');assert.equal(snapshot.floor,1);assert.equal(snapshot.latitude,1.3);assert.equal(snapshot.locationDescription,'-');
- const edited=await createOrderEdits(db,credit,dirs,creditOptions).edit(r.order.id,f.user,'real-grpc-edit',editOrderSchema.parse({destination:'COM2'}));assert.equal(edited.order.pickupLocation,'-');
+ assert.equal(r.order.pickupLocation,'1.3, 103.77');const snapshot=await dirs.getSupplier('1');assert.equal(snapshot.buildingName,'NUS');assert.equal(snapshot.floor,1);assert.equal(snapshot.latitude,1.3);assert.equal(snapshot.pickupLocation,'1.3, 103.77');
+ const edited=await createOrderEdits(db,credit,dirs,creditOptions).edit(r.order.id,f.user,'real-grpc-edit',editOrderSchema.parse({destination:'COM2'}));assert.equal(edited.order.pickupLocation,'1.3, 103.77');
  const cancellation=await createOrderLifecycle(db,credit,[],creditOptions).cancel(r.order.id,f.user);assert.equal(cancellation.order.creditState,'REFUNDED');assert.equal(f.ledger.get(r.order.id).status,'RELEASED');
 });
 

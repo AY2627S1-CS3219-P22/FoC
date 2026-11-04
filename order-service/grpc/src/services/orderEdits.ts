@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-04: Save Supplier coordinate-string pickup snapshots; review pending; see ../../../usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Implemented author-approved durable edit operations and Credit UpdateReservation reconciliation.
 // Author review: Pending; see ../../usage-log.md.
@@ -61,14 +62,14 @@ export function createOrderEdits(db: PrismaClient, credit: ReturnType<typeof cre
           directories.getSupplier(input.supplierId), credit.getReservation({ orderId }, creditOptions).then(validateReservation),
         ]);
       } catch (error) { return classifyCreditError(error) === 'rejected' ? { status: 409, error: 'dependency-rejected' } : { status: 503, error: 'dependency-unavailable' }; }
-      if (supplier.supplierId !== input.supplierId || !supplier.name.trim() || !supplier.locationDescription.trim()
+      if (supplier.supplierId !== input.supplierId || !supplier.name.trim() || !supplier.pickupLocation.trim()
         || reservation.orderId !== orderId || reservation.requesterId !== requesterId || reservation.amount !== order.credits || reservation.status !== 'RESERVED') {
         return { status: 409, error: 'dependency-rejected' };
       }
       await tx.orderEditOperation.create({ data: { id, orderId, requesterId, expectedVersion: reservation.version,
         targetCredits: input.credits, proposedChanges: { request, target: { supplierId: input.supplierId,
           destination: input.destination, ...(destinationLocationId ? { destinationLocationId } : {}), requestDetails: input.requestDetails, credits: input.credits, expiryTime: input.expiryTime.toISOString(),
-          pickupStore: supplier.name, pickupLocation: supplier.locationDescription } } as Prisma.InputJsonValue } });
+          pickupStore: supplier.name, pickupLocation: supplier.pickupLocation } } as Prisma.InputJsonValue } });
       return null;
     }, { timeout: 15_000 });
     if (initial) return initial;

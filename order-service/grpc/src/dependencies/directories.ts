@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-04: Use validated Supplier coordinates for the approved pickupLocation string; review pending; see ../../../usage-log.md.
 // ChatGPT (Codex), 2026-10-30: Removed unused Supplier IsOpen adapter; human review pending.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Integrated approved shared Supplier validation and missing-location placeholder.
@@ -20,10 +21,10 @@ export function createDirectories(userAddress: string, supplierAddress: string, 
       const response = await supplier.getSupplier({
         supplierId: toSupplierRpcId(supplierId),
       });
+      const validated = grpcsupplierSchema.parse(response);
       return {
-        ...grpcsupplierSchema.parse(response),
-        // Human-approved placeholder while Supplier no longer provides this field.
-        locationDescription: response.locationDescription?.trim() ? response.locationDescription : '-',
+        ...validated,
+        pickupLocation: `${validated.latitude}, ${validated.longitude}`,
       };
     },
     close: () => { user.close(); supplier.close(); },
