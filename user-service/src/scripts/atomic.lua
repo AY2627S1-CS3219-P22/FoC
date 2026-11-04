@@ -1,4 +1,4 @@
-local record, requests, attempts = KEYS[1], KEYS[2], KEYS[3]
+local record, requests, attempts, pendingKey = KEYS[1], KEYS[2], KEYS[3], KEYS[4]
 local action, challenge, otpHash, token = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
 local otpTTL, window = tonumber(ARGV[5]), tonumber(ARGV[6])
 local maxRequests, maxAttempts = tonumber(ARGV[7]), tonumber(ARGV[8])
@@ -45,6 +45,15 @@ if redis.call('HGET', record, 'otpHash') ~= otpHash then
   if count == 1 then redis.call('EXPIRE', attempts, window) end
   if count >= maxAttempts then return reject('locked', redis.call('TTL', attempts)) end
   return reject('mismatch')
+end
+
+-- Register verify: pending must still be present or we refuse without consuming the OTP.
+local pending
+if pendingKey and pendingKey ~= '' then
+  pending = redis.call('GET', pendingKey)
+  if not pending then return reject('missing') end
+  redis.call('DEL', record, attempts, pendingKey)
+  return cjson.encode({ok = true, pending = pending})
 end
 
 redis.call('DEL', record, attempts)

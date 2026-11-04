@@ -9,6 +9,9 @@ Service requirement details
 6. OTP validation, 3 incorrect OTP per session throttle attempts
 7. OTP expiry
 
+
+HELPER for otp requirements
+
 */
 
 import {createHash, createHmac, randomInt, randomUUID} from 'crypto'
@@ -23,25 +26,34 @@ const REQUEST_WINDOW_SECONDS = 600;
 const MAX_REQUESTS = 3;
 const MAX_ATTEMPTS = 3;
 
+function hashEmail(email: string) {
+  return createHash('sha256').update(email).digest('hex');
+}
+
+// register:{sha256(email)} / reset:{sha256(email)} — one Cluster slot per address.
+export function otpKeyPrefix(challengeId: string, email: string) {
+  return `${challengeId}:{${hashEmail(email)}}`;
+}
+
 function hashOTP(input: otpRequestInput, otp: string): string {
     return createHmac('sha256', otpKey)
-      .update(JSON.stringify([input.userId, input.challengeId, otp]))
+      .update(JSON.stringify([input.email, input.challengeId, otp]))
       .digest('hex');
   }
 
 
 type Result =
-  | { ok: true }
+  | { ok: true; pending?: string }
   | {
       ok: false;
       reason: 'throttled' | 'locked' | 'missing' | 'challenge' | 'mismatch' | 'invalid';
       retryAfterSeconds?: number;
     };
 
-
+type OtpUpdateInput = otpRequestInput & { pendingKey?: string };
 
 export async function verifyOTP(
-    input: otpRequestInput & { otp: string }
+    input: otpRequestInput & { otp: string; pendingKey?: string }
   ): Promise<Result> {
     return updateOTP(
       'verify',
@@ -52,7 +64,7 @@ export async function verifyOTP(
 
 
 export async function sendOTPRequest(
-  input: otpRequestInput & { email: string }
+  input: otpRequestInput
 ): Promise<Result> {
   const otp = String(randomInt(100000, 1000000));
   const token = randomUUID();
@@ -89,15 +101,15 @@ const OTP_SCRIPT = fs.readFileSync(env.REDIS_OTP_LUA, 'utf8');
 // All keys use one hash slot, so the script also works with Redis Cluster.
 async function updateOTP(
     action: 'send' | 'verify' | 'cancel',
-    input: otpRequestInput,
+    input: OtpUpdateInput,
     otpHash = '',
     token = '',
   ): Promise<Result> {
-    const user = createHash('sha256').update(input.userId).digest('hex');
-    const session = createHash('sha256').update(input.challengeId).digest('hex');
-    const prefix = `otp:{${user}}`;
+    const prefix = otpKeyPrefix(input.challengeId, input.email);
+    const keys = [`${prefix}:record`, `${prefix}:requests`, `${prefix}:attempts`];
+    if (input.pendingKey) keys.push(input.pendingKey);
     const result = await redis.eval(OTP_SCRIPT, {
-      keys: [`${prefix}:record`, `${prefix}:requests`, `${prefix}:attempts:${session}`],
+      keys,
       arguments: [
         action, input.challengeId, otpHash, token,
         String(OTP_TTL_SECONDS), String(REQUEST_WINDOW_SECONDS),
