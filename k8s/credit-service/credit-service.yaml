@@ -60,7 +60,7 @@ spec:
             preStop:  # waits 5s before shutdown so traffic can move away, allows 30s in total
               sleep: { seconds: 5 }       # let traffic drain before SIGTERM
           resources:
-            requests: { cpu: 100m, memory: 128Mi }
+            requests: { cpu: 250m, memory: 128Mi }
             limits: { memory: 256Mi }
           securityContext:  # bcs of this container logs need their own mount
             allowPrivilegeEscalation: false
