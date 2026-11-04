@@ -164,19 +164,87 @@ Protected routes run two middlewares: `authenticate` (verifies the access token 
 `401` if missing/invalid) then `requireRole(...)` (checks role claims → `403` if
 not allowed). Roles: `USER` (default) and `ADMINISTRATOR`.
 
-| Method | Route              | Access                | Purpose                                         |
-| ------ | ------------------ | --------------------- | ----------------------------------------------- |
-| POST   | `/users/register`  | public                | Create an account (F1)                          |
-| POST   | `/users/login`     | public                | Verify credentials → access token + refresh cookie |
-| POST   | `/users/refresh`   | refresh cookie        | Rotate refresh cookie → new access token        |
-| POST   | `/users/logout`    | refresh cookie        | End this browser's session (F2.2) → `204`       |
-| GET    | `/users/me`        | any authenticated     | Own profile (F2.3)                              |
-| PATCH  | `/users/me`        | any authenticated     | Update own first/last name, username (F2.4)     |
-| DELETE | `/users/me`        | any authenticated     | Delete own account after eligibility checks      |
-| GET    | `/users`           | `ADMINISTRATOR`       | List all users                                  |
-| GET    | `/users/:id`       | `ADMINISTRATOR`       | View a specific user                            |
-| POST   | `/users/:id/admin` | `ADMINISTRATOR`       | Grant the Administrator role (F3.3)             |
-| DELETE | `/users/:id/admin` | `ADMINISTRATOR`       | Revoke the Administrator role (F3.3, F3.2)      |
+| Method | Route                            | Access            | Purpose                                              |
+| ------ | -------------------------------- | ----------------- | ---------------------------------------------------- |
+| POST   | `/users/register`                | public            | Stash signup + email OTP (no User row yet)           |
+| POST   | `/users/register/verify`         | public            | Consume OTP and create the account (`{ email, otp }`) |
+| POST   | `/users/login`                   | public            | Verify credentials → access token + refresh cookie   |
+| POST   | `/users/refresh`                 | refresh cookie    | Rotate refresh cookie → new access token             |
+| POST   | `/users/logout`                  | refresh cookie    | End this browser's session (F2.2) → `204`            |
+| POST   | `/users/forgot-password/request` | public            | Email a reset OTP (`{ email }`)                      |
+| POST   | `/users/forgot-password`         | public            | Set a new password (`{ email, password, otp }`)      |
+| POST   | `/users/reset-password/request`  | any authenticated | Email a reset OTP to the caller's address            |
+| POST   | `/users/reset-password/verify`   | any authenticated | Set a new password (`{ otp, newPassword }`)          |
+| GET    | `/users/me`                      | any authenticated | Own profile (F2.3)                                   |
+| PATCH  | `/users/me`                      | any authenticated | Update own first/last name, username (F2.4)          |
+| DELETE | `/users/me`                      | any authenticated | Delete own account after eligibility checks          |
+| GET    | `/users`                         | `ADMINISTRATOR`   | List all users                                       |
+| GET    | `/users/:id`                     | `ADMINISTRATOR`   | View a specific user                                 |
+| POST   | `/users/:id/admin`               | `ADMINISTRATOR`   | Grant the Administrator role (F3.3)                  |
+| DELETE | `/users/:id/admin`               | `ADMINISTRATOR`   | Revoke the Administrator role (F3.3, F3.2)           |
+
+**OTP / password (as implemented).** Codes live in Redis for 2 minutes, are
+single-use, and are HMAC'd before storage. Redis keys are
+`register:{sha256(email)}` / `reset:{sha256(email)}` (`:record`, `:requests`,
+`:attempts`; register also stores `:pending`). Skipping a UI step does not bypass
+this: complete endpoints refuse the change unless a matching unused OTP is in
+Redis.
+
+- **Register:** `POST /users/register` hashes the password, stores pending
+  signup in Redis (TTL 2 minutes), and emails an OTP with challenge `register`.
+  `POST /users/register/verify` consumes that OTP and pending signup in one
+  Redis script (missing pending does not burn the code), rejects duplicate
+  email/username with `409`, then in one transaction creates the user and
+  enqueues `user.created` (`P2002` → `409`). A still-retained deleted account
+  returns `409` until `confirmRestore` is set; verify then enqueues `user.restored`.
+- **Forgot / reset:** both send and verify with challenge `reset`.
+  `POST /users/forgot-password/request` always returns `200` so unknown emails
+  are not distinguishable. `POST /users/forgot-password` verifies the OTP,
+  hashes the new password, then in one transaction updates `passwordHash`
+  where `email` matches and `isDeleted` is false and revokes every session
+  (`404` if no active account). `POST /users/reset-password/request` uses the
+  session only to look up the caller's email, then sends the same reset OTP.
+  `POST /users/reset-password/verify` loads that email via `getProfile`, calls
+  `completeForgotPassword` with `{ email, otp, password: newPassword }`, and
+  clears the refresh cookie. There is no generic `/users/otp` route. OTP
+  failures: `429` when throttled or locked (`Retry-After` set), otherwise `400`.
+
+**OTP QA — three E2E paths.** Mailpit UI: `http://localhost:8025`. Use an NUS
+address. Password must meet F1.1.2. These are the happy paths only.
+
+**1. Register OTP**
+
+| Step | Call | Expect |
+| ---- | ---- | ------ |
+| 1 | `POST /users/register` full signup body | `200` `{ message: "OTP sent" }`. No `User` row yet. Mailpit has a 6-digit code. |
+| 2 | `POST /users/register/verify` `{ email, otp }` | `201` `{ user }`. Pending and OTP keys gone. `user.created` in the outbox. |
+| 3 | `POST /users/login` with the same password | `200` token + refresh cookie. |
+
+**2. Forgot-password OTP**
+
+| Step | Call | Expect |
+| ---- | ---- | ------ |
+| 1 | `POST /users/forgot-password/request` `{ email }` | `200` (“If an account exists…”). Mailpit has a code if the account is active. |
+| 2 | `POST /users/forgot-password` `{ email, password, otp }` | `200`. Other sessions revoked. |
+| 3 | `POST /users/login` with the new password | `200`. Old password fails. |
+
+**3. Reset-password OTP (logged in)**
+
+| Step | Call | Expect |
+| ---- | ---- | ------ |
+| 1 | `POST /users/login` then `POST /users/reset-password/request` with Bearer | `200`. Mail goes to the **session** email, not a body email. |
+| 2 | `POST /users/reset-password/verify` `{ otp, newPassword }` | `200`. Refresh cookie cleared. |
+| 3 | Login with the new password; old password rejected | `200` / `401`. |
+
+**Remarks (known races — do not script these as extra tests).** Verify consumes
+OTP and pending in one Lua script: if `:pending` expired first, the OTP is not
+burned. If Postgres `create` / password `update` fails **after** that script
+succeeds, the code is already gone and the client must start the flow again.
+Forgot and logged-in reset share `reset:{email}`, so a new send on either route
+overwrites the other. The 3-fail lock lives on `:attempts` and is **not** reset
+by a resend (hardcoded `register` / `reset` challenge). Two signups that pass
+`findDuplicate` together still collide on `@unique` (`P2002` → `409`). A retained
+deleted account is restored only when register is sent with `confirmRestore`.
 
 Quick demo (service running on `:3001`):
 

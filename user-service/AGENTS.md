@@ -33,9 +33,9 @@ management, role-based access control, and OTP email verification (FR F1–F4).
   to other services over gRPC/REST only.
 - **User events are published through the transactional outbox, never from the
   HTTP/gRPC handler.** The change and its `user_outbox` row go in one
-  `prisma.$transaction`: `register` / `bootstrapAdmin` queue `user.created` to
+  `prisma.$transaction`: `completeRegister` / `bootstrapAdmin` queue `user.created` to
   `CREDIT_USER_QUEUE`, `deleteAccount` queues `user.deleted` to
-  `QUEUES.orderUser`, and a restoring `register` queues `user.restored` to
+  `QUEUES.orderUser`, and a restoring `completeRegister` queues `user.restored` to
   `CREDIT_USER_QUEUE` with `deleteOnPublish`, so the row linking old and new
   ids is deleted once delivered. Only the background dispatcher calls
   `RabbitMQClient.publishToQueue`. A broker outage must not fail sign-up or
@@ -52,8 +52,21 @@ management, role-based access control, and OTP email verification (FR F1–F4).
   uppercase, ≥1 numeric — F1.1.2).
 - Ports: REST on `3001`, gRPC on `50051` (both configurable via `.env`).
 - **OTP state lives in Redis, not Postgres.** Codes expire (2 minutes), are
-  single-use, and a new request overwrites the previous one. Client: `src/redis.ts`.
-- **OTP HTTP routes require a JWT, and the caller must match `:id`.**
+  single-use, and a new request overwrites the previous one. Keys are
+  `register:{sha256(email)}` / `reset:{sha256(email)}` (`:record`, `:requests`,
+  `:attempts`; register also has `:pending`). Client: `src/redis.ts`.
+- **OTP HTTP routes match `userRoutes.ts`.** There is no generic `/users/otp`.
+  HTTP register is OTP-gated and public: `initiateRegister` / `completeRegister`
+  (pending signup in Redis, challenge `'register'`). Admin bootstrap is
+  `bootstrapAdmin` (`buildNewUser` + outbox), not an immediate HTTP register.
+  Forgot-password is
+  public (`/forgot-password/request` then `/forgot-password`). Logged-in password
+  change uses the session only to resolve email (`/reset-password/request` then
+  `/reset-password/verify` → `completeForgotPassword`). The OTP code itself is
+  never taken from the JWT. Forgot/reset use `RESET_CHALLENGE` (`'reset'`).
+  Requesting a forgotten-password OTP must not reveal whether the email exists
+  (always `200`). Completing forgot-password may `404` if no active account
+  matches.
 - **The OTP key is a local file, same pattern as the JWT keys.** `npm run keys:otp`
   writes `keys/otp.key` (git-ignored). Boot reads `OTP_HMAC_KEY_PATH`, decodes the
   32-byte key, and refuses to start if it is missing. OTPs are HMAC-SHA256 hashed
