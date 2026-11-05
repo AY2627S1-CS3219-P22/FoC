@@ -1,3 +1,7 @@
+# AI Assistance Disclosure: Claude Code (Claude Opus), 2026-11-05.
+# Scope: the migrate image steps.
+# Details: ai/usage-log.md, entry 001.
+
 name: Order Service CI
 
 on:
@@ -124,5 +128,27 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Migration image, used by the Kubernetes initContainer before the app starts.
+      - name: Extract Docker metadata (migrate)
+        id: meta-migrate
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-migrate
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable=${{ steps.tip.outputs.stale != 'true' }}
+
+      - name: Build and push migrate image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: order-service/Dockerfile
+          target: migrate
+          push: true
+          tags: ${{ steps.meta-migrate.outputs.tags }}
+          labels: ${{ steps.meta-migrate.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
