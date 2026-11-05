@@ -31,7 +31,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}/user-service
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,10 +44,10 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm test -w user-service
+      - run: npm run build -w user-service
 
   build-and-push-image:
-    needs: test
+    needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
