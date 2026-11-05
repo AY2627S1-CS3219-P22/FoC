@@ -1,6 +1,6 @@
 /*
 This file will 
-- Initialize connections to the PostgresSQL database hosted on Supabase rn
+- Initialize connections to the local PostgreSQL database
 - Export the database connection pool for use in other files
 */
 

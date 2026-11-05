@@ -5,7 +5,7 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { AppError, ErrorCode} from '@middleware/errors';
 
-export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
+export const errorHandler = (err: Error, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof ZodError) {
         return res.status(400).json({
             message: 'Bad Request: Validation failed',

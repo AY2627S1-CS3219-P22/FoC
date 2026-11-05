@@ -32,11 +32,9 @@ export const USER = 'USER';
 export const ADMINISTRATOR = 'ADMINISTRATOR';
 export type Role = typeof USER | typeof ADMINISTRATOR;
 
-declare global {
-    namespace Express {
-    interface Request {
-      user?: { id: string; roles: Role[] };
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: { id: string; roles: Role[] };
   }
 }
 

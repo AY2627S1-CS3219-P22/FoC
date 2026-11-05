@@ -9,7 +9,7 @@ export default defineConfig({
     fileParallelism: false,
     globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/setup-env.ts'],
-    //First run pulls the Supabase image before anything can connect.
+    //First run pulls postgres:17 before anything can connect.
     testTimeout: 60_000,
     hookTimeout: 60_000,
   },

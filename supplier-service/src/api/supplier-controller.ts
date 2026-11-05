@@ -12,7 +12,7 @@ import {getSupplierByIdService,
 
 import { SUPPLIER_CATEGORY, supplierRadiusQuerySchema, updateRequestSchema } from '@/data/schema';
 
-const handleResponse = (res: Response, status: number, data: any, message: string) => {
+const handleResponse = (res: Response, status: number, data: unknown, message: string) => {
     res.status(status).json({
         data,
         message
@@ -55,7 +55,6 @@ export const deleteSupplierById = async(req:Request, res:Response, next:NextFunc
  export const createSupplier = async(req:Request, res:Response, next:NextFunction) => {
     try {
         const newSupplier = await createSupplierService(req.body);
-        const newSupplierName = req.body.name;
         handleResponse(res, 201, newSupplier, `Successful. New supplier created`);
     } catch(err) {
         next(err);
@@ -106,9 +105,8 @@ export const updateSupplierHours = async(req:Request, res:Response, next:NextFun
         const dayOfWeek = Number(req.params.dayOfWeek)
         const dayOfWeekString = DAY_OF_WEEK[dayOfWeek]; //the number value 0-6
     
-        const updatedHours = await updateSupplierHoursByIdService
-                                    (Number(req.params.id), 
-                                    {...req.body, 
+        const updatedHours = await updateSupplierHoursByIdService(Number(req.params.id), {
+                                    ...req.body,
                                         dayOfWeek,});
         handleResponse(res, 200, updatedHours, `Supplier ${req.params.id} hours successfully updated for ${dayOfWeekString}`)
     }
