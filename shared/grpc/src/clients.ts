@@ -280,16 +280,6 @@ export function createSupplierClient(target: string, config: ClientConfig = {}) 
         ),
       );
     },
-    isOpen(request: IsOpenRequest, options: RpcOptions = {}): Promise<IsOpenResponse> {
-      return unary((callback) =>
-        client.isOpen(
-          request,
-          options.metadata ?? new Metadata(),
-          callOptions(timeoutMs, options),
-          callback,
-        ),
-      );
-    },
     close(): void {
       client.close();
     },
