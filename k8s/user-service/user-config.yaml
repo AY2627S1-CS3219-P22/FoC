@@ -11,3 +11,6 @@ data: # ports here need to match containerPort and probes in *-service.yaml file
   PGDATABASE: user_service
   JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
   JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+  # the public link is plain http (no domain for an HTTPS certificate), and browsers
+  # drop Secure cookies over http; set back to "true" once the site has HTTPS
+  COOKIE_SECURE: "false"
