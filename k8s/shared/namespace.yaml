@@ -1,4 +1,6 @@
+# Namespace shared by all FoC services. Apply this first.
 apiVersion: v1
 kind: Namespace
-metadata:
+metadata: 
   name: foc
+  labels: { app.kubernetes.io/part-of: foc }
