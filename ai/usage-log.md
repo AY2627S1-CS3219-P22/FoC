@@ -29,3 +29,27 @@ logged in each service's own log.
 - **External sources:** Failing GitHub Actions log for PR #100 (User Service
   CI); teammate's workflows in PR #100 (sunpterodactyl); Kubernetes manifests
   in PR #95, which name the `-migrate` images.
+
+## 002: UI CI workflow
+
+- **Timestamp:** 2026-11-05 (Asia/Singapore).
+- **Tool/model:** Claude Code (Anthropic), Claude Opus.
+- **Mode/scenario:** New CI workflow so the UI image is published to GHCR for
+  the Kubernetes (EKS) deployment.
+- **Prompts:** [prompts/002-ui-ci.md](prompts/002-ui-ci.md) (2 prompts).
+- **Key responses:**
+  1. "Sure, here's a UI CI workflow following the `user-service.yaml`
+     pattern: a build check on PRs, and on main a push of the `runtime`
+     image to GHCR."
+  2. "The other services are root npm workspaces covered by the root
+     `package-lock.json`. The UI is not, so its build runs inside `ui/` with
+     its own lockfile and Docker context."
+- **Key output:** New `UI CI` workflow: build check on PRs; on main, builds
+  the Dockerfile's `runtime` stage and pushes `foc/ui` with `sha-<sha>` and
+  `latest` tags.
+- **Affected locations:** `.github/workflows/ui.yaml`.
+- **Human review/edits:** JadeCheah asked for UI CI following the
+  user-service pattern and checked it against the other workflows; AI wrote
+  the workflow; JadeCheah reviewed it and approved.
+- **External sources:** `.github/workflows/user-service.yaml` (template);
+  `ui/Dockerfile`, `ui/package.json`.
