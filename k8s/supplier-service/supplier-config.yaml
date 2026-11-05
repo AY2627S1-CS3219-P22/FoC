@@ -11,6 +11,6 @@ data: # ports here need to match containerPort and probes in *-service.yaml file
   PORT: "3002"
   USER_SERVICE_PUBLIC_KEY_PATH: /app/keys/public.pem
   USER_GRPC_ADDR: user-service:50051
-  ORDER_GRPC_ADDR: dns:///supplier-service:50053
+  ORDER_GRPC_ADDR: dns:///order-service:50053
   CREDIT_GRPC_ADDR: dns:///credit-service:50054
 
