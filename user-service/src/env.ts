@@ -20,6 +20,7 @@ const schema = z.object({
   JWT_PUBLIC_KEY_PATH: z.string().min(1),
   JWT_EXPIRES_IN: z.string().default('15m'),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
+  COOKIE_SECURE: z.enum(['true', 'false']).optional(),
 
   RABBITMQ_URL: z.string().default('amqp://guest:guest@localhost:5672'),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1000),

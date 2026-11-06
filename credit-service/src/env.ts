@@ -12,10 +12,15 @@ const schema = z.object({
   GRPC_HOST: z.string().min(1).default('0.0.0.0'),
   GRPC_PORT: z.coerce.number().int().min(1).max(65535).default(50054),
   CREDIT_ORDER_SERVICE_TOKEN: z.string().min(1),
-  RABBITMQ_URL: z.string().min(1).default('amqp://guest:guest@localhost:5672'),
+  RABBITMQ_URL: z.string().min(1),
   CREDIT_JWT_PUBLIC_KEY_PATH: z.string().min(1).default('../user-service/keys/public.pem'),
   HTTP_HOST: z.string().min(1).default('0.0.0.0'),
   HTTP_PORT: z.coerce.number().int().min(1).max(65535).default(3004),
+  PGHOST: z.string().min(1),
+  PGPORT: z.coerce.number().int().min(1).max(65535),
+  PGUSER: z.string().min(1),
+  PGPASSWORD: z.string().min(1),
+  PGDATABASE: z.string().min(1),
 });
 
 export const env = schema.parse(process.env);
