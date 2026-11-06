@@ -21,7 +21,7 @@ spec:
       terminationGracePeriodSeconds: 30
       initContainers:   # applies any new database migrations, only relevant for user
         - name: migrate
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service-migrate:sha-f123c90f7fc71a9ca3b43e56d24beff80c460a4f
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service-migrate:sha-20d9c4f9614eb3dede74ec189a342d4039bea679
           imagePullPolicy: IfNotPresent
           command: ['npx', 'prisma', 'migrate', 'deploy']
           envFrom:
@@ -31,7 +31,7 @@ spec:
             limits: { memory: 128Mi }
       containers:
         - name: user-service
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service:sha-f123c90f7fc71a9ca3b43e56d24beff80c460a4f # same tag as migrate above
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service:sha-20d9c4f9614eb3dede74ec189a342d4039bea679 # same tag as migrate above
           imagePullPolicy: IfNotPresent
           ports:
             - { name: grpc, containerPort: 50051 }
