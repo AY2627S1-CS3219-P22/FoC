@@ -20,7 +20,7 @@ const schema = z.object({
   CREDIT_ORDER_SERVICE_TOKEN: z.string().trim().min(1).optional(),
   RABBITMQ_URL: z.string().min(1).optional(),
   REDIS_URL: z.string().min(1).optional(),
-  SUPPLIER_CACHE_TTL_SECONDS: z.coerce.number().int().positive().max(86_400).default(60),
+  SUPPLIER_CACHE_TTL_SECONDS: z.coerce.number().int().positive().max(86_400).default(600), //10 min TTL for supplier cache cos no warm caching
   USER_GRPC_ADDR: z.string().min(1).default('localhost:50051'),
   ORDER_GRPC_ADDR: z.string().min(1).default('localhost:50053'),
   CREDIT_GRPC_ADDR: z.string().min(1).default('localhost:50054'),
