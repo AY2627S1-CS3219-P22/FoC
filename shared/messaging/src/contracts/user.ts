@@ -16,19 +16,21 @@ const userEventBaseSchema = z.object({
   });
   
   /**
-   * User soft-deleted. Credit snapshots the balance and archives credit history;
-   * order archives order history. Both keep the data until `purgeAfter`.
+   * User row deleted. Order resolves active orders and scrubs personal details;
+   * credit keeps the balance under the old id in case the user returns.
    */
   export const userDeletedSchema = userEventBaseSchema.extend({
     type: z.literal('user.deleted'),
     deletedAt: z.string(),
-    /** deletedAt + 4 years, set once by the user service so consumers never compute it themselves. */
-    purgeAfter: z.string(),
   });
-  
-  /** User logged back in within the retention window. Consumers restore archived data. */
+
+  /**
+   * Deleted user re-registered within the retention window, with a new id.
+   * Sent instead of user.created. Credit moves the old balance to `userId`.
+   */
   export const userRestoredSchema = userEventBaseSchema.extend({
     type: z.literal('user.restored'),
+    previousUserId: z.string(),
   });
   
   export const userEventSchema = z.discriminatedUnion('type', [

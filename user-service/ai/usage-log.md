@@ -1,5 +1,112 @@
 # AI usage log: User Service
 
+## 033: README update for recent workflows
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Documentation update for recent author-specified account and cross-service workflows.
+- **Prompts:** [prompts/033-readme-recent-changes.md](prompts/033-readme-recent-changes.md).
+- **Key response:** Documented account deletion, archived-account restoration, archive purging, and Order Service deletion eligibility in the User Service README and root AI summary.
+- **Affected locations:** `user-service/README.md`, `README.md`.
+- **Checks:** `git diff --check` passed.
+- **Human review/edits:** Author reviewed the changes line by line, manually
+  tested and confirmed the behaviour, approved the implementation.
+- **External sources:** None.
+
+## 032: Deletion eligibility service disclosure
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Added the disclosure header to the moved Order Service service-layer logic.
+- **Prompts:** [prompts/032-deletion-eligibility-service-header.md](prompts/032-deletion-eligibility-service-header.md).
+- **Key response:** Added a comprehensive AI disclosure header to `deletionEligibility.ts`.
+- **Affected locations:** `order-service/grpc/src/services/deletionEligibility.ts`.
+- **Checks:** `git diff --check` pending.
+- **Human review/edits:** Author reviewed the changes line by line, manually
+  tested and confirmed the behaviour, approved the implementation.
+- **External sources:** None.
+
+## 031: Order deletion eligibility gRPC
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified cross-service gRPC eligibility check.
+- **Prompts:** [prompts/031-order-deletion-eligibility-grpc.md](prompts/031-order-deletion-eligibility-grpc.md).
+- **Key response:** Added the Order Service gRPC contract, database-backed blocked-order count, User Service client wiring, and missing-argument/internal-error mappings. Existing stub behavior was replaced; no event behavior was changed.
+- **Affected locations:** `shared/grpc/proto/order.proto`, `shared/grpc/src/clients.ts`, `order-service/grpc/src/grpc/server.ts`, `user-service/src/env.ts`, `user-service/src/services/userService.ts`, `user-service/package.json`.
+- **Checks:** `npm run grpc:generate`, shared gRPC build, Order Service build, User Service build, `npm install --package-lock-only --ignore-scripts`, and `git diff --check` passed.
+- **Human review/edits:** Author reviewed the changes line by line, manually
+  tested and confirmed the behaviour, approved the implementation.
+- **External sources:** None.
+
+## 030: Archived user purge job
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified scheduled cleanup job.
+- **Prompts:** [prompts/030-archived-user-purge-job.md](prompts/030-archived-user-purge-job.md).
+- **Key response:** Added expired `ArchivedUser` deletion at startup and on a 24-hour interval, with no `user.purged` event.
+- **Affected locations:** `user-service/src/jobs/archivePurge.ts`, `user-service/src/index.ts`.
+- **Checks:** Pending.
+- **Human review/edits:** Author reviewed the changes line by line, manually
+  tested and confirmed the behaviour, approved the implementation.
+- **External sources:** None.
+
+## 027: User restoration workflow
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified registration restore workflow.
+- **Prompts:** [prompts/027-user-restored-workflow.md](prompts/027-user-restored-workflow.md).
+- **Key response:** Added `confirmRestore`, archived-email detection after duplicate checks, restore confirmation response, `buildUserRestored`, `enqueueUserRestored`, and transactional selection between `user.created` and `user.restored`.
+- **Affected locations:** `user-service/src/api/dto/registerDto.ts`, `user-service/src/api/controllers/userController.ts`, `user-service/src/services/userService.ts`, `user-service/src/events/userRestored.ts`, `user-service/src/events/outboxStore.ts`.
+- **Checks:** `npm run build --workspace user-service` and `git diff --check` passed. Author manually tested the user restoration behavior.
+- **Human review/edits:** Author reviewed the changes line by line, manually tested the behavior successfully, and approved the implementation.
+- **External sources:** None.
+
+## 026: Enqueue user.deleted event
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified outbox event workflow.
+- **Prompts:** [prompts/026-user-deleted-event.md](prompts/026-user-deleted-event.md).
+- **Key response:** Added `buildUserDeleted`, `enqueueUserDeleted`, and transactional enqueueing from `deleteAccount`, following the existing `user.created` pattern. No contract or consumer changes were made.
+- **Affected locations:** `user-service/src/events/userDeleted.ts`, `user-service/src/events/outboxStore.ts`, `user-service/src/services/userService.ts`.
+- **Checks:** `npm run build --workspace user-service` and `git diff --check` passed. Author manually tested the user.deleted enqueue behavior.
+- **Human review/edits:** Author reviewed the changes line by line, manually tested the behavior successfully, and approved the implementation.
+- **External sources:** None.
+
+## 025: User account deletion workflow
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified account deletion workflow.
+- **Prompts:** [prompts/025-user-account-deletion.md](prompts/025-user-account-deletion.md).
+- **Key response:** Added the Order Service eligibility stub, administrator last-admin protection under the advisory lock, `ArchivedUser` creation, hard deletion of the `User` row, and `DELETE /users/me` error mappings. Event handling was intentionally excluded.
+- **Affected locations:** `user-service/src/services/adminGuards.ts`, `user-service/src/services/adminService.ts`, `user-service/src/services/userService.ts`, `user-service/src/api/controllers/userController.ts`, `user-service/src/api/routes/userRoutes.ts`.
+- **Checks:** `npm run build --workspace user-service` and `git diff --check` passed. Author also manually tested the account deletion workflow.
+- **Human review/edits:** Author checked all affected files, manually tested the implementation, and approved it.
+- **External sources:** None.
+
+## 023: Archived user retention schema
+
+- **Timestamp:** 2026-11-02 (Asia/Singapore).
+- **Tool/model:** OpenAI Codex; model identifier is not exposed in this session.
+- **Mode/scenario:** Implementation of an author-specified Prisma schema model.
+- **Exact prompt:**
+
+  > ok, I need to implement user deletion, let's start with defining the schema. Can you implement this please: ArchivedUser, email String (PK), userId String, deletedAt (DateTime, now), purgeAfter datetime
+  >
+  > index on purgeAfter
+  >
+  > this archival is for keeping up to 4 years after user account deletion, to prevent a returning user from resetting their credits. Note that it only holds the email and old user id, and no other personal data
+
+- **Key response:** Added the author-specified `ArchivedUser` Prisma model with `email` as the primary key, `userId`, `deletedAt` defaulting to `now()`, `purgeAfter`, and an index on `purgeAfter`. No additional personal data was added.
+- **Affected locations:** `prisma/schema.prisma`.
+- **Checks:** `npx prisma validate --schema user-service/prisma/schema.prisma` passed. `prisma migrate dev --name add_archived_user` could not generate a migration because the configured PostgreSQL database at `127.0.0.1:54322` was unavailable; no migration file was created.
+- **Human review/edits:** Author reviewed and approved the schema change.
+- **External sources:** None.
+
 ## 001: Initial user-service scaffolding (setup)
 
 - **Timestamp:** 2026-09-24 – 2026-09-25 (Asia/Singapore).

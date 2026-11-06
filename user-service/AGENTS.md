@@ -31,16 +31,20 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 - **Schema changes go through `prisma migrate dev`, never `db push`.**
 - **No cross-service database access.** This service owns its own DB/schema; talk
   to other services over gRPC/REST only.
-- **`user.created` is published through the transactional outbox, never from the
-  HTTP/gRPC handler.** `register` / `bootstrapAdmin` insert `User` and a
-  `user_outbox` row in one `prisma.$transaction`. Only the background dispatcher
-  calls `RabbitMQClient.publishToQueue`, and only to `CREDIT_USER_QUEUE`. A
-  broker outage must not fail sign-up. Delivery is at-least-once: the same
-  `eventId` is retried until `published_at` is set.
+- **User events are published through the transactional outbox, never from the
+  HTTP/gRPC handler.** The change and its `user_outbox` row go in one
+  `prisma.$transaction`: `register` / `bootstrapAdmin` queue `user.created` to
+  `CREDIT_USER_QUEUE`, `deleteAccount` queues `user.deleted` to
+  `QUEUES.orderUser`, and a restoring `register` queues `user.restored` to
+  `CREDIT_USER_QUEUE` with `deleteOnPublish`, so the row linking old and new
+  ids is deleted once delivered. Only the background dispatcher calls
+  `RabbitMQClient.publishToQueue`. A broker outage must not fail sign-up or
+  deletion. Delivery is at-least-once: the same `eventId` is retried until
+  `published_at` is set.
 - **Passwords are hashed (bcryptjs), never encrypted/decrypted.**
 - **All Administrator-role changes go through `adminService`:** one transaction
   that calls `lockAdminSet` first and writes an `AdminRoleChange` row. Never
-  update an admin's `roles`/`isDeleted` directly (or via Prisma Studio). The lock
+  update an admin's `roles` directly (or via Prisma Studio). The lock
   plus `ensureNotLastAdmin` is what guarantees at least one active admin under
   concurrent requests — account deletion must call `ensureNotLastAdmin` too.
 - **`/health` must ping the database**, not just return 200.
@@ -60,6 +64,8 @@ management, role-based access control, and OTP email verification (FR F1–F4).
 
 **Folder layout:**
 - `src/api/` = HTTP (REST) transport; `src/grpc/` = gRPC transport.
+- `src/jobs/` = background timers (e.g. the daily archive purge). Services never
+  start timers themselves.
 - Shared building blocks (`env.ts`, `db.ts`) live at `src/` root.
 - Services live in `src/services/`, shared by both transports (moved out of
   `src/api/` once gRPC needed them). Transports import services; services never

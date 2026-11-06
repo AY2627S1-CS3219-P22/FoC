@@ -1,13 +1,17 @@
 // AI Assistance Disclosure:
-// Tool: Claude Code (Claude Opus), dates: 2026-09-27 – 2026-10-19
+// Tool: Claude Code (Claude Opus), 2026-09-27 – 2026-10-19; OpenAI Codex,
+// 2026-11-02 (Asia/Singapore).
 // Scope: AI generated the register logic (duplicate check, P2002 handling,
-// bcryptjs hashing), the login credential check, profile lookups, the
-// profile/public profile selects, the profile update, and the shared
-// buildNewUser/duplicateField helpers.
-// Author review: Author specified the requirements, how to handle concurrent
-// duplicates, the select fields and the update rules, reviewed the code and
-// approved. See user-service/ai/usage-log.md, entries 004, 008, 009, 013, 015,
-// 019.
+// bcryptjs hashing), login credential checks, profile/public-profile selects,
+// profile update, shared buildNewUser/duplicateField helpers, account
+// deletion, user.deleted enqueueing, and archived-account restoration with
+// user.restored enqueueing.
+// Author review: Author specified the requirements, duplicate handling,
+// fields, update rules, deletion workflow, and restore behavior. Entries
+// 004, 008, 009, 013, 015, 019, 025, and 026 were reviewed, manually tested,
+// and approved. Author also reviewed, manually tested, and approved entry 027.
+// See user-service/ai/usage-log.md. OpenAI Codex added the author-specified
+// Order Service eligibility client; entry 031 is pending review.
 
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
@@ -15,9 +19,13 @@ import { prisma } from '../db';
 import type { RegisterInput } from '../api/dto/registerDto';
 import type { LoginInput } from '../api/dto/loginDto';
 import type { UpdateProfileInput } from '../api/dto/updateProfileDto';
-import { enqueueUserCreated } from '../events/outboxStore';
+import { enqueueUserCreated, enqueueUserDeleted, enqueueUserRestored } from '../events/outboxStore';
+import { ensureNotLastAdmin, lockAdminSet } from './adminGuards';
+import { createOrderClient } from '@foc/grpc';
+import { env } from '../env';
 
 const SALT_ROUNDS = 10;
+const RETENTION_YEARS = 4;
 
 // Profile: everything except secrets — for the user themselves or an admin.
 export const profileSelect = {
@@ -72,14 +80,27 @@ export async function register(input: RegisterInput) {
     return { ok: false as const, field };
   }
 
+  const archived = await prisma.archivedUser.findUnique({ where: { email: input.email } });
+  const now = new Date();
+  // Past its 4 years, the row is ignored and deleted below: a normal signup.
+  const restoreFrom = archived && archived.purgeAfter > now ? archived : null;
+  if (restoreFrom && !input.confirmRestore) {
+    return { ok: false as const, reason: 'restore_confirmation_required' as const };
+  }
+
   try {
-    //DECLARATION CHANGED
     const user = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: await buildNewUser(input),
         select: profileSelect,
       });
-      await enqueueUserCreated(tx, created.id);
+      if (restoreFrom) {
+        await enqueueUserRestored(tx, created.id, restoreFrom.userId);
+        await tx.archivedUser.delete({ where: { email: restoreFrom.email } });
+      } else {
+        await tx.archivedUser.deleteMany({ where: { email: input.email, purgeAfter: { lte: now } } });
+        await enqueueUserCreated(tx, created.id);
+      }
       return created;
     });
     return { ok: true as const, user };
@@ -113,7 +134,7 @@ export async function getProfile(id: string) {
 
 export async function getPublicProfile(id: string) {
   return prisma.user.findUnique({
-    where: { id, isDeleted: false },
+    where: { id },
     select: publicProfileSelect,
   });
 }
@@ -141,4 +162,56 @@ export async function updateProfile(id: string, input: UpdateProfileInput) {
 
 export async function listProfiles() {
   return prisma.user.findMany({ select: profileSelect });
+}
+
+const orderClient = createOrderClient(env.ORDER_GRPC_ADDR);
+
+export async function checkDeletionEligibility(userId: string) {
+  try {
+    const result = await orderClient.checkDeletionEligibility({ userId });
+    return { ok: true as const, eligible: result.eligible, activeOrders: result.blockedOrderCount };
+  } catch (err) {
+    // Can't confirm there are no active orders, so don't delete.
+    console.error('Order eligibility check failed:', err instanceof Error ? err.message : String(err));
+    return { ok: false as const };
+  }
+}
+
+function addRetentionYears(date: Date, years: number): Date {
+  const result = new Date(date);
+  result.setFullYear(result.getFullYear() + years);
+  return result;
+}
+
+export async function deleteAccount(userId: string) {
+  const eligibility = await checkDeletionEligibility(userId);
+  if (!eligibility.ok) return { ok: false as const, reason: 'eligibility_unavailable' as const };
+  if (!eligibility.eligible) {
+    return { ok: false as const, reason: 'active_orders' as const, activeOrders: eligibility.activeOrders };
+  }
+
+  return prisma.$transaction(async (tx) => {
+    await lockAdminSet(tx);
+
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, roles: true },
+    });
+    if (!user) return { ok: false as const, reason: 'not_found' as const };
+
+    // The guard only counts other admins, so it must not run for a non-admin.
+    if (user.roles.includes('ADMINISTRATOR')) {
+      const guard = await ensureNotLastAdmin(tx, user.id);
+      if (!guard.ok) return guard;
+    }
+
+    const deletedAt = new Date();
+    const purgeAfter = addRetentionYears(deletedAt, RETENTION_YEARS);
+
+    await tx.archivedUser.create({ data: { email: user.email, userId: user.id, deletedAt, purgeAfter } });
+    await tx.user.delete({ where: { id: user.id } });
+    await enqueueUserDeleted(tx, user.id, deletedAt);
+
+    return { ok: true as const, deletedAt, purgeAfter };
+  });
 }
