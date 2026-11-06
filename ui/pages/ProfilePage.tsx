@@ -1,5 +1,7 @@
+// AI-assisted (Claude), reviewed and tested by Maliha
 import { useEffect, useState } from "react"
 import type { User, Order, Page } from "../App"
+import { deleteError, deleteMe } from "../api/users"
 import { formatTime, listOrders } from "../api/orders"
 import { creditChange, creditLabel, getCreditHistory, type CreditEntry } from "../api/credits"
 
@@ -13,6 +15,30 @@ export default function ProfilePage({ user, onNavigate, onLogout }: Props) {
   const [myRequests, setMyRequests]     = useState<Order[]>([])
   const [myDeliveries, setMyDeliveries] = useState<Order[]>([])
   const [history, setHistory]           = useState<CreditEntry[] | null>(null)
+
+  // delete account: confirm -> (error | done message) -> logged out
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting]           = useState(false)
+  const [deleteMsg, setDeleteMsg]         = useState("")
+  const [deletedMsg, setDeletedMsg]       = useState("")
+
+  const closeDelete = () => {
+    setConfirmDelete(false)
+    setDeleteMsg("")
+  }
+
+  const deleteAccount = async () => {
+    setDeleting(true)
+    setDeleteMsg("")
+    try {
+      setDeletedMsg(await deleteMe())
+      setConfirmDelete(false)
+    } catch (err) {
+      setDeleteMsg(deleteError(err))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   // stats just stay at 0 if order-service isn't up
   useEffect(() => {
@@ -177,6 +203,60 @@ export default function ProfilePage({ user, onNavigate, onLogout }: Props) {
           Log out
         </button>
       </div>
+
+      <button
+        onClick={() => setConfirmDelete(true)}
+        className="w-full mt-6 py-2 text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+      >
+        Delete account
+      </button>
+
+      {/* Confirm */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/30 flex items-end sm:items-center justify-center z-50 p-4" onClick={closeDelete}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-[#162A46] mb-2">Delete your account?</h3>
+            <p className="text-sm text-[#3F6B5A] mb-5 leading-relaxed">
+              You'll be logged out and your account will be closed. You can't do this while you still have
+              requests or errands in progress.
+            </p>
+            {deleteMsg && (
+              <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2.5 text-xs text-red-600">{deleteMsg}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={closeDelete}
+                className="flex-1 py-2.5 border border-[#E4E8E6] text-[#1B2522] text-sm font-medium rounded-lg hover:bg-[#F7F9F8] transition-colors"
+              >
+                Keep account
+              </button>
+              <button
+                onClick={deleteAccount}
+                disabled={deleting}
+                className="flex-1 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-60 transition-colors"
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Done. user-service already ended the session, so OK just logs out here */}
+      {deletedMsg && (
+        <div className="fixed inset-0 bg-black/30 flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
+            <h3 className="text-base font-semibold text-[#162A46] mb-2">Account deleted</h3>
+            <p className="text-sm text-[#3F6B5A] mb-5 leading-relaxed">{deletedMsg}</p>
+            <button
+              onClick={onLogout}
+              className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] transition-colors"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

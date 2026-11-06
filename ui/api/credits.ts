@@ -11,7 +11,7 @@ export type Balance = {
 export type CreditEntry = {
   id: string
   orderId: string | null
-  type: "INITIAL_GRANT" | "RESERVED" | "RESERVATION_UPDATED" | "RELEASED" | "TRANSFER_OUT" | "TRANSFER_IN"
+  type: "INITIAL_GRANT" | "BALANCE_RESTORED" | "RESERVED" | "RESERVATION_UPDATED" | "RELEASED" | "TRANSFER_OUT" | "TRANSFER_IN"
   totalAmountChange: number
   totalReservedChange: number
   createdAt: string
@@ -28,6 +28,8 @@ export const getCreditHistory = (pageSize = 10, pageToken?: string) => {
 
 const LABELS: Record<CreditEntry["type"], string> = {
   INITIAL_GRANT:       "Welcome credits",
+  // re-registered after deleting the account, old balance comes back
+  BALANCE_RESTORED:    "Balance restored from your old account",
   RESERVED:            "Held for a request",
   RESERVATION_UPDATED: "Request credits changed",
   RELEASED:            "Returned from a cancelled request",
