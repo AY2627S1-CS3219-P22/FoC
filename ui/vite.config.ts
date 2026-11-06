@@ -14,6 +14,8 @@ export default defineConfig({
       // start order-service with ORDER_HTTP_PORT=3003, its default clashes with supplier-service
       '/backend/orders':    { target: 'http://localhost:3003', rewrite: (p) => p.replace(/^\/backend/, '') },
       '/backend/credits':   { target: 'http://localhost:3004', rewrite: (p) => p.replace(/^\/backend/, '') },
+      // ws: true so Socket.IO can upgrade to a WebSocket
+      '/backend/chat':      { target: 'http://localhost:3005', rewrite: (p) => p.replace(/^\/backend/, ''), ws: true },
     },
   },
 })

@@ -1,5 +1,6 @@
 // AI-assisted (Claude), reviewed and tested by Maliha
 import type { Order } from "../App"
+import ChatPanel from "../components/ChatPanel"
 import StatusBadge from "../components/StatusBadge"
 import { useOrder } from "../hooks/useOrder"
 
@@ -107,6 +108,8 @@ export default function AcceptedOrderPage({ initialOrder, onDelivered, onBack }:
           ))}
         </div>
       </div>
+
+      <ChatPanel orderId={order.id} />
 
       {actionError && (
         <p role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-center text-xs text-red-600">{actionError}</p>

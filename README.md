@@ -50,7 +50,7 @@ microservice (`user-service/`, `supplier-service/`, `order-service/`,
 ├── credit-service/
 ├── shared/               # gRPC contracts/clients, RabbitMQ messaging
 ├── ui/
-├── <n2h-service>/
+├── chat-service/       # N2H: errand chat + content filter
 └── README.md
 ```
 
@@ -73,6 +73,7 @@ cp user-service/.env.example user-service/.env
 cp supplier-service/.env.example supplier-service/.env
 cp credit-service/.env.example credit-service/.env
 cp order-service/.env.example order-service/.env
+cp chat-service/.env.example chat-service/.env
 ```
 
 Then, from the repository root:
@@ -114,6 +115,7 @@ configuration predictable.
 | Supplier service | 3002 | 50052 | 54332 |
 | Order service | 3003 | 50053 | 5434 |
 | Credit service | 3004 | 50054 | 5433 |
+| Chat service (N2H) | 3005 | — | 5436 |
 | UI (nginx) | 8080 | — | — |
 | RabbitMQ | — | — | 5672 (AMQP), 15672 (management UI) |
 

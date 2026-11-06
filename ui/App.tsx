@@ -13,6 +13,7 @@ import SuppliersPage from "./pages/SuppliersPage"
 import { getMe, logout, type ApiUser } from "./api/users"
 import { getBalance } from "./api/credits"
 import { refreshToken } from "./api/client"
+import { closeChatSocket } from "./api/chat"
 
 export type Page =
   | "login"
@@ -175,6 +176,8 @@ export default function App() {
   const handleLogout = () => {
     logout().catch(() => {})
     localStorage.removeItem("token")
+    // so the next person to log in doesn't reuse this chat connection
+    closeChatSocket()
     setUser(CURRENT_USER)
     setIsLoggedIn(false)
     navigate("login")
