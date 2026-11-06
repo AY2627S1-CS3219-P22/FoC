@@ -229,7 +229,9 @@ pending; documentation-only update.
   JWTs and RBAC; refresh-token sessions with rotation and logout; profile
   update; the internal `GetPublicProfile` gRPC endpoint; admin bootstrap CLI,
   grant/revoke endpoints with last-admin protection and audit records;
-  cross-service port standardisation; setup and API documentation.
+  cross-service port standardisation; account deletion and archived-account
+  restoration; daily archive purging; Order Service deletion-eligibility gRPC;
+  setup and API documentation.
 - **Human decisions:** The author chose the stack and specified the schemas,
   endpoints, access rules, error behaviour, session design and admin
   bootstrap approach. Some design points (for example SHA-256 token hashing,

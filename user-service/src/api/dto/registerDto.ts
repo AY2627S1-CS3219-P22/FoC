@@ -1,8 +1,11 @@
 // AI Assistance Disclosure:
-// Tool: Claude Code (Claude Opus), date: 2026-09-27
-// Scope: AI generated the Zod registration schema.
-// Author review: Author specified the fields and validation rules, reviewed the
-// code line by line and approved. See user-service/ai/usage-log.md, entry 002.
+// Tool: Claude Code (Claude Opus), 2026-09-27; OpenAI Codex,
+// 2026-11-02 (Asia/Singapore).
+// Scope: AI generated the Zod registration schema and added the
+// author-specified confirmRestore field for archived-account restoration.
+// Author review: Author specified the fields and validation rules and reviewed
+// and approved entries 002 and 027. See
+// user-service/ai/usage-log.md.
 
 import { z } from 'zod';
 
@@ -26,6 +29,8 @@ export const registerSchema = z.object({
     .regex(/[A-Z]/, 'Password must contain an uppercase letter')
     .regex(/[0-9]/, 'Password must contain a number')
     .regex(/[^A-Za-z0-9]/, 'Password must contain a special character'),
+
+  confirmRestore: z.boolean().optional().default(false),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

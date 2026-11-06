@@ -27,9 +27,10 @@ COPY user-service/package.json ./user-service/
 
 # --- Build stage ---
 FROM base AS build
-RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci -w user-service -w @foc/messaging
+RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci -w user-service -w @foc/messaging -w @foc/grpc
 
 COPY shared/messaging ./shared/messaging
+COPY shared/grpc ./shared/grpc
 COPY user-service ./user-service
 
 WORKDIR /repo/user-service
@@ -45,10 +46,13 @@ CMD ["npx", "prisma", "migrate", "deploy"]
 # --- Runtime stage ---
 FROM base AS runtime
 ENV NODE_ENV=production
-RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci --omit=dev -w user-service -w @foc/messaging
+RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci --omit=dev -w user-service -w @foc/messaging -w @foc/grpc
 
 # Compiled code from the build stage.
 COPY --from=build /repo/shared/messaging/dist ./shared/messaging/dist
+COPY --from=build /repo/shared/grpc/dist ./shared/grpc/dist
+# @foc/grpc loads these at runtime by relative path.
+COPY shared/grpc/proto ./shared/grpc/proto
 COPY --from=build /repo/user-service/dist ./user-service/dist
 
 # Prisma's generated engine/client artifacts.
