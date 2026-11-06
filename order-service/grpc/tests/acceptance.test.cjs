@@ -21,3 +21,12 @@ test('expiry equality and past timestamps reject acceptance',()=>{
  assert.deepEqual(acceptanceFailure({...order,expiryTime:now},courier,now),{status:409,error:'expired'});
  assert.equal(acceptanceFailure({...order,expiryTime:new Date(+now-1)},courier,now).status,409);
 });
+
+// ChatGPT (Codex), 2026-11-06: Local invalid Supplier IDs must not masquerade as service outages; review pending.
+test('Supplier ID adapter errors carry INVALID_ARGUMENT and classify as rejected',()=>{
+ const {toSupplierRpcId}=require('../dist/dependencies/supplierErrorHelper');
+ const {classifyCreditError}=require('../dist/dependencies/creditValidation');
+ assert.equal(toSupplierRpcId('1'),1);
+ assert.equal(toSupplierRpcId('9007199254740991'),Number.MAX_SAFE_INTEGER);
+ for(const id of ['0','-1','abc','9007199254740992'])assert.throws(()=>toSupplierRpcId(id),error=>error.name==='InvalidSupplierError'&&error.code===3&&classifyCreditError(error)==='rejected');
+});

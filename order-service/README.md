@@ -719,3 +719,17 @@ curl -H 'Authorization: Bearer <token>' http://localhost:3003/orders/<order-uuid
 
 AI assistance: ChatGPT (Codex), 2026-11-03; implementation, refactoring, tests and
 documentation following the confirmed contract. Human review pending; see usage-log.md.
+
+### Acceptance display names and financial UI feedback
+
+Acceptance saves the User public-profile display name (trimmed first/last name,
+falling back to username) alongside courierId. Profiles without a usable name do
+not cause an assignment. Existing historical null snapshots are not backfilled.
+Listings/details expose the stored destinationLocationId. The UI retains
+creditState and confirms delivery credits as received only when SETTLED;
+SETTLEMENT_PENDING remains visibly pending. Creation choices and validation
+require expiry at least one hour ahead, matching the backend.
+
+See [completeness review](COMPLETENESS_REVIEW.md) for reviewed areas, fixes and
+remaining confirmed scope. AI assistance: ChatGPT (Codex), 2026-11-06;
+implementation/debugging/tests/documentation, human review pending; see usage-log.md.

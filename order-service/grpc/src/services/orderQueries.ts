@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-06: Complete lifecycle snapshots and UI contract handling; review pending; see order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Implemented author-approved administrator and authenticated relationship-based order listings.
@@ -8,7 +9,7 @@ import { prisma } from '../db';
 const publicOrderFields = {
   id: true, requesterId: true, courierId: true, supplierId: true,
   pickupStore: true, pickupLocation: true, requesterName: true, courierName: true,
-  destination: true, requestDetails: true, credits: true, expiryTime: true,
+  destination: true, destinationLocationId: true, requestDetails: true, credits: true, expiryTime: true,
   status: true, cancellationReason: true, creditState: true,
   createdAt: true, updatedAt: true, acceptedAt: true, pickedUpAt: true,
   deliveredAt: true, cancelledAt: true,

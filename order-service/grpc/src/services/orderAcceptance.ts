@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-06: Complete lifecycle snapshots and UI contract handling; review pending; see order-service/usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Implemented author-requested courier eligibility and first-lock-wins acceptance.
 // Author review: Pending; see ../../usage-log.md.
@@ -20,7 +21,7 @@ export function acceptanceFailure(order: AcceptanceOrder, actor: Actor, now: Dat
   return undefined;
 }
 
-type UserLookup = { getPublicProfile: (request: { userId: string }) => Promise<{ userId: string }> };
+type UserLookup = { getPublicProfile: (request: { userId: string }) => Promise<{ userId: string; firstName: string; lastName: string; username: string }> };
 
 export function createOrderAcceptance(db: PrismaClient, users: UserLookup) {
   async function accept(orderId: string, actor: Actor): Promise<CommandResult> {
@@ -36,9 +37,12 @@ export function createOrderAcceptance(db: PrismaClient, users: UserLookup) {
         orderId, state: { in: ['PENDING', 'PROCESSING', 'RECONCILIATION_REQUIRED'] },
       }, select: { id: true } });
       if (editing) return { status: 409, error: 'conflict' };
+      let courierName: string;
       try {
         const profile = await users.getPublicProfile({ userId: actor.id });
         if (profile.userId !== actor.id) return { status: 503, error: 'dependency-unavailable' };
+        courierName = [profile.firstName, profile.lastName].map(name => name.trim()).filter(Boolean).join(' ') || profile.username.trim();
+        if (!courierName) return { status: 503, error: 'dependency-unavailable' };
       } catch (error) {
         if ((error as { code?: number } | null)?.code === rpcStatus.NOT_FOUND) {
           return { status: 403, error: 'forbidden' };
@@ -49,7 +53,7 @@ export function createOrderAcceptance(db: PrismaClient, users: UserLookup) {
       const acceptedAt = (await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`)[0].now;
       if (order.expiryTime <= acceptedAt) return { status: 409, error: 'expired' };
       const assigned = await tx.order.update({ where: { id: orderId }, data: {
-        status: 'ASSIGNED', courierId: actor.id, courierName: null, acceptedAt,
+        status: 'ASSIGNED', courierId: actor.id, courierName, acceptedAt,
       } });
       return { status: 200, order: assigned };
     });

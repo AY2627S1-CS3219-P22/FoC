@@ -14,7 +14,7 @@ const {createOrderCreation}=require('../dist/services/orderCreation');const {cre
 const {createOrderLifecycle}=require('../dist/services/orderLifecycle');const {createOrderSchema,editOrderSchema}=require('../dist/api/dto/orderInput');
 const {createApp}=require('../dist/api/app');
 const {createOrderAcceptance}=require('../dist/services/orderAcceptance');
-const existingUsers={getPublicProfile:async({userId})=>({userId})};
+const existingUsers={getPublicProfile:async({userId})=>({userId,firstName:'Campus',lastName:'Courier',username:'courier'})};
 const prefix='lifecycle-'+randomUUID();let userCounter=0;
 before(()=>db.$connect());
 after(async()=>{
@@ -267,7 +267,7 @@ test('automatic expiry worker ignores future and delivered orders and refunds ov
 test('acceptance persists courier identity, timestamp and ASSIGNED without new credit mutations',async()=>{
  const f=fixture(),order=await create(f);const acceptance=createOrderAcceptance(db,existingUsers);const actor={id:'courier-'+randomUUID(),roles:['USER']};
  const response=await acceptance.accept(order.id,actor);assert.equal(response.status,200);assert.equal(response.order.status,'ASSIGNED');assert.equal(response.order.courierId,actor.id);assert.ok(response.order.acceptedAt instanceof Date);assert.ok(response.order.acceptedAt>=response.order.createdAt);assert.equal(response.order.creditState,'RESERVED');
- const stored=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(stored.courierId,actor.id);assert.equal(stored.status,'ASSIGNED');assert.equal(f.calls,1);assert.equal(f.updates,0);assert.equal(f.releases,0);
+ const stored=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(stored.courierId,actor.id);assert.equal(stored.courierName,'Campus Courier');assert.equal(response.order.courierName,'Campus Courier');assert.equal(stored.status,'ASSIGNED');assert.equal(f.calls,1);assert.equal(f.updates,0);assert.equal(f.releases,0);
  assert.equal((await acceptance.accept(order.id,actor)).status,409);assert.equal((await acceptance.accept(order.id,{id:'another',roles:['USER']})).status,409);
 });
 test('twelve concurrent couriers yield exactly one successful acceptance and one persisted winner',async()=>{
@@ -771,13 +771,13 @@ test('acceptance verifies the JWT courier via User gRPC and fails closed without
   mode=nextMode;assert.equal((await post()).status,expected,nextMode);assert.equal(lastUser,actor);
   const current=await db.order.findUniqueOrThrow({where:{id:order.id}});assert.equal(current.status,'UNASSIGNED');assert.equal(current.courierId,null);assert.equal(current.acceptedAt,null);
  }
- mode='exists';const accepted=await post();assert.equal(accepted.status,200);assert.equal((await accepted.json()).order.courierId,actor);assert.equal(f.calls,1);
+ mode='exists';const accepted=await post();assert.equal(accepted.status,200);const acceptedOrder=(await accepted.json()).order;assert.equal(acceptedOrder.courierId,actor);assert.equal(acceptedOrder.courierName,'Campus Courier');assert.equal(f.calls,1);
 });
 
 test('acceptance rechecks expiry after User lookup and does not assign an expired order',async()=>{
  const f=fixture(),order=await create(f);
  await db.order.update({where:{id:order.id},data:{expiryTime:new Date(Date.now()+100)}});
- const users={getPublicProfile:async({userId})=>{await new Promise(r=>setTimeout(r,150));return {userId}}};
+ const users={getPublicProfile:async({userId})=>{await new Promise(r=>setTimeout(r,150));return {userId,firstName:'Campus',lastName:'Courier',username:'courier'}}};
  const result=await createOrderAcceptance(db,users).accept(order.id,{id:'courier',roles:['USER']});
  assert.equal(result.status,409);assert.equal(result.error,'expired');assert.equal((await db.order.findUniqueOrThrow({where:{id:order.id}})).courierId,null);
 });
@@ -897,7 +897,7 @@ test('single-order GET enforces relationships, open visibility, authentication a
  assert.equal((await get('/invalid',requester)).status,400);
  const open=await get('/'+order.id,outsider);assert.equal(open.status,200);
  const listing=await get('?scope=open',outsider);assert.deepEqual(open.body.order,listing.body.orders.find(o=>o.id===order.id));
- assert.equal(typeof open.body.order.supplierId,'string');
+ assert.equal(typeof open.body.order.supplierId,'string');assert.equal(open.body.order.destinationLocationId,'kr_001');
  for(const field of ['creation','payload','creditOperations','editOperations','requestFingerprint','idempotencyKey'])assert.equal(field in open.body.order,false);
  for(const auth of [requester,admin])assert.equal((await get('/'+order.id,auth)).status,200);
  await db.order.update({where:{id:order.id},data:{expiryTime:new Date(0)}});
@@ -908,4 +908,22 @@ test('single-order GET enforces relationships, open visibility, authentication a
   for(const auth of [requester,courier,admin])assert.equal((await get('/'+order.id,auth)).status,200,status);
  }
  const location=await get('/locations?query=COM1',requester);assert.equal(location.status,200);assert.ok(Array.isArray(location.body.locations));
+});
+
+// ChatGPT (Codex), 2026-11-06: Name snapshot completeness and fallback regression tests; review pending.
+test('acceptance stores trimmed profile name or username and rejects missing display identity',async()=>{
+ const f=fixture();
+ for(const [key,profile,expected] of [
+  ['full',{firstName:'  Campus ',lastName:' Courier  ',username:'courier'},'Campus Courier'],
+  ['username',{firstName:' ',lastName:'',username:' fallback '},'fallback'],
+  ['first',{firstName:'Only',lastName:'',username:'fallback'},'Only'],
+  ['blank',{firstName:' ',lastName:' ',username:' '},null],
+ ]){
+  const order=await create(f,'name-'+key),actor={id:f.user+'-'+key,roles:['USER']};
+  const users={getPublicProfile:async({userId})=>({userId,...profile})};
+  const result=await createOrderAcceptance(db,users).accept(order.id,actor);
+  const stored=await db.order.findUniqueOrThrow({where:{id:order.id}});
+  if(expected===null){assert.equal(result.status,503);assert.equal(stored.status,'UNASSIGNED');assert.equal(stored.courierId,null);assert.equal(stored.courierName,null);}
+  else{assert.equal(result.status,200);assert.equal(result.order.courierName,expected);assert.equal(stored.courierName,expected);}
+ }
 });
