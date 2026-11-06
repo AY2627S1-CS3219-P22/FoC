@@ -1,12 +1,12 @@
-// AI-generated; human review pending. OpenAI Codex (GPT-6), 2026-11-04 (Asia/Singapore).
-// Scope: Applied lifecycle migration before current-service checks; missing history account now returns ACCOUNT_NOT_FOUND.
-// Citation: ../ai/usage-log.md, entry 049.
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
-// Scope: Tested the human-finalized history migration, sequence ordering, and account-lock pagination concurrency. Verified REST pagination against database ordering without exposing sequence IDs. Added/tested/documented startup-only listener health with database-based HTTP status as the human specified. Implemented/documented the human-defined history constraints and scoped SQL/seeded concurrency checks. Tested entry-ID bookmarks, scoped sequence lookup and uniform REST rejection while preserving sequence pagination. Ran paging/repository scenarios against the metadata-free idempotency schema.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-11-04 (Asia/Singapore).
+// Scope: Tested the human-finalized history migration, sequence ordering, and account-lock pagination concurrency. 
+// Verified REST pagination against database ordering without exposing sequence IDs. Added/tested/documented startup-only listener health with database-based HTTP status as the human specified. 
+// Implemented/documented the human-defined history constraints and scoped SQL/seeded concurrency checks. Tested entry-ID bookmarks, scoped sequence lookup and uniform REST rejection while preserving sequence pagination. Ran paging/repository scenarios against the metadata-free idempotency schema. 
+// Applied lifecycle migration before current-service checks; missing history account now returns ACCOUNT_NOT_FOUND.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: I reviewed that the test specification is correct.
-// Prompts and key responses: ../ai/usage-log.md, entries 005–025, 031, 038, 039, 043, 045.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–025, 031, 038, 039, 043, 045, 049.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

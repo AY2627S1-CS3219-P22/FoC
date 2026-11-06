@@ -1,9 +1,11 @@
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-11-04 (Asia/Singapore).
-// Scope: Implemented human-specified SQL account/reservation/history/idempotency operations and transaction-level bigint advisory/row locks. Removed account timestamp reads and account/reservation timestamp writes. Looked up bookmark sequence boundaries by history entry ID and authenticated user ID. Removed idempotency user-column reads/writes. Implemented human-specified account status reads, deletion and atomic closure
+// Scope: Implemented human-specified SQL account/reservation/history/idempotency operations and transaction-level bigint advisory/row locks. 
+// Removed account timestamp reads and account/reservation timestamp writes. Looked up bookmark sequence boundaries by history entry ID and authenticated user ID. Removed idempotency user-column reads/writes. 
+// Implemented human-specified account status reads, deletion and atomic closure.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: I reviewed the pure SQL operations, and ultimately changed the design to remove accounts, reservation, idempotency records timestamp fields as well as user id field in idempotency records..
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–024, 040, 043, 045 (prior scopes retained).
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–024, 040, 043, 045, 049.
 
 import type { PoolClient } from 'pg';
 import type {
