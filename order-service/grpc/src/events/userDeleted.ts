@@ -1,3 +1,7 @@
+// AI Assistance Disclosure: Claude Opus (Cursor), 2026-11-05.
+// Prompt: improve index.ts to ensure supplier/order pub-sub works for the supplier cache.
+// Scope: extracted subscribeUserDeleted so it can share Order's single broker connection.
+// Author review: Updated to single broker for both supplier and user, reviewed by @sunpterodactyl.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02.
 // Scope: Shared subscription, repeat-safe receipt and human-confirmed deletion processing.
 // Author review: Pending; see ../../../usage-log.md.
@@ -33,14 +37,20 @@ export function createUserDeletedHandler(db: PrismaClient): QueueHandler<unknown
   };
 }
 
+//@sunpterodactyl refactored here so there is a single connection across supplier and user for the order service 
+
+export async function subscribeUserDeleted(db: PrismaClient, broker: Pick<RabbitMQClient, 'consumeFromQueue'>) {
+  // Finish receipts ACKed by the earlier receipt-only consumer before upgrade.
+  await processReceivedUserDeletions(db);
+  await broker.consumeFromQueue(QUEUES.orderUser, createUserDeletedHandler(db));
+  console.info('Order user.deleted subscription ready', { queue: QUEUES.orderUser });
+}
+
 export async function startUserDeletedConsumer(db: PrismaClient, url: string) {
   const broker = new RabbitMQClient({ url, serviceName: 'order-service', queues: [QUEUES.orderUser], prefetch: 10 });
   try {
     await broker.connect();
-    // Finish receipts ACKed by the earlier receipt-only consumer before upgrade.
-    await processReceivedUserDeletions(db);
-    await broker.consumeFromQueue(QUEUES.orderUser, createUserDeletedHandler(db));
-    console.info('Order user.deleted subscription ready', { queue: QUEUES.orderUser });
+    await subscribeUserDeleted(db, broker);
     return broker;
   } catch (error) {
     await broker.close().catch(() => undefined);
