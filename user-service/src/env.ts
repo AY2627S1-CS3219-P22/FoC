@@ -4,6 +4,8 @@
 // key loading, the refresh-token settings and the standardised gRPC port.
 // Author review: Author reviewed the code and approved. See
 // user-service/ai/usage-log.md, entries 001, 008, 010, 016.
+// OpenAI Codex added the author-specified Order Service gRPC address for
+// deletion eligibility; entry 031 is pending review.
 
 import 'dotenv/config';
 import fs from 'node:fs';
@@ -15,6 +17,7 @@ const schema = z.object({
   DATABASE_URL: z.url(),
   PORT: z.coerce.number().int().positive().default(3001),
   GRPC_PORT: z.coerce.number().int().positive().default(50051),
+  ORDER_GRPC_ADDR: z.string().min(1).default('localhost:50053'),
 
   JWT_PRIVATE_KEY_PATH: z.string().min(1),
   JWT_PUBLIC_KEY_PATH: z.string().min(1),

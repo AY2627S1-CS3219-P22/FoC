@@ -1,7 +1,6 @@
 <!--
 AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-30 (Asia/Singapore).
 Scope: Archived the RabbitMQ retry request, follow-up, comments and inspection results.
-Review: Pending human review. Prompts/key responses: ../usage-log.md, entry 047.
 -->
 
 # Prompt archive — 047

@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "keys:generate": "mkdir -p keys && openssl genpkey -algorithm RSA -out keys/private.pem -pkeyopt rsa_keygen_bits:2048 && openssl rsa -in keys/private.pem -pubout -out keys/public.pem",
-    "prebuild": "npm run build --prefix ../shared/messaging",
+    "prebuild": "npm run build --prefix ../shared/messaging && npm run build --prefix ../shared/grpc",
     "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
@@ -24,6 +24,7 @@
     "@foc/messaging": "file:../shared/messaging",
     "@grpc/grpc-js": "^1.14.5",
     "@grpc/proto-loader": "^0.8.1",
+    "@foc/grpc": "0.1.0",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",

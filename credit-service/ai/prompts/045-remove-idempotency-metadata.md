@@ -24,4 +24,4 @@ let's remove user_id and created_at from idempotency_record, and from our tests,
   Existing seeded ledger checks found no genuine violation or deadlock. Tests
   cleaned their schemas and disposable broker. Documentation/disclosure updated.
 - Migration 010 is not applied to the running local database; no application
-  container replacement, dependency change, commit or push. Human review pending.
+  container replacement, dependency change, commit or push. 

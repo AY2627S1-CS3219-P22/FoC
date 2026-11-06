@@ -1,30 +1,21 @@
 // AI Assistance Disclosure:
-// Tool: Claude Code (Claude Opus), dates: 2026-10-19
+// Tool: Claude Code (Claude Opus), 2026-10-19; OpenAI Codex,
+// 2026-11-02 (Asia/Singapore).
 // Scope: AI generated bootstrapAdmin (advisory lock, single transaction, audit
-// record), grantAdmin, revokeAdmin and ensureNotLastAdmin.
-// Author review: Author specified the bootstrap steps, both endpoints, the
-// transaction, the lock and last-admin protection, reviewed the code and
-// approved. See user-service/ai/usage-log.md, entries 019, 020.
+// record), grantAdmin, revokeAdmin and ensureNotLastAdmin, then extracted the
+// advisory-lock guard for account deletion.
+// Author review: Author specified the bootstrap, role-management, locking,
+// and last-admin requirements; reviewed, manually tested, and approved. See
+// user-service/ai/usage-log.md, entries 019, 020, and 025.
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import type { RegisterInput } from '../api/dto/registerDto';
 import { buildNewUser, duplicateField, profileSelect } from './userService';
 import { enqueueUserCreated } from '../events/outboxStore';
+import { activeAdminWhere, ensureNotLastAdmin, lockAdminSet } from './adminGuards';
 
-// App-wide key for the admin lock.
-const ADMIN_LOCK_KEY = 32190001;
-
-export const activeAdminWhere = {
-  roles: { has: 'ADMINISTRATOR' },
-  isDeleted: false,
-} satisfies Prisma.UserWhereInput;
-
-// Call first in any transaction that changes who is an admin, so those run one
-// at a time. Released when the transaction ends.
-async function lockAdminSet(tx: Prisma.TransactionClient) {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${ADMIN_LOCK_KEY}::bigint)`;
-}
+export { activeAdminWhere, ensureNotLastAdmin, lockAdminSet } from './adminGuards';
 
 export async function isInitialized() {
   return (await prisma.systemBootstrap.findUnique({ where: { id: 1 } })) !== null;
@@ -70,7 +61,7 @@ async function checkActorAndTarget(tx: Prisma.TransactionClient, actorId: string
   if (!actor) return { ok: false as const, reason: 'forbidden' as const };
 
   const target = await tx.user.findFirst({
-    where: { id: targetId, isDeleted: false },
+    where: { id: targetId },
     select: profileSelect,
   });
   if (!target) return { ok: false as const, reason: 'not_found' as const };
@@ -96,13 +87,6 @@ export async function grantAdmin(actorId: string, targetId: string) {
     await tx.adminRoleChange.create({ data: { actorId, targetId, action: 'GRANT' } });
     return { ok: true as const, user };
   });
-}
-
-// Call only after lockAdminSet in the same transaction, or the count can be stale.
-export async function ensureNotLastAdmin(tx: Prisma.TransactionClient, userId: string) {
-  const others = await tx.user.count({ where: { ...activeAdminWhere, NOT: { id: userId } } });
-  if (others === 0) return { ok: false as const, reason: 'last_admin' as const };
-  return { ok: true as const };
 }
 
 export async function revokeAdmin(actorId: string, targetId: string) {

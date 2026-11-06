@@ -20,4 +20,4 @@ i think let's also remove hashing and timingSafeEqual from auth.ts we don't need
   authorization behavior retained. No security rationale generated.
 - Credit TypeScript build and all eight existing authentication tests passed.
 - Updated README wording and consolidated AI disclosure. No dependency change,
-  database operation, container replacement, commit or push; human review pending.
+  database operation, container replacement, commit or push; 

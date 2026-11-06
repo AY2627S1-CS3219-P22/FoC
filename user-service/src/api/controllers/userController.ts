@@ -8,7 +8,12 @@
 // session settings, wrote the logout handler, reviewed the code and approved.
 // See user-service/ai/usage-log.md, entries 004, 008, 009, 010, 011, 013, 015,
 // 017, 020.
-
+// Author specified the layers, endpoint behavior, JWT and session settings,
+// and wrote the logout handler. OpenAI Codex also added DELETE /users/me and
+// restore-confirmation registration handling.
+// registration handling (entries 025 and 027); both were reviewed, manually
+// tested, and approved.
+//
 import type { RequestHandler, Response } from 'express';
 import type { Roles } from '@prisma/client';
 import jwt from 'jsonwebtoken';
@@ -54,6 +59,13 @@ export const register: RequestHandler = async (req, res) => {
   const result = await userService.register(req.body as RegisterInput);
 
   if (!result.ok) {
+    if (result.reason === 'restore_confirmation_required') {
+      res.status(409).json({
+        error: 'Restore Confirmation Required',
+        message: 'A deleted account exists for this email. Confirm to restore only the previous credit balance; other account data will not be restored.',
+      });
+      return;
+    }
     res.status(409).json({
       error: 'Conflict',
       message: `An account with this ${result.field} already exists.`,
@@ -136,6 +148,28 @@ export const updateMe: RequestHandler = async (req, res) => {
   }
 
   res.status(200).json({ user: result.user });
+};
+
+// DELETE /users/me
+export const deleteMe: RequestHandler = async (req, res) => {
+  const result = await userService.deleteAccount(req.user!.id);
+  if (!result.ok) {
+    if (result.reason === 'not_found') {
+      res.status(404).json({ error: 'Not Found', message: 'User no longer exists.' });
+    } else if (result.reason === 'last_admin') {
+      res.status(409).json({ error: 'Conflict', message: 'Cannot delete the last remaining active administrator.' });
+    } else if (result.reason === 'eligibility_unavailable') {
+      res.status(503).json({ error: 'Service Unavailable', message: "Can't delete your account right now. Please try again later." });
+    } else {
+      res.status(409).json({ error: 'Conflict', message: `Cannot delete an account with ${result.activeOrders} active orders.` });
+    }
+    return;
+  }
+
+  clearRefreshCookie(res);
+  res.status(200).json({
+    message: 'Account deleted. Re-registering with the same email within 4 years will restore your previous credit balance, but not your other account information.',
+  });
 };
 
 // GET /users

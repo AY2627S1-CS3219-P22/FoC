@@ -1,9 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
-// Scope: Generated PostgreSQL behaviour/concurrency tests for the human-specified core credit operations. Generated regression tests for settled-reservation retries without saved results.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-11-04 (Asia/Singapore).
+// Scope: Generated PostgreSQL behaviour/concurrency tests for the human-specified core credit operations. Generated regression tests for settled-reservation retries without saved results. Updated courier error assertion for the human-requested ID-free messages.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: I reviewed that the test specification is correct.
-// Prompts and key responses: ../ai/usage-log.md, entries 005–026 and 028.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–026, 028, 049.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -387,7 +387,8 @@ test('core credit operations implement the supplied state and transaction rules'
       await service.reserveCredits({ orderId, requesterId, amount: 4 });
       await rejectsWithoutWrites(() => service.settleCredits({ orderId, courierId: requesterId }), 'FAILED_PRECONDITION', 'INVALID_STATE');
       await rejectsWithoutWrites(() => service.settleCredits({ orderId, courierId: 'missing-courier' }), 'NOT_FOUND', 'ACCOUNT_NOT_FOUND');
-      await assert.rejects(service.settleCredits({ orderId, courierId: 'missing-courier' }), /missing-courier/);
+      await assert.rejects(service.settleCredits({ orderId, courierId: 'missing-courier' }), error =>
+        error.message === 'Courier credit account not found' && !error.message.includes('missing-courier'));
       await rejectsWithoutWrites(() => service.settleCredits({ orderId: randomUUID(), courierId: requesterId }), 'NOT_FOUND', 'RESERVATION_NOT_FOUND');
       await rejectsWithoutWrites(() => service.reserveCredits({ orderId: randomUUID(), requesterId: 'missing-requester', amount: 1 }), 'NOT_FOUND', 'ACCOUNT_NOT_FOUND');
     });

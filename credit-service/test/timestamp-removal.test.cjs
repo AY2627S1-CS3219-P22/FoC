@@ -1,8 +1,8 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22-2026-10-26 (Asia/Singapore).
-// Scope: Tested timestamp-removal upgrade preservation and credit operations on the resulting schema. Extended populated-data upgrade/replay checks to removed idempotency metadata.
+// Tool: OpenAI Codex (model: GPT-6), date: 2026-10-22-2026-11-04 (Asia/Singapore).
+// Scope: Tested timestamp-removal upgrade preservation and credit operations on the resulting schema. Extended populated-data upgrade/replay checks to removed idempotency metadata. Applied lifecycle migration after historical upgrade assertions; expected account status in current reads.
 // Author review: I reviewed that the test specification is correct.
-// Prompts/key responses: ../ai/usage-log.md, entry 040, 045.
+// Prompts/key responses: ../ai/usage-log.md, entry 040, 045, 049.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -111,10 +111,11 @@ test('account/reservation timestamps and idempotency metadata removal preserve d
     });
 
     // A genuine ledger failure stops this scenario before further operations.
+    await apply('011_account_lifecycle.sql');
     await verifyLedger();
     await t.test('reads, allocation, update, release, settlement and saved replay work without timestamps', async () => {
       const account = await new SqlCreditRepository(client).findAccount(users[0]);
-      assert.deepEqual(account, { userId: users[0], totalCredits: 10, reservedCredits: 6 });
+      assert.deepEqual(account, { userId: users[0], totalCredits: 10, reservedCredits: 6, status: 'ACTIVE' });
       const updated = await service.updateReservation({ orderId: orders[0], amount: 4, expectedVersion: 1 });
       assert.equal(updated.version, 2);
       assert.equal((await service.releaseCredits({ orderId: orders[1] })).status, 'RELEASED');

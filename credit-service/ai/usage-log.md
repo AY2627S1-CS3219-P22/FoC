@@ -1,42 +1,9 @@
 <!--
 AI Assistance Disclosure:
-Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-10-30 (Asia/Singapore).
-Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, and bounded clarification.
-Author review: Pending human review; no human validation is claimed.
-Prompts and key responses: Entries 001–049 below and the linked prompt archives.
-Entry 031: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Recorded the latest implementation request, changes and actual verification.
-New changes await human review; see credit-service/ai/usage-log.md, entry 031 (repository-relative).
-Entry 032: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded the human-requested move to local Git exclusions; review pending.
-Entry 033: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded source-based README verification and documentation corrections; review pending.
-Entry 034: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded whole-folder local exclusions and the approved migration-runner relocation; review pending.
-Entry 035: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained.
-Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 035 (repository-relative).
-Entry 036: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded event-startup integration request, pending lifecycle/package decisions and independent configuration work; review pending.
-Entry 037: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded authorized upstream messaging import, broker authorship and actual integration checks; human review pending.
-Entry 038: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded the confirmed startup-only listener field and database-based health response; review pending.
-Entry 039: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Implemented/documented the human-defined history constraints and scoped SQL/seeded concurrency checks.
-Changes await human review; prompts/key responses: credit-service/ai/usage-log.md, entry 039 (repository-relative).
-Entry 040: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded human-requested account/reservation timestamp removal and actual checks.
-Changes await human review; prompts/key responses: entry 040 below and its archive.
-Entry 041: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Applied the requested local migration and recorded rebuild/restart/runtime checks.
-Changes await human review; prompts/key responses: entry 041 below and its archive.
-Entry 042: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded the human-requested direct service-token comparison and targeted checks.
-Changes await human review; prompts/key responses: entry 042 below and its archive.
-Entry 043: OpenAI Codex (GPT-6), 2026-10-22 (Asia/Singapore).
-Scope: Recorded the human-defined entry-ID history token and paging implementation/checks.
-Changes await human review; prompts/key responses: entry 043 below and its archive.
+Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-19–2026-11-06 (Asia/Singapore).
+Scope: Maintained this credit-service log for supplied references, Docker/PostgreSQL setup, implementation/tests, credit contracts including event-driven initialization replacement, human-confirmed business/transaction rules, bounded clarification.
+Author review: I ensured all the importan prompts that contributed to the development of Credit Service are recorded.
+Prompts and key responses: Entries 001–050 below and the linked prompt archives.
 -->
 
 # AI usage log
@@ -69,8 +36,6 @@ submission files; retained disclosure content is under this ai directory.
 - **Agent verification:** Inspected branch/status and existing instruction/README
   files; checked the documentation diff, attribution headers, and relative links.
   No application tests are applicable to this documentation-only change.
-- **Human review/edits:** Pending. No author review, correctness validation, team
-  agreement, or acceptance is asserted.
 - **External sources/licensing:** No external sources or third-party code used.
 - **Instruction files used:** User-supplied AGENTS.md instructions; repository root
   `AGENTS.md` and `credit-service/AGENTS.md` (both empty before setup). No skills
@@ -119,9 +84,7 @@ submission files; retained disclosure content is under this ai directory.
   granted. Human environment files were not read or changed. Containers remain
   running at host ports 5433 (PostgreSQL) and 50054 (gRPC). Compose reported
   pre-existing stopped project containers; those were left untouched.
-- **Human review/edits:** The user supplied PostgreSQL 17 and the reference design.
-  Review of generated Docker configuration and copied documentation remains
-  pending. No human validation or team approval is asserted.
+- **Human edits:** The user supplied PostgreSQL 17 and the reference design.
 - **Sources/licensing:** Consulted the [official PostgreSQL image documentation](https://github.com/docker-library/docs/blob/master/postgres/README.md)
   for PostgreSQL 17 environment/volume configuration and
   [Docker Compose startup documentation](https://docs.docker.com/compose/how-tos/startup-order/)
@@ -154,8 +117,7 @@ submission files; retained disclosure content is under this ai directory.
 - **Agent verification:** Checked the documentation diff, local links,
   attribution headers, and final README disclosure section. No application tests
   were run for this documentation-only update.
-- **Human review/edits:** These decisions were explicitly supplied by the human;
-  review of the formatted record remains pending.
+- **Human edits:** These decisions were explicitly supplied by the human.
 - **External sources/licensing:** No external sources or third-party code used.
 - **Instruction files used:** Root `AGENTS.md` and empty
   `credit-service/AGENTS.md`. No skills were invoked.
@@ -204,9 +166,8 @@ submission files; retained disclosure content is under this ai directory.
   the authorized install with network access succeeded. Docker and local
   database access used granted sandbox escalation. No automatic approval review
   rejection occurred.
-- **Human review/edits:** Human supplied the recorded schema decisions and JSON
-  exception. Generated implementation, tests, and formatted records await human
-  review; passing agent tests do not assert human validation.
+- **Human edits:** Human supplied the recorded schema decisions and JSON
+  exception. 
 - **Sources/licensing:** Consulted [node-postgres connections](https://node-postgres.com/features/connecting),
   [node-postgres transactions](https://node-postgres.com/features/transactions),
   and [PostgreSQL 17 constraints](https://www.postgresql.org/docs/17/ddl-constraints.html).
@@ -259,9 +220,8 @@ submission files; retained disclosure content is under this ai directory.
   rows or leftover test schemas. Inspected the applied defaults, signed integer
   field types, and required application-supplied version. Attribution headers,
   local links, final README section, and `git diff --check` passed.
-- **Human review/edits:** Schema decisions came from the human across exchanges
-  004–006. Generated SQL, tests, and shorthand formatting await human review;
-  passing agent checks do not assert human validation.
+- **Human edits:** Schema decisions came from the human across exchanges
+  004–006. 
 - **Sources/licensing:** Consulted PostgreSQL 17 documentation for
   [signed integer types](https://www.postgresql.org/docs/17/datatype-numeric.html),
   [UUID generation](https://www.postgresql.org/docs/17/functions-uuid.html), and
@@ -313,12 +273,12 @@ submission files; retained disclosure content is under this ai directory.
   PostgreSQL. Corrected that test to check missing-ID validation without a
   database call. The suite then passed seven of seven; no User Service code was
   changed.
-- **Human review/edits:** Schema rename/terminal-status changes and contract
-  alignment were requested by the human. Generated changes await human review.
+- **Human edits:** Schema rename/terminal-status changes and contract
+  alignment were requested by the human. 
   The broader casing/scope answers arrived during this work and are captured in
   entry 008; no response was assumed from the preselected options. Preserved the
   human's existing `Human Reviewed.` marker in `credit-service/README.md` for its
-  earlier content and separately marked these new additions as pending review.
+  earlier content.
 - **Sources/licensing:** Consulted the [Protobuf message-update documentation](https://protobuf.dev/programming-guides/proto3/#updating)
   and [PostgreSQL 17 ALTER TABLE reference](https://www.postgresql.org/docs/17/sql-altertable.html).
   No third-party implementation code was pasted. Generated types came from the
@@ -354,9 +314,8 @@ submission files; retained disclosure content is under this ai directory.
   exactly. Verified the live `requester_id` column, uppercase default, updated
   reserve request shape, and absence of leftover test schemas. Attribution,
   local-link, final README section, and `git diff --check` checks passed.
-- **Human review/edits:** Human explicitly chose all three uppercase values and
-  stated that a wider RPC specification will follow. Generated artifacts await
-  human review.
+- **Human edits:** Human explicitly chose all three uppercase values and
+  stated that a wider RPC specification will follow. 
 - **Sources/licensing:** PostgreSQL ALTER TABLE documentation already consulted
   in entry 007; no third-party implementation code was copied.
 - **Instruction files used:** Root `AGENTS.md` and empty
@@ -399,10 +358,9 @@ submission files; retained disclosure content is under this ai directory.
   No SQL, migration,
   dependency, or database state changes were required; database tests were not
   repeated for these contract-only changes.
-- **Human review/edits:** RPC names, core request fields, and described behavior
+- **Human edits:** RPC names, core request fields, and described behavior
   were supplied by the human. Responses not fully specified by the human have
-  not been invented. Existing reviewed README content was preserved; new edits
-  remain pending review.
+  not been invented. 
 - **Sources/licensing:** Used the existing repository generator and loader;
   Protobuf documentation previously recorded in entry 007 supplies the field
   number/optional-field conventions. No third-party implementation code was
@@ -455,9 +413,8 @@ submission files; retained disclosure content is under this ai directory.
 - **Attribution maintenance:** Restored headers on three regenerated request
   files whose bodies reverted to their original baseline when caller keys were
   removed, as well as other affected generated files. Preserved generated source
-  comments and the human's existing README review marker; current edits remain
-  pending human review.
-- **Human review/edits:** The human specified exact responses, all-table history
+  comments and the human's existing README review marker.
+- **Human edits:** The human specified exact responses, all-table history
   entries, once-only registration behavior, and internal key generation,
   superseding the earlier caller-key choice. No unprovided InitCredits response,
   page wrapper, or internal retry-identification design was selected by AI.
@@ -510,9 +467,9 @@ submission files; retained disclosure content is under this ai directory.
   or implemented. Attribution/log-pointer, local-link, final README section, and
   `git diff --check` checks passed. No database schema or state changes were required; database tests
   were not repeated for this contract-only change.
-- **Human review/edits:** The human selected the shared page/entry and exact
+- **Human edits:** The human selected the shared page/entry and exact
   field names, deterministic-key/locking flow, original-response replay, and
-  initialization behavior. Generated code/docs await human review. No hash,
+  initialization behavior. No hash,
   concrete lock strategy, initialization result schema, retry strategy, or
   response-code policy was selected by AI.
 - **Sources/licensing:** Consulted [Stripe's idempotency documentation](https://docs.stripe.com/api/idempotent_requests)
@@ -525,8 +482,7 @@ submission files; retained disclosure content is under this ai directory.
   `credit-service/AGENTS.md`. No skills were invoked.
 - **Remaining human input:** Confirm the hash algorithm; define initialization
   payload fields/types/values and any gRPC failure codes; specify duplicate
-  initialization's result versus the general original-response replay rule;
-  review the generated artifacts. Concrete pagination/locking details remain
+  initialization's result versus the general original-response replay rule. Concrete pagination/locking details remain
   for the subsequent business-implementation step.
 
 ## 012 — Complete InitCredits contract and record SHA-256/saved-success replay
@@ -565,16 +521,15 @@ submission files; retained disclosure content is under this ai directory.
   passed. These checks verify contract transport/scaffolding, not
   initial allocation or duplicate replay business behavior. No database schema,
   dependency, or data changes were required; database tests were not repeated.
-- **Human review/edits:** The human selected SHA-256, the exact four-field
+- **Human edits:** The human selected SHA-256, the exact four-field
   initialization payload, and original-success replay on duplicate initialization,
-  resolving the earlier questions. Code/docs remain pending human review;
-  existing human-reviewed README content was preserved.
+  resolving the earlier questions. 
 - **Sources/licensing:** Existing repository generator/client/scaffold conventions
   and previously recorded Protobuf references were used. No new external source
   was consulted and no third-party implementation code was copied.
 - **Instruction files used:** Root `AGENTS.md` and empty
   `credit-service/AGENTS.md`. No skills were invoked.
-- **Remaining human input:** Review of generated artifacts. Concrete pagination,
+- **Remaining human input:** Concrete pagination,
   locking, and operation/error details remain for the later business-implementation
   step; no further success-payload clarification is required for this contract.
 
@@ -619,7 +574,7 @@ submission files; retained disclosure content is under this ai directory.
   and whitespace checks passed.
   No main business handlers, service retry loop, or requested business-concurrency
   scenarios have been implemented or tested in this change.
-- **Human review/edits:** Pending review of generated artifacts. All implemented
+- **Human edits:** All implemented
   schema constraints were explicitly supplied by the human. No human approval of
   the unanswered questions or generated implementation is inferred.
 - **Sources/licensing:** Consulted primary [gRPC authentication](https://grpc.io/docs/guides/auth/),
@@ -659,7 +614,7 @@ submission files; retained disclosure content is under this ai directory.
   decisions. Documentation attribution, pointers/links, final root README section,
   service-local records, and whitespace checks passed. No implementation, schema, database,
   dependencies, or gRPC wire definitions changed; tests/build were not repeated.
-- **Human review/edits:** Pending. The human described the workflow as under
+- **Human edits:** The human described the workflow as under
   consideration; this does not establish final authorization of an event design
   or removal of InitCredits.
 - **Sources/licensing:** Used repository and human-supplied material only.
@@ -713,8 +668,8 @@ submission files; retained disclosure content is under this ai directory.
   and default MAX_RETRIES=3. Git tree/grep found no user.created contract/queue/
   publisher in that snapshot or this local branch; no publisher implementation
   is claimed to have been verified.
-- **Human review/edits:** The human finalized event-triggered initialization
-  and complete InitCredits RPC replacement. Generated code/docs await review.
+- **Human edits:** The human finalized event-triggered initialization
+  and complete InitCredits RPC replacement.
 - **Sources/licensing:** Read the repository and
   [PR 57](https://github.com/AY2627S1-CS3219-P22/FoC/pull/57), including its shared
   messaging implementation/README/topology and User Service registration code.
@@ -755,7 +710,7 @@ submission files; retained disclosure content is under this ai directory.
   b8b924db95a60a36f9bc6b8c1880bf5ae96fb939, whose client retries all rejected
   handlers without a permanent-failure special case. No broker was started or
   live acknowledgment/dead-letter routing tested.
-- **Human review/edits:** Pending review of generated artifacts. The human
+- **Human edits:** The human
   authorizes implementation before the publisher exists and requires no writes
   or successful acknowledgment for an unconfirmed existing account.
 - **Sources/licensing:** Read the previously inspected
@@ -818,7 +773,7 @@ submission files; retained disclosure content is under this ai directory.
   The tested migration was applied to the local development database.
   Initial tests without PGDATABASE skipped integration checks; the subsequent
   PostgreSQL-enabled runs passed all checks. No live RabbitMQ delivery was tested.
-- **Human review/edits:** Pending review of generated artifacts. The human chose
+- **Human edits:** The human chose
   INITIAL_GRANT, transaction-level bigint advisory locks, and bounded retry then
   dead-letter. No new permanent-error mechanism or production lock encoding was
   generated as a design choice.
@@ -869,8 +824,7 @@ submission files; retained disclosure content is under this ai directory.
   decimal bigint. All 11 affected code/documentation attributions, log pointers/
   local links, final README disclosure, service-local AI records, and whitespace
   checks passed. No schema, dependency, or persisted data changes were required.
-- **Human review/edits:** The human finalized the complete encoding. Generated
-  code/docs await human review; test success does not establish human approval.
+- **Human edits:** The human finalized the complete encoding. 
 - **Sources/licensing:** Used the human's exact algorithm, existing Node crypto/
   Buffer APIs, and previously recorded PostgreSQL references. Python standard
   library was used only to compute independent verification vectors. No new
@@ -924,9 +878,6 @@ submission files; retained disclosure content is under this ai directory.
   Affected-file attributions/log pointers, local links, final README disclosure,
   service-local AI records, and whitespace checks passed. No schema/dependency or
   persisted application-data changes were required.
-- **Human review/edits:** Pending review of generated artifacts and answers to
-  the recorded remaining behaviour/interface questions. Existing user changes
-  are preserved; no reviewer approval is inferred from tests.
 - **Sources/licensing:** Used the human's recorded requirements and repository
   implementation conventions. No new external source was consulted or
   third-party implementation code copied.
@@ -995,7 +946,7 @@ submission files; retained disclosure content is under this ai directory.
   Migration 006 was applied once to the local development database. Docker
   rebuild/start and no-write runtime token/error/UUID checks passed. After
   exchange 022, the suite has 70 passing credit checks; see below.
-- **Human review:** Pending review of generated implementation/docs. The human
+- **Instructions:** The human
   supplied the decisions; agent-run checks do not establish human validation.
   Root AGENTS.md and existing empty credit-service/AGENTS.md were used. No skills
   invoked. No agent delegation, commit, PR, merge, or deployment was performed.
@@ -1006,8 +957,7 @@ submission files; retained disclosure content is under this ai directory.
   [Node timingSafeEqual](https://nodejs.org/api/crypto.html#cryptotimingsafeequala-b),
   and [gRPC authentication](https://grpc.io/docs/guides/auth/). Prior PostgreSQL
   advisory-lock references are recorded in entries 018–019. No third-party
-  implementation code was copied. No new license-compatibility assurance or
-  human review is claimed.
+  implementation code was copied. No new license-compatibility assurance is claimed.
 - **Scope:** RabbitMQ startup and User Service implementation remain with
   teammates. REST paths/bookmark shape were left pending until the human's
   answer in exchange 022. No new schema/interface choices filled those gaps.
@@ -1061,7 +1011,7 @@ submission files; retained disclosure content is under this ai directory.
   attribution/header pointer, root README last-section, service-local AI location,
   and tracked diff whitespace checks passed. Prompt archives retain original
   trailing whitespace where supplied by the human.
-- **Human review:** Pending. Root AGENTS.md and the existing empty service
+- **Instructions:** Root AGENTS.md and the existing empty service
   AGENTS.md used; no skills invoked. Existing personal env files and teammates'
   implementations were not edited. No commit/merge/publication performed.
 - **Sources/licensing:** Used the human's exact wire definitions and existing
@@ -1132,7 +1082,7 @@ submission files; retained disclosure content is under this ai directory.
   NOT_FOUND/ACCOUNT_NOT_FOUND behavior. Header/log/documentation links and
   tracked diff whitespace checked. Coverage figures from entry 022 remain
   historical, not a new run for these changes.
-- **Human review/sources/instructions:** Human review pending. Used the human's
+- **Sources/instructions:** Used the human's
   decisions and repository code/tests; no new external sources or copied
   third-party implementation. Read root AGENTS.md and existing empty service
   AGENTS.md. No skill, delegation, commit, merge or deployment performed.
@@ -1170,8 +1120,7 @@ submission files; retained disclosure content is under this ai directory.
   src/rest/server.ts, src/events/userCreated.ts;
   test/{core-credit,auth,rest}.test.cjs; credit-service README,
   docs/user-decisions.md, this log and prompt archive 026; root README final
-  disclosure. Prior human-review markers remain, with entry-026 edits marked
-  pending human review.
+  disclosure. Prior human-review markers remain.
 - **Agent verification:** Full workspace build passed after resolving the
   compiler's duplicate userId warning by forwarding the service balance from
   REST. All 74 credit checks passed with PostgreSQL and temporary API listeners,
@@ -1188,7 +1137,7 @@ submission files; retained disclosure content is under this ai directory.
   in-memory fixtures; no application-data writes. Current attribution/log/docs
   links, the final root README disclosure and tracked whitespace checked.
   Earlier coverage numbers are historical; coverage was not rerun here.
-- **Human review/sources/instructions:** New edits await human review. Used the
+- **Sources/instructions:** Used the
   human's exact contract and repository implementation/generation conventions;
   no new external source or third-party implementation code. Read root AGENTS.md
   and existing empty service AGENTS.md. No skill, agent delegation, commit,
@@ -1235,7 +1184,7 @@ submission files; retained disclosure content is under this ai directory.
   sandbox-only listener check failed with EPERM; authorized local-listener
   rerun passed. Diff whitespace checked. No Order retry implementation was found
   in this checkout; no teammate branches were inspected.
-- **Human review/sources/instructions:** Human review pending. Read root
+- **Sources/instructions:** Read root
   AGENTS.md and the empty credit-service/AGENTS.md. Used repository sources;
   no external source, copied third-party code, new dependency, skill, delegation,
   commit, publication, or deployment. Prior PR-only drafting remains
@@ -1271,8 +1220,7 @@ submission files; retained disclosure content is under this ai directory.
   still checks saved-result replay/conflict, RELEASED rejection and active
   settlement. Test schemas are removed afterward; no application-data changes.
   Diff whitespace checked.
-- **Human review/sources/instructions:** New changes await human review; prior
-  human-review markers are preserved and do not claim approval of these edits.
+- **Sources/instructions:** 
   Read root AGENTS.md and the empty credit-service/AGENTS.md. Used the human's
   explicit behavior and repository code; no external source, copied third-party
   implementation, dependency, skill, delegation, commit, push or deployment.
@@ -1316,8 +1264,7 @@ submission files; retained disclosure content is under this ai directory.
   historical live Postman figures belong to entry 030, not a new live run.
   All three removed-from-index documents remain on disk and are explicitly
   ignored. Seed exclusion remains; no credentials read or new runtime seed used.
-- **Limitations/review:** The human confirmed the exact history signs and an initial grant of exactly
-  10. New code/docs/tests await human review.
+- **Limitations/review:** The human confirmed the exact history signs and an initial    grant of exactly 10. 
   Full diff whitespace checking reports one concurrent human edit in shared
   transport.test.cjs; this task's scoped changes have no whitespace errors.
   Existing Order demo prerequisites remain; no live combined Order run claimed.
@@ -1359,7 +1306,7 @@ submission files; retained disclosure content is under this ai directory.
 - **Instructions/review/provenance:** Root AGENTS.md, empty service instructions
   and existing repository implementations; no external source or copied code,
   dependency, skill, agent, commit, push or deployment. Human owns the transport
-  decision; no rationale/trade-off analysis generated. Human review pending.
+  decision; no rationale/trade-off analysis generated. 
 
 ## 036 — Nonfatal event consumer startup and shutdown
 
@@ -1400,8 +1347,7 @@ submission files; retained disclosure content is under this ai directory.
   current helpers and local remote-tracking shared/User code only. Matching local
   validation ref inspected: 0b48f5f85be01d148176a6410c9ca22c2b8e672e. No fetch, branch
   merge/copy, external source, dependency, skill or agent. Human owns the clarified
-  lifecycle behavior; no rationale/trade-off analysis generated. All new changes
-  await human review; no commit/push or replacement of the running Credit service.
+  lifecycle behavior; no rationale/trade-off analysis generated. 
 
 ## 037 — Import attributed messaging package and verify listener
 
@@ -1440,10 +1386,8 @@ submission files; retained disclosure content is under this ai directory.
   with lifecycle scripts disabled. amqplib 2.2.0 and Zod 4.6.7 resolve from the
   unchanged upstream ranges; their lockfile metadata lists MIT. No broader
   licensing validation is claimed.
-- **Review/instructions:** Root AGENTS.md and empty service instructions used.
-  Human review pending for integration/tests/docs. Original broker authors retain
-  ownership and responsibility for their declarations. No external web source,
-  skill, delegation, commit, push, remote PR edit or running-service deployment.
+- **Instructions:** Root AGENTS.md and empty service instructions used.
+  Original broker authors retain ownership and responsibility for their declarations. No external web source, skill, delegation, commit, push, remote PR edit or running-service deployment.
 
 ## 038 — Startup-only listener health with database-based status
 
@@ -1476,7 +1420,7 @@ submission files; retained disclosure content is under this ai directory.
 - **Instructions/provenance/review:** Used root AGENTS.md, empty service instructions,
   existing local source and installed amqplib types during inspection. No external
   source, dependency, skill, agent, commit/push or running-service replacement.
-  Human decisions finalized before implementation. New changes await human review.
+  Human decisions finalized before implementation. 
 
 ## 039 — History constraints and scoped seeded ledger invariants
 
@@ -1532,8 +1476,7 @@ submission files; retained disclosure content is under this ai directory.
 - **Review/provenance/instructions:** Root AGENTS.md/empty service instructions,
   supplied rules and existing repository implementation only. Local Markdown links,
   scoped whitespace, test syntax and final diff checked. No external source,
-  dependency, skill, agent, commit, push or deployment. Human review remains
-  pending; no assignment compliance/human validation asserted.
+  dependency, skill, agent, commit, push or deployment. 
 
 ## 040 — Remove account and reservation timestamps
 
@@ -1568,8 +1511,7 @@ submission files; retained disclosure content is under this ai directory.
   was replaced, application rows changed or queue altered.
 - **Review/provenance/instructions:** Root AGENTS.md and empty service instructions
   read; existing implementation and supplied requirements used. No new external
-  source, dependency, skill, sub-agent, commit, push or deployment. Human review
-  remains pending; agent-run tests do not establish author validation.
+  source, dependency, skill, sub-agent, commit, push or deployment. 
 
 ## 042 — Simplify gRPC service-token comparison
 
@@ -1595,7 +1537,7 @@ submission files; retained disclosure content is under this ai directory.
   historical; no unrelated SQL/shared-suite/Docker rerun or container replacement.
 - **Review/provenance:** Root AGENTS.md and empty service instructions read;
   existing implementation/tests and the supplied change used. No external
-  source, dependency, skill, agent, commit or push. Human review pending.
+  source, dependency, skill, agent, commit or push. 
 
 ## 043 — Entry-ID history bookmarks with internal sequence boundaries
 
@@ -1633,7 +1575,7 @@ submission files; retained disclosure content is under this ai directory.
   no application rows, migrations, running container or dependencies changed.
   No unrelated shared-suite/Docker/live-broker run. Root AGENTS.md and empty
   service instructions plus existing source/supplied decisions used; no external
-  source, skill, agent, commit or push. Human review pending.
+  source, skill, agent, commit or push. 
 
 ## 045 — Remove user and timestamp metadata from idempotency records
 
@@ -1675,7 +1617,7 @@ submission files; retained disclosure content is under this ai directory.
   checked. Unrelated shared-client suite and Docker build were not repeated.
 - **Docs/disclosure:** Both READMEs describe ten migrations, the current four-column
   retry record, preserved replay behavior and current checks; attribution headers
-  remain short. This log and archive 045 added. Human review is pending.
+  remain short. This log and archive 045 added. 
 - **Runtime/cleanup:** Tests removed their schemas/child processes/connections;
   dedicated credit-idempotency-test broker and anonymous volume removed. Existing
   PostgreSQL, RabbitMQ and services retained. Metadata-only inspection confirmed
@@ -1683,8 +1625,7 @@ submission files; retained disclosure content is under this ai directory.
   been applied there and no runtime container was replaced.
 - **Instructions/provenance:** Followed updated user-supplied/root AGENTS.md and
   empty service instructions. Existing source/contracts and supplied decisions
-  only; no external source, dependency, skill, sub-agent, commit or push. Agent
-  checks do not establish author validation or assignment compliance.
+  only; no external source, dependency, skill, sub-agent, commit or push.
 
 ## 046 — Migration runner for the credit-migrate job
 
@@ -1761,8 +1702,7 @@ submission files; retained disclosure content is under this ai directory.
 - **Cleanup/review:** Temporary schemas, child processes, sockets and test broker/
   anonymous volume cleaned. Existing PostgreSQL/services untouched; no running
   application deployment. Followed repository/service instructions and supplied
-  assignment restrictions. All new implementation/docs await human review;
-  prior review markers do not validate this exchange.
+  assignment restrictions. 
 
 ## 048 — Use the tracked migration runner with an inclusive stop point
 
@@ -1808,8 +1748,123 @@ submission files; retained disclosure content is under this ai directory.
 - **Cleanup/review/provenance:** Test schemas, temporary runner/SQL folders and
   connections cleaned. No running application schema, migration history or
   container was changed. Existing instructions and local code only; no external
-  source, skill, sub-agent, commit or push. New work awaits human review; original
-  runner's human-review/Claude attribution is retained for its earlier scope.
+  source, skill, sub-agent, commit or push. 
+
+## 049 — Implement user deletion and balance restoration
+
+- **Timestamp:** 2026-11-04, Asia/Singapore (SGT, UTC+08:00); work began before
+  13:54, progress recorded at 14:00.
+- **Tool/model/modes:** OpenAI Codex, GPT-6; implementation, debugging, regression
+  tests and documentation of human-finalized requirements and architecture.
+- **Exact prompts/key responses:** [Full request and follow-up replies](prompts/049-user-lifecycle.md).
+  The human specified schema, interfaces, status rules, transaction/lock ordering,
+  replay behavior, privacy requirements and error cases. No additional AI-use
+  rules were added. Followed credit-service/AGENTS.md; root AGENTS.md was empty.
+  No skill, sub-agent or external source was used.
+- **Clarifications:** The human declined temporary local event-schema adaptation
+  and requested waiting for the User service update. Shared user.ts remains
+  untouched; consumer lifecycle wiring is pending that update. The human clarified
+  ACTIVE without opening-allocation history is non-retryable. The human described
+  delayed creation as adding 10 to the placeholder's zero balance; explained the
+  allowed courier-settlement overlap and implemented an additive grant that
+  preserves any received credits while leaving the placeholder DELETED.
+  At 14:03 SGT the human explicitly confirmed granting by adding +10 to the
+  existing total, including TRANSFER_IN funds, with no 0/0 requirement. Source
+  inspection confirmed that the implementation already matches: it adds 10,
+  preserves reserved credits and status, and has no zero-balance precondition.
+  Recorded the exact follow-up in archive 049 and clarified the README. No
+  implementation or test changed for this confirmation. Existing coverage checks
+  a placeholder receiving 3 credits, initialization to 13 and duplicate replay.
+  No tests were rerun for the documentation-only confirmation; git diff --check
+  passed. 
+- **Implementation:** Migration 011 adds ACTIVE/DELETED/CLOSED with CLOSED 0/0,
+  BALANCE_RESTORED delta/link checks, and exclusive INITIAL_GRANT/BALANCE_RESTORED
+  allocation uniqueness. Repository reads status, creates DELETED placeholders,
+  updates only ACTIVE on deletion, and closes eligible accounts atomically;
+  saveAccount retains status. Service status gates follow the request; saved
+  reserve/update results still replay first. markDeleted uses account advisory
+  and row locks and preserves existing balances/history/reservations.
+  restoreCredits validates both IDs, locks both resources/rows in sorted order,
+  follows the supplied retry/repeat decisions, moves the balance once and writes
+  only a destination history row with no source ID or restore idempotency record.
+  initCredits grants once to a DELETED placeholder and preserves its status.
+  Removed unused Credit archive/restore confirmation contracts and RESTORED reason.
+  Courier-not-found messages now omit the ID, following the latest error rule;
+  the historical test expecting an ID was updated.
+- **Affected paths:** src/domains/types.ts; src/repos/CreditRepository.ts and
+  SqlCreditRepository.ts; src/services/CreditService.ts;
+  migrations/011_account_lifecycle.sql; shared/messaging/src/contracts/credit.ts;
+  test/user-lifecycle.test.cjs, core-credit.test.cjs, history.test.cjs and
+  timestamp-removal.test.cjs; README.md; this log and prompt archive 049.
+- **Actual checks:** Shared Messaging and Credit TypeScript builds passed.
+  Credit source/tests and the changed shared contract passed ESLint. Targeted
+  lifecycle/history/upgrade tests passed 25 results after correcting a new fixture
+  that omitted required total_credits. The first full suite passed 122/124 results;
+  the failure and parent failure were the historical courier-ID expectation.
+  After updating that assertion and adding REST coverage, all 125 results passed
+  with zero failures/skips. After the additive-grant and inconsistent-ACTIVE
+  changes, both builds, ESLint and whitespace checks passed again; the full
+  Credit suite passed all 126 results with zero failures/skips. No live RabbitMQ
+  lifecycle test has run.
+- **Test environment:** The documented local PostgreSQL endpoint was offline;
+  Docker was also unavailable. With sandbox escalation, initialized and started
+  a temporary PostgreSQL 14 cluster under /private/tmp/foc-credit-lifecycle-pg
+  on local port 55439. Tests use isolated schemas, clean them afterward, and leave
+  application databases untouched. PostgreSQL 17 is the documented production
+  version; these local checks use the installed PostgreSQL 14 binaries.
+
+## 050 — Review the integrated lifecycle consumer and update README
+
+- **Timestamp:** 2026-11-06, Asia/Singapore (SGT, UTC+08:00); verification recorded
+  at 10:52 SGT.
+- **Tool/model/modes:** OpenAI Codex, GPT-6; source review, debugging correction,
+  existing-suite verification and documentation. Followed credit-service/AGENTS.md
+  and the human's restrictions. No skill, sub-agent or external source was used.
+- **Exact prompts/key responses:** [Review request, no-new-tests clarification and archive correction](prompts/050-lifecycle-consumer-review.md).
+- **Human changes reviewed:** Shared User schemas now omit purgeAfter on deletion
+  and require previousUserId on restoration. The human renamed the Credit
+  consumer to userEvents.ts, added deletion/restoration dispatch and validation,
+  updated broker registration/types and existing test imports, and routed User
+  deletion outbox messages to Credit as well as Order. These changes remain
+  attributed to the human; pre-existing staged edits were retained.
+- **Findings/correction:** Shared Messaging/Credit builds, ESLint and the baseline
+  126 existing Credit checks passed. The lifecycle success logs included userId,
+  and failure logs printed raw error messages. Updated the handler to log only
+  eventId for deletion/restoration receipts, success and failure, following entry
+  049's explicit requirement. Creation keeps its user/balance success log and
+  failure details. InitialAllocationError/RestoreError mapping and retryable
+  failure propagation are unchanged. No service, schema or migration changed.
+- **Scope adjustment:** Initially proposed adding consumer integration coverage.
+  The human instructed that no tests need to be added; no test files or cases
+  were added or edited. Ran the existing suites and reviewed lifecycle routing,
+  both-ID validation, awaited operations and repeat/error handling directly.
+- **Actual verification:** After the logging correction, shared Messaging and
+  Credit TypeScript builds and full Credit ESLint passed. All 126 existing Credit
+  Node test results passed with zero failures/skips. All 10 existing live-listener
+  results passed with zero failures/skips. The live suite exercises registration
+  through the renamed consumer, acknowledgements, duplicate delivery, retry,
+  dead letters, restart and outage/shutdown recovery; it does not send lifecycle
+  deletion/restoration events. Existing lifecycle service tests verify balance
+  conservation, duplicates, placeholders, rollback and status access rules.
+  Whitespace and README local-link checks passed.
+- **README:** Updated the event table and consumer section for all three events,
+  required fields, no purgeAfter, validation/error mapping, acknowledgement and
+  repeat behavior, lifecycle logging, restored history and reserved-credit retry
+  behavior. Removed the pending-schema statement. Corrected missing/inactive
+  REST history behavior, described migration 010/011 and current verification.
+  Kept AI Use Summary last, with attribution for the consumer logging correction.
+- **Affected paths:** src/events/userEvents.ts, README.md, this usage log and
+  prompts/050-lifecycle-consumer-review.md.
+  Per the human's latest instruction, edited the existing README/log disclosure
+  headers' dates, scopes and prompt references. The consumer has no disclosure
+  header; none was added. Its correction is attributed here and in README.
+- **Environment/cleanup:** Used locally cached postgres:17 and
+  rabbitmq:3.13-management images in new disposable containers
+  credit-consumer-review-db-20261106 (localhost:55439) and
+  credit-consumer-review-rabbit-20261106 (localhost:5674). Tests used isolated
+  schemas, queues and temporary files, with their existing cleanup. Confirmed
+  no test schemas remained, then stopped both --rm containers; they and their
+  disposable storage were removed. Application databases/services were untouched.
 
 For each later entry, record the same fields and update the README and affected
 file headers. Record actual human edits, acceptances, or rejections only when the

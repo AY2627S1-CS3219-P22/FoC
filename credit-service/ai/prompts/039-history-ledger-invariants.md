@@ -71,4 +71,4 @@ If any check finds a genuine violation, stop and report it rather than weakening
   was needed for this SQL/test-only change; older results remain historical.
 - Service/root READMEs and required AI disclosures updated; local links/scoped
   whitespace checked. No new dependency, external source, skill, agent, commit,
-  push or deployment. Human review pending; checks are agent-run verification.
+  push or deployment.

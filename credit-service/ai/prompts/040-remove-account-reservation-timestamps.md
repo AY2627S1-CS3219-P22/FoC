@@ -27,4 +27,4 @@ i also want to remove the fields createdAt and updatedAt from accounts and reser
   integration test skips without PGDATABASE. READMEs and disclosure updated.
 - Migration 009 has not been applied to the running local database; apply it
   alongside the updated service build. Isolated schemas were cleaned up.
-- Human review remains pending. No commit, push or running-service replacement.
+- No commit, push or running-service replacement.

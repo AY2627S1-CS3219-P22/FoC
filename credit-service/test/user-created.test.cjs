@@ -10,7 +10,7 @@ const { test } = require('node:test');
 require('tsx/cjs');
 const { NonRetryableError } = require('@foc/messaging');
 const { InitialAllocationError } = require('../src/services/CreditService.ts');
-const { createUserCreatedHandler } = require('../src/events/userCreated.ts');
+const { createUserEventHandler } = require('../src/events/userEvents.ts');
 
 const balance = { totalCredits: 10, reservedCredits: 0, availableCredits: 10 };
 const event = (overrides = {}) => ({
@@ -25,7 +25,7 @@ test('handler remains pending until initialization finishes', async () => {
   let finish;
   const initialization = new Promise((resolve) => { finish = resolve; });
   const received = [];
-  const handler = createUserCreatedHandler({
+  const handler = createUserEventHandler({
     initCredits(input) {
       received.push(input);
       return initialization;
@@ -43,7 +43,7 @@ test('handler remains pending until initialization finishes', async () => {
 
 test('the same user reaches initialization with the same input across different events', async () => {
   const received = [];
-  const handler = createUserCreatedHandler({
+  const handler = createUserEventHandler({
     async initCredits(input) { received.push(input); return balance; },
   });
   await handler({ payload: event() });
@@ -58,7 +58,7 @@ test('permanent and transient service failures reject unchanged, without a succe
     new Error('Database connection failed'),
     new Error('Lock acquisition failed'),
   ]) {
-    const handler = createUserCreatedHandler({
+    const handler = createUserEventHandler({
       async initCredits() { throw failure; },
     });
     await assert.rejects(handler({ payload: event() }), (error) => error === failure);
@@ -67,7 +67,7 @@ test('permanent and transient service failures reject unchanged, without a succe
 
 test('invalid event type or user identity fails before initialization', async () => {
   let calls = 0;
-  const handler = createUserCreatedHandler({
+  const handler = createUserEventHandler({
     async initCredits() { calls += 1; return balance; },
   });
   for (const payload of [
@@ -83,7 +83,7 @@ test('invalid event type or user identity fails before initialization', async ()
 
 test('eventId and occurredAt follow the required string fields in the shared schema', async () => {
   let calls = 0;
-  const handler = createUserCreatedHandler({ async initCredits() { calls += 1; return balance; } });
+  const handler = createUserEventHandler({ async initCredits() { calls += 1; return balance; } });
   for (const payload of [
     { type: 'user.created', userId: 'new-user' },
     event({ eventId: undefined }), event({ occurredAt: undefined }),
@@ -96,7 +96,7 @@ test('eventId and occurredAt follow the required string fields in the shared sch
 
 test('delivery eventId must match the payload when supplied', async () => {
   let calls = 0;
-  const handler = createUserCreatedHandler({ async initCredits() { calls += 1; return balance; } });
+  const handler = createUserEventHandler({ async initCredits() { calls += 1; return balance; } });
   await assert.rejects(handler({ eventId: 'other-event', retryCount: 0, payload: event() }), NonRetryableError);
   assert.equal(calls, 0);
   await handler({ eventId: 'first-event', retryCount: 0, payload: event() });
@@ -105,6 +105,6 @@ test('delivery eventId must match the payload when supplied', async () => {
 
 test('known inconsistent initial allocations are non-retryable and preserve the original cause', async () => {
   const failure = new InitialAllocationError('ALREADY_EXISTS', 'Account has no confirmed initial grant');
-  const handler = createUserCreatedHandler({ async initCredits() { throw failure; } });
+  const handler = createUserEventHandler({ async initCredits() { throw failure; } });
   await assert.rejects(handler({ payload: event() }), error => error instanceof NonRetryableError && error.cause === failure);
 });

@@ -69,6 +69,7 @@ services:
       DATABASE_URL: 'postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@user-db:5432/${POSTGRES_DB}?schema=public'
       PORT: '3001'
       GRPC_PORT: '50051'
+      ORDER_GRPC_ADDR: order-service:50053
       # Keys are mounted at runtime (see volumes), never baked into the image.
       JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
       JWT_PUBLIC_KEY_PATH: /app/keys/public.pem

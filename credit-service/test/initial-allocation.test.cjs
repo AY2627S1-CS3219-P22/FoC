@@ -15,7 +15,7 @@ require('tsx/cjs');
 const { ValidationError } = require('../src/services/validation.ts');
 const { CreditService } = require('../src/services/CreditService.ts');
 const { SqlCreditRepository } = require('../src/repos/SqlCreditRepository.ts');
-const { createUserCreatedHandler } = require('../src/events/userCreated.ts');
+const { createUserEventHandler } = require('../src/events/userEvents.ts');
 
 test('initialization rejects invalid user IDs before obtaining a database connection', async () => {
   let connections = 0;
@@ -36,7 +36,7 @@ test('initial grant transaction implements the human-specified event allocation 
   const client = new Client({ connectionTimeoutMillis: 5000 });
   const pool = new Pool({ max: 8, connectionTimeoutMillis: 5000, options: '-c search_path=' + schema });
   const service = new CreditService(pool);
-  const handler = createUserCreatedHandler(service);
+  const handler = createUserEventHandler(service);
   const deliver = (userId) => handler({
     payload: { type: 'user.created', eventId: randomUUID(), occurredAt: new Date().toISOString(), userId },
   });

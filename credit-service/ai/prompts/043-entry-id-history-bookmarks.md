@@ -31,4 +31,4 @@ update historyBookmark.ts, the history paging in CreditService, and the reposito
 - Updated unit/integration tests and README/disclosures. Credit build and all
   103 tests passed, including high-precision ordering, later writes, cross-user
   rejection, old tokens and seeded ledger checks. Existing human edits retained.
-- No running-container replacement, commit or push; human review pending.
+- No running-container replacement, commit or push.

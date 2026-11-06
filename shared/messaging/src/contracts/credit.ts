@@ -1,5 +1,11 @@
+// AI-Assistance Disclosure
+// Tool: OpenAI Codex (GPT-6), date: 2026-11-04 (Asia/Singapore).
+// Scope: Removed human-specified unused lifecycle confirmations and RESTORED reason.
+// Author review: I verified that the changes removed the earlier design elements that are now irrelevant.
+// Prompts/key responses: ../../../../credit-service/ai/usage-log.md, entry 049.
+
 // Message producer: credit service
-// Consumers: UI gateway, notification service, user service (archive/restore confirmations)
+// Consumers: UI gateway, notification service
 
 import { z } from 'zod';
 
@@ -20,7 +26,7 @@ export const creditBalanceUpdatedSchema = creditEventBaseSchema.extend({
   available: z.number(),
   reserved: z.number(),
   /** What caused the change, for UI messaging and debugging. */
-  reason: z.enum(['GRANTED', 'RESERVED', 'RELEASED', 'PAID', 'RESTORED']),
+  reason: z.enum(['GRANTED', 'RESERVED', 'RELEASED', 'PAID']),
 });
 
 /** Payment settled for an order (reserved credits moved from requester to courier). */
@@ -32,31 +38,11 @@ export const creditPaymentCompletedSchema = creditEventBaseSchema.extend({
   amount: z.number(),
 });
 
-/** User deleted: balance snapshotted and credit history archived. Confirms user.deleted. */
-export const creditUserArchivedSchema = creditEventBaseSchema.extend({
-  type: z.literal('credit.user_archived'),
-  archivedAt: z.string(),
-  /** Remaining balance stored for restore. */
-  remainingCredits: z.number(),
-  /** Same as user.deleted purgeAfter. */
-  purgeAfter: z.string(),
-});
-
-/** User restored within the retention window: balance and history are back. Confirms user.restored. */
-export const creditUserRestoredSchema = creditEventBaseSchema.extend({
-  type: z.literal('credit.user_restored'),
-  restoredCredits: z.number(),
-});
-
 export const creditEventSchema = z.discriminatedUnion('type', [
   creditBalanceUpdatedSchema,
   creditPaymentCompletedSchema,
-  creditUserArchivedSchema,
-  creditUserRestoredSchema,
 ]);
 
 export type CreditBalanceUpdated = z.infer<typeof creditBalanceUpdatedSchema>;
 export type CreditPaymentCompleted = z.infer<typeof creditPaymentCompletedSchema>;
-export type CreditUserArchived = z.infer<typeof creditUserArchivedSchema>;
-export type CreditUserRestored = z.infer<typeof creditUserRestoredSchema>;
 export type CreditEvent = z.infer<typeof creditEventSchema>;
