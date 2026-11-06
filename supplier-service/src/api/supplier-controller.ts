@@ -1,3 +1,7 @@
+// AI Assistance Disclosure: Claude Opus (Cursor), 2026-11-05.
+// Prompt: improve index.ts to ensure supplier/order pub-sub works for the supplier cache.
+// Scope: publish supplier.updated/supplier.deleted after create, update and delete.
+// Author review: Reviewed and approved by @sunpterodactyl.
 //Standardize the controller responses for the UI
 
 import { Request, Response, NextFunction } from 'express';
@@ -10,7 +14,8 @@ import {getSupplierByIdService,
     getNearbySuppliersService,
     updateSupplierHoursByIdService,}  from '@/database/supplier-repository';
 
-import { SUPPLIER_CATEGORY, supplierRadiusQuerySchema, updateRequestSchema } from '@/data/schema';
+import { SUPPLIER_CATEGORY, supplierRadiusQuerySchema, updateRequestSchema, type PublicSupplier } from '@/data/schema';
+import { supplierEvents } from '@/messaging/producer';
 
 const handleResponse = (res: Response, status: number, data: any, message: string) => {
     res.status(status).json({
@@ -45,6 +50,7 @@ export const getSupplierById = async(req:Request, res:Response, next:NextFunctio
 export const deleteSupplierById = async(req:Request, res:Response, next:NextFunction) => {
     try {
         const deletedSupplier = await deleteSupplierByIdService(Number(req.params.id));
+        await supplierEvents.publishSupplierDeleted(deletedSupplier);
         const id_value = Number(req.params.id);
         handleResponse(res, 200, deletedSupplier, `Supplier ${id_value} deleted from active supplier list successfully`);
     } catch (err) {
@@ -55,7 +61,7 @@ export const deleteSupplierById = async(req:Request, res:Response, next:NextFunc
  export const createSupplier = async(req:Request, res:Response, next:NextFunction) => {
     try {
         const newSupplier = await createSupplierService(req.body);
-        const newSupplierName = req.body.name;
+        await supplierEvents.publishSupplierUpdated(newSupplier);
         handleResponse(res, 201, newSupplier, `Successful. New supplier created`);
     } catch(err) {
         next(err);
@@ -67,6 +73,8 @@ export const updateSupplierById = async(req:Request, res:Response, next:NextFunc
         const { expectedUpdatedAt, ...updateData } = updateRequestSchema.parse(req.body);
 
         const updatedSupplier = await updateSupplierByIdService(Number(req.params.id), updateData, expectedUpdatedAt);
+        //the update returns publicSupplierColumns, so the row is complete despite the partial type
+        await supplierEvents.publishSupplierUpdated(updatedSupplier as PublicSupplier);
 
         handleResponse(res, 200, updatedSupplier, `Supplier ${req.params.id} was updated`);
     } catch(err) {
