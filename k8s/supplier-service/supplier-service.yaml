@@ -12,8 +12,6 @@ spec:
       labels: { app.kubernetes.io/name: supplier-service, app.kubernetes.io/part-of: foc }
     spec:
       # nodeSelector: { role: supplier }   # enable on EC2; leave off for local k3d
-      imagePullSecrets:   # pulls image from GHCR in
-        - name: ghcr-pull
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000                  # the image's "node" user

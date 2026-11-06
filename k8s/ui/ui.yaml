@@ -14,8 +14,6 @@ spec:
     metadata:
       labels: { app.kubernetes.io/name: ui, app.kubernetes.io/part-of: foc }
     spec:
-      imagePullSecrets:   # pulls image from GHCR in
-        - name: ghcr-pull
       containers:
         - name: ui
           image: ghcr.io/ay2627s1-cs3219-p22/foc/ui:latest

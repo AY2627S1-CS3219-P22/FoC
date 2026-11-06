@@ -13,8 +13,6 @@ spec:
       labels: { app.kubernetes.io/name: credit-service, app.kubernetes.io/part-of: foc }
     spec:
       # nodeSelector: { role: credit }   # enable on EC2; leave off for local k3d
-      imagePullSecrets:   # pulls image from GHCR and logs in
-        - name: ghcr-pull
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000                  # the image's "node" user
