@@ -1,4 +1,5 @@
 // AI-assisted (Claude), reviewed and tested by Maliha
+// Request key fallback for http: AI-assisted (Claude), reviewed and tested by JadeCheah (ui/ai-usage/order-request-key.md)
 import { useEffect, useState } from "react"
 import type { User, Page } from "../App"
 import { CATEGORIES, categoryLabel, supplierLocation, type Category } from "../api/suppliers"

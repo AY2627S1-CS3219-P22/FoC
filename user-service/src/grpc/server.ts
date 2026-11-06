@@ -4,6 +4,7 @@
 // handler and its error mapping.
 // Author review: Author specified the endpoint and error behaviour, reviewed
 // the code and approved. See user-service/ai/usage-log.md, entries 001, 013.
+// gRPC connection age (2026-11-06): see ai/usage-log.md (repo root), entry 005.
 
 import path from 'node:path';
 import {

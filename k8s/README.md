@@ -1,3 +1,5 @@
+<!-- AI Assistance Disclosure: Claude Code (Claude Opus), 2026-11-06. Details: ai/usage-log.md, entry 004. -->
+
 # Kubernetes (EKS) deployment
 
 FoC runs on an AWS EKS cluster in the team's NUS AWS sandbox. Everything lives

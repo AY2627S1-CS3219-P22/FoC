@@ -1,3 +1,7 @@
+// AI Assistance Disclosure: Claude Code (Claude Opus), 2026-11-06.
+// Scope: server connection age, so clients find pods added by autoscaling.
+// Details: ai/usage-log.md (repo root), entry 005.
+
 import {
   Server,
   ServerCredentials,

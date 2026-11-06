@@ -1,3 +1,7 @@
+# AI Assistance Disclosure: Claude Code (Claude Opus), 2026-11-06.
+# Scope: migrate initContainer memory limit (OOMKilled at 128Mi).
+# Details: ai/usage-log.md, entry 003.
+
 # the service in this file sends traffic to user app pods, port 50051, 3001, used by other services calling user
 apiVersion: apps/v1
 kind: Deployment

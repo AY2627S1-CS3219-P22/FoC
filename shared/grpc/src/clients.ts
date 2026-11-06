@@ -2,6 +2,7 @@
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Added human-finalized credit wrappers and bounded application retries with one overall deadline and configurable backoff.
 // Author review: I reviewed the shared client retry implementation.
+// Claude Code (Claude Opus), 2026-11-06: round_robin for all clients. Details: ai/usage-log.md (repo root), entry 005.
 // Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 010–012, 016, 021, 026–027 and 029.
 
 import {
