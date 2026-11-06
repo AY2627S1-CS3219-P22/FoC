@@ -1,9 +1,20 @@
+// AI Assistance Disclosure: Claude Opus (Cursor), 2026-11-05.
+// Prompt: improve index.ts to ensure supplier/order pub-sub works for the supplier cache.
+// Scope: publishToExchange, exchange/binding declaration on connect and publish, shared confirmPublish.
+// Author review: @sunpterodactyl Done.
 import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import amqp, { type ChannelModel, type ConfirmChannel, type ConsumeMessage, type Options } from 'amqplib';
 import { QueueLogger } from './queueLog';
-import { deadLetterExchange, deadLetterQueue, MAX_RETRIES, RETRY_HEADER } from './topology';
+import {
+  bindingsForExchange,
+  bindingsForQueue,
+  deadLetterExchange,
+  deadLetterQueue,
+  MAX_RETRIES,
+  RETRY_HEADER,
+} from './topology';
 import { NonRetryableError, toError } from './errors';
 
 export type RabbitMQConfig = {
@@ -55,6 +66,8 @@ export class RabbitMQClient {
   private reconnectTimer: NodeJS.Timeout | undefined;
   private reconnectAttempts = 0;
   private closing = false;
+  // Exchange topology already declared on the current channel, keyed by exchange name.
+  private declaredExchanges = new Map<string, Promise<void>>();
 
   constructor(config: RabbitMQConfig = {prefetch:100}) { 
     this.config = config;
@@ -113,6 +126,7 @@ export class RabbitMQClient {
     let channel: ConfirmChannel | undefined;
     try {
       channel = this.channel = await connection.createConfirmChannel();
+      this.declaredExchanges = new Map();
       channel.on('close', () => {
         if (this.channel !== channel) return;
         this.channel = undefined;
@@ -215,6 +229,8 @@ export class RabbitMQClient {
     await this.assertQueueWithDeadLetterOnChannel(channel, queue);
   }
 
+  // Every queue declaration goes through here so the dead-letter arguments never
+  // differ between declarers; RabbitMQ rejects a redeclare with other arguments.
   private async assertQueueWithDeadLetterOnChannel(channel: ConfirmChannel, queue: string): Promise<void> {
     const dlx = deadLetterExchange(queue);
     const dlq = deadLetterQueue(queue);
@@ -227,6 +243,47 @@ export class RabbitMQClient {
       deadLetterExchange: dlx,
       deadLetterRoutingKey: queue,
     });
+    for (const binding of bindingsForQueue(queue)) {
+      await channel.assertExchange(binding.exchange, 'topic', { durable: true });
+      await channel.bindQueue(queue, binding.exchange, binding.routingKey);
+    }
+  }
+
+  // Declares the exchange and the queues bound to it, so a publisher that starts
+  // before any consumer does not drop its first messages as unroutable.
+  private declareExchangeTopology(exchange: string): Promise<void> {
+    const channel = this.requireChannel();
+    let declared = this.declaredExchanges.get(exchange);
+    if (!declared) {
+      declared = (async () => {
+        await channel.assertExchange(exchange, 'topic', { durable: true });
+        for (const queue of new Set(bindingsForExchange(exchange).map((binding) => binding.queue))) {
+          await this.assertQueueWithDeadLetterOnChannel(channel, queue);
+        }
+      })();
+      const declarations = this.declaredExchanges;
+      declarations.set(exchange, declared);
+      declared.catch(() => declarations.delete(exchange));
+    }
+    return declared;
+  }
+
+  async publishToExchange(exchange: string, routingKey: string, message: object, eventId?: string): Promise<boolean> {
+    await this.declareExchangeTopology(exchange);
+
+    const id =
+      eventId ??
+      (typeof (message as { eventId?: unknown }).eventId === 'string'
+        ? (message as { eventId: string }).eventId
+        : randomUUID());
+
+    const sent = await this.confirmPublish(exchange, routingKey, Buffer.from(JSON.stringify(message)), {
+      persistent: true,
+      messageId: id,
+      contentType: 'application/json',
+    });
+    this.log.info(sent ? 'published' : 'publish-rejected', undefined, { eventId: id, exchange, routingKey });
+    return sent;
   }
 
   private scheduleReconnect(): void {
@@ -286,18 +343,25 @@ export class RabbitMQClient {
   // Waits for the broker ack. `false` from sendToQueue only means the socket
   // buffer is full; the confirm callback is still the result that matters.
   private confirmSend(queue: string, body: Buffer, options: Options.Publish): Promise<boolean> {
+    return this.confirmPublish('', queue, body, options);
+  }
+
+  private confirmPublish(exchange: string, routingKey: string, body: Buffer, options: Options.Publish): Promise<boolean> {
     const channel = this.requireChannel();
+    // The default exchange routes by queue name, so log against the queue there.
+    const logQueue = exchange === '' ? routingKey : undefined;
+    const target = exchange === '' ? {} : { exchange, routingKey };
     return new Promise((resolve) => {
       try {
-        const buffered = channel.sendToQueue(queue, body, options, (err: Error | null) => {
+        const buffered = channel.publish(exchange, routingKey, body, options, (err: Error | null) => {
           resolve(!err);
         });
         if (!buffered) {
-          this.log.info('publish-blocked', queue, { eventId: options.messageId });
+          this.log.info('publish-blocked', logQueue, { eventId: options.messageId, ...target });
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        this.log.error('publish-rejected', queue, { eventId: options.messageId, message });
+        this.log.error('publish-rejected', logQueue, { eventId: options.messageId, message, ...target });
         resolve(false);
       }
     });

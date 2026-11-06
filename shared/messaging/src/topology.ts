@@ -1,8 +1,10 @@
-import type { Channel } from "amqplib";
-
+// AI Assistance Disclosure: Claude Opus (Cursor), 2026-11-05.
+// Prompt: improve index.ts to ensure supplier/order pub-sub works for the supplier cache.
+// Scope: supplier.updated/supplier.deleted bindings, BINDINGS lookups; queue/key removals by the author.
+// Author review: Pending.
 export const EXCHANGES = {
   order: 'order.events',
-  credit: 'credit.events',
+ 
   supplier: 'supplier.events',
   user: 'user.events',
   dead_letter: 'dlx.events', //subject to specific implementation
@@ -15,35 +17,35 @@ export const QUEUES = {
   creditUser: CREDIT_USER_QUEUE,
   orderUser: "order.user-events",
   orderSupplier: "order.supplier-events",
-  notificationOrders: "notification.order-events",
-  uiSupplier: "ui-gateway.supplier-events",
-  uiCredit: "ui-gateway.credit-events",
-  uiOrder: "ui-gateway.order-events",
+ 
+ 
+
 } as const;
 
 export const ROUTING_KEYS = {
   userDeleted: "user.deleted",
   userRestored: "user.restored",
   supplierUpdated: "supplier.updated",
-  supplierHoursChanged: "supplier.hours.changed",
-  creditPaymentCompleted: "credit.payment.completed",
-  creditBalanceUpdated: "credit.balance.updated",
-  orderAccepted: "order.accepted",
-  orderPickedUp: "order.picked_up",
-  orderDelivered: "order.delivered",
-  orderCancelled: "order.cancelled",
+  supplierDeleted: "supplier.deleted",
+
 } as const;
 
-const BINDINGS: [string, string, string][] = [
-  [QUEUES.creditUser, EXCHANGES.user, "user.*"],
-  [QUEUES.orderUser, EXCHANGES.user, "user.*"],
-  [QUEUES.orderSupplier, EXCHANGES.supplier, ROUTING_KEYS.supplierHoursChanged],
-  [QUEUES.orderSupplier, EXCHANGES.supplier, ROUTING_KEYS.supplierUpdated],
-  [QUEUES.notificationOrders, EXCHANGES.order, "order.*"],
-  [QUEUES.uiSupplier, EXCHANGES.supplier, "supplier.#"],
-  [QUEUES.uiCredit, EXCHANGES.credit, ROUTING_KEYS.creditBalanceUpdated],
-  [QUEUES.uiOrder, EXCHANGES.order, "order.*"],
+export type Binding = { queue: string; exchange: string; routingKey: string };
+
+export const BINDINGS: readonly Binding[] = [
+  { queue: QUEUES.creditUser, exchange: EXCHANGES.user, routingKey: "user.*" },
+  { queue: QUEUES.orderUser, exchange: EXCHANGES.user, routingKey: "user.*" },
+  { queue: QUEUES.orderSupplier, exchange: EXCHANGES.supplier, routingKey: ROUTING_KEYS.supplierUpdated },
+  { queue: QUEUES.orderSupplier, exchange: EXCHANGES.supplier, routingKey: ROUTING_KEYS.supplierDeleted },
 ];
+
+export function bindingsForQueue(queue: string): Binding[] {
+  return BINDINGS.filter((binding) => binding.queue === queue);
+}
+
+export function bindingsForExchange(exchange: string): Binding[] {
+  return BINDINGS.filter((binding) => binding.exchange === exchange);
+}
 
 export const MAX_RETRIES = 3;
 export const RETRY_HEADER = 'x-retry';
@@ -54,17 +56,4 @@ export function deadLetterExchange(queue: string): string {
 
 export function deadLetterQueue(queue: string): string {
   return `${queue}.dlq`;
-}
-
-//suggested to combine bindings with queue 
-export async function setupTopology(ch: Channel) {
-  for (const ex of Object.values(EXCHANGES)) {
-    await ch.assertExchange(ex, "topic", { durable: true });
-  }
-  for (const q of Object.values(QUEUES)) {
-    await ch.assertQueue(q, { durable: true });
-  }
-  for (const [queue, exchange, key] of BINDINGS) {
-    await ch.bindQueue(queue, exchange, key);
-  }
 }
