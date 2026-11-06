@@ -38,3 +38,14 @@ export function deleteError(err: unknown) {
   if (err.status === 404 && err.message.startsWith("Request failed")) return "Account deletion isn't available yet."
   return err.message
 }
+
+// ── Admin only ──
+
+export const listUsers = () => api<{ users: ApiUser[] }>("/users").then((r) => r.users)
+
+export const isAdmin = (u: ApiUser) => u.roles.includes("ADMINISTRATOR")
+
+// user-service refuses to remove the last admin (409), the message says so
+export const setAdmin = (id: string, admin: boolean) =>
+  api<{ user: ApiUser }>(`/users/${id}/admin`, { method: admin ? "POST" : "DELETE" })
+    .then((r) => r.user)
