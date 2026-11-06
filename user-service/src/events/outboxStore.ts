@@ -3,7 +3,7 @@
 // Scope: Added the author-specified user.deleted and user.restored outbox
 // enqueue helpers, following the existing user.created pattern.
 // Author review: Author specified the event flow; entry 026 was reviewed,
-// manually tested, and approved.
+// manually tested, and approved. Credit owner also added flow to send user.deleted to Credit Service.
 // Author reviewed, manually tested, and approved entry 027. See
 // user-service/ai/usage-log.md.
 
@@ -69,20 +69,22 @@ export async function enqueueUserCreated(
   });
 }
 
-// Order only: it scrubs personal details. Credit keeps the balance and needs no event.
+// Order: it scrubs personal details. Credit freezes the account until restore.
 export async function enqueueUserDeleted(
   tx: Prisma.TransactionClient,
   userId: string,
   deletedAt: Date,
 ): Promise<void> {
-  const event = buildUserDeleted(userId, deletedAt);
-  await tx.userOutbox.create({
-    data: {
-      eventId: event.eventId,
-      queue: QUEUES.orderUser,
-      body: JSON.stringify(event),
-    },
-  });
+  for (const queue of [QUEUES.orderUser, CREDIT_USER_QUEUE]) {
+    const event = buildUserDeleted(userId, deletedAt);
+    await tx.userOutbox.create({
+      data: {
+        eventId: event.eventId,
+        queue: queue,
+        body: JSON.stringify(event),
+      },
+    });
+  }
 }
 
 // Credit only: it moves the old balance to the new id. Order keeps old records unlinked.

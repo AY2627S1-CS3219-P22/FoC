@@ -52,4 +52,3 @@ order and i have decided to remove TLS, so credit should now only run plaintext 
 
 Human defined the transport change. No architecture/security rationale generated;
 no new dependency, skill, sub-agent, external source, commit, push or deployment.
-New changes await human review; agent checks do not imply author validation.

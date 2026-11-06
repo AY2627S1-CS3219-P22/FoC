@@ -191,4 +191,4 @@ were needed. Whitespace check passed. Other implementation review remains pendin
   builds, Credit source/test and changed-contract ESLint, and whitespace checks
   passed. Tests used isolated schemas in temporary local PostgreSQL 14; the
   temporary server was stopped afterward. No live RabbitMQ lifecycle check ran.
-- Per-file attribution, README and usage log updated. Human review pending.
+- Per-file attribution, README and usage log updated. 

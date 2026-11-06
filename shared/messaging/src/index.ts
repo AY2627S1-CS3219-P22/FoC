@@ -1,7 +1,8 @@
 // AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-30 (Asia/Singapore).
 // Scope: Added the human-requested live connection/recovery getter for Credit health.
 // Original broker implementation/declarations below remain credited to the shared messaging authors.
-// Review: New getter awaits human review; prompts/key responses: ../../../credit-service/ai/usage-log.md, entry 047.
+// Review: I verified the implementation of the live connection getter.
+// Prompts/key responses: ../../../credit-service/ai/usage-log.md, entry 047.
 
 import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';

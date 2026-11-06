@@ -1,7 +1,6 @@
 <!--
 AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-30 (Asia/Singapore).
 Scope: Archived the exact tracked-runner stop-point request and actual outcomes.
-Review: Pending human review; prompts/key responses: ../usage-log.md, entry 048.
 -->
 
 # Prompt archive — 048

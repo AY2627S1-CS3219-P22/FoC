@@ -1,12 +1,10 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-22 (Asia/Singapore).
-// Scope: Connected the human-specified credit service to authenticated gRPC/REST and transport/database lifecycle. Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained. Wired nonfatal user-event consumer startup and broker cleanup using the human's helpers. Added/tested/documented startup-only listener health with database-based HTTP status as the human specified. Connected REST health to a PostgreSQL SELECT 1 probe.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-30 (Asia/Singapore).
+// Scope: Connected the human-specified credit service to authenticated gRPC/REST and transport/database lifecycle. Implemented/documented the human-decided plaintext-only Credit gRPC transport; service-token and REST JWT authentication retained. 
+// Wired nonfatal user-event consumer startup and broker cleanup using the human's helpers. Added/tested/documented startup-only listener health with database-based HTTP status as the human specified. Connected REST health to a PostgreSQL SELECT 1 probe. Implemented human-specified cancellable startup retries and live listener health.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
-// Author review: 
-// Prompts and key responses: ../ai/usage-log.md, entries 005–024, 031, 035, 036, 038.
-// Entry 047: OpenAI Codex (GPT-6), 2026-10-30 (Asia/Singapore).
-// Scope: Implemented human-specified cancellable startup retries and live listener health.
-// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 047.
+// Author review: I reviewed and verified that the implementation matches my specification.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–024, 031, 035, 036, 038, 047.
 
 import { startServer, stopServer } from '@foc/grpc';
 import { readFile } from 'node:fs/promises';

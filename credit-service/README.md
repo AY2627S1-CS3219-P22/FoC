@@ -1,8 +1,8 @@
 <!--
-AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-11-04 (Asia/Singapore).
-Mode/scope: Documented and checked the human-defined Credit implementation.
+AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-11-06 (Asia/Singapore).
+Mode/scope: Documented and checked the human-defined Credit implementation, including the integrated lifecycle consumer, logging correction and existing verification suites.
 Review: I edited for style and conciseness.
-Exact prompts, key responses and checks: ai/usage-log.md, entries 003–049.
+Exact prompts, key responses and checks: ai/usage-log.md, entries 003–050.
 -->
 
 # Credit service
@@ -18,14 +18,7 @@ uses JWT-authenticated REST for each user's own balance and history.
 | REST balance | GET `/credits/me/balance` on port 3004 | User JWT |
 | REST history | GET `/credits/me/history` on port 3004 | User JWT |
 | Health | GET `/health` on port 3004 | Public |
-| User events | RabbitMQ queue `credit.user-events` | `user.created` consumer |
-
-The current implementation has entry-ID page tokens, direct service-token
-comparison, and no account/reservation timestamp columns. Deletion/restoration
-service methods and migration 011 are implemented. Lifecycle consumer integration
-awaits the User service's shared event schema update, as requested by the human.
-The human's definitions and AI records are retained in
-[the usage log](ai/usage-log.md).
+| User events | RabbitMQ queue `credit.user-events` | `user.created`, `user.deleted`, `user.restored` |
 
 ## Source layout
 
@@ -37,7 +30,7 @@ credit-service/
     services/      credit rules, validation and history bookmarks
     grpc/          plaintext gRPC handlers, service-token authentication and error mapping
     rest/          REST handlers and user-token authentication
-    events/        user.created callback and registration helper
+    events/        user event handler (created, deleted, restored) and consumer
     env.ts
     index.ts
   test/
@@ -63,8 +56,8 @@ Local `scripts/` and `docs/` are not required by a fresh clone.
   `BALANCE_RESTORED` receives its 10-credit grant and remains DELETED. The grant
   adds 10 to the existing total, including any `TRANSFER_IN` credits received
   through settlement. It preserves reserved credits and does not require 0/0.
-  Other existing
-  accounts lacking grant evidence fail with `ALREADY_EXISTS` and no changes.
+  Other existing accounts lacking grant evidence fail with `ALREADY_EXISTS`
+  and no changes.
 - `getBalance` returns userId, total, reserved, and computed available credits. A missing
   account fails; reads never initialize an account.
 - `reserveCredits` creates a lifetime-unique reservation per order, holds credits,
@@ -137,7 +130,7 @@ JSON `[namespace, key]` and converts its first eight bytes to a signed big-endia
 PostgreSQL [transaction-level advisory locks](https://www.postgresql.org/docs/17/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS)
 release at transaction end.
 
-## Initial-allocation implementation
+## User event consumer
 
 Credit accepts this `user.created` payload from User Service's event transport:
 
@@ -150,19 +143,41 @@ Credit accepts this `user.created` payload from User Service's event transport:
 }
 ```
 
-The [user.created callback and registration helper](src/events/userCreated.ts)
-validate deliveries with the shared `userEventSchema`, verify matching delivery
-and payload event IDs, and allocate through `initCredits({ userId })`. Allocation
-uniqueness remains per userId. Malformed events, unsupported lifecycle types and
-inconsistent prior allocations become NonRetryableError; other failures propagate to the shared client's
-retry/dead-letter handling. A successful handler finishes only after the allocation
-transaction commits or an existing grant is confirmed. Duplicate event IDs or
-different events for the same user cannot grant credits again.
+The [user event handler and registration helper](src/events/userEvents.ts)
+validate deliveries with the shared `userEventSchema` and verify matching
+delivery and payload event IDs. Every event requires `type`, `eventId`,
+`occurredAt` and `userId`:
+
+| Event | Additional required fields | Credit operation |
+| --- | --- | --- |
+| `user.created` | None | `initCredits({ userId })`; grant 10 once |
+| `user.deleted` | `deletedAt` | `markDeleted({ userId })`; keep balance, reservations and history |
+| `user.restored` | `previousUserId` | `restoreCredits({ previousUserId, userId })`; move the balance with no starter grant |
+
+Deletion does not require `purgeAfter`. Restoration validates both IDs. User
+Service sends `user.restored` instead of `user.created` when a user returns
+within four years; after that window no restoration event is sent. Credit does
+not calculate the retention window or purge old records.
+
+Malformed events, invalid IDs, inconsistent initial allocations and permanent
+restoration conflicts become `NonRetryableError`. Other failures remain
+retryable through the shared client's retry/dead-letter handling. The handler
+awaits each service operation, so RabbitMQ acknowledges only after the
+transaction commits or a repeat is confirmed. Duplicate event IDs or different
+events for the same user cannot grant or restore credits twice. Restoration
+uses the destination account and CLOSED source as its repeat check and writes
+no restore idempotency record.
+
+Deletion and restoration handler logs contain only `eventId`; creation retains
+its existing user/balance success log. The restored account's history contains
+only its own `BALANCE_RESTORED` row, with no source ID. If the source still has
+reserved credits, restoration moves nothing and retries; exhausted retries
+dead-letter the message. A dead-lettered restoration message retains both IDs
+until it is removed.
 
 The [consumer helper](src/events/broker.ts) creates one RabbitMQClient for
 CREDIT_USER_QUEUE using serviceName credit-service and prefetch 10. Configure
-RABBITMQ_URL: host execution
-defaults to `amqp://guest:guest@localhost:5672`; the Docker example reaches a broker
+RABBITMQ_URL: required; the Docker example reaches a broker
 published on the Docker host. Supply a URL reachable from your chosen deployment.
 After both API listeners start, `index.ts` attempts consumer startup in the
 background with the same CreditService instance. Failed connection, registration
@@ -183,12 +198,8 @@ logged and does not skip database cleanup.
 root builds, Credit predev and the Docker image build it before Credit. The
 package was copied from `origin/events/data-validation` at
 `0b48f5f85be01d148176a6410c9ca22c2b8e672e`. **Broker implementation and contracts
-are authored by @sunpterodactyl and the shared messaging contributors.** This PR
-includes their code for integration/testing and does not claim its authorship.
-The [package README](../shared/messaging/README.md) records the import and original
-AI declarations. Credit-specific work includes consumer wiring/tests and the
-human-requested shared-client `isConnected` getter used for live listener health.
-User Service publication remains owned by its implementer. There is no InitCredits RPC.
+are authored by @sunpterodactyl and the shared messaging contributors.** Credit-specific work includes consumer wiring/tests and the
+human-requested shared-client `isConnected` getter used for live listener health. User Service publication remains owned by its implementer. There is no InitCredits RPC.
 
 ## gRPC authentication and errors
 
@@ -290,9 +301,9 @@ Errors have `{ error, message }` fields. Matching GET routes require authenticat
 missing/invalid tokens return 401. Route matching happens first, so an unknown
 path returns 404 even without a token. Known limitation: unsupported methods
 currently return 404 rather than 405, with or without a token.
-On matched routes, invalid sizes/bookmarks return 400; missing accounts return 404; transient
-service failures return 503; internal failures return 500. Unknown users have
-empty history, entries [] and nextPageToken null.
+On matched routes, invalid sizes/bookmarks return 400; missing, DELETED or CLOSED
+accounts return 404; transient service failures return 503; internal failures
+return 500. Both balance and history require an ACTIVE account.
 
 The REST listener runs on port 3004. Set CREDIT_JWT_PUBLIC_KEY_PATH to the User
 Service public PEM. Local Compose mounts that same file read-only at
@@ -304,10 +315,13 @@ Both history RPCs, their messages/types, and client wrappers have been removed.
 User history is REST-only; there is no order-history operation.
 
 History storage/query support is implemented. Entries retain order_id and
-reservation_id (nullable for initial grants), both signed deltas, and created_at.
+reservation_id (both NULL for `INITIAL_GRANT` and `BALANCE_RESTORED`), both signed
+deltas, and created_at.
 Migration 006 adds an always-generated bigint sequence_id, unique sequence index,
 `(user_id, sequence_id DESC)` index, and one INITIAL_GRANT per user via a partial
-unique index. There is no order-history method/index. Queries page downward below
+unique index. Migration 011 replaces that index with one allowing a single
+`INITIAL_GRANT` or `BALANCE_RESTORED` row per user. There is no order-history
+method/index. Queries page downward below
 the sequence boundary; sequence values stay decimal strings in JavaScript.
 Created_at is display-only: PostgreSQL [now()](https://www.postgresql.org/docs/17/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT)
 uses transaction start. The human selected default page size 50, maximum 100,
@@ -333,7 +347,7 @@ Service key is needed.
 | --- | --- |
 | CREDIT_ORDER_SERVICE_TOKEN | Required; match Order Service's configured secret |
 | CREDIT_JWT_PUBLIC_KEY_PATH | `../user-service/keys/public.pem`, relative to credit-service/ |
-| RABBITMQ_URL | Host runs: `amqp://guest:guest@localhost:5672` |
+| RABBITMQ_URL | Required, .env.example uses : `amqp://guest:guest@localhost:5672` |
 | DOCKER_RABBITMQ_URL | Compose: the broker as seen from the container (`host.docker.internal`) |
 | HTTP_PORT / GRPC_PORT | `3004` / `50054` |
 | PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE | Compose creates `credit-db` from PGUSER/PGPASSWORD/PGDATABASE and publishes it on PGPORT; host runs connect through PGHOST:PGPORT |
@@ -447,8 +461,15 @@ RESERVATION_UPDATED may occur multiple times. Invalid legacy links or duplicate
 indexed events reject the entire migration; no data is repaired or deleted.
 Migration 009 drops created_at and updated_at from credit_accounts and reservations.
 The account model and repository no longer read or write those columns.
-credit_history.created_at and idempotency_records.created_at remain. The existing
-balance/reservation REST and gRPC response fields are unchanged.
+Migration 010 removes user_id and created_at from idempotency_records;
+credit_history.created_at remains. The existing balance/reservation REST and
+gRPC response fields are unchanged.
+Migration 011 adds account status (ACTIVE by default, DELETED or CLOSED),
+requires CLOSED balances to be 0/0, and adds `BALANCE_RESTORED` with nonnegative
+total change, zero reserved change and NULL order/reservation links. It replaces
+the initial-grant-only unique index with one opening allocation per user across
+`INITIAL_GRANT` and `BALANCE_RESTORED`. Apply migrations through 011 before
+running the lifecycle consumer.
 
 ## Verification
 
@@ -460,28 +481,14 @@ PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_loc
 npm test --workspace @foc/grpc
 ```
 
-The most recent messaging/Credit builds passed after the startup retry change.
-Lifecycle tests control time to check capped retries, client reuse,
-one initial consumer, shutdown cancellation and live health. Shared-client tests
-hold consumer recovery pending to verify that readiness remains down until it
-finishes. Earlier shared gRPC, Docker and listener results remain in
-[the usage log](ai/usage-log.md).
-After switching the migration command to the tracked runner with `--to`, all 110
-Credit tests passed. Migration tests cover inclusive boundaries, skipping already
-successful files, atomic failure and repair/resume, and concurrent-run locking.
-Schema tests exercise the npm command and historical checkpoints through `--to`.
-The updated live-listener suite also passed all 10 Node test results against a
-dedicated broker and private outage proxy, including startup recovery, later
-disconnect recovery and shutdown during backoff.
+
 Root `npm test` runs the shared gRPC suite; use the Credit workspace command above
 for Credit tests. Without PGDATABASE, the database integration checks skip.
 
 Tests cover migrations and rollback, initial-allocation duplicates, full atomic
 rollback, no overspend, version conflicts, settle/release races, opposing
 settlements, exact history links/deltas, entry-ID pagination, late writes,
-authentication, error trailers and public health. Migration 009's upgrade test
-verifies populated-row preservation and operations after timestamp removal.
-
+authentication, error trailers and public health. 
 The shared [SQL ledger oracle](test/sql/ledger-violations.sql) returns violating
 rows for explicitly scoped scenario users/reservations (empty means pass).
 It checks order/actor links, held amounts, reservation versions, terminal history,
@@ -519,12 +526,12 @@ listeners and child processes. Agent-run checks do not establish human review.
 The human approved this attribution method for comment-free JSON in
 [entry 005](ai/usage-log.md#005--confirm-column-rules-and-add-pg-migration-tooling).
 
-| File | Tool, date, and scope | Author review |
-| --- | --- | --- |
-| credit-service/package.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: pg, migration/test scripts, @types/pg, jsonwebtoken and @types/jsonwebtoken; relocated the existing workspace manifest to the service root in exchange 024; relocated the migration CLI in exchange 034 (2026-10-22); added @foc/messaging dependency and predev build in exchange 037; exchange 048 (2026-10-30) points db:migrate to the tracked run-migrations.cjs runner with optional --to. | Pending human review. |
-| Root package-lock.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: corresponding dependencies/transitive packages and relocated credit workspace/link metadata; earlier npm also normalized existing flags; exchange 037 adds messaging/amqplib workspace entries and resolves the shared Zod range to 4.6.7. | Pending human review. |
-| Root package.json | OpenAI Codex (GPT-6), 2026-10-21: changed only the credit workspace path from credit-service/grpc to credit-service, using the recorded comment-free JSON attribution method; exchange 037 adds the shared/messaging workspace and prerequisite build. | Pending human review. |
-| shared/messaging/package.json and tsconfig.json | Original files by @sunpterodactyl/shared messaging contributors, copied byte-for-byte from 0b48f5f in exchange 037; no AI-generated source/config changes. Provenance is in shared/messaging/README.md. | Upstream authorship preserved; integration review pending. |
+| File | Tool, date, and scope | 
+| --- | --- |
+| credit-service/package.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: pg, migration/test scripts, @types/pg, jsonwebtoken and @types/jsonwebtoken; relocated the existing workspace manifest to the service root in exchange 024; relocated the migration CLI in exchange 034 (2026-10-22); added @foc/messaging dependency and predev build in exchange 037; exchange 048 (2026-10-30) points db:migrate to the tracked run-migrations.cjs runner with optional --to. | 
+| Root package-lock.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: corresponding dependencies/transitive packages and relocated credit workspace/link metadata; earlier npm also normalized existing flags; exchange 037 adds messaging/amqplib workspace entries and resolves the shared Zod range to 4.6.7. | 
+| Root package.json | OpenAI Codex (GPT-6), 2026-10-21: changed only the credit workspace path from credit-service/grpc to credit-service, using the recorded comment-free JSON attribution method; exchange 037 adds the shared/messaging workspace and prerequisite build. | 
+| shared/messaging/package.json and tsconfig.json | Original files by @sunpterodactyl/shared messaging contributors, copied byte-for-byte from 0b48f5f in exchange 037. Provenance is in shared/messaging/README.md. | 
 
 Exact prompts/key exchanges and actual checks are archived under
 [credit-service/ai/](ai/usage-log.md). The human authors remain responsible for
@@ -533,5 +540,5 @@ review, validation, team norms, licensing checks, and submission disclosure.
 ## AI Use Summary
 
 Credit implementation, tests and documentation assistance are recorded in
-[ai/usage-log.md](ai/usage-log.md), including tools/models, exact prompts, affected files, actual checks and human review status. 
-
+[ai/usage-log.md](ai/usage-log.md), including tools/models, exact prompts, affected
+files, actual checks and human review status.
