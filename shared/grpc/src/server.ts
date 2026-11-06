@@ -19,7 +19,12 @@ export function createServer(
   definition: ServiceDefinition,
   handlers: UntypedServiceImplementation,
 ): Server {
-  const server = new Server();
+  // Close connections after 2 min so clients reconnect and re-resolve DNS,
+  // which is how they find pods added by autoscaling.
+  const server = new Server({
+    'grpc.max_connection_age_ms': 120_000,
+    'grpc.max_connection_age_grace_ms': 30_000, // let in-flight calls finish first
+  });
   server.addService(definition, handlers);
   return server;
 }

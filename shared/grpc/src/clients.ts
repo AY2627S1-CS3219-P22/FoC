@@ -152,9 +152,16 @@ async function creditUnary<Response>(
   }
 }
 
+// Behind a headless Kubernetes Service, DNS returns every pod's IP. round_robin
+// spreads calls across all of them; the default (pick_first) sends everything
+// to one pod. The servers cap connection age so clients re-resolve and find new pods.
+const channelOptions = {
+  'grpc.service_config': JSON.stringify({ loadBalancingConfig: [{ round_robin: {} }] }),
+};
+
 export function createUserClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 3000);
-  const client = new UserService(target, config.credentials ?? credentials.createInsecure());
+  const client = new UserService(target, config.credentials ?? credentials.createInsecure(), channelOptions);
   return {
     getPublicProfile(
       request: GetPublicProfileRequest,
@@ -177,7 +184,7 @@ export function createUserClient(target: string, config: ClientConfig = {}) {
 
 export function createOrderClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 3000);
-  const client = new OrderService(target, config.credentials ?? credentials.createInsecure());
+  const client = new OrderService(target, config.credentials ?? credentials.createInsecure(), channelOptions);
   return {
     getOrder(request: GetOrderRequest, options: RpcOptions = {}): Promise<Order> {
       return unary((callback) =>
@@ -198,7 +205,7 @@ export function createOrderClient(target: string, config: ClientConfig = {}) {
 export function createCreditClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 1300);
   const retries = creditRetryOptions(creditRetryDefaults, config);
-  const client = new CreditService(target, config.credentials ?? credentials.createInsecure(), { 'grpc.service_config': JSON.stringify({ loadBalancingConfig: [{ round_robin: {} }] }) },);
+  const client = new CreditService(target, config.credentials ?? credentials.createInsecure(), channelOptions);
   return {
     getBalance(request: GetBalanceRequest, options: RpcOptions = {}): Promise<Balance> {
       return creditUnary(timeoutMs, retries, options, (attemptOptions, callback) =>
@@ -268,7 +275,7 @@ export function createCreditClient(target: string, config: ClientConfig = {}) {
 
 export function createSupplierClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 3000);
-  const client = new SupplierService(target, config.credentials ?? credentials.createInsecure());
+  const client = new SupplierService(target, config.credentials ?? credentials.createInsecure(), channelOptions);
   return {
     getSupplier(request: GetSupplierRequest, options: RpcOptions = {}): Promise<Supplier> {
       return unary((callback) =>

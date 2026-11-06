@@ -32,7 +32,7 @@ Key ideas:
 - **After that:** CD deploys each merge by its exact `sha-<commit>` tag, so the running version is traceable and a rollback is `kubectl set image` to an earlier SHA.
 - Which build is running: `kubectl -n foc get deploy -o wide` (shows the tag), or the pod's `imageID` (exact digest).
 
-## Deploying
+## Deploying (Manually)
 
 Creating or deleting the cluster needs access to the team's AWS sandbox
 (currently JadeCheah). Teammates don't need AWS access to ship code: merge to
@@ -78,20 +78,22 @@ To add it, put a `deploy` job at the end of each service workflow:
    `aws-region: ap-southeast-1`.
 4. Skip when the cluster is down: `aws eks describe-cluster --name foc || exit 0`.
 5. Connect: `aws eks update-kubeconfig --name foc --region ap-southeast-1`.
-6. Deploy this build's exact tag:
+6. Apply the service's manifests with this build's exact tag swapped in for `latest`,
+   so manifest and config changes ship together with the new image:
    ```bash
-   kubectl -n foc set image deployment/order-service \
-     migrate=ghcr.io/ay2627s1-cs3219-p22/foc/order-service-migrate:sha-${{ github.sha }} \
-     order-service=ghcr.io/ay2627s1-cs3219-p22/foc/order-service:sha-${{ github.sha }}
+   sed "s|:latest|:sha-${{ github.sha }}|" k8s/order-service/*.yaml | kubectl apply -f -
    kubectl -n foc rollout status deployment/order-service --timeout=5m
    ```
-   Container names match the service (`user-service`, `credit-service`, ..., `ui`).
-   User, order and credit also have a `migrate` container: always set it in the same
-   command (user and order use the `-migrate` image, credit uses its normal image).
+   One apply, one rolling update. The `sed` covers the app and `migrate` images together,
+   and new pods start with the latest config. Use `k8s/ui/ui.yaml` for the UI.
+7. Add `k8s/<service>/**` to the workflow's `paths:`, so a manifest-only change also deploys.
 
 Things to know:
 - The role only trusts `main`, so the job can't be tested from a PR branch.
-- Re-running `kubectl apply -f k8s/...` resets images to `latest`, i.e. the newest builds. That is fine, but the Deployment then shows `latest` again until the next CD deploy.
+- CD never creates or changes **secrets**. If new code needs a new secret key, create it
+  before merging, or the new pods fail to start (the old ones keep running).
+- A manual `kubectl apply -f k8s/...` deploys `latest`, i.e. the newest builds. That is fine;
+  the next CD deploy switches back to an exact SHA.
 - No image pull secret is needed, since the GHCR packages are public.
 
 ## Autoscaling demo
@@ -110,8 +112,6 @@ kubectl -n foc delete pod -l role=load          # stop; scales back down after ~
 - **http only:** HTTPS needs a domain and certificate. Because of that, `user-config.yaml`
   sets `COOKIE_SECURE: "false"` so the login cookie works over http.
 - **Single replica databases** on one disk each. Fine for the demo, not highly available.
-- **gRPC balancing:** only the credit client spreads calls across pods (`round_robin`).
-  Other gRPC calls stick to one pod; HTTP traffic through nginx is spread across pods.
 
 ## Troubleshooting
 
