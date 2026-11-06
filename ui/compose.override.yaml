@@ -8,6 +8,7 @@ services:
       SUPPLIER_SERVICE_URL: ${SUPPLIER_SERVICE_URL:-http://host.docker.internal:3002}
       ORDER_SERVICE_URL: ${ORDER_SERVICE_URL:-http://host.docker.internal:3003}
       CREDIT_SERVICE_URL: ${CREDIT_SERVICE_URL:-http://host.docker.internal:3004}
+      CHAT_SERVICE_URL: ${CHAT_SERVICE_URL:-http://host.docker.internal:3005}
     extra_hosts:
       # makes host.docker.internal work on Linux too (Docker Desktop has it already)
       - 'host.docker.internal:host-gateway'

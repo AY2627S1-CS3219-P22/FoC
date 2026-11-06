@@ -3,10 +3,11 @@ import type { User, Page } from "../App"
 import StatusBadge from "../components/StatusBadge"
 import UsersSection from "../components/admin/UsersSection"
 import SuppliersSection from "../components/admin/SuppliersSection"
+import FlagsSection from "../components/admin/FlagsSection"
 import { tdCls, thCls } from "../components/admin/table"
 import { getAllOrders, orderStatus as badgeStatus, type ApiOrder } from "../api/orders"
 
-type Section = "overview" | "orders" | "users" | "suppliers"
+type Section = "overview" | "orders" | "users" | "suppliers" | "flags"
 
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleString("en-SG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })
@@ -55,6 +56,7 @@ export default function AdminPage({ user, onNavigate }: Props) {
     { key: "orders",     label: "Orders" },
     { key: "users",      label: "Users" },
     { key: "suppliers",  label: "Suppliers" },
+    { key: "flags",      label: "Flagged Chats" },
   ]
 
   // Loading / error / empty row for the order tables, or null once there's data to show
@@ -277,6 +279,7 @@ export default function AdminPage({ user, onNavigate }: Props) {
 
           {section === "users" && <UsersSection currentUserId={user.id} />}
           {section === "suppliers" && <SuppliersSection />}
+          {section === "flags" && <FlagsSection />}
 
         </div>
       </div>

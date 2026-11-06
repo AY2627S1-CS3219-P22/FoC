@@ -16,4 +16,5 @@ include:
   - supplier-service/compose.yaml
   - credit-service/compose.yaml
   - order-service/compose.yaml
+  - chat-service/compose.yaml
   - ui/compose.yaml
