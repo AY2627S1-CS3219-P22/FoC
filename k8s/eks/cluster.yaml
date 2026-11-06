@@ -22,9 +22,9 @@ vpc:
 managedNodeGroups:
   - name: workers
     instanceType: t3.medium # 2 vCPU, 4 GiB
-    desiredCapacity: 2
-    minSize: 2
-    maxSize: 2 # fixed node count, no node scaling
+    desiredCapacity: 3
+    minSize: 3
+    maxSize: 3 # fixed node count, no node scaling
     volumeSize: 20 # 20 GiB root disk per worker node
 
 addons:
