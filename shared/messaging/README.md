@@ -4,6 +4,21 @@ Scope: Documented the human-requested shared-client readiness getter; original b
 Author review: I edited for conciseness and structure.
 Prompts/key responses: ../../credit-service/ai/usage-log.md, entry 047.
 -->
+<!-- AI Assistance Disclosure: Claude Opus (Cursor), 2026-11-05.
+Prompt: improve index.ts to ensure supplier/order pub-sub works for the supplier cache.
+Scope: supplier publishing example now uses publishToExchange on supplier.events.
+Author review: Pending. -->
+## Upstream attribution for the Credit PR
+
+This package was copied from `origin/events/data-validation` at commit
+`0b48f5f85be01d148176a6410c9ca22c2b8e672e`, authored by **@sunpterodactyl and the
+shared messaging contributors**. The broker implementation and contracts belong
+to those authors; this Credit PR does not claim their authorship. Their source
+and existing AI declarations are preserved. This README adds provenance; package
+source/configuration files are copied unchanged. Credit-specific work consists of
+consumer integration, workspace/build wiring and listener tests.
+
+The upstream README follows.
 
 ## RabbitMQ Broker
 
@@ -53,7 +68,7 @@ const broker = new RabbitMQClient({ queues: [QUEUES.orderSupplier] });
 await broker.connect();
 
 await broker.consumeFromQueue<SupplierEvent>(QUEUES.orderSupplier, async (msg) => {
-  // msg.payload is SupplierUpdated | SupplierStatusChanged | SupplierDeleted
+  // msg.payload is SupplierUpdated | SupplierDeleted
 });
 ```
 
@@ -79,18 +94,19 @@ const command: CreditReleaseCommand = {
 await broker.publishToQueue(QUEUES.creditPayments, command, command.eventId);
 ```
 
-**Supplier service** — notify order-service of a catalogue change:
+**Supplier service** — notify order-service of a catalogue change. Supplier events go to the `supplier.events` topic exchange with the event `type` as the routing key; the `order.supplier-events` queue receives them through its `supplier.updated` and `supplier.deleted` bindings, so the publisher never names the order queue:
 
 ```ts
-import { RabbitMQClient, QUEUES, type SupplierUpdated } from '@foc/messaging';
+import { RabbitMQClient, EXCHANGES, type SupplierUpdated } from '@foc/messaging';
 
-const broker = new RabbitMQClient();
+const broker = new RabbitMQClient({ prefetch: 10 });
 await broker.connect();
 
 const event: SupplierUpdated = {
   type: 'supplier.updated',
   eventId: crypto.randomUUID(),
   occurredAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
   supplierId: '42',
   name: 'Fine Food',
   supplierType: 'canteen',
@@ -101,7 +117,7 @@ const event: SupplierUpdated = {
   longitude: '103.77',
 };
 
-await broker.publishToQueue(QUEUES.orderSupplier, event, event.eventId);
+await broker.publishToExchange(EXCHANGES.supplier, event.type, event, event.eventId);
 ```
 
 ### Idempotent consumers

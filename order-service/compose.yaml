@@ -92,7 +92,7 @@ services:
       CREDIT_ORDER_SERVICE_TOKEN: ${CREDIT_ORDER_SERVICE_TOKEN:?set CREDIT_ORDER_SERVICE_TOKEN in .env}
       USER_SERVICE_PUBLIC_KEY_PATH: /run/keys/user-public.pem
       REDIS_URL: redis://redis:6379
-      SUPPLIER_CACHE_TTL_SECONDS: ${SUPPLIER_CACHE_TTL_SECONDS:-60}
+      SUPPLIER_CACHE_TTL_SECONDS: ${SUPPLIER_CACHE_TTL_SECONDS:-600}
     volumes:
       # Fails at start if user-service's public key is missing
       # (run `npm run keys:generate` in user-service first).
