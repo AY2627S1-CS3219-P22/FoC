@@ -1,4 +1,4 @@
-insert into public."Supplier_Database" (
+INSERT INTO public."Supplier_Database" (
     id,
     "Name",
     "Type",
@@ -12,7 +12,7 @@ insert into public."Supplier_Database" (
     deleted_at,
     created_at,
     updated_at
-) values
+) VALUES
     (
         1,
         'The Coffee Roaster',
@@ -24,7 +24,7 @@ insert into public."Supplier_Database" (
         '08:00',
         '20:00',
         'https://example.com/suppliers/coffee-roaster.jpg',
-        null,
+        NULL,
         '2026-01-01 00:00:00+00',
         '2026-01-01 00:00:00+00'
     ),
@@ -39,7 +39,7 @@ insert into public."Supplier_Database" (
         '09:00',
         '18:00',
         'https://example.com/suppliers/central-print.jpg',
-        null,
+        NULL,
         '2026-01-02 00:00:00+00',
         '2026-01-02 00:00:00+00'
     ),
@@ -59,16 +59,15 @@ insert into public."Supplier_Database" (
         '2026-03-01 00:00:00+00'
     );
 
-select setval(
+SELECT setval(
     pg_get_serial_sequence('public."Supplier_Database"', 'id'),
-    (select max(id) from public."Supplier_Database")
+    (SELECT max(id) FROM public."Supplier_Database")
 );
--- seed data for testing purposes
 
-insert into public.supplier_opening_hours
+INSERT INTO public.supplier_opening_hours
   (supplier_id, day_of_week, opens_at, closes_at, is_closed)
-select s.id, d, '09:00', '17:00', false
-from public."Supplier_Database" s
-cross join generate_series(1, 6) as d
-where s.deleted_at is null
-on conflict (supplier_id, day_of_week) do nothing;
+SELECT s.id, d, '09:00', '17:00', false
+FROM public."Supplier_Database" s
+CROSS JOIN generate_series(1, 6) AS d
+WHERE s.deleted_at IS NULL
+ON CONFLICT (supplier_id, day_of_week) DO NOTHING;
