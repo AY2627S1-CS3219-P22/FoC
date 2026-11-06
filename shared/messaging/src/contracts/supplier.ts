@@ -1,3 +1,7 @@
+// AI Assistance Disclosure: Claude Opus (Cursor), 2026-11-05.
+// Prompt: add in supplier/order pub-sub works for the supplier cache.
+// Scope: updatedAt version field and stricter eventId/occurredAt/supplierId validation.
+// Author review: Approved event base schema by @sunpterodactyl.
 //message producer
 
 import { z } from 'zod';
@@ -11,10 +15,12 @@ export const openingHoursDaySchema = z.object({
 export type OpeningHoursDay = z.infer<typeof openingHoursDaySchema>;
 
 const supplierEventBaseSchema = z.object({
-  eventId: z.string(),
-  occurredAt: z.string(),
+  eventId: z.string().trim().min(1),
+  occurredAt: z.iso.datetime({ offset: true }),
   /** Decimal string; matches the gRPC uint64 wire format. */
-  supplierId: z.string(),
+  supplierId: z.string().regex(/^[1-9][0-9]*$/),
+  /** Supplier row updated_at after the write; for supplier.deleted, the time of the soft delete. Consumers order events by it. */
+  updatedAt: z.iso.datetime({ offset: true }),
 });
 
 export const supplierUpdatedSchema = supplierEventBaseSchema.extend({
