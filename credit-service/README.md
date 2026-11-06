@@ -533,5 +533,5 @@ review, validation, team norms, licensing checks, and submission disclosure.
 ## AI Use Summary
 
 Credit implementation, tests and documentation assistance are recorded in
-[ai/usage-log.md](ai/usage-log.md), including tools/models, exact prompts, affected
-files, actual checks and human review status. 
+[ai/usage-log.md](ai/usage-log.md), including tools/models, exact prompts, affected files, actual checks and human review status. 
+

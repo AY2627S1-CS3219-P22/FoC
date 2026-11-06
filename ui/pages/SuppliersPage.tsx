@@ -1,8 +1,10 @@
 // AI-assisted (Claude), reviewed and tested by Maliha
-import type { ReactElement } from "react"
+import { useState, type ReactElement } from "react"
 import { CATEGORIES, categoryLabel, supplierLocation, type Category } from "../api/suppliers"
 import { useSuppliers } from "../hooks/useSuppliers"
 import LoadMessage from "../components/LoadMessage"
+import OpenBadge from "../components/OpenBadge"
+import SupplierCard from "../components/SupplierCard"
 
 const TYPE_COLORS: Record<Category, string> = {
   "food/coffee": "bg-orange-50 text-orange-600",
@@ -44,6 +46,7 @@ const TYPE_ICONS: Record<Category, ReactElement> = {
 
 export default function SuppliersPage() {
   const { suppliers, error, query, category, search, filter, retry } = useSuppliers()
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   return (
     <div className="mx-auto w-full max-w-4xl px-3 py-5 sm:px-6 sm:py-8 lg:px-8">
@@ -96,9 +99,11 @@ export default function SuppliersPage() {
           {suppliers.map((s) => {
             const iconBg = TYPE_COLORS[s.type] ?? TYPE_COLORS.other
             return (
-              <div
+              <button
+                type="button"
                 key={s.supplierId}
-                className="bg-white border border-[#E4E8E6] rounded-xl p-5 hover:border-[#3F6B5A] hover:shadow-sm transition-all"
+                onClick={() => setSelectedId(s.supplierId)}
+                className="text-left bg-white border border-[#E4E8E6] rounded-xl p-5 hover:border-[#3F6B5A] hover:shadow-sm transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#1A4A36]"
               >
                 <div className="flex items-start gap-3 mb-3">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
@@ -115,13 +120,20 @@ export default function SuppliersPage() {
                   </div>
                 </div>
 
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${iconBg}`}>
-                  {categoryLabel(s.type)}
-                </span>
-              </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${iconBg}`}>
+                    {categoryLabel(s.type)}
+                  </span>
+                  <OpenBadge isOpen={s.isOpen} />
+                </div>
+              </button>
             )
           })}
         </div>
+      )}
+
+      {selectedId !== null && (
+        <SupplierCard supplierId={selectedId} onClose={() => setSelectedId(null)} />
       )}
     </div>
   )

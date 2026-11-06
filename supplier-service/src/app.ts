@@ -33,7 +33,7 @@ app.use(supplierRouter);
 
 //Send message
 app.get('/', (req:Request, res: Response) => {
-    res.send("Server is running \n \supplier");
+    res.send("Server is running \n supplier");
 });
 
 //Error handling middleware

@@ -35,7 +35,7 @@ function signAccessToken(userId: string, roles: Roles[]) {
 // httpOnly: JS can't read it (XSS-safe). path: only sent to /users/* routes.
 const refreshCookieOptions = {
   httpOnly: true,
-  secure: env.NODE_ENV === 'production',
+  secure: env.COOKIE_SECURE ? env.COOKIE_SECURE === 'true' : env.NODE_ENV === 'production',
   sameSite: 'lax',
   path: '/users',
 } as const;

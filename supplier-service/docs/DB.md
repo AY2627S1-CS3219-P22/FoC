@@ -1,42 +1,69 @@
-## Database Stack Overview 
+## Database Stack Overview
 
-----------------------------------------------------------------------------------------------------
+- PostgreSQL 17 (`postgres:17` official image)
+- Drizzle ORM + `pg` pool
+- Testcontainers (`@testcontainers/postgresql`) for `npm test`
 
-- PostgreSQL
-- Supabase 
-- Testcontainers [Docker] for testing
+Schema and seed live in `db/init/` and are applied by the image on first start
+(`/docker-entrypoint-initdb.d`):
 
-----------------------------------------------------------------------------------------------------
+- `01_schema.sql` / `02_opening_hours.sql` — tables and indexes
+- `03_seed.sql` — three test fixtures (two active, one soft-deleted)
+- `04_import_campus.sh` — parses `data/campus_suppliers.json` (idempotent)
 
-### Database Schema 
+Tests copy **01–03 only**. Do not add `04` to Testcontainers or
+`reset-database.ts`, or list/radius tests will break.
 
-![Alt text](./schema.jpg)
+### Schema
 
-- 2 Tables 
-- Foreign key is supplierId and is also specified in drizzle schema opening-hours.ts
-- fts is used for vector search with PostgresSql ts vector. It counts a set of letters and matches them to the next most relevant parameter 
-[Building Name, Location Description, Name]
-If a location description is `This is an ice cream shop` then `ice cream shop` has evaluate the 14 chars against the 25 chars description
+- `Supplier_Database` — suppliers; soft delete via `deleted_at`
+- `supplier_opening_hours` — one row per supplier per day (`day_of_week` 0–6)
+- `fts` — generated `tsvector` (name A, building/description B) + GIN index
+- `unique_active_supplier_name` — unique `"Name"` where `deleted_at IS NULL`
+- `idx_supplier_earth` — GiST on `ll_to_earth(lat, lng)` for radius search
+  (`cube` + `earthdistance`). There is no btree on `deleted_at`.
 
-### How to run supabase, create a migration, and test migration 
+### Local database
 
-To run supabase safely and without connecting to the production database, please run it locally. 
+From `supplier-service/`:
 
-`npx supabase start` initializes supabase with the migration files and the `seed.sql` file
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
 
-Before pushing a new migration please execute `npx supabase migration new <migration_name>`
+Postgres is on `127.0.0.1:54332`. Changing `db/init/` after the volume exists
+does nothing until:
 
-Apply the migration with `npx supabase migration up` to verify that your schema/column changes are applied 
+```bash
+docker compose down -v
+docker compose up -d --build
+```
 
-Finally to push to prod `npx supabase link <prod_link>'
-Then `npx supabase db push ` 
+Add a new numbered file in `db/init/` for the next schema change. Do not run
+`npx supabase`.
 
-AND LASTLY: npx supabase unlink
+Managed Postgres (RDS, Cloud SQL, Neon, and so on) never runs
+`docker-entrypoint-initdb.d`. Apply campus rows once from the JSON:
 
-This repo executes test only on the seed.sql data, which is hardcoded test data. IF the seed.sql data changes the tests will also need to change
+```bash
+CAMPUS_SUPPLIERS_JSON=data/campus_suppliers.json \
+  DATABASE_URL="$DATABASE_URL" \
+  sh db/init/04_import_campus.sh
+```
 
-Find the testcontainers setup that runs lightweight supabase tests in tests/ folder
+The script skips names that already exist, so a second apply is a no-op.
+Replace `data/campus_suppliers.json` and re-run to load a new scrape.
 
-### How to setup testcontainers for local unit testing
+### Tests
 
-### How to setup a staging environment for production database testing 
+```bash
+npm install   # repo root
+npm test      # supplier-service/
+```
+
+Testcontainers uses `postgres:16` and copies `01`–`03` from `db/init/`.
+Fixture changes in `03_seed.sql` require matching test updates.
+
+This repo tests against `03_seed.sql` only (two active suppliers, one
+soft-deleted).

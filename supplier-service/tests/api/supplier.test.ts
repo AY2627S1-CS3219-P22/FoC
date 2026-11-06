@@ -9,7 +9,7 @@ the router wires up authenticate.
 */
 
 import request from 'supertest';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { app } from '@/app';
 import pool from '@database/db';
 import { resetDatabase } from '../helpers/reset-database';
@@ -59,7 +59,7 @@ describe('GET /suppliers', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(2);
     //getAllSuppliersService has no ORDER BY, so compare as a set
-    expect(res.body.data.map((s: any) => s.name).sort()).toEqual([
+    expect(res.body.data.map((s: { name: string }) => s.name).sort()).toEqual([
       'Central Print Shop',
       'The Coffee Roaster',
     ]);
@@ -69,6 +69,77 @@ describe('GET /suppliers', () => {
     const res = await request(app).get('/suppliers');
 
     expect(res.body.data[0]).not.toHaveProperty('deletedAt');
+  });
+
+  //hours are joined only to compute the flag; the list stays a flat supplier shape
+  it('returns isOpen on every supplier without the raw opening hours', async () => {
+    const res = await request(app).get('/suppliers');
+
+    for (const s of res.body.data) {
+      expect(typeof s.isOpen).toBe('boolean');
+      expect(s).not.toHaveProperty('openingHours');
+    }
+  });
+});
+
+/*
+seed.sql opens both active suppliers 09:00-17:00 Monday to Saturday and leaves Sunday
+without a row. Only Date is faked so the pg pool's socket timers keep running.
+*/
+describe('isOpen on supplier lists', () => {
+  const MONDAY_10AM_SGT = new Date('2026-11-02T02:00:00Z');
+  const MONDAY_8PM_SGT = new Date('2026-11-02T12:00:00Z');
+  const SUNDAY_10AM_SGT = new Date('2026-11-01T02:00:00Z');
+
+  const at = (when: Date) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(when);
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('marks suppliers open inside their hours', async () => {
+    at(MONDAY_10AM_SGT);
+    const res = await request(app).get('/suppliers');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((s: { isOpen: boolean }) => s.isOpen)).toEqual([true, true]);
+  });
+
+  it('marks suppliers closed after closing time', async () => {
+    at(MONDAY_8PM_SGT);
+    const res = await request(app).get('/suppliers');
+
+    expect(res.body.data.map((s: { isOpen: boolean }) => s.isOpen)).toEqual([false, false]);
+  });
+
+  it('marks suppliers closed on a day with no hours row', async () => {
+    at(SUNDAY_10AM_SGT);
+    const res = await request(app).get('/suppliers');
+
+    expect(res.body.data.map((s: { isOpen: boolean }) => s.isOpen)).toEqual([false, false]);
+  });
+
+  it('is included on search, category and radius results', async () => {
+    at(MONDAY_10AM_SGT);
+    const [search, category, nearby] = await Promise.all([
+      request(app).get('/suppliers/search').query({ q: 'coffee' }),
+      request(app).get('/suppliers/category').query({ type: 'printing' }),
+      request(app).get('/suppliers/search-radius').query({
+        latitude: 1.294167,
+        longitude: 103.773611,
+        radius: 500,
+      }),
+    ]);
+
+    expect(search.body.data[0]).toMatchObject({ name: 'The Coffee Roaster', isOpen: true });
+    expect(category.body.data[0]).toMatchObject({ name: 'Central Print Shop', isOpen: true });
+    expect(nearby.body.data.map((s: { isOpen: boolean }) => s.isOpen)).toEqual([true, true]);
+    for (const res of [search, category, nearby]) {
+      expect(res.body.data[0]).not.toHaveProperty('openingHours');
+    }
   });
 });
 
@@ -178,7 +249,7 @@ describe('POST /supplier', () => {
     );
 
     expect(rows).toHaveLength(7);
-    expect(rows.map((r: any) => r.day_of_week)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(rows.map((r: { day_of_week: number }) => r.day_of_week)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(rows[0]).toMatchObject({ opens_at: '09:00:00', closes_at: '17:00:00', is_closed: false });
   });
 
@@ -495,7 +566,7 @@ describe('GET /suppliers/search', () => {
     const res = await request(app).get('/suppliers/search').query({ q: 'AS8' });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.map((s: any) => s.name)).toEqual(['Central Print Shop']);
+    expect(res.body.data.map((s: { name: string }) => s.name)).toEqual(['Central Print Shop']);
   });
 
   it('returns the same camelCase shape as the rest of the API', async () => {
