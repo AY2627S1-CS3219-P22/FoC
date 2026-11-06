@@ -26,9 +26,9 @@ spec:
           command: ['npx', 'prisma', 'migrate', 'deploy']
           envFrom:
             - secretRef: { name: user-secrets }
-          resources:
-            requests: { cpu: 50m, memory: 64Mi }
-            limits: { memory: 128Mi }
+          resources:   # prisma's migrate engine was OOMKilled at 128Mi
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { memory: 512Mi }
       containers:
         - name: user-service
           image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service:sha-20d9c4f9614eb3dede74ec189a342d4039bea679 # same tag as migrate above
