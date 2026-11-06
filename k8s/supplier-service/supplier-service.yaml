@@ -20,8 +20,8 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: supplier-service
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/supplier-service:sha-f123c90f7fc71a9ca3b43e56d24beff80c460a4f
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/supplier-service:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           ports:
             - { name: grpc, containerPort: 50052 }
             - { name: http, containerPort: 3002 }

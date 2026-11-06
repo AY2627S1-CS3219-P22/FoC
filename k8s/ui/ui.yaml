@@ -18,8 +18,8 @@ spec:
         - name: ghcr-pull
       containers:
         - name: ui
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/ui:sha-b9deaed2c7637ec8976590b5cc51564a2888d51a
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/ui:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           ports:
             - { name: http, containerPort: 80 }
           env:

@@ -20,8 +20,8 @@ spec:
       terminationGracePeriodSeconds: 30
       initContainers:   # applies any new database migrations, only relevant for order
         - name: migrate
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/order-service-migrate:sha-aa7d9f9ecd2f1a8732571049127a1426355553ac
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/order-service-migrate:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           command: ['npm', 'run', 'prisma:deploy']
           envFrom:
             - secretRef: { name: order-secrets }
@@ -30,8 +30,8 @@ spec:
             limits: { memory: 512Mi }
       containers:
         - name: order-service
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/order-service:sha-aa7d9f9ecd2f1a8732571049127a1426355553ac # same tag as migrate above
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/order-service:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           ports:
             - { name: grpc, containerPort: 50053 }
             - { name: http, containerPort: 3003 }

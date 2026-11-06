@@ -21,8 +21,8 @@ spec:
       terminationGracePeriodSeconds: 30
       initContainers:   # applies any new database migrations, only relevant for Credit
         - name: migrate
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/credit-service:sha-20d9c4f9614eb3dede74ec189a342d4039bea679
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/credit-service:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           command: ['node', 'migrations/run-migrations.cjs']
           envFrom:
             - configMapRef: { name: credit-config }
@@ -32,8 +32,8 @@ spec:
             limits: { memory: 128Mi }
       containers:
         - name: credit-service
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/credit-service:sha-20d9c4f9614eb3dede74ec189a342d4039bea679 # same image as migrate above
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/credit-service:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           ports:
             - { name: grpc, containerPort: 50054 }
             - { name: http, containerPort: 3004 }

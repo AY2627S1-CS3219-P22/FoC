@@ -21,8 +21,8 @@ spec:
       terminationGracePeriodSeconds: 30
       initContainers:   # applies any new database migrations, only relevant for user
         - name: migrate
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service-migrate:sha-20d9c4f9614eb3dede74ec189a342d4039bea679
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service-migrate:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           command: ['npx', 'prisma', 'migrate', 'deploy']
           envFrom:
             - secretRef: { name: user-secrets }
@@ -31,8 +31,8 @@ spec:
             limits: { memory: 512Mi }
       containers:
         - name: user-service
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service:sha-20d9c4f9614eb3dede74ec189a342d4039bea679 # same tag as migrate above
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           ports:
             - { name: grpc, containerPort: 50051 }
             - { name: http, containerPort: 3001 }
