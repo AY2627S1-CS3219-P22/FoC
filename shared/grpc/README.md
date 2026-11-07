@@ -204,3 +204,19 @@ ChatGPT (Codex), 2026-10-25: imported agreed Credit contracts/client/tests and
 Supplier validators. Added Zod to shared/grpc/package.json and regenerated the
 root lockfile. JSON attribution in this README and order-service/usage-log.md
 was approved by the human. 
+
+
+### Order deletion eligibility (2026-11-02)
+
+AI Assistance Disclosure: ChatGPT (Codex). Transcribed the human-approved RPC
+contract and added the shared client; author review pending. Exact exchanges:
+[Order usage log](../../order-service/usage-log.md).
+
+`order.OrderService/CheckDeletionEligibility` takes proto field `user_id` and
+returns `eligible` plus `blocked_order_count` (the number of blocking orders). The shared Promise
+client uses `createOrderClient(address).checkDeletionEligibility({ userId })`
+and returns `{ eligible, blockedOrderCount }`. It preserves the shared deadline and
+metadata options. User Service must reject deletion on a non-eligible result or
+any RPC failure. No new service token or network exposure was added. Order's
+GetOrder stub and existing wire enum were not changed. More details:
+[Order deletion handling](../../order-service/messaging/README.md).

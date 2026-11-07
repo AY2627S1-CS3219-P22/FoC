@@ -1,6 +1,10 @@
+// ChatGPT (Codex), 2026-11-04: Save Supplier coordinate-string pickup snapshots; review pending; see ../../../usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Implemented author-approved durable edit operations and Credit UpdateReservation reconciliation.
 // Author review: Pending; see ../../usage-log.md.
+// ChatGPT (Codex), 2026-10-30: Removed current-opening-hours checks as requested; human review pending.
+// ChatGPT (Codex), 2026-11-02: Catalogue validation for durable edits; review pending.
+import { resolveDestination } from './destinationLocations';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { PrismaClient, Prisma } from '../generated/prisma';
@@ -40,23 +44,32 @@ export function createOrderEdits(db: PrismaClient, credit: ReturnType<typeof cre
       if (order.status !== 'UNASSIGNED') return { status: 409, error: 'invalid-transition' };
       if (order.expiryTime <= time) return { status: 409, error: 'expired' };
       if (await tx.orderEditOperation.findFirst({ where: { orderId, state: { in: [...active] } } })) return { status: 409, error: 'conflict' };
+      const selected = patch.destinationLocationId ? await tx.destinationLocation.findUnique({ where: { id: patch.destinationLocationId } }) : null;
+      if (patch.destinationLocationId && !selected) return { status: 400, error: 'invalid-destination' };
       const input = createOrderSchema.parse({ supplierId: order.supplierId.toString(), destination: order.destination,
-        requestDetails: order.requestDetails, credits: order.credits, expiryTime: order.expiryTime.toISOString(), ...request });
+        requestDetails: order.requestDetails, credits: order.credits, expiryTime: order.expiryTime.toISOString(), ...request,
+        ...(selected && patch.destination === undefined ? { destination: selected.name } : {}) });
+      const locationChanged = patch.destination !== undefined || patch.destinationLocationId !== undefined;
+      const destination = locationChanged
+        ? await resolveDestination(tx, input.destination, patch.destinationLocationId)
+        : null;
+      if (locationChanged && !destination) return { status: 400, error: 'invalid-destination' };
+      const destinationLocationId = destination?.id ?? order.destinationLocationId;
       if (!isAllowedExpiry(input.expiryTime, time)) return { status: 400, error: 'invalid-input' };
-      let supplier, opening, reservation;
+      let supplier, reservation;
       try {
-        [supplier, opening, reservation] = await Promise.all([
-          directories.getSupplier(input.supplierId), directories.isSupplierOpen(input.supplierId), credit.getReservation({ orderId }, creditOptions).then(validateReservation),
+        [supplier, reservation] = await Promise.all([
+          directories.getSupplier(input.supplierId), credit.getReservation({ orderId }, creditOptions).then(validateReservation),
         ]);
       } catch (error) { return classifyCreditError(error) === 'rejected' ? { status: 409, error: 'dependency-rejected' } : { status: 503, error: 'dependency-unavailable' }; }
-      if (!opening.isOpen || supplier.supplierId !== input.supplierId || !supplier.name.trim() || !supplier.locationDescription.trim()
+      if (supplier.supplierId !== input.supplierId || !supplier.name.trim() || !supplier.pickupLocation.trim()
         || reservation.orderId !== orderId || reservation.requesterId !== requesterId || reservation.amount !== order.credits || reservation.status !== 'RESERVED') {
         return { status: 409, error: 'dependency-rejected' };
       }
       await tx.orderEditOperation.create({ data: { id, orderId, requesterId, expectedVersion: reservation.version,
         targetCredits: input.credits, proposedChanges: { request, target: { supplierId: input.supplierId,
-          destination: input.destination, requestDetails: input.requestDetails, credits: input.credits, expiryTime: input.expiryTime.toISOString(),
-          pickupStore: supplier.name, pickupLocation: supplier.locationDescription } } as Prisma.InputJsonValue } });
+          destination: input.destination, ...(destinationLocationId ? { destinationLocationId } : {}), requestDetails: input.requestDetails, credits: input.credits, expiryTime: input.expiryTime.toISOString(),
+          pickupStore: supplier.name, pickupLocation: supplier.pickupLocation } } as Prisma.InputJsonValue } });
       return null;
     }, { timeout: 15_000 });
     if (initial) return initial;
@@ -83,7 +96,7 @@ export function createOrderEdits(db: PrismaClient, credit: ReturnType<typeof cre
     if (!work) return;
     const data = work.proposedChanges as { target: Record<string, string | number> };
     const input = createOrderSchema.parse({ supplierId: data.target.supplierId, destination: data.target.destination,
-      requestDetails: data.target.requestDetails, credits: data.target.credits, expiryTime: data.target.expiryTime });
+      requestDetails: data.target.requestDetails, credits: data.target.credits, expiryTime: data.target.expiryTime, destinationLocationId: data.target.destinationLocationId });
     let confirmed = false;
     let failed = false;
     try {
@@ -111,7 +124,7 @@ export function createOrderEdits(db: PrismaClient, credit: ReturnType<typeof cre
       const order = await tx.order.findUniqueOrThrow({ where: { id: work.orderId } });
       const time = await now(tx);
       if (confirmed && order.status === 'UNASSIGNED' && order.expiryTime > time && input.expiryTime > time) {
-        await tx.order.update({ where: { id: work.orderId }, data: { supplierId: BigInt(input.supplierId), destination: input.destination,
+        await tx.order.update({ where: { id: work.orderId }, data: { supplierId: BigInt(input.supplierId), destination: input.destination, destinationLocationId: input.destinationLocationId,
           requestDetails: input.requestDetails, credits: input.credits, expiryTime: input.expiryTime,
           pickupStore: String(data.target.pickupStore), pickupLocation: String(data.target.pickupLocation) } });
         await tx.orderEditOperation.update({ where: { id }, data: { state: 'SUCCEEDED', leaseExpiresAt: null, lastError: null } });

@@ -1,6 +1,9 @@
+<!-- ChatGPT (Codex), 2026-11-02: Destination catalogue setup and API contract; review pending; see usage-log.md. -->
+<!-- ChatGPT (Codex), 2026-10-30: Updated opening-hours behavior; human review pending. -->
 <!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-24.
 Scope: Updated Order integration/client/pickup documentation after Order-only port. Human review pending.
 See usage-log.md. -->
+<!-- ChatGPT (Codex), 2026-10-30: Documented author-specified admin status filters. Human review pending. -->
 
 # Order Service
 
@@ -95,7 +98,7 @@ npm ci
 cp order-service/grpc/.env.example order-service/grpc/.env
 # Edit the copied file if using different database or server ports.
 cp order-service/.env.example order-service/.env
-docker compose -f order-service/compose.yaml up -d order-db --wait
+(cd order-service && docker compose up -d order-db --wait)
 ```
 
 Do not overwrite an existing `.env`; update it instead. npm workspace commands
@@ -177,9 +180,9 @@ that attribution refers to the same records now maintained in this service.
 
 ## Order lifecycle (2026-10-22)
 
-**Peer-service status:** Supplier GetSupplier/IsOpen and User outbox are inherited
+**Peer-service status:** Supplier GetSupplier and User outbox are inherited
 from main. The Credit runtime in this checkout remains a scaffold. Successful production creation requires the real User
-GetPublicProfile, implemented Supplier GetSupplier/IsOpen, and Credit from the
+GetPublicProfile, implemented Supplier GetSupplier, and Credit from the
 agreed `feat/credit-implementation` contract. Order now imports that contract
 from `@foc/grpc`; the duplicate local protobuf was removed. Shared contracts
 and teammate sources are unchanged by this Order-only port. No test doubles
@@ -241,7 +244,7 @@ supplierId (positive bigint decimal string), destination, requestDetails, credit
 accepts any nonempty subset of these five fields. Unknown fields are rejected;
 requester identity, names and pickup snapshots cannot be supplied by the client.
 Required text must be nonblank; expiry must be at least one hour after database
-time at initial creation/edit validation. Supplier must currently be open.
+time at initial creation/edit validation. Supplier existence is validated; current opening hours do not block creation or editing.
 
 Newly published orders are UNASSIGNED/RESERVED. Returns use `{order: {...}}` with
 supplierId serialized as a decimal string and timestamps as ISO UTC. Internal
@@ -358,6 +361,24 @@ An administrator with USER can also use these views for their own subject.
 Listings are snapshots; acceptance still rechecks eligibility under a row lock.
 
 ### Administrator dashboard: GET /orders
+
+Omit query parameters to retrieve all orders, or filter by status:
+
+| Query | Included statuses |
+| --- | --- |
+| `?status=ONGOING` | `UNASSIGNED`, `ASSIGNED`, `PICKED_UP` |
+| `?status=UNASSIGNED` | `UNASSIGNED` |
+| `?status=ASSIGNED` | `ASSIGNED` |
+| `?status=PICKED_UP` | `PICKED_UP` |
+| `?status=DELIVERED` | `DELIVERED` |
+| `?status=CANCELLED` | `CANCELLED` |
+
+Filters use persisted status, including overdue orders awaiting expiry processing.
+Responses retain `{ "orders": [...] }`, newest first, without pagination.
+Status values are case-sensitive. Empty, unknown, repeated or structured values,
+unsupported query parameters, and combining `status` with `scope` return 400.
+The existing USER `scope` queries remain unchanged; `status` queries require
+ADMINISTRATOR, including when the caller also has USER.
 
 Requires a valid User Service bearer JWT with ADMINISTRATOR role. USER alone
 returns 403; missing/invalid credentials return 401. An administrator does not
@@ -499,7 +520,7 @@ implemented as described in the integration update below; delivery requires a PI
 Supply a nonempty partial body containing supplierId (decimal string), destination,
 requestDetails, credits (positive int32), and/or offset-bearing ISO expiryTime.
 The resulting order must meet the existing validation rules, including expiry at
-least one hour after database time and a currently open supplier. Only the
+least one hour after database time and a valid supplier. Only the
 original requester can edit an unexpired UNASSIGNED order.
 
 The durable OrderEditOperation saves the request, complete target fields and
@@ -542,7 +563,7 @@ The full Credit business runtime remains in the teammate PR.
 Order now uses shared createCreditClient with service-token metadata on each
 RPC; creditValidation.ts retains response validation and error classification.
 Explicit ACCOUNT_NOT_FOUND is retried within the existing bounded budget.
-Supplier results use shared validation; missing locationDescription becomes "-".
+Supplier results use shared validation; pickupLocation stores "latitude, longitude" from the validated Supplier coordinates. Existing saved history is unchanged.
 Destination remains a string; Order schema/migrations are unchanged.
 
 `POST /orders/:id/pickup` requires USER role and the assigned courier, an
@@ -550,7 +571,7 @@ unexpired ASSIGNED order, and an empty JSON object. A row-locked transaction
 sets PICKED_UP and pickedUpAt, returning 200 with `{ "order": {...} }`. Wrong
 actor/role returns 403, missing/invalid JWT 401, malformed input 400, missing
 order 404, invalid transition/expiry 409. Repeated pickup returns 409. No credits
-move at pickup. Supplier opening is checked during creation; pickup/delivery use
+move at pickup. Supplier opening hours do not gate creation, editing or recovery; pickup/delivery use
 the saved snapshot without another Supplier RPC, as approved by the human.
 
 ## AI Use Summary
@@ -562,3 +583,165 @@ recovery and author-approved delivery. Prompts, key exchanges, affected files
 and verification are recorded in [usage-log.md](usage-log.md). Human review and
 validation remain pending. See the root README final AI Use Summary for the
 consolidated project disclosure and submission slide-deck link requirement.
+
+
+## Destination catalogue
+
+Order owns a PostgreSQL `DestinationLocation` catalogue populated from the
+206-row [CSV](data/nus_kent_ridge_locations.csv). All supplied columns are retained;
+blank coordinates are SQL NULL and the verification flag is a boolean. CSV IDs
+(such as `kr_001`) are unique. The migration
+`20261102000000_destination_catalogue` creates and populates the table automatically
+when `prisma:deploy` runs; no separate import command is needed. The supplied
+source/verification metadata is preserved; importing does not independently
+verify the locations or fill missing coordinates.
+
+Search (also used by the UI through its Vite proxy):
+
+```sh
+curl 'http://localhost:3003/orders/locations?query=COM%201&limit=20'
+```
+
+`GET /orders/locations` searches names and aliases using case-insensitive substring
+matching. Results have `{ "locations": [{ "id": "kr_001", "name": "COM1", "code": "COM1" }] }`.
+No login is required to search this non-personal building catalogue. Results are
+sorted by name, then ID. `limit` defaults to 20 and must be an integer from 1
+through 50. No matches returns 200 with an empty array. Missing/blank query returns
+400 with `{ "error": { "message": "Search query must not be empty." } }`.
+Invalid limits, duplicate parameters and unknown parameters return 400.
+
+The create form replaces its fixed dropdown with debounced search results. Users
+must select a building from those results; additional room/meeting-point details
+belong in request instructions. The UI submits these fields with the usual order
+body and Idempotency-Key:
+
+```json
+{
+  "destinationLocationId": "kr_001",
+  "destination": "COM1"
+}
+```
+
+The server verifies the ID/name combination before credit reservation and stores
+both on the Order. Unlisted destinations and ID/name mismatches return 400
+`invalid-destination`. Existing clients may submit an exact catalogue display
+name without an ID; the backend resolves and stores its catalogue ID. Arbitrary
+free text is no longer accepted for new destinations. Names/aliases in search
+are suggestions; submit the selected name, not the alias.
+
+`PATCH /orders/:id` can change destination using `destinationLocationId` alone,
+or with its matching `destination` name. Exact-name-only edits remain supported.
+Destination changes are validated before credit adjustments; the ID/name are
+stored in the durable edit target and applied together during recovery.
+
+Historical orders retain their existing destination text and a NULL ID. Already
+recorded pending creations/edits without a catalogue ID can still recover using
+their original snapshot. No historical destination is guessed or overwritten.
+Changes to the CSV after deployment require an explicit data migration; editing
+the CSV does not update an existing database or a previously applied migration.
+Apply migrations and rebuild/restart Order before testing the updated UI. The
+existing Docker startup already runs `prisma:deploy`, including this catalogue
+migration.
+
+
+## Courier existence during acceptance
+
+AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02. Implemented the author's
+explicit courier existence requirement; review pending; see usage-log.md.
+
+Before assigning an eligible order, Order calls User Service's existing
+`GetPublicProfile` RPC through the shared gRPC client, using the courier ID from
+the verified JWT. User NOT_FOUND returns 403 `forbidden`; timeout, unavailable
+User Service or mismatched profile ID returns 503 `dependency-unavailable`.
+Neither failure assigns the courier or changes the order. The order row remains
+locked during the check, and expiry is checked again before assignment.
+
+Existing role, self-acceptance, status, credit-state and pending-edit checks
+remain. This checks User existence, not Credit account initialization. It also
+is not an atomic cross-service deletion protocol; asynchronous deletion handling
+remains separate work.
+
+Rebuild/restart the Order container with the shared or standalone Compose setup to use
+this change; USER_GRPC_ADDR continues to supply the User endpoint. No new
+configuration or database migration is required for this acceptance check.
+
+
+## RabbitMQ user.deleted subscription
+
+AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02. Subscription, durable
+receipt and tests; review pending; see usage-log.md.
+
+Order now uses the shared RabbitMQ client to consume `order.user-events` when
+RABBITMQ_URL is configured. The root Compose uses the shared `rabbitmq` service;
+the standalone override uses the host broker by default. Start the host broker
+first when running standalone. Valid deletion events are recorded
+in UserDeletionEvent before ACK; event IDs prevent duplicate receipt across
+restarts. Invalid/conflicting messages are dead-lettered; storage failures use
+the shared retry/DLQ behavior. The new migration runs during Docker startup.
+
+Deletion processing now scrubs safely completed/cancelled history and records
+active or unresolved work for manual review. No orders are cancelled or reassigned
+because of deletion. The internal CheckDeletionEligibility RPC is implemented. The User
+publisher must send deletion events to Order's queue; publishing only to Credit
+will not reach Order. Exact payload, startup, inspection, test instructions and
+remaining lifecycle work: [messaging/README.md](messaging/README.md).
+
+
+## Deletion consistency handling update
+
+AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02. Implemented the team's
+confirmed manual-review policy and safe-history scrubbing; review pending;
+see usage-log.md.
+
+User deletion does not trigger speculative cancellation, refunds or account
+restoration. Active/unresolved work is preserved and recorded as
+MANUAL_REVIEW_REQUIRED with blocker UUIDs. Confirmed historical orders retain
+rows/IDs and financial outcomes while the deleted participant's name, destination,
+request details and JSON copies are scrubbed. The destination catalogue reference
+is cleared. Processing and its recorded outcome commit atomically; duplicate
+events are safe. Older receipt-only events are processed on subscriber startup.
+
+The internal CheckDeletionEligibility RPC checks both participant relationships,
+active statuses and unresolved credit/edit/creation work. User Service must call
+it before deletion and fail closed on errors. This is not an atomic deletion
+fence: preventing new order activity during deletion and recovering unexpected
+active orders still require agreement with User Service. No notification or
+restoration contract was invented. Contract, state definitions, race explanation
+and operational queries: [messaging/README.md](messaging/README.md).
+
+
+### Single-order details
+
+`GET /orders/:id` requires a User Service bearer token and returns `{ "order": {...} }`
+using the same fields and serialization as the existing listings. The requester,
+assigned courier and administrator may read their permitted order in any state.
+Other authenticated USERs may read only UNASSIGNED, unexpired orders, matching
+`scope=open`. Internal creation payloads, edit records and credit-operation records
+are excluded. Missing/invalid tokens return 401; denied access returns 403;
+unknown UUIDs return 404; malformed UUIDs return 400.
+
+The existing UI details and active-errand pages fetch this endpoint when opened.
+Actions remain disabled during loading; access/load errors replace the details.
+Both development and Docker UI use the existing `/backend/orders` proxy. This
+does not introduce URL-based navigation or preserve the selected page on reload.
+
+```sh
+curl -H 'Authorization: Bearer <token>' http://localhost:3003/orders/<order-uuid>
+```
+
+AI assistance: ChatGPT (Codex), 2026-11-03; implementation, refactoring, tests and
+documentation following the confirmed contract. Human review pending; see usage-log.md.
+
+### Acceptance display names and financial UI feedback
+
+Acceptance saves the User public-profile display name (trimmed first/last name,
+falling back to username) alongside courierId. Profiles without a usable name do
+not cause an assignment. Existing historical null snapshots are not backfilled.
+Listings/details expose the stored destinationLocationId. The UI retains
+creditState and confirms delivery credits as received only when SETTLED;
+SETTLEMENT_PENDING remains visibly pending. Creation choices and validation
+require expiry at least one hour ahead, matching the backend.
+
+See [completeness review](COMPLETENESS_REVIEW.md) for reviewed areas, fixes and
+remaining confirmed scope. AI assistance: ChatGPT (Codex), 2026-11-06;
+implementation/debugging/tests/documentation, human review pending; see usage-log.md.

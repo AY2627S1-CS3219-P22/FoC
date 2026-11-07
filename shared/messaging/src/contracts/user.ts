@@ -1,3 +1,5 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02.
+// Scope: Align user.deleted with the team-supplied event contract; review pending; see ../../../../order-service/usage-log.md.
 // Message producer: user service
 // Consumers: credit service, order service
 
@@ -16,14 +18,15 @@ const userEventBaseSchema = z.object({
   });
   
   /**
-   * User soft-deleted. Credit snapshots the balance and archives credit history;
-   * order archives order history. Both keep the data until `purgeAfter`.
+   * User row deleted. Order receives the old ID and deletion timestamps;
+   * User owns the four-year archive and sends no later purge event.
    */
   export const userDeletedSchema = userEventBaseSchema.extend({
     type: z.literal('user.deleted'),
-    deletedAt: z.string(),
-    /** deletedAt + 4 years, set once by the user service so consumers never compute it themselves. */
-    purgeAfter: z.string(),
+    eventId: z.string().trim().min(1),
+    userId: z.string().trim().min(1),
+    occurredAt: z.iso.datetime({ offset: true }),
+    deletedAt: z.iso.datetime({ offset: true }),
   });
   
   /** User logged back in within the retention window. Consumers restore archived data. */

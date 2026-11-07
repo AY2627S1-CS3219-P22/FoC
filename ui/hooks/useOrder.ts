@@ -1,19 +1,31 @@
+// ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { Order } from "../App"
-import { orderError, updateOrder, type OrderAction } from "../api/orders"
+import { getOrder, orderError, updateOrder, type OrderAction } from "../api/orders"
 
-// Holds one order and runs accept / pickup / deliver / cancel on it.
-// order-service has no single-order endpoint, so the page starts from the
-// order the list already loaded, and each action returns the updated one.
-// Used by the details page and the active errand page.
+// Refresh details from the backend, then run lifecycle actions.
 export function useOrder(initial: Order) {
   const [order, setOrder] = useState(initial)
   const [actionError, setActionError] = useState("")
   const [busy, setBusy] = useState(false)
 
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState("")
+  useEffect(() => {
+    const controller = new AbortController()
+    setLoading(true)
+    setLoadError("")
+    getOrder(initial.id, controller.signal)
+      .then(updated => { if (!controller.signal.aborted) setOrder(updated) })
+      .catch(error => { if (!controller.signal.aborted) setLoadError(orderError(error)) })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [initial.id])
+
   // returns the updated order, or null if it failed (error is shown on the page)
   const run = async (action: OrderAction) => {
+    if (loading || loadError || busy) return null
     setBusy(true)
     setActionError("")
     try {
@@ -28,5 +40,5 @@ export function useOrder(initial: Order) {
     }
   }
 
-  return { order, actionError, busy, run }
+  return { order, actionError, busy: busy || loading, loadError, run }
 }

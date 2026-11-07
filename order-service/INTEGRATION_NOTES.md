@@ -1,3 +1,4 @@
+<!-- ChatGPT (Codex), 2026-10-30: Updated opening-hours behavior; human review pending. -->
 <!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-25 Asia/Singapore.
 Scope: Document completed shared contract integration and validation facts.
 Human review pending; exact prompts/results: usage-log.md. -->
@@ -25,13 +26,13 @@ extended scope to the missing agreed shared contracts and dependency metadata.
 
 The teammate's implemented Credit runtime is still required for real credit
 operations. This branch's Credit scaffold intentionally returns UNIMPLEMENTED.
-User event/outbox and Supplier GetSupplier/IsOpen come from main. Use the same
+User event/outbox and Supplier GetSupplier come from main. Use the same
 JWT public key, Order/Credit token and configured gRPC addresses across services.
 Apply Credit's own migrations using its README when that implementation lands.
 
 Order owns the lifecycle APIs, state/ownership rules, PostgreSQL schema,
 durable creation/edit/refund/settlement recovery and pickup. Creation validates
-current Supplier opening; pickup/delivery use saved snapshot. Missing Supplier
+Supplier existence; pickup/delivery use saved snapshot. Missing Supplier
 description is "-"; destination remains a string. No schema change was needed
 for the later integration port or pickup addition.
 

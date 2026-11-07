@@ -1,6 +1,10 @@
+// ChatGPT (Codex), 2026-11-04: Save Supplier coordinate-string pickup snapshots; review pending; see ../../../usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Implemented author-approved durable creation, same-key replay, recovery and compensation.
 // Author review: Pending; see ../../usage-log.md.
+// ChatGPT (Codex), 2026-10-30: Removed current-opening-hours checks as requested; human review pending.
+// ChatGPT (Codex), 2026-11-02: Catalogue validation and saved ID/name; review pending.
+import { resolveDestination } from './destinationLocations';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { PrismaClient, Prisma, Order } from '../generated/prisma';
@@ -17,7 +21,8 @@ async function now(tx: Prisma.TransactionClient) {
 }
 function canonical(input: z.infer<typeof createOrderSchema>) {
   return { supplierId: input.supplierId, destination: input.destination, requestDetails: input.requestDetails,
-    credits: input.credits, expiryTime: input.expiryTime.toISOString() };
+    credits: input.credits, expiryTime: input.expiryTime.toISOString(),
+    ...(input.destinationLocationId ? { destinationLocationId: input.destinationLocationId } : {}) };
 }
 function fingerprint(input: z.infer<typeof createOrderSchema>) {
   return createHash('sha256').update(JSON.stringify(canonical(input))).digest('hex');
@@ -37,16 +42,18 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
     let creation = await db.orderCreation.findUnique({ where: { requesterId_idempotencyKey: { requesterId, idempotencyKey: key } } });
     let created = false;
     if (!creation) {
-      let profile, supplier, opening;
+      const destination = await resolveDestination(db, input.destination, input.destinationLocationId);
+      if (!destination) return { status: 400, error: 'invalid-destination' };
+      let profile, supplier;
       try {
-        [profile, supplier, opening] = await Promise.all([
-          directories.getRequester(requesterId), directories.getSupplier(input.supplierId), directories.isSupplierOpen(input.supplierId),
+        [profile, supplier] = await Promise.all([
+          directories.getRequester(requesterId), directories.getSupplier(input.supplierId),
         ]);
       } catch (error) {
         return { status: rpcCode(error) === rpcStatus.NOT_FOUND || rpcCode(error) === rpcStatus.INVALID_ARGUMENT ? 409 : 503,
           error: rpcCode(error) === rpcStatus.NOT_FOUND || rpcCode(error) === rpcStatus.INVALID_ARGUMENT ? 'dependency-rejected' : 'dependency-unavailable' };
       }
-      if (profile.userId !== requesterId || supplier.supplierId !== input.supplierId || !opening.isOpen
+      if (profile.userId !== requesterId || supplier.supplierId !== input.supplierId
         || !supplier.name.trim()) return { status: 409, error: 'dependency-rejected' };
       const requesterName = [profile.firstName, profile.lastName].filter((s) => s.trim()).join(' ') || profile.username;
       if (!requesterName.trim()) return { status: 409, error: 'dependency-rejected' };
@@ -54,8 +61,8 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
         creation = await db.$transaction(async (tx) => {
           if (!isAllowedExpiry(input.expiryTime, await now(tx))) return null;
           const row = await tx.orderCreation.create({ data: { orderId: randomUUID(), requesterId, idempotencyKey: key,
-            requestFingerprint: hash, payload: { ...canonical(input), requesterName, pickupStore: supplier.name,
-              pickupLocation: supplier.locationDescription } } });
+            requestFingerprint: hash, payload: { ...canonical(input), destinationLocationId: destination.id, requesterName, pickupStore: supplier.name,
+              pickupLocation: supplier.pickupLocation } } });
           await tx.creditOperation.create({ data: { orderId: row.orderId, type: 'RESERVE', payload: { requesterId, amount: input.credits } } });
           return row;
         });
@@ -95,25 +102,17 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
     if (!work) return;
     const data = work.row.payload as Record<string, string | number>;
     const input = createOrderSchema.parse({ supplierId: data.supplierId, destination: data.destination,
-      requestDetails: data.requestDetails, credits: data.credits, expiryTime: data.expiryTime });
+      requestDetails: data.requestDetails, credits: data.credits, expiryTime: data.expiryTime, destinationLocationId: data.destinationLocationId });
     let failure: 'rejected' | 'uncertain' | 'unavailable' | undefined;
     let confirmed = false;
     let compensated = false;
     let expiry = false;
-    let supplierRejected = false;
     try {
       let receipt;
       try { receipt = validateReservation(await credit.getReservation({ orderId: id }, creditOptions)); }
       catch (error) { if (rpcCode(error) !== rpcStatus.NOT_FOUND) throw error; }
       expiry = input.expiryTime <= await now(db);
-      if (!expiry && work.row.state !== 'COMPENSATING') {
-        try { supplierRejected = !(await directories.isSupplierOpen(input.supplierId)).isOpen; }
-        catch (error) {
-          if (rpcCode(error) === rpcStatus.NOT_FOUND || rpcCode(error) === rpcStatus.INVALID_ARGUMENT) supplierRejected = true;
-          else throw error;
-        }
-      }
-      if (expiry || supplierRejected || work.row.state === 'COMPENSATING') {
+      if (expiry || work.row.state === 'COMPENSATING') {
         if (!receipt && work.reserveAttempts === 0) { compensated = true; }
         else if (receipt) {
           if (receipt.orderId !== id || receipt.requesterId !== work.row.requesterId || receipt.amount !== input.credits) throw new Error('Reservation mismatch');
@@ -152,14 +151,11 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
           if (!receipt || receipt.orderId !== id || receipt.requesterId !== work.row.requesterId || receipt.amount !== input.credits) throw new Error('Reservation mismatch');
           if (receipt.status === 'RELEASED') failure = 'rejected';
           else if (receipt.status !== 'RESERVED') throw new Error('Unexpected reservation state');
-          else {
-            confirmed = (await directories.isSupplierOpen(input.supplierId)).isOpen;
-            supplierRejected = !confirmed;
-          }
+          else confirmed = true;
         }
       }
     } catch (error) {
-      failure = expiry || supplierRejected || work.row.state === 'COMPENSATING' ? 'uncertain' : classifyCreditError(error);
+      failure = expiry || work.row.state === 'COMPENSATING' ? 'uncertain' : classifyCreditError(error);
     }
     await db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "orderId" FROM "OrderCreation" WHERE "orderId" = ${id}::uuid FOR UPDATE`;
@@ -171,7 +167,7 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
       if (confirmed && creationState === 'PENDING' && input.expiryTime > time) {
         await tx.order.create({ data: { id, requesterId: work.row.requesterId, supplierId: BigInt(input.supplierId),
           requesterName: String(data.requesterName), pickupStore: String(data.pickupStore), pickupLocation: String(data.pickupLocation),
-          destination: input.destination, requestDetails: input.requestDetails, credits: input.credits, expiryTime: input.expiryTime,
+          destination: input.destination, destinationLocationId: input.destinationLocationId, requestDetails: input.requestDetails, credits: input.credits, expiryTime: input.expiryTime,
           status: 'UNASSIGNED', creditState: 'RESERVED' } });
         await tx.orderCreation.update({ where: { orderId: id }, data: { state: 'SUCCEEDED' } });
         await tx.creditOperation.update({ where: { id: currentOp.id }, data: { state: 'SUCCEEDED', leaseExpiresAt: null, lastError: null } });
@@ -180,8 +176,8 @@ export function createOrderCreation(db: PrismaClient, credit: ReturnType<typeof 
         await tx.creditOperation.update({ where: { id: currentOp.id }, data: { state: compensated ? 'SUCCEEDED' : 'PERMANENTLY_FAILED', leaseExpiresAt: null, lastError: compensated ? 'expired' : 'dependency-rejected' } });
         if (compensated) await tx.creditOperation.updateMany({ where: { orderId: id, type: 'REFUND' }, data: { state: 'SUCCEEDED' } });
       } else {
-        await tx.orderCreation.update({ where: { orderId: id }, data: { state: input.expiryTime <= time || supplierRejected || creationState === 'COMPENSATING' ? 'COMPENSATING' : 'PENDING' } });
-        if (input.expiryTime <= time || supplierRejected || creationState === 'COMPENSATING') await tx.creditOperation.upsert({ where: { orderId_type: { orderId: id, type: 'REFUND' } },
+        await tx.orderCreation.update({ where: { orderId: id }, data: { state: input.expiryTime <= time || creationState === 'COMPENSATING' ? 'COMPENSATING' : 'PENDING' } });
+        if (input.expiryTime <= time || creationState === 'COMPENSATING') await tx.creditOperation.upsert({ where: { orderId_type: { orderId: id, type: 'REFUND' } },
           create: { orderId: id, type: 'REFUND', payload: {} }, update: {} });
         await tx.creditOperation.update({ where: { id: currentOp.id }, data: {
           state: currentOp.attempts >= 6 ? 'PERMANENTLY_FAILED' : 'PENDING', leaseExpiresAt: null,

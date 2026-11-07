@@ -220,6 +220,71 @@ shared Supplier validators' runtime Zod import and corrected the dependency
 summary in Order PR_DESCRIPTION.md. Prompt/checks: Order usage log. Human review
 pending; documentation-only update.
 
+Administrator order filters, ChatGPT (Codex), 2026-10-30: implemented the team's
+explicit GET /orders status query contract and confirmed ONGOING membership,
+including overdue orders. Added HTTP/database regression coverage and service
+documentation. Exact prompts, key responses and verification are in
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+Supplier opening-hours restriction removal, ChatGPT (Codex), 2026-10-30:
+removed current-open checks from Order creation, recovery and editing following
+the user's explicit instruction. Supplier existence, expiry and credit validation
+remain. Updated regression tests and operational documentation. Exact prompt,
+key response and verification: [order-service/usage-log.md](order-service/usage-log.md).
+Human review pending.
+
+
+Order deletion eligibility preparation, ChatGPT (Codex), 2026-11-02: implemented
+the supplied requester/courier active-order and unresolved-credit blocking query.
+The asynchronous deletion flow and gRPC exposure are not yet complete. Exchanges
+and validation: [order-service/usage-log.md](order-service/usage-log.md).
+Human review pending.
+
+
+Destination catalogue, ChatGPT (Codex), 2026-11-02: implemented the user-approved
+PostgreSQL catalogue, supplied CSV import, search API, order destination validation
+and UI type-to-search selection. Added migration/recovery/search tests and setup
+documentation. Exact prompts, key exchanges and verification:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+
+Courier-only UI controls, ChatGPT (Codex), 2026-11-02: fixed missing viewer checks
+on the active errand page, aligned detail-page controls with existing backend
+requester exclusion and added UI/HTTP regression tests. Backend authorization
+was already enforced. Exact prompt and verification:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+
+Courier existence validation, ChatGPT (Codex), 2026-11-02: implemented the user's
+explicit requirement to check User GetPublicProfile before acceptance, fail
+closed on RPC failures and recheck expiry before assignment. Added real gRPC/HTTP
+regression coverage. Exact prompts, key response and verification:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+
+Order user.deleted subscription, ChatGPT (Codex), 2026-11-02: implemented the
+requested shared RabbitMQ consumer, durable repeat-safe event receipts,
+configuration and Docker wiring. This does not complete deletion lifecycle
+processing. Added real broker/database and message validation tests. JSON and
+root lockfile attribution, exact prompts, key exchanges and verification:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+
+Order deletion consistency handling, ChatGPT (Codex), 2026-11-02: implemented the
+human-confirmed eligibility RPC, manual-review handling for active/unresolved
+work and transactional personal-data scrubbing for safe history. No notification,
+account restoration or active-order recovery contract was invented. Cross-service
+deletion coordination remains pending agreement with User Service. Exact prompts,
+key exchanges, JSON/generated-file attribution and verification:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
+
+User deletion PR integration review, ChatGPT (Codex), 2026-11-03: reviewed PR #101
+at 6ffe05ff for Order/shared-contract compatibility and ran focused isolated
+wire/event-schema and archive-purge race checks. No service code merged or changed
+by this review. Exact prompt, findings and validation limits:
+[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
+
 ### User service
 
 - **Tool and modes:** Claude Code (Anthropic, Claude Opus). Code generation
@@ -245,3 +310,9 @@ pending; documentation-only update.
   Docker images.
 - **Verification:** The author reviewed all AI-assisted code and tested the
   endpoints manually.
+
+
+Order merge resolution, ChatGPT (Codex), 2026-11-07: retained main's Compose and
+HTTP-safe request key while preserving Order's catalogue and event consumer.
+Prompts, integration checks and exact resolutions: [Order usage log](order-service/usage-log.md).
+Human review pending.

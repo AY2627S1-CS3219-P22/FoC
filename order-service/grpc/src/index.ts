@@ -1,12 +1,16 @@
+// ChatGPT (Codex), 2026-11-02: Start/close the shared User-event consumer; review pending; see ../../usage-log.md.
+// ChatGPT (Codex), 2026-11-02: Wire mandatory shared User lookup for acceptance; review pending; see ../../usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Generated approved service startup; adopted shared @foc/grpc Credit client on 2026-10-22.
 // Author review: Pending; see ../../usage-log.md.
+import { startUserDeletedConsumer } from './events/userDeleted';
 import { readFileSync } from 'node:fs';
 import { Metadata } from '@grpc/grpc-js';
 import { createDirectories } from './dependencies/directories';
 import { createOrderCreation } from './services/orderCreation';
 import { createOrderEdits } from './services/orderEdits';
 import { createOrderLifecycle } from './services/orderLifecycle';
+import { createOrderAcceptance } from './services/orderAcceptance';
 import { once } from 'node:events';
 import { createCreditClient, startServer, stopServer, type RpcOptions } from '@foc/grpc';
 import { env } from './env';
@@ -16,7 +20,7 @@ import { createGrpcServer } from './grpc/server';
 
 async function main(): Promise<void> {
   await prisma.$connect();
-  const grpcServer = createGrpcServer();
+  const grpcServer = createGrpcServer(prisma);
   const publicKey = env.USER_SERVICE_PUBLIC_KEY_PATH ? readFileSync(env.USER_SERVICE_PUBLIC_KEY_PATH, 'utf8') : undefined;
   const credit = env.CREDIT_ORDER_SERVICE_TOKEN ? createCreditClient(env.CREDIT_GRPC_ADDR,
     { timeoutMs: env.GRPC_TIMEOUT_MS }) : undefined;
@@ -27,10 +31,16 @@ async function main(): Promise<void> {
   const creation = credit ? createOrderCreation(prisma, credit, directories, creditOptions) : undefined;
   const edits = credit ? createOrderEdits(prisma, credit, directories, creditOptions) : undefined;
   const lifecycle = credit ? createOrderLifecycle(prisma, credit, [() => creation!.recoverBatch(), () => edits!.recoverBatch()], creditOptions) : undefined;
-  const httpServer = createApp(publicKey, lifecycle, creation, edits).listen(env.PORT);
+  const acceptance = createOrderAcceptance(prisma, {
+    getPublicProfile: ({ userId }) => directories.getRequester(userId),
+  });
+  const httpServer = createApp(publicKey, lifecycle, creation, edits, acceptance).listen(env.PORT);
+  let broker: Awaited<ReturnType<typeof startUserDeletedConsumer>> | undefined;
   try {
     await once(httpServer, 'listening');
     await startServer(grpcServer, env.GRPC_PORT, env.GRPC_HOST);
+    if (env.RABBITMQ_URL) broker = await startUserDeletedConsumer(prisma, env.RABBITMQ_URL);
+    else console.info("Order user.deleted subscription disabled: RABBITMQ_URL not configured");
   } catch (error) {
     httpServer.close();
     grpcServer.forceShutdown();
@@ -46,6 +56,7 @@ async function main(): Promise<void> {
   const shutdown = async (): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
+    await broker?.close();
     await lifecycle?.stopWorker();
     await Promise.all([
       new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve())),

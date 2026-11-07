@@ -1,3 +1,4 @@
+# ChatGPT (Codex), 2026-11-03: Proxy Order routes including destination locations; review pending; see ../order-service/usage-log.md.
 # AI-assisted (Claude), reviewed and tested by Maliha
 # Serves the built UI and forwards /backend/* to each service, same as the
 # Vite dev proxy. Only this container is exposed to the browser.

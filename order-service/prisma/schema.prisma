@@ -13,6 +13,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ChatGPT (Codex), 2026-11-02: Approved durable event IDs/deleted-user detection; review pending.
+// Receipt only: presence does not mean history scrubbing/lifecycle work completed.
+model UserDeletionEvent {
+  eventId    String   @id
+  userId     String
+  occurredAt DateTime @db.Timestamptz(3)
+  deletedAt  DateTime @db.Timestamptz(3)
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+  state UserDeletionState @default(RECEIVED)
+  blockingOrderIds String[] @default([])
+  lastError String?
+  processedAt DateTime? @db.Timestamptz(3)
+
+  @@index([userId])
+  @@index([state, receivedAt])
+}
+
+enum UserDeletionState {
+  RECEIVED
+  PROCESSED
+  MANUAL_REVIEW_REQUIRED
+}
+
 enum OrderStatus {
   UNASSIGNED
   ASSIGNED
@@ -31,6 +54,8 @@ model Order {
   pickupLocation     String
   requesterName      String
   courierName        String?
+  destinationLocationId String?
+  destinationLocation DestinationLocation? @relation(fields: [destinationLocationId], references: [id], onDelete: Restrict)
   destination        String
   requestDetails     String
   credits            Int
@@ -142,4 +167,19 @@ model OrderEditOperation {
   lastError       String?
   createdAt       DateTime @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+}
+
+// ChatGPT (Codex), 2026-11-02: User-approved CSV destination catalogue; review pending.
+model DestinationLocation {
+  id String @id
+  name String
+  code String
+  category String
+  campus String
+  aliases String
+  latitude Float?
+  longitude Float?
+  source String
+  verified_on_interactive_map Boolean
+  orders Order[]
 }

@@ -903,3 +903,551 @@ scope to include shared Zod alongside Order dependencies. Retained actual
 previously-run 51 shared/16 unit/61 integration and Docker results and reviewer
 commands, clearly distinguishing separate full Credit runtime. Documentation
 only; no tests rerun or new runtime verification claimed. git diff --check used.
+
+
+## 2026-10-30 (Asia/Singapore): administrator order status filters
+
+Tool: ChatGPT (Codex). Modes: implementation, tests, documentation.
+Human review and validation remain pending.
+
+Exact user prompts:
+
+> Great. Could we add another endpoint for administrator? They should be able to see all orders and also filter to currently ongoing orders.
+
+```text
+We will have one endpoint that accepts a filter as a query parameter.
+All Orders
+`GET /orders`
+Ongoing
+`GET /orders?status=ONGOING`
+Unassigned
+`GET /orders?status=UNASSIGNED`
+Assigned
+`GET /orders?status=ASSIGNED`
+Picked Up
+`GET /orders?status=PICKED_UP`
+Delivered
+`GET /orders?status=DELIVERED`
+Cancelled
+`GET /orders?status=CANCELLED`
+```
+
+Assistant clarification: “For status=ONGOING, which statuses should match, and should overdue orders awaiting expiry processing still appear?”
+
+Exact user answer: “UNASSIGNED, ASSIGNED, PICKED_UP; include overdue orders”.
+
+Key response: “ONGOING will include UNASSIGNED, ASSIGNED, and PICKED_UP, including overdue orders. I’ll verify the filters, administrator access checks, and existing user queries.”
+
+Implemented the supplied status filter on the existing administrator endpoint,
+keeping the existing USER scopes. Invalid filters and mixed scope/status queries
+return 400. Added real PostgreSQL/HTTP regression coverage for exact statuses,
+ongoing/overdue inclusion, role restrictions and query validation. Updated the
+service README and final project README AI disclosure. No UI changes.
+
+Verification: Order build passed; 16 unit/authentication/gRPC tests passed after
+rerunning outside the sandbox (local listeners were blocked inside it). Existing
+migrations applied to a temporary dedicated PostgreSQL test database.
+
+Final verification: all 62 Order PostgreSQL/HTTP/gRPC integration tests passed,
+including the new administrator filter test and existing USER scope regression
+test. The initial sandboxed integration attempt could not reach PostgreSQL;
+rerunning with local network access succeeded. `git diff --check` passed.
+Temporary PostgreSQL test container removed after verification.
+
+
+## 2026-10-30 (Asia/Singapore): remove current supplier opening-hours restriction
+
+Tool: ChatGPT (Codex). Modes: implementation, regression tests, documentation.
+Human review remains pending.
+
+Exact user prompt: “Remove that check since it does not make sense if the supplier is not currently open but will be open in the other hours and the order can still be completed.”
+
+Key response: “I’ll remove the supplier open-status checks from order creation, recovery, and editing, then update the tests and documentation. Supplier existence validation will stay in place.”
+
+Removed calls to Supplier IsOpen from creation preflight, reservation recovery,
+final publication validation and editing. Removed the unused Order adapter.
+Supplier lookup, order expiry and credit reservation/compensation remain. Existing
+COMPENSATING operations still complete their recorded refund workflow. Updated
+regression tests: an accidental IsOpen call throws in the fixture, the real
+gRPC adapter test exposes an unimplemented IsOpen RPC, and uncertain reservation
+recovery now publishes without an opening-hours check or refund. Updated Order
+README, manual testing and integration notes, plus the root AI disclosure.
+
+Verification: Order build and all 16 unit/authentication/gRPC tests passed.
+
+All 62 PostgreSQL/HTTP/gRPC integration tests passed, including creation/editing
+with IsOpen unimplemented and recovery without current-opening-hours checks.
+`git diff --check` passed. Temporary test container removed after verification.
+
+
+## 2026-11-02: account deletion eligibility preparation (incomplete)
+
+Tool: ChatGPT (Codex). Mode: implementation. Human review pending.
+
+Exact user replies:
+
+> For a race condition, prioritise the row lock to standardise across different operations. But also, if the user has any active orders (unassigned, assigned, picked_up) or is currently assigned as a supplier (order is assigned, picked_up), both will block the user from account deletion as they have an order in progress. Ensure that settlement is completed.
+
+> That will be implemented by the user microservice owner. I only have infomration within the text given, any additional, i can check.
+
+> DeletedUser. It is an async work flow so sub for the event
+
+Relevant original requirement (verbatim):
+
+> Block deletion if the user is requester or courier on an order with status UNASSIGNED, ASSIGNED, or PICKED_UP.
+> Also block if an order has creditState of RESERVED, SETTLEMENT_PENDING, or REFUND_PENDING.
+
+Key response: “I’ll use `DeletedUser` for scrubbed text and check the existing gRPC and messaging setup. Row locks will serialize Order operations, but the `user.deleted` handler still needs a defined outcome if it finds an active order after User has already deleted the account. I’ll confirm that gap while working on the eligibility check.”
+
+Implemented only the internal blocking-order query in
+`grpc/src/services/deletionEligibility.ts`. It matches either participant and
+blocks active status OR unresolved credit state, including pending settlement on
+a delivered order. It rejects a blank user ID. This is a point-in-time query,
+not a deletion fence. It is not exposed over gRPC yet. No event consumer,
+tombstone schema, scrubbing or lifecycle changes have been implemented.
+
+Pending human confirmation: deletion-event race outcome; Order-local durable
+marker/event tracking; exact gRPC response and access contract. No User or Credit
+implementation changed. Verification: Order Prisma generation and TypeScript
+build passed. Database/runtime behavior has not yet been tested.
+
+
+## 2026-11-02: searchable destination catalogue
+
+Tool: ChatGPT (Codex). Modes: implementation, tests and documentation. Human
+review pending. File attribution for the unchanged CSV is in data/README.md.
+
+Exact user prompts/replies for this work:
+
+1. “Could we build a database with this for the destination and the user can type and it can find from this database when creating the order?”
+   File: `/Users/euniceng/Downloads/nus_kent_ridge_locations.csv`.
+2. “Postgres. Yes, for now, retain and use the format within the csv file. It can be changed later right?”
+3. “It should be one of the buildings within this csv file. any additional details can be specified in their description”
+4. “Order owns it. The order itself should store the display name and the locationID which should be unique. The search should also search aliases and names.”
+5. Search contract supplied by the user (verbatim formatting):
+
+```
+GET /api/locations?query={searchTerm}&limit={limit}
+`limit`: Optional, defaults to `20`, maximum `50`.
+{\
+&#x20; "locations": [\
+&#x20;   {\
+&#x20;     "id": "nus-com1",\
+&#x20;     "name": "COM1",\
+&#x20;     "code": "COM1"\
+&#x20;   },\
+&#x20;   {\
+&#x20;     "id": "kr_002",\
+&#x20;     "name": "COM2",\
+&#x20;   }\
+&#x20; ]\
+}
+
+bad request:
+{\
+&#x20; "error": {\
+&#x20;   "message": "Search query must not be empty."\
+&#x20; }\
+}
+```
+
+Key assistant responses:
+- “I’ll inspect the CSV and the current destination selector. A searchable list is possible; I’ll check what fields the file contains so you can confirm the storage and API choices required by your course policy.”
+- “Confirmed: Order owns the PostgreSQL catalogue, each order stores the unique location ID and display name, and search matches names and aliases.”
+- “I’ll add the CSV-backed catalogue, the agreed search endpoint, and a searchable selector in the create form. I’ll also validate the selected location on create and edit, then save its ID and catalogue name on the order.”
+
+Implementation: preserved all 206 user-supplied CSV rows/columns in Order-owned
+DestinationLocation; migration creates/seeds the catalogue and adds nullable
+Order.destinationLocationId for historical compatibility. Names and aliases are
+searched case-insensitively; literal wildcard characters are escaped. Query and
+limit validation, stable ordering, empty results and the specified error shape
+are implemented. UI searches are debounced and obsolete results are discarded;
+users must select a result. Catalogue ID/name validation runs before reservation
+or edit adjustment; durable creation/edit payloads retain the selected pair.
+Exact catalogue names remain supported for existing clients and resolve to IDs.
+Historical text and previously recorded recovery payloads are preserved. Updated
+setup/API and manual test documentation. No changes to Supplier/Credit contracts.
+
+Verification:
+- Order Prisma generation and TypeScript build passed.
+- UI production build and TypeScript check passed.
+- All 16 Order unit/authentication/gRPC tests passed. Initial sandbox attempt
+  could not bind test servers; rerun with local network permission passed.
+- All 66 PostgreSQL/HTTP/gRPC integration tests passed, including CSV import,
+  search defaults/max/validation, names/aliases, literal wildcards, invalid
+  ID/name rejection before credit calls, stored IDs, durable edit recovery and
+  pre-catalogue creation recovery.
+- First migration attempt found an empty leftover directory from the user's
+  reverted supplier snapshot rename. Removed that empty directory and applied
+  migrations successfully. The premature integration run failed because the
+  catalogue migration had not applied; subsequent full suites passed.
+- Used a disposable dedicated PostgreSQL database, not the development database.
+  UI interaction in a browser and a full Docker application build were not run.
+
+
+## 2026-11-02: requester versus courier pickup/delivery authorization
+
+Tool: ChatGPT (Codex). Modes: debugging, implementation, regression tests.
+Human review pending.
+
+Exact user prompt: “Can you check if there is a bug where the requester is able to mark picked up, delivered, which is only supposed to be done from the courier's side both frontend and backend?”
+
+Key response: “The backend already rejects pickup and delivery unless the authenticated user is the assigned courier. I found a UI gap: the ‘Active Errand’ page shows those buttons without checking the viewer’s identity. I’ll fix that and add regression tests.”
+
+Inspection: backend OrderLifecycle.pickup/deliver already compare JWT-derived
+actor ID against courierId and explicitly exclude requesterId, within row-locked
+transactions. Both routes require USER role. No backend authorization change was
+needed. Same-origin tabs share localStorage tokens, so a stale requester UI can
+send a courier token after another tab logs in; this is not evidence that the
+backend authorized the requester identity. Session storage behavior is unchanged.
+
+Changes: pass currentUserId from App to AcceptedOrderPage; hide and guard pickup
+and delivery for non-couriers, explicitly excluding requesters even if both IDs
+match. Mirror that exclusion and handler checks on OrderDetailsPage. Restrict the
+courier credit-earned message on the active errand page to the courier.
+
+Tests: added actual React server-rendered page checks for requester, outsider,
+unknown viewer, requester/courier ID collision, eligible courier and status
+transitions. Run from the repository root:
+`TSX_TSCONFIG_PATH=ui/tsconfig.json node --import tsx --test ui/tests/courierActions.test.cjs`.
+Added authenticated HTTP requester/outsider delivery assertions with checks that
+status stays PICKED_UP and no settlement intent or Credit call is made. Existing
+pickup HTTP test already verifies requester/outsider rejection and courier success.
+
+Verification: all 4 UI rendering tests passed; UI production build and TypeScript
+check passed. All 66 Order PostgreSQL/HTTP/gRPC integration tests passed against
+a disposable dedicated database. The initial tsx CLI attempt was blocked from
+opening its IPC socket; node --import tsx ran the same tests successfully without
+that socket. No live user orders or balances were modified. No manual browser
+interaction testing performed. Changes remain uncommitted.
+
+
+## 2026-11-02: validate courier still exists before acceptance
+
+Tool: ChatGPT (Codex). Modes: implementation, debugging and tests. Human review
+pending.
+
+Exact user prompt: “Check for this and if not present, implement that "Validate courier still exists before accepting an order"”
+
+Key response: “Acceptance previously relied on the JWT and local order state; it didn’t check whether the courier still existed. I’ve added a User Service lookup before assignment. A missing user is rejected, and an unavailable or timed-out lookup leaves the order unassigned.”
+
+Acceptance now uses User GetPublicProfile through the existing shared gRPC client
+and existing startup-owned User connection (via directories). JWT determines the
+queried user ID. NOT_FOUND returns 403 forbidden. Other RPC failures/timeouts or
+a mismatched returned ID return 503 dependency-unavailable. Lookup occurs under
+the existing order row lock after local eligibility checks; database expiry is
+sampled again before assignment. No Credit account check or balance mutation was
+added. This point-in-time existence check is not an atomic cross-service deletion
+protocol, and does not replace the pending asynchronous deletion work.
+
+App receives the configured acceptance service explicitly. Without that service,
+the existing route returns 503 rather than bypassing lookup. Existing acceptance
+fixtures now explicitly inject the test User lookup. Added live User gRPC + HTTP
+coverage for deleted/missing courier, unavailable service, deadline expiry,
+response identity mismatch, successful assignment and no mutations on rejection.
+Added expiry-during-lookup coverage. Existing concurrent acceptance, cancellation
+and edit race tests remain.
+
+Verification: Order generation/build passed after rerunning with Prisma cache
+access (initial sandbox attempt failed with EPERM touching the cached engine).
+All 16 unit/authentication/gRPC tests passed. First full integration run had four
+creation/recovery fixture failures (one new acceptance test failed during its
+creation setup); the isolated acceptance run passed all 9 tests. A subsequent
+complete run passed all 68 PostgreSQL/HTTP/gRPC integration tests. No claim is
+made that the initial intermittent fixture failures were fixed. Tests used a
+disposable dedicated PostgreSQL database, removed afterward. Existing demo
+accounts/orders/credits and running containers were not modified. No migration
+is needed for the acceptance check. Rebuild Order to activate it. Uncommitted.
+
+
+## 2026-11-02: subscribe to user.deleted through RabbitMQ
+
+Tool: ChatGPT (Codex). Modes: implementation, debugging, tests and documentation.
+Human review pending. JSON/lockfile attribution is recorded here and in the
+project README; Order package.json also has _aiAssistance metadata.
+
+Exact user prompt: “Subscribe to `user.deleted` events through RabbitMQ”
+
+Relevant prior human approval (verbatim): “if user.deleted arrives and an active order still exists, we will notify the user service that the user is unable to be deleted. so keep it active for completion. yes, we can store that.”
+The storage approval answered the question about Order-local deleted-user markers
+and processed event IDs surviving restarts. The notification contract remains
+unconfirmed; no notification schema or endpoint was invented.
+
+Key assistant responses:
+- “I’ll check the existing RabbitMQ client and User event format, then wire Order to consume `user.deleted`. I’ll keep the subscription separate from deletion-conflict notifications, since their contract is still unconfirmed.”
+- “Order’s shared User queue is `order.user-events`. I’m wiring the shared RabbitMQ client to record each deletion event durably before acknowledging it, using the event ID to make redelivery safe. Invalid deletion messages will go to the queue’s dead-letter queue.”
+- “This step records receipt of deletion events. It does not yet scrub history or resolve deletion races.”
+
+Implementation: added @foc/messaging dependency and builds, optional RABBITMQ_URL
+configuration, shared-client startup/cleanup, handler validation and PostgreSQL
+UserDeletionEvent receipts keyed by eventId, plus migration. Match broker
+messageId when present. Duplicate deliveries do not duplicate receipts, and
+conflicting reused IDs are rejected. Database failures propagate into the shared
+three-retry/DLQ flow; ACK follows durable receipt. Created/restored messages have
+no Order action. Shared user.deleted schema now matches the supplied contract:
+no required purgeAfter, nonblank IDs and ISO timestamps. Added Docker source
+allowlisting so the messaging package is actually built/included. Root lockfile
+change is only the new Order messaging dependency; no Credit entries removed.
+
+Scope: receipt/subscription only. No scrubbing, old-token rejection based on the
+inbox, active-order cancellation, Credit mutation, eligibility RPC or conflict
+notification added. User's direct-to-queue outbox publisher must target
+order.user-events; publishing only to credit.user-events does not fan out to
+Order. The consumer does not invent an exchange binding or modify User/Credit
+business functionality. Documentation explicitly distinguishes receipt from
+completed deletion processing.
+
+Verification:
+- Shared messaging and Order generation/build passed; Credit TypeScript build
+  checked for shared contract compatibility.
+- All 19 Order unit/authentication/gRPC tests passed, including malformed
+  events, event-ID mismatch, ignored unrelated events and propagated DB errors.
+- Final complete suite: all 69 PostgreSQL/HTTP/gRPC/RabbitMQ integration tests
+  passed, zero skipped. Live broker tests cover five concurrent duplicates,
+  restart/offline queued redelivery, invalid/conflicting events in DLQ and a
+  simulated database outage exhausting retries without a receipt.
+- Initial suite had a legacy recovery fixture count failure. Scoped the two
+  catalogue recovery tests to their saved operation IDs, avoiding unrelated
+  fixture work. A subsequent run had widespread transient creation failures;
+  no production creation behavior was changed and no root cause is claimed.
+  Final full run passed. Synthetic diagnostic creation used only the disposable
+  test database and fake credits.
+- Built foc-order-events-test Docker image successfully. Started an isolated
+  Order container with the disposable database/broker; startup logged its
+  subscription, and a synthetic user.deleted reached UserDeletionEvent through
+  the startup-wired consumer. Stopped that consumer before the final broker
+  integration run to avoid a second consumer on the test queue.
+- git diff --check passed. All runtime tests used disposable containers on
+  PostgreSQL port 55450 and RabbitMQ port 5679; no demo queues, accounts or
+  balances were changed. Test containers removed afterward.
+
+
+## 2026-11-02: active-order deletion consistency and safe-history scrubbing
+
+Tool: ChatGPT (Codex). Modes: implementation, debugging, tests and documentation.
+Human review pending. JSON package-script attribution is recorded here and in
+README. Generated gRPC files are attributed and trace to the approved proto.
+
+Exact user prompt: “Handle deletion of requester/courier on active orders.”
+
+Exact clarification question:
+“Your earlier rule was to keep raced active orders for completion and notify User Service that deletion is blocked. I still found no notification contract. What event name, payload and destination queue—or RPC—has the User owner agreed to receive? Since user.deleted means the account is already deleted, please also confirm how User will restore access so an affected courier can finish their order.”
+
+Exact human answer:
+
+> Thanks for flagging this. You're correct that we have not agreed on a notification contract or account-restoration mechanism with the User Service owner.
+> Please do not invent an event, queue, RPC or restoration workflow.
+> For now, follow these decisions:
+> 1. CheckDeletionEligibility is the synchronous pre-deletion safeguard. User Service must reject deletion when Order Service reports blocking orders.
+> 2. The user.deleted event is a post-deletion notification, not a request for Order Service to approve or reject deletion.
+> 3. If a user.deleted event arrives while the deleted user still has an active order, treat this as an exceptional consistency failure. Preserve the affected order and its credit state rather than automatically completing, reassigning or cancelling it without an agreed recovery contract.
+> 4. Do not assume User Service can restore the deleted account or reactivate its JWT. No such mechanism has been confirmed.
+> 5. Implement the confirmed functionality first: courier existence validation on acceptance, RabbitMQ consumption, idempotent processing and personal-data scrubbing for safely completed/cancelled orders.
+> 6. For unexpected active orders, ensure the failure is recorded and observable, and use the existing retry/dead-letter mechanisms where appropriate. Do not endlessly retry an inconsistency that requires manual intervention.
+> 7. Identify the deletion-versus-order-creation/acceptance race and document that User Service and Order Service must coordinate to prevent new order activity while deletion is in progress.
+> Please leave the active-order recovery workflow pending agreement with the User Service owner rather than implementing speculative behaviour.
+
+Previously approved RPC contract:
+`CheckDeletionEligibility(user_id) -> { eligible: boolean, blocking_orders: string[] }`,
+blocking requester/courier active orders and unresolved credits, with existing
+internal gRPC access conventions and failure closed. No new endpoint token.
+
+Key assistant responses:
+- “I’ll follow that contract: preserve active orders and unresolved credits, record them for manual review, and acknowledge the event without endlessly retrying it. Safely completed or cancelled orders can have their personal data scrubbed using `DeletedUser`.”
+- “The cross-service race remains as you specified: User and Order still need an agreed way to prevent new activity between the eligibility check and deletion.”
+
+Implementation:
+- Added the approved eligibility RPC/shared client and wired the existing Prisma
+  connection. Includes both participants, active/credit states, unresolved durable
+  operations/edits and preallocated pending/compensating creation IDs. Blank input
+  gives INVALID_ARGUMENT; unavailable database gives UNAVAILABLE, never eligible.
+- Added recorded RECEIVED/PROCESSED/MANUAL_REVIEW_REQUIRED outcomes with blocker
+  IDs, error code and completion timestamp. Locks event and Order rows; active
+  and unresolved work is preserved without deletion-triggered Credit/lifecycle
+  mutations. Logs the consistency failure and ACKs the recorded manual-review
+  result instead of endlessly retrying it.
+- Scrubs only confirmed DELIVERED/SETTLED or CANCELLED/REFUNDED history without
+  unresolved intents. Deleted participant name, destination, request details,
+  referenced destination ID and free-text JSON copies are scrubbed. Counterpart
+  name, public Supplier snapshots, original IDs, status and financial audit data
+  remain. Resolved error text is replaced. Confirmed failed creations without
+  unresolved funds are also scrubbed. Related JSON request/target shapes remain
+  valid objects. No cascades or restoration/reassignment behavior added.
+- Scrubbing and processing outcome commit atomically. Storage failure rolls back
+  the scrub and propagates to existing broker retry/DLQ behavior. Old receipt-only
+  events are processed at subscriber startup. Manual-review rows are not
+  automatically replayed. Existing ordinary lifecycle/recovery workers remain.
+- Integration files run sequentially because subscriber startup scans the shared
+  test inbox; independent test processes must not process one another's fixtures.
+- Documented User's required synchronous call and pending coordination to stop
+  new create/accept activity during deletion. This implementation is not an
+  atomic cross-service deletion fence, a User restoration mechanism, or an active
+  recovery contract. No notification event/queue/RPC invented.
+
+Verification:
+- Shared gRPC generation/build and Order Prisma generation/build passed.
+- All 20 Order unit/authentication/gRPC tests passed.
+- All 51 shared gRPC regression tests passed. Initial shared run could not load
+  an ungenerated local User Prisma client; generated it and built Credit test
+  modules, then reran successfully. No User/Credit database changes were made.
+- Final complete run: all 81 PostgreSQL/HTTP/gRPC/RabbitMQ integration tests
+  passed, zero skipped. Covers each active requester/courier case, duplicate and
+  replay handling, partial-history scrubbing, nested JSON, destination reference
+  removal, pending creation/settlement/refund/edit work, rollback on write failure,
+  saved-inbox recovery, fail-closed eligibility transport and waiting for an
+  in-flight lifecycle row lock. Initial full run passed 80 before adding the
+  final explicit row-lock test.
+- Docker image foc-order-deletion-test built. An isolated runtime smoke test
+  exercised the startup-wired RPC and actual RabbitMQ consumer with synthetic
+  active/history orders: eligibility=false; MANUAL_REVIEW_REQUIRED persisted;
+  active order/name/RESERVED credits unchanged; cancelled/refunded history
+  scrubbed and destination reference removed.
+- Used only disposable PostgreSQL (55450), RabbitMQ (5679) and an isolated runtime
+  container (HTTP 33014). No live demo orders, users, balances or queues changed.
+  Test containers removed after verification. git diff --check passed.
+
+
+## 2026-11-03: review User deletion PR #101 for Order integration
+
+Tool: ChatGPT (Codex). Modes: code review, debugging and documentation.
+Human review pending. No User/Order service implementation was modified or merged
+as part of this review. Existing local changes were preserved.
+
+Exact user prompt: “Lets start by reviewing my teammate's PR on user delete so we can also get any relevant information we need for it”
+
+Reviewed source: https://github.com/AY2627S1-CS3219-P22/FoC/pull/101,
+branch origin/F2.7-user-account-deletion, fetched head
+6ffe05ff4a4f1b560b07abeef924815f934ab454. Compared its diff against origin/main
+and the current uncommitted Order implementation. Attached PR to this chat.
+
+Key responses:
+- “I found PR #101, on F2.7-user-account-deletion. Its code does publish user.deleted directly to Order’s queue, which matches our consumer.”
+- “I confirmed the protobuf mismatch with a focused check: decoding our ID-list response using their count contract fails. I also reproduced an edge case where the archive purge removes a row during restoration; registration then throws an unhandled P2025 instead of returning a controlled response.”
+
+Findings / integration facts:
+- Shared field 2 differs: PR int32 blocked_order_count versus our approved repeated
+  string blocking_orders. The User client reads blockedOrderCount, so retaining
+  our generated types requires corresponding User-side alignment. The two wire
+  types are not interchangeable. Direct serializer/deserializer checks showed
+  ID-list response -> count contract throws a decoding error; count response ->
+  ID-list contract produced a bogus empty-string list item.
+- PR Order eligibility helper checks active statuses, top-level credit states
+  and pending/compensating creations. It does not inspect separate unresolved
+  credit/edit records. Integration must preserve the stronger existing checks
+  from the confirmed Order requirements rather than taking the incoming helper
+  wholesale. This is an integration coverage difference, not a claim that the
+  PR fails to compile independently.
+- Restoration reads ArchivedUser before its transaction and later unconditionally
+  deletes that snapshot's email row. A focused test of the actual PR register
+  function, transpiled in a sandbox with mocked Prisma and clock, let the archive
+  expire and be purged between those steps. It threw uncaught P2025; fake user and
+  event were rolled back. The catch handles duplicate P2002 only. No live database
+  reproduction or automatic fix was performed.
+- PR user.deleted builder emits the exact required IDs/ISO timestamps, omits
+  purgeAfter and enqueues directly to order.user-events inside the deletion
+  transaction. Its generated payload was accepted by the current Order schema.
+- Hard deletion means User GetPublicProfile returns NOT_FOUND, compatible with
+  the existing courier-existence validation before acceptance.
+- PR user.restored adds previousUserId and routes only to Credit; Order should
+  keep its no-op behavior. A focused schema check confirmed our old restored
+  schema currently strips previousUserId, so retain that PR field while merging
+  shared messaging and our stronger deletion validation.
+- User uses ORDER_GRPC_ADDR, with order-service:50053 for the shared network and
+  host.docker.internal:50053 in the standalone Compose override. No new service
+  token is introduced.
+- Existing known limitations remain: User/Order check-then-delete race needs
+  agreed coordination; active orders remain manual review on Order. Restoration
+  lacks ownership verification and Credit restoration support is required. These
+  acknowledged limitations were not treated as newly discovered bugs.
+
+Validation limits: no new automated deletion/restoration test files are included
+in the PR diff (existing User tests are outbox/user.created). Ran focused wire,
+event-schema and mocked archive-purge race checks only, using temporary files
+under /tmp/foc-pr101-review. No production accounts/credits/events were touched.
+CI tool requested a GitHub account connection; CI results could not be inspected.
+The combined User+Order full-stack deletion flow was not run during this review.
+
+
+### 2026-11-03 — Order destination route and database separation
+Tool: ChatGPT (Codex). Mode: refactor/debug/document.
+Exact prompt: “it is an order call. rename the route to /order also make sure the abstraction between db query and route is enforced. also double check that i am not creating a second db or prisma client”
+Key response/implementation: Moved lookup to GET /order/locations through an Order router; controller validates HTTP query and formats response; destination service performs Prisma queries using existing src/db.ts singleton. Updated UI client, Vite proxy, nginx proxy, README and existing integration request path. Existing /orders lifecycle endpoints unchanged. No new database, schema or Prisma client.
+Verification: Temporary isolated HTTP test exercised actual router/controller/service with mocked singleton storage: success, empty/invalid queries, limits, alias configuration, literal wildcard escaping and old route 404 passed. git diff --check passed. Production source has one new PrismaClient, in src/db.ts. Full PostgreSQL integration suite and full builds were not rerun (worktree dependencies absent). Author review pending.
+
+
+### 2026-11-03 — Match the single Order router from the UI
+Tool: ChatGPT (Codex). Mode: refactor.
+Exact prompt: “I changed it to orders/locations instead and i mounted it to the existing router. I ONLY WANT ONE ROUTER. Can you make sure the UI changes its route accordingly? Preserve the proxy”
+Implementation: UI search now calls /orders/locations through /backend/orders/locations. Preserved Vite proxy target/rewrite and nginx Order proxy, aligned both prefixes to /backend/orders. Backend router files unchanged. Checked client-to-proxy URL matching and git diff whitespace; no full build rerun. Human review pending.
+
+
+### 2026-11-03 — Validate existing worktree before commit
+Tool: ChatGPT (Codex). Mode: debug/test/document.
+Exact prompt: “Check and make sure code works and let me know how to term my latest commit.”
+Updated location integration test to use an authenticated USER JWT after the human moved the endpoint into the existing authenticated Order router; added unauthenticated 401 assertion.
+Verification in /Users/euniceng/Desktop/FoC: shared gRPC/messaging and Order builds passed; Order unit tests passed; shared gRPC 51 tests passed. UI build and TypeScript check passed with installed Node 22.22.0 (default Node 20.10.0 is too old for this Vite version). Fresh disposable PostgreSQL migration and integration run: 80 passed, 0 failed, 1 RabbitMQ-dependent test skipped because no test broker configured. No live database touched. Test container removed. No commit or staging performed; test/log edits remain unstaged over the user's existing staged changes.
+
+
+### 2026-11-03 — Align deletion eligibility with User PR #101
+Tool: ChatGPT (Codex). Mode: implementation/refactor/test/document.
+Exact prompts: “Can we follow the convention in my teammate's PR?”; clarification: “Do you mean the User deletion PR #101 convention, specifically changing CheckDeletionEligibility to return { eligible, blocked_order_count } instead of { eligible, blocking_orders }?”; answer: “Yes”.
+Implementation: proto field 2 is now int32 blocked_order_count; TypeScript response uses blockedOrderCount. Handler counts existing blocker results. Existing active-order, requester/courier, unresolved credit/edit and pending creation checks retained. Generated response type, RPC integration expectations and current docs aligned. This supersedes earlier ID-list contract log entries; deploy matching clients/server together because field 2 wire type changed. Author review pending.
+
+Verification: shared gRPC/messaging and Order builds passed; shared gRPC 51 tests passed; fresh PostgreSQL migration + Order integration suite 80 passed, 0 failed, 1 broker-dependent test skipped. Real gRPC integration assertions cover count 0/1, requester/courier blockers, pending creations, invalid IDs and unavailable database fail-closed behaviour. Disposable database removed; no live records touched. git diff --check passed. Nothing staged or committed.
+
+
+### 2026-11-03 — Postman deletion eligibility checks
+Tool: ChatGPT (Codex). Mode: documentation/test instructions.
+Exact prompt: “can we have some postman tests for this?”
+Added order-service/postman/deletion-eligibility.md: manual gRPC request setup, zero/count response, invalid IDs, requester/courier active states, idempotent creation, settlement/refund eligibility and fail-closed downtime. Does not change existing demo collections or invoke account deletion. Current User checkout lacks DELETE /users/me; full User integration explicitly deferred until that PR is integrated. Reviewed against current handlers and DTO; these manual steps were not executed in Postman. Author review pending.
+
+
+### 2026-11-03 — Single-order API and frontend details
+Tool: ChatGPT (Codex). Modes: implement/refactor/test/document. Author review pending.
+Exact initial prompt: “Lets implement a GET /orders/:id for the api with frontend/”
+Initial clarification answer: “Requester, assigned courier, or administrator only; existing order fields”. This was superseded before implementation by the following exact prompt:
+
+Please implement `GET /orders/:id` with these access rules:
+
+1. Authentication is required.
+2. The requester, assigned courier and administrator may retrieve the order.
+3. Other authenticated users may retrieve an `UNASSIGNED` order, but only with the same limited fields exposed by the existing `scope=open` listing.
+4. Other authenticated users cannot retrieve orders in `ASSIGNED`, `PICKED_UP`, `DELIVERED` or `CANCELLED` states unless they are the requester, assigned courier or administrator.
+5. Return `{ "order": {...} }`, reusing the existing order-listing field names, types and serializers.
+6. Do not expose internal credit operations, creation payloads, edit-operation records or other sensitive metadata.
+7. Use the existing authorization conventions. Return 401 for missing/invalid authentication, 403 for unauthorized access and 404 for nonexistent orders.
+8. Add tests for requester, assigned courier, admin, unrelated authenticated user viewing an open order, unrelated user viewing a non-open order, missing authentication and nonexistent order.
+
+Please keep the implementation consistent with our existing `GET /orders?scope=open`, `requested` and `assigned` behaviour.
+
+Key implementation: existing single router, locations route before parameter route, authentication before lookup; controller validation and serialization; service uses existing singleton and listing projection. Unrelated users cannot view overdue UNASSIGNED orders, matching open listing. No internal relation payloads selected. UI API client and useOrder fetch latest details on open, disable actions until loaded and show load errors instead of stale controls. No new router, database, Prisma instance, public proxy or gRPC GetOrder implementation.
+
+Validation: Order build and 20 unit tests passed. UI build, TypeScript check and 4 existing courier-control render tests passed using Node 22. Fresh PostgreSQL migrations applied to isolated order_service_test_details. Initial full run had 34 creation-related failures returning pending, while the new single-order test passed. Isolated creation check passed; full reruns under default Node 20 and Node 22 each passed 81 tests, 0 failures, 1 RabbitMQ-dependent test skipped. Initial issue did not reproduce; no unrelated creation source was changed. Temporary diagnostic instrumentation was applied only to generated dist output and restored immediately. Test container removed. No live data, commits or staging changes. Full browser interaction not exercised. git diff --check passed.
+
+
+### 2026-11-04 — Supplier coordinate pickup snapshot
+Tool: ChatGPT (Codex). Mode: implementation/debug/test/document.
+Exact initial prompt: “Change getSupplier in order control to use longtitude and latitude instead. What is it currently using”
+Exact clarification answer: “Keep pickupLocation string: \"latitude, longitude\"”.
+Implementation: shared Supplier response validated as before, then adapter formats pickupLocation from latitude and longitude. Creation and edit snapshots use that property rather than locationDescription/fallback. No schema, RPC lookup parameter, router, database or Prisma instance changed. Existing saved history and durable historical recovery payloads unchanged. Actual current edit preflight re-fetches Supplier for every edit, so successful edits save the latest coordinate snapshot even if supplierId is unchanged. Regression fixtures and real Supplier gRPC integration expectations updated. Human review pending.
+
+Verification: Order build and 20 unit tests passed. Real Supplier gRPC adapter + PostgreSQL tests confirm creation and edit pickupLocation equals "1.3, 103.77". Full integration rerun: 81 passed, 0 failed, 1 RabbitMQ-dependent test skipped. Initial fresh-container run returned widespread pending creation responses; isolated creation/real-Supplier checks and subsequent full run passed without changing creation logic. Initial environment/setup issue not conclusively diagnosed. Temporary dist-only diagnostic instrumentation restored immediately. Disposable database removed, no live data changed. git diff --check passed. No commit or staging performed.
+
+## 2026-11-06 — Courier-name fix and lifecycle completeness review
+
+Tool: ChatGPT (Codex). Modes: debug/implement/refactor/test/document. Human review pending.
+Exact prompt: “Resolve this issue. After, check for any incomplete work like this. Thoroughly.”
+Context: acceptance explicitly wrote courierName=null after checking User existence; human requested completion of the previously explained first/last-name snapshot with username fallback.
+
+Changes: acceptance now saves a trimmed display name from the verified profile and fails closed without assignment for missing display identity. HTTP/list query projection includes the already-stored destinationLocationId. UI API mapping preserves creditState and completion feedback reports received funds only for SETTLED. Creation time options, validation and hints enforce the existing one-hour minimum. Removed misleading opening-hours rejection copy. Added persistence/name/fallback and frontend contract regression tests; wrote COMPLETENESS_REVIEW.md with reviewed files/paths and remaining confirmed scope. No new schema, database/client, speculative recovery, cache or gRPC GetOrder implementation; historical accepted orders not backfilled. Existing contracts and human decisions retained.
+
+Verification: Order build and 20 unit tests passed. UI build, TypeScript and 7 UI tests passed with Node22. Disposable PostgreSQL and RabbitMQ full integration suite: 83 passed, no failures or skipped tests. No live data changed. Startup found Docker stopped; started Docker Desktop to run disposable tests. Test containers cleaned up after verification. No staging, commit or push performed. Browser end-to-end and combined teammate User deletion PR flow not exercised.
+
+Final audit follow-up: fixed InvalidSupplierError to carry the existing INVALID_ARGUMENT gRPC code; previously out-of-safe-integer local IDs appeared as unavailable-service failures. Added adapter-error classification test. Strengthened actual User gRPC acceptance HTTP assertion for courierName. Final rebuild and rerun: 21 Order unit tests, 51 shared gRPC tests, 83 PostgreSQL/RabbitMQ integration tests and 7 UI tests passed; no skips in final integration run. UI build/typecheck passed. Existing database rows were not backfilled. Test PostgreSQL/RabbitMQ containers removed; Docker Desktop left running after tests.
+
+
+## 2026-11-07 — Merge main into order-endpoints
+Tool: ChatGPT (Codex). Modes: merge conflict resolution, debugging, testing, documentation. Human review pending.
+Exact prompts: “Could you resolve any merge conflicts before I merge to main?”; prior steering “what abt this? happy to help with the ui/pages/CreateRequestPage.tsx conflict when you merge main in. Just keep main’s newRequestKey() (it’s the http fix)”.
+Resolved README disclosures, Order Dockerfile, Dockerfile-specific ignore and CreateRequestPage conflicts. Retained main runtime/migrate stages and root ignore file; included shared messaging workspace install, compilation and runtime dist. Kept newRequestKey HTTP fallback, idempotency reuse, destination catalogue and one-hour deadline validation. Preserved no Supplier IsOpen call; removed stale shared-client test for removed method. Root Compose points Order at shared broker; standalone override uses host broker. Order CI path filter includes its messaging dependency. Updated Order setup/docs.
+Verification: clean npm ci under Node22; builds for shared gRPC/messaging and Order/User/Supplier/Credit; UI build and typecheck, 7 UI tests; 21 Order unit and 50 shared gRPC tests (User Prisma generation required first); 83 PostgreSQL/RabbitMQ integration tests passed with no skips; Docker runtime and migration images built, migration applied to a separate disposable DB, first runtime smoke caught non-root RabbitMQ log directory EACCES; Dockerfile creates a node-owned logs directory. Rebuilt final image, reran container migrations on fresh disposable PostgreSQL, and confirmed HTTP 200 /health plus RabbitMQ subscription ready under the non-root user. No live stack restart, no database volume changes. Resolutions staged; no commit or push. Existing whitespace in incoming main files and original CSV line endings were left intact.

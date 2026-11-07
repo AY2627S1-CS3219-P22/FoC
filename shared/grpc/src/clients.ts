@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-02: Added human-approved deletion eligibility client; review pending; see ../../../order-service/usage-log.md.
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Added human-finalized credit wrappers and bounded application retries with one overall deadline and configurable backoff.
@@ -17,6 +18,9 @@ import { UserService, OrderService, CreditService, SupplierService } from './con
 import type { GetPublicProfileRequest } from './generated/user/GetPublicProfileRequest';
 import type { PublicProfile__Output as PublicProfile } from './generated/user/PublicProfile';
 import type { GetOrderRequest } from './generated/order/GetOrderRequest';
+// ChatGPT (Codex), 2026-11-02: Team-approved User-to-Order deletion check; review pending; see ../../../order-service/usage-log.md.
+import type { CheckDeletionEligibilityRequest } from './generated/order/CheckDeletionEligibilityRequest';
+import type { CheckDeletionEligibilityResponse__Output } from './generated/order/CheckDeletionEligibilityResponse';
 import type { Order__Output as Order } from './generated/order/Order';
 import type { GetBalanceRequest } from './generated/credit/GetBalanceRequest';
 import type { Balance__Output as Balance } from './generated/credit/Balance';
@@ -179,6 +183,11 @@ export function createOrderClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 3000);
   const client = new OrderService(target, config.credentials ?? credentials.createInsecure());
   return {
+    checkDeletionEligibility(request: CheckDeletionEligibilityRequest, options: RpcOptions = {}): Promise<CheckDeletionEligibilityResponse__Output> {
+      return unary((callback) => client.checkDeletionEligibility(
+        request, options.metadata ?? new Metadata(), callOptions(timeoutMs, options), callback,
+      ));
+    },
     getOrder(request: GetOrderRequest, options: RpcOptions = {}): Promise<Order> {
       return unary((callback) =>
         client.getOrder(
