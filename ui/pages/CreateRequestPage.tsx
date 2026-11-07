@@ -2,6 +2,7 @@
 // ChatGPT (Codex), 2026-11-06: Complete lifecycle snapshots and UI contract handling; review pending; see order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Catalogue-backed destination selector; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
+// Request key fallback for http: AI-assisted (Claude), reviewed and tested by JadeCheah (ui/ai-usage/order-request-key.md)
 import { useEffect, useState } from "react"
 import { DestinationSearch } from "../components/DestinationSearch"
 import type { User, Page } from "../App"

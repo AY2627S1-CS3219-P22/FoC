@@ -13,16 +13,14 @@ spec:
       labels: { app.kubernetes.io/name: credit-service, app.kubernetes.io/part-of: foc }
     spec:
       # nodeSelector: { role: credit }   # enable on EC2; leave off for local k3d
-      imagePullSecrets:   # pulls image from GHCR and logs in
-        - name: ghcr-pull
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000                  # the image's "node" user
       terminationGracePeriodSeconds: 30
       initContainers:   # applies any new database migrations, only relevant for Credit
         - name: migrate
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/credit-service:sha-f123c90f7fc71a9ca3b43e56d24beff80c460a4f
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/credit-service:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           command: ['node', 'migrations/run-migrations.cjs']
           envFrom:
             - configMapRef: { name: credit-config }
@@ -32,8 +30,8 @@ spec:
             limits: { memory: 128Mi }
       containers:
         - name: credit-service
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/credit-service:sha-f123c90f7fc71a9ca3b43e56d24beff80c460a4f # same image as migrate above
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/credit-service:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           ports:
             - { name: grpc, containerPort: 50054 }
             - { name: http, containerPort: 3004 }

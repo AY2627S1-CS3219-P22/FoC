@@ -1,3 +1,7 @@
+# AI Assistance Disclosure: Claude Code (Claude Opus), 2026-11-06.
+# Scope: migrate initContainer memory limit (OOMKilled at 128Mi).
+# Details: ai/usage-log.md, entry 003.
+
 # the service in this file sends traffic to user app pods, port 50051, 3001, used by other services calling user
 apiVersion: apps/v1
 kind: Deployment
@@ -13,26 +17,24 @@ spec:
       labels: { app.kubernetes.io/name: user-service, app.kubernetes.io/part-of: foc }
     spec:
       # nodeSelector: { role: user }   # enable on EC2; leave off for local k3d
-      imagePullSecrets:   # pulls image from GHCR and logs in
-        - name: ghcr-pull
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000                  # the image's "node" user
       terminationGracePeriodSeconds: 30
       initContainers:   # applies any new database migrations, only relevant for user
         - name: migrate
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service-migrate:sha-f123c90f7fc71a9ca3b43e56d24beff80c460a4f
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service-migrate:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           command: ['npx', 'prisma', 'migrate', 'deploy']
           envFrom:
             - secretRef: { name: user-secrets }
-          resources:
-            requests: { cpu: 50m, memory: 64Mi }
-            limits: { memory: 128Mi }
+          resources:   # prisma's migrate engine was OOMKilled at 128Mi
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { memory: 512Mi }
       containers:
         - name: user-service
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service:sha-f123c90f7fc71a9ca3b43e56d24beff80c460a4f # same tag as migrate above
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/user-service:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           ports:
             - { name: grpc, containerPort: 50051 }
             - { name: http, containerPort: 3001 }

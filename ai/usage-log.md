@@ -53,3 +53,62 @@ logged in each service's own log.
   the workflow; JadeCheah reviewed it and approved.
 - **External sources:** `.github/workflows/user-service.yaml` (template);
   `ui/Dockerfile`, `ui/package.json`.
+
+## 003: Debugging the user-service migration crash on EKS
+
+- **Timestamp:** 2026-11-06 (Asia/Singapore).
+- **Tool/model:** Claude Code (Anthropic), Claude Opus.
+- **Mode/scenario:** Debugging a crash-looping migration initContainer during the
+  first full-stack deploy on EKS.
+- **Prompts:** [prompts/003-migrate-oomkilled.md](prompts/003-migrate-oomkilled.md) (3 prompts).
+- **Key responses:**
+  1. "The migrate initContainer is failing, so check its logs and whether the
+     database is up."
+  2. "The log stops right after Prisma connects with no error, which usually
+     means the process was killed from outside. Check whether it was OOMKilled."
+  3. "Confirmed OOMKilled: raise the migrate memory limit from 128Mi to 512Mi
+     for user and order, which both run `prisma migrate deploy`."
+- **Key output:** Migrate initContainer memory raised to 256Mi request / 512Mi
+  limit for user-service and order-service.
+- **Affected locations:** `k8s/user-service/user-service.yaml`,
+  `k8s/order-service/order-service.yaml`.
+- **Human review/edits:** JadeCheah ran the diagnosis commands on the cluster
+  and applied the fix; AI identified the cause and made the edits; JadeCheah
+  verified the migration completed and the service started.
+- **External sources:** Pod status and logs from the EKS cluster (`kubectl`).
+
+## 004: Kubernetes deployment README
+
+- **Timestamp:** 2026-11-06 (Asia/Singapore).
+- **Tool/model:** Claude Code (Anthropic), Claude Opus.
+- **Mode/scenario:** Documentation of the EKS deployment.
+- **Prompts:** [prompts/004-k8s-readme.md](prompts/004-k8s-readme.md) (1 prompt).
+- **Key responses:**
+  1. "Sure, here's a short README: an overview of how the deployment fits
+     together, what each folder is, how images and deploys work, and a
+     Continuous Deployment section with the OIDC setup and the steps for the
+     deploy job."
+- **Key output:** `k8s/README.md`.
+- **Affected locations:** `k8s/README.md`.
+- **Human review/edits:** JadeCheah set the scope and audience; AI wrote the
+  README; JadeCheah reviewed it and approved.
+- **External sources:** none.
+
+## 005: gRPC load balancing across pods
+
+- **Timestamp:** 2026-11-06 (Asia/Singapore).
+- **Tool/model:** Claude Code (Anthropic), Claude Opus.
+- **Mode/scenario:** Fixing gRPC calls that went to only one pod behind the
+  Kubernetes Services, found while documenting the deployment.
+- **Prompts:** [prompts/005-grpc-round-robin.md](prompts/005-grpc-round-robin.md) (1 prompt).
+- **Key responses:**
+  1. "Only the credit client balanced across pods; the others sent every call
+     to one pod. Use round_robin for all clients, and have servers close
+     connections periodically so clients find pods added by autoscaling."
+- **Key output:** All gRPC clients balance across pods; servers pick up new pods.
+- **Affected locations:** `shared/grpc/src/clients.ts`, `shared/grpc/src/server.ts`,
+  `user-service/src/grpc/server.ts`.
+- **Human review/edits:** JadeCheah flagged the issue and asked for the fix;
+  AI made the edits; JadeCheah reviewed and approved.
+- **External sources:** credit-service's existing gRPC server settings
+  (`credit-service/src/grpc/server.ts`), reused for consistency.
