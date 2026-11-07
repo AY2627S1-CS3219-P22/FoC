@@ -1,3 +1,11 @@
+# AI Assistance Disclosure:
+# Tool: Claude Code (Claude Opus), dates: 2026-09-25, 2026-10-16
+# Scope: AI generated the original two-stage Dockerfile, later updated the
+# exposed gRPC port.
+# Author review: Author specified the stages, base image and port map, had it
+# explained line by line and approved. See user-service/ai/usage-log.md,
+# entries 001, 016.
+
 # Must be built from the project root so shared/ is available.
 
 # --- Base ---

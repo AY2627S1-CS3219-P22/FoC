@@ -1,3 +1,14 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), dates: 2026-09-27 – 2026-10-19
+// Scope: AI generated the register, login (JWT signing), getMe, list,
+// getUserById, refresh, updateMe, grantAdmin and revokeAdmin handlers, and the
+// refresh cookie handling; reviewed the author's logout handler (idempotent
+// 204).
+// Author review: Author decided the layers, endpoint behaviour, JWT and
+// session settings, wrote the logout handler, reviewed the code and approved.
+// See user-service/ai/usage-log.md, entries 004, 008, 009, 010, 011, 013, 015,
+// 017, 020.
+
 import type { RequestHandler, Response } from 'express';
 import type { Roles } from '@prisma/client';
 import jwt from 'jsonwebtoken';
@@ -24,7 +35,7 @@ function signAccessToken(userId: string, roles: Roles[]) {
 // httpOnly: JS can't read it (XSS-safe). path: only sent to /users/* routes.
 const refreshCookieOptions = {
   httpOnly: true,
-  secure: env.NODE_ENV === 'production',
+  secure: env.COOKIE_SECURE ? env.COOKIE_SECURE === 'true' : env.NODE_ENV === 'production',
   sameSite: 'lax',
   path: '/users',
 } as const;

@@ -91,7 +91,7 @@ describe('GET /suppliers/search as an anonymous user', () => {
     const res = await request(app).get('/suppliers/search').query({ q: 'print' });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.map((s: any) => s.name)).toEqual(['Central Print Shop']);
+    expect(res.body.data.map((s: { name: string }) => s.name)).toEqual(['Central Print Shop']);
   });
 
   it('returns 200 and an empty list when the text matches nothing', async () => {
@@ -115,7 +115,7 @@ describe('GET /suppliers/category as an anonymous user', () => {
     const res = await request(app).get('/suppliers/category').query({ type: 'food' });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.map((s: any) => s.name)).toEqual(['The Coffee Roaster']);
+    expect(res.body.data.map((s: { name: string }) => s.name)).toEqual(['The Coffee Roaster']);
   });
 
   it('returns 200 and an empty list for a category nobody is in', async () => {

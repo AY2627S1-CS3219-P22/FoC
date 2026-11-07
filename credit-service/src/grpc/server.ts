@@ -4,8 +4,8 @@
 // Author review: I reviewed that all the required authentication paths are present, and that only Order Service is allowed to call the credit RPCs via grpc.
 // Prompts and key responses: ../../ai/usage-log.md, entries 005–026.
 
-import { CreditService as Contract, createServer, type CreditServiceHandlers } from '@foc/grpc';
-import { status, type handleUnaryCall } from '@grpc/grpc-js';
+import { CreditService as Contract, type CreditServiceHandlers } from '@foc/grpc';
+import { status, type handleUnaryCall, Server } from '@grpc/grpc-js';
 import type { CreditService } from '../services/CreditService';
 import { AuthenticationError, serviceIdentityVerifier } from './auth';
 import { grpcError } from './errors';
@@ -39,5 +39,10 @@ export function createGrpcServer(service: CreditService, tokens: Readonly<Record
     SettleCredits: handler((request) => service.settleCredits(request)),
     GetReservation: handler((request) => service.getReservation(request)),
   };
-  return createServer(Contract.service, handlers);
+  const server = new Server({
+  'grpc.max_connection_age_ms': 120_000,        // fine-tuned after load testing on kubectl, clients reconnect and re-resolve DNS every ~30s
+  'grpc.max_connection_age_grace_ms': 30_000,  // let in-flight calls finish first
+  });
+  server.addService(Contract.service, handlers);
+  return server;
 }

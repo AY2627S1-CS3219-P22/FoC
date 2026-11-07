@@ -7,7 +7,7 @@ Run it on its own with `yarn test:perf`.
 
 src/app.ts deliberately does not listen, so this file binds it to port 0 and
 lets the OS pick a free port. The database underneath is the same testcontainers
-Postgres the API suites use, seeded from supabase/schemas/seed.sql, so the
+Postgres the API suites use, seeded from db/init/03_seed.sql, so the
 numbers describe the service and the driver rather than an empty table.
 
 Both scenarios are reads. Hammering a write endpoint would fight the unique

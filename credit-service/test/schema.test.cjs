@@ -4,6 +4,9 @@
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: I reviewed that the test specification is correct.
 // Prompts and key responses: ../ai/usage-log.md, entries 005–024, 034, 045.
+// Entry 048: OpenAI Codex (GPT-6), 2026-10-30 (Asia/Singapore).
+// Scope: Used tracked --to checkpoints and a fresh schema for latest idempotency checks.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 048.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -14,16 +17,17 @@ const { randomUUID } = require('node:crypto');
 const { Client } = require('pg');
 
 const execute = promisify(execFile);
-const migration = join(__dirname, '../migrations/001_initial.sql');
-const alignment = join(__dirname, '../migrations/002_align_credit_contract.sql');
-const uppercaseStatus = join(__dirname, '../migrations/003_uppercase_reservation_status.sql');
-const runner = join(__dirname, '../migrations/apply-migration.cjs');
+const migration = '001_initial.sql';
+const alignment = '002_align_credit_contract.sql';
+const uppercaseStatus = '003_uppercase_reservation_status.sql';
+const runner = join(__dirname, '../migrations/run-migrations.cjs');
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 test('SQL migrations implement the supplied schema', {
   skip: !process.env.PGDATABASE && 'Set PGDATABASE and PG connection variables to run schema checks.',
 }, async (t) => {
   const schema = 'schema_check_' + randomUUID().replaceAll('-', '');
+  const retrySchema = 'retry_schema_check_' + randomUUID().replaceAll('-', '');
   const client = new Client({ connectionTimeoutMillis: 5000 });
   let connected = false;
   const bad = (sql, values, code) => assert.rejects(client.query(sql, values), (error) => {
@@ -36,7 +40,8 @@ test('SQL migrations implement the supplied schema', {
     connected = true;
     await client.query(`CREATE SCHEMA "${schema}"`);
     await client.query(`SET search_path TO "${schema}"`);
-    await execute(process.execPath, [runner, migration], {
+    await execute('npm', ['run', 'db:migrate', '--workspace', '@foc/credit-grpc', '--', '--to', migration], {
+      cwd: join(__dirname, '../..'),
       env: { ...process.env, PGOPTIONS: '-c search_path=' + schema },
     });
     await client.query('INSERT INTO credit_accounts (user_id, total_credits) VALUES ($1, $2)', ['upgrade-requester', 10]);
@@ -48,10 +53,10 @@ test('SQL migrations implement the supplied schema', {
       );
       legacy.push(row);
     }
-    await execute(process.execPath, [runner, alignment], {
+    await execute(process.execPath, [runner, '--to', alignment], {
       env: { ...process.env, PGOPTIONS: '-c search_path=' + schema },
     });
-    await execute(process.execPath, [runner, uppercaseStatus], {
+    await execute(process.execPath, [runner, '--to', uppercaseStatus], {
       env: { ...process.env, PGOPTIONS: '-c search_path=' + schema },
     });
 
@@ -69,12 +74,12 @@ test('SQL migrations implement the supplied schema', {
       await bad('UPDATE reservations SET status = $1 WHERE reservation_id = $2', ['released', legacy[0].reservation_id], '23514');
     });
 
-    await t.test('creates only four tables with the specified column names and timestamp types', async () => {
+    await t.test('creates four application tables and a migration ledger with the specified column types', async () => {
       const tables = await client.query(
         'SELECT table_name FROM information_schema.tables WHERE table_schema = $1 ORDER BY table_name', [schema],
       );
       assert.deepEqual(tables.rows.map((row) => row.table_name), [
-        'credit_accounts', 'credit_history', 'idempotency_records', 'reservations',
+        'credit_accounts', 'credit_history', 'credit_migrations', 'idempotency_records', 'reservations',
       ]);
       const columns = (await client.query(
         'SELECT table_name, column_name, udt_name, is_nullable FROM information_schema.columns WHERE table_schema = $1', [schema],
@@ -153,8 +158,12 @@ test('SQL migrations implement the supplied schema', {
       await bad('UPDATE credit_history SET total_amount_change = NULL WHERE id = $1', [initial.id], '23502');
     });
 
-    await execute(process.execPath, [runner, join(__dirname, '../migrations/010_remove_idempotency_metadata.sql')], {
-      env: { ...process.env, PGOPTIONS: '-c search_path=' + schema },
+    // Historical fixtures above intentionally violate later migrations; latest
+    // idempotency checks use a fresh schema and the complete tracked prefix.
+    await client.query(`CREATE SCHEMA "${retrySchema}"`);
+    await client.query(`SET search_path TO "${retrySchema}"`);
+    await execute(process.execPath, [runner, '--to', '010_remove_idempotency_metadata.sql'], {
+      env: { ...process.env, PGOPTIONS: '-c search_path=' + retrySchema },
     });
     await t.test('idempotency keys are unique per operation without user or timestamp metadata', async () => {
       const insert = 'INSERT INTO idempotency_records (operation_type, idempotency_key, request_hash, result) VALUES ($1, $2, $3, $4) RETURNING *';
@@ -170,7 +179,10 @@ test('SQL migrations implement the supplied schema', {
     });
   } finally {
     try {
-      if (connected) await client.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+      if (connected) {
+        await client.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+        await client.query(`DROP SCHEMA IF EXISTS "${retrySchema}" CASCADE`);
+      }
     } finally {
       await client.end();
     }

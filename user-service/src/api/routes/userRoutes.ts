@@ -1,3 +1,11 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), dates: 2026-09-27 – 2026-10-19
+// Scope: AI generated the register, login, /me, admin list, admin get-by-id,
+// refresh, PATCH /me and admin grant/revoke routes.
+// Author review: Author specified the endpoints and access rules, reviewed the
+// code and approved. See user-service/ai/usage-log.md, entries 004, 008, 009,
+// 010, 015, 020.
+
 import { Router } from 'express';
 import { validate } from '../middleware/validate';
 import { authenticate } from '../middleware/authenticate';

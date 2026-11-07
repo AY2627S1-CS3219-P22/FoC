@@ -4,7 +4,7 @@
 services:
   supplier-db:
     ports:
-      - '54332:5432' # 54322 belongs to `npx supabase start`
+      - '54332:5432'
 
   supplier-service:
     ports:

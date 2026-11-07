@@ -4,9 +4,13 @@
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: 
 // Prompts and key responses: ../ai/usage-log.md, entries 005–024, 031, 035, 036, 038.
+// Entry 047: OpenAI Codex (GPT-6), 2026-10-30 (Asia/Singapore).
+// Scope: Implemented human-specified cancellable startup retries and live listener health.
+// Changes await human review; prompts/key responses: ../ai/usage-log.md, entry 047.
 
 import { startServer, stopServer } from '@foc/grpc';
 import { readFile } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import { Pool } from 'pg';
 import { ServerCredentials } from '@grpc/grpc-js';
 import { env } from './env';
@@ -20,6 +24,7 @@ async function main(): Promise<void> {
   pool.on('error', () => console.error('Credit database idle connection error'));
   const service = new CreditService(pool);
   const server = createGrpcServer(service, { 'order-service': env.CREDIT_ORDER_SERVICE_TOKEN });
+  let broker: ReturnType<typeof import('./events/broker').createUserEventClient> | undefined;
   let listenerStarted = false;
   const rest = createRestServer(service, publicKeyPem, async () => {
     try {
@@ -28,7 +33,7 @@ async function main(): Promise<void> {
     } catch {
       return false;
     }
-  }, () => listenerStarted);
+  }, () => listenerStarted && broker?.isConnected === true);
   let port: number;
   try {
     port = await startServer(server, env.GRPC_PORT, env.GRPC_HOST, ServerCredentials.createInsecure());
@@ -45,12 +50,14 @@ async function main(): Promise<void> {
   console.log('credit-service REST listening on ' + env.HTTP_HOST + ':' + env.HTTP_PORT);
 
   let shuttingDown = false;
-  let broker: Awaited<ReturnType<typeof import('./events/broker').startUserEventConsumer>> | undefined;
+  const consumerStop = new AbortController();
+  // eslint-disable-next-line prefer-const -- assigned after shutdown handlers are registered
   let consumerStartup: Promise<void>;
   const shutdown = async (): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
     listenerStarted = false;
+    consumerStop.abort();
     const results = await Promise.allSettled([
       stopServer(server),
       new Promise<void>((resolve) => { rest.close(() => resolve()); }),
@@ -69,13 +76,31 @@ async function main(): Promise<void> {
   process.on('SIGTERM', onSignal);
 
   consumerStartup = (async () => {
-    try {
-      // Package loading is part of the nonfatal consumer startup attempt.
-      const { startUserEventConsumer } = require('./events/broker') as typeof import('./events/broker');
-      broker = await startUserEventConsumer(service, env.RABBITMQ_URL);
-      listenerStarted = !shuttingDown;
-    } catch (error) {
-      console.error('Credit user-event consumer unavailable; APIs remain running', error);
+    let retryDelayMs = 1000;
+    while (!shuttingDown) {
+      try {
+        // Package loading is part of each nonfatal startup attempt.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded lazily so a broken broker package doesn't stop REST/gRPC
+        const { createUserEventClient, startUserEventConsumer } = require('./events/broker') as typeof import('./events/broker');
+        broker ??= createUserEventClient(env.RABBITMQ_URL);
+        await broker.connect();
+        if (shuttingDown) break;
+        await startUserEventConsumer(service, broker);
+        listenerStarted = !shuttingDown;
+        return;
+      } catch (error) {
+        if (shuttingDown) break;
+        console.error('Credit user-event consumer unavailable; APIs remain running', {
+          message: error instanceof Error ? error.message : String(error),
+          retryInMs: retryDelayMs,
+        });
+        try {
+          await delay(retryDelayMs, undefined, { signal: consumerStop.signal });
+        } catch (error) {
+          if (!consumerStop.signal.aborted) throw error;
+        }
+        retryDelayMs = Math.min(retryDelayMs * 2, 30_000);
+      }
     }
   })();
 }

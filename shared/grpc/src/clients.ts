@@ -207,7 +207,7 @@ export function createOrderClient(target: string, config: ClientConfig = {}) {
 export function createCreditClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 1300);
   const retries = creditRetryOptions(creditRetryDefaults, config);
-  const client = new CreditService(target, config.credentials ?? credentials.createInsecure());
+  const client = new CreditService(target, config.credentials ?? credentials.createInsecure(), { 'grpc.service_config': JSON.stringify({ loadBalancingConfig: [{ round_robin: {} }] }) },);
   return {
     getBalance(request: GetBalanceRequest, options: RpcOptions = {}): Promise<Balance> {
       return creditUnary(timeoutMs, retries, options, (attemptOptions, callback) =>
@@ -282,16 +282,6 @@ export function createSupplierClient(target: string, config: ClientConfig = {}) 
     getSupplier(request: GetSupplierRequest, options: RpcOptions = {}): Promise<Supplier> {
       return unary((callback) =>
         client.getSupplier(
-          request,
-          options.metadata ?? new Metadata(),
-          callOptions(timeoutMs, options),
-          callback,
-        ),
-      );
-    },
-    isOpen(request: IsOpenRequest, options: RpcOptions = {}): Promise<IsOpenResponse> {
-      return unary((callback) =>
-        client.isOpen(
           request,
           options.metadata ?? new Metadata(),
           callOptions(timeoutMs, options),

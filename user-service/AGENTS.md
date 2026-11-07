@@ -1,3 +1,12 @@
+<!--
+AI Assistance Disclosure:
+Tool: Claude Code (Claude Opus), dates: 2026-09-25 – 2026-10-19
+Scope: AI drafted and updated the stack, conventions and design notes at the
+author's request.
+Author review: Author reviewed and approved each update. See
+user-service/ai/usage-log.md, entries 001, 004, 008, 009, 016, 021.
+-->
+
 # AGENTS.md — User Service
 
 Context and rules for AI coding agents working in `user-service/`.

@@ -18,28 +18,14 @@ Promise clients, metadata, finite deadlines, and server lifecycle helpers.
 | Credit | 50054 | GetBalance, ReserveCredits, UpdateReservation, ReleaseCredits, SettleCredits, GetReservation | shared/grpc/proto/credit.proto |
 | Supplier | 50052 | GetSupplier, IsOpen | shared/grpc/proto/supplier.proto |
 
-# gRPC endpoint scaffolding
-
-The shared `@foc/grpc` package provides generated TypeScript contracts, Promise
-clients, deadlines, and server helpers. User and Supplier RPC handlers are
-implemented in their services. The Credit scaffold remains UNIMPLEMENTED; its
-full business runtime is in the teammate PR.
-
-| Service  | Default host port | RPCs                                                              | Contract                                   |
-| -------- | ----------------- | ----------------------------------------------------------------- | ------------------------------------------ |
-| User     | 50051             | `GetPublicProfile`                                                | `user-service/proto/user.proto` (existing) |
-| Order    | 50053             | `GetOrder`                                                        | `shared/grpc/proto/order.proto`            |
-| Credit   | 50054             | `GetBalance`, `GetReservation`, `ReserveCredits`, `UpdateReservation`, `ReleaseCredits`, `SettleCredits` | `shared/grpc/proto/credit.proto`           |
-| Supplier | 50052             | `GetSupplier`, `IsOpen`                                           | `shared/grpc/proto/supplier.proto`         |
-
 Credit contract/client/types follow the agreed teammate feature branch. Order
 uses per-call x-credit-service-token metadata and versioned receipts. Supplier
 exports grpcsupplierSchema, isOpenResponseSchema and parseSupplierId. Zod is an
 explicit shared-package dependency. No Credit ledger implementation is added here.
 
-Order remains a scaffold. Credit's six handlers are connected to its SQL business
-service and authorize only Order Service. User public-profile lookup and Supplier
-IsOpen use their existing service implementations.
+User, Supplier and Credit implement their gRPC handlers in their own services;
+Credit's six handlers authorize only Order Service. Order's gRPC `GetOrder` still
+returns UNIMPLEMENTED; Order's features are served over REST.
 
 ## Credit contract alignment
 
@@ -77,11 +63,6 @@ npm test
   [Protobuf update guidance](https://protobuf.dev/programming-guides/proto3/#updating).
 
 ## Calling Credit from Order Service
-```bash
-npm run dev --workspace @foc/order-grpc
-npm run dev --workspace @foc/credit-grpc
-yarn --cwd supplier-service dev:grpc
-```
 
 Credit uses plaintext gRPC, with the same configured secret on both services:
 
@@ -187,6 +168,18 @@ Credit source lives under credit-service/src/{domains,repos,services,grpc,rest,e
 with env.ts/index.ts in src and its package/test/scripts at the service root. The
 existing @foc/credit-grpc package identifier is retained.
 
+### Run services locally (without Docker)
+
+To run the full stack, use `docker compose up` from the root (see the
+[root README](../../README.md#run-the-whole-stack-docker)). To run individual gRPC
+services on the host instead:
+
+```bash
+npm run dev --workspace @foc/order-grpc
+npm run dev --workspace @foc/credit-grpc
+yarn --cwd supplier-service dev:grpc
+```
+
 Follow each service README for startup and env configuration. Credit now connects
 to PostgreSQL and exposes REST as well as gRPC. User Service retains its existing
 startup; no User Service publisher or shared messaging startup was added here.
@@ -203,37 +196,7 @@ and initialization files were removed.
 
 The loader reads the existing User Service proto in place; retain repository
 layout when packaging. Other service contracts and startup ownership remain in
-their existing folders. The compatibility notes below record earlier checks.
-
-## Branch compatibility checked on 4 October 2026
-
-Remote references were refreshed with `git fetch origin`; no branch was merged.
-
-- `origin/F2-auth-jwt-rbac` at `8586684` (1 October): CommonJS TypeScript,
-  Prisma user IDs, JWT/RBAC, and the same unimplemented public-profile RPC.
-  Its source entrypoint, auth code, package/lock files, and proto remain untouched.
-- `origin/init-supplier-database` at `55af095` (1 October): ES modules, Yarn,
-  Express, Drizzle/Supabase, and JWT validation. The new `supplier-service/grpc/`
-  package has its own module boundary; its files do not overlap that branch's
-  service package, `src/index.ts`, REST handlers, tests, schema, or Docker files.
-- `origin/refine-db-search` is an older supplier branch. Its supplier files also
-  do not overlap the scaffold directory. The other fetched branches contain no
-  order/credit implementations.
-
-Supplier contract fields follow the current Drizzle schema: a positive bigint
-`supplierId` (decimal string on the wire/JS), integer `floor`, `buildingName`,
-nullable hours/image fields, and coordinates. A future repository adapter should
-convert Drizzle's numeric coordinate strings to doubles, map `imageURL` to
-`imageUrl`, check IDs before passing them to the repository's JavaScript-number
-parameter, and keep its existing soft-delete filtering. No adapter is implemented.
-
-Merge rehearsals in a temporary checkout found no conflicts with the latest User
-Service branch. Both supplier branches produced only a `.gitignore` conflict;
-the same conflict occurs when merging them into unchanged `main`, so the
-scaffolding introduces no additional conflicting paths in these rehearsals.
-The supplier branch's empty root `package.json` merged with the workspace
-manifest automatically. Preserve its service-level Yarn setup. These rehearsals
-check Git compatibility; they do not validate the merged services' business logic.
+their existing folders.
 
 ## AI disclosure for shared dependency integration
 

@@ -1,3 +1,12 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), dates: 2026-10-11 – 2026-10-19
+// Scope: AI generated the refresh-token session logic (create, revoke, rotate),
+// chose SHA-256 for the token hash, and implemented the review fixes (in-place
+// rotation, superseded detection, cleanup).
+// Author review: Author specified the session workflow and the review fix
+// approach, confirmed the rotation and race behaviour, reviewed the code and
+// approved. See user-service/ai/usage-log.md, entries 010, 017.
+
 import { createHash, randomBytes } from 'node:crypto';
 import { prisma } from '../db';
 import { env } from '../env';

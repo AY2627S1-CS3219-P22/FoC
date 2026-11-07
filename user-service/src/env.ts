@@ -1,3 +1,10 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), dates: 2026-09-25 – 2026-10-16
+// Scope: AI generated the zod env validation, then added the JWT config and
+// key loading, the refresh-token settings and the standardised gRPC port.
+// Author review: Author reviewed the code and approved. See
+// user-service/ai/usage-log.md, entries 001, 008, 010, 016.
+
 import 'dotenv/config';
 import fs from 'node:fs';
 import { z } from 'zod';
@@ -13,6 +20,7 @@ const schema = z.object({
   JWT_PUBLIC_KEY_PATH: z.string().min(1),
   JWT_EXPIRES_IN: z.string().default('15m'),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
+  COOKIE_SECURE: z.enum(['true', 'false']).optional(),
 
   RABBITMQ_URL: z.string().default('amqp://guest:guest@localhost:5672'),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1000),

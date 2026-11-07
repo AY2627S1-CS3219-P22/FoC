@@ -1,8 +1,8 @@
 <!--
-AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-10-26 (Asia/Singapore).
+AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-20–2026-10-30 (Asia/Singapore).
 Mode/scope: Documented and checked the human-defined Credit implementation.
-Review: I have reviewed the README and edited for style and updated as I made changes in the code.
-Exact prompts, key responses and checks: ai/usage-log.md, entries 003–045.
+Review: Prior content human-reviewed; entries 047–049 changes await human review.
+Exact prompts, key responses and checks: ai/usage-log.md, entries 003–049.
 -->
 
 # Credit service
@@ -21,8 +21,7 @@ uses JWT-authenticated REST for each user's own balance and history.
 | User events | RabbitMQ queue `credit.user-events` | `user.created` consumer |
 
 The current implementation has entry-ID page tokens, direct service-token
-comparison, no account/reservation timestamp columns, and idempotency records
-without user or timestamp metadata. Archival, restoration
+comparison, and no account/reservation timestamp columns. Archival, restoration
 and deletion are deferred. The human's definitions and AI records are retained in
 [the usage log](ai/usage-log.md).
 
@@ -47,9 +46,10 @@ credit-service/
 ```
 
 The workspace is `credit-service/`, named `@foc/credit-grpc`. TypeScript builds
-into `dist/`; `src/index.ts` starts REST, gRPC and the event consumer. The migration
-runner is `migrations/apply-migration.cjs`. Local `scripts/` and `docs/` are not
-required by a fresh clone.
+into `dist/`; `src/index.ts` starts REST, gRPC and the event consumer.
+`migrations/run-migrations.cjs` is the tracked runner used by `npm run db:migrate`
+and the `credit-migrate` job. It supports an optional inclusive `--to` stop point.
+Local `scripts/` and `docs/` are not required by a fresh clone.
 
 ## Business operations
 
@@ -126,19 +126,25 @@ retry/dead-letter handling. A successful handler finishes only after the allocat
 transaction commits or an existing grant is confirmed. Duplicate event IDs or
 different events for the same user cannot grant credits again.
 
-The [consumer startup helper](src/events/broker.ts) connects a RabbitMQClient for
-CREDIT_USER_QUEUE using serviceName credit-service and prefetch 10. It closes its
-client if connection/consumer setup throws. Configure RABBITMQ_URL: host execution
+The [consumer helper](src/events/broker.ts) creates one RabbitMQClient for
+CREDIT_USER_QUEUE using serviceName credit-service and prefetch 10. Configure
+RABBITMQ_URL: host execution
 defaults to `amqp://guest:guest@localhost:5672`; the Docker example reaches a broker
 published on the Docker host. Supply a URL reachable from your chosen deployment.
 After both API listeners start, `index.ts` attempts consumer startup in the
-background with the same CreditService instance. A failed connection,
-registration or package load is logged; the REST and gRPC APIs keep running.
-This is one startup attempt: after a failure, restart Credit once the package
-and broker are available. No consumer reconnect loop is added here. SIGINT/SIGTERM
-close both API listeners, wait for any pending consumer startup, close the broker
-if connected, then end the database pool. A broker close failure is logged and
-does not skip database cleanup.
+background with the same CreditService instance. Failed connection, registration
+or package-load attempts retry indefinitely after 1, 2, 4, 8, 16 and then 30 seconds,
+remaining capped at 30 seconds. Each failed startup attempt logs its error message
+and next delay once; the REST and gRPC APIs keep running. Connection attempts
+reuse the same client. Once connected, Credit registers its consumer and exits
+the startup retry loop. The shared client's existing reconnect loop handles later
+disconnects and restores its registered consumers.
+
+SIGINT/SIGTERM cancel a pending startup retry wait and prevent further attempts.
+Shutdown closes both API listeners, waits for an in-flight startup operation,
+closes the broker, then ends the database pool. A connection that finishes during
+shutdown is closed without registering a consumer. A broker close failure is
+logged and does not skip database cleanup.
 
 `@foc/messaging` is now included as a local workspace and Credit dependency;
 root builds, Credit predev and the Docker image build it before Credit. The
@@ -147,7 +153,8 @@ package was copied from `origin/events/data-validation` at
 are authored by @sunpterodactyl and the shared messaging contributors.** This PR
 includes their code for integration/testing and does not claim its authorship.
 The [package README](../shared/messaging/README.md) records the import and original
-AI declarations. Credit-specific work is consumer wiring and tests.
+AI declarations. Credit-specific work includes consumer wiring/tests and the
+human-requested shared-client `isConnected` getter used for live listener health.
 User Service publication remains owned by its implementer. There is no InitCredits RPC.
 
 ## gRPC authentication and errors
@@ -207,27 +214,31 @@ maxDelayMs. Other service client behavior is unchanged.
 
 ## Health
 
-Public GET `/health` on port 3004 runs `SELECT 1` and reports event-listener startup:
+Public GET `/health` on port 3004 runs `SELECT 1` and reports live listener readiness:
 
 ```json
 { "status": "ok", "db": "up", "listener": "up" }
 ```
 
-| Database | Listener startup | HTTP | Overall status |
+| Database | Listener readiness | HTTP | Overall status |
 | --- | --- | --- | --- |
 | up | up or down | 200 | ok |
 | down | up or down | 503 | degraded |
 
-The listener flag is down while starting, after startup failure or during explicit
-shutdown, and up after startup succeeds. It reports startup success only; it does
-not detect later broker disconnects or consumer cancellation. API listeners remain
-available if consumer startup fails. No token is required.
+The listener is down before initial registration, while disconnected or recovering,
+and during shutdown. It becomes up after initial registration or after the shared
+client reconnects and finishes restoring its consumers. Credit reads the shared
+client's `isConnected` getter; it does not actively probe RabbitMQ. Consumer
+cancellation on an otherwise open channel is not detected by this getter.
+Listener readiness remains informational: database health alone controls HTTP
+status and overall status. No token is required.
 
 ```sh
 curl -i http://localhost:3004/health
 ```
 
-Compose has a PostgreSQL healthcheck; it does not configure one for Credit itself.
+Compose healthchecks both `credit-db` (`pg_isready`) and `credit-service` (this
+`/health` endpoint, which must return 200).
 
 ## Frontend REST and user history
 
@@ -251,9 +262,9 @@ service failures return 503; internal failures return 500. Unknown users have
 empty history, entries [] and nextPageToken null.
 
 The REST listener runs on port 3004. Set CREDIT_JWT_PUBLIC_KEY_PATH to the User
-Service public PEM. Local Compose mounts CREDIT_JWT_PUBLIC_KEY_FILE read-only
-at /run/credit/user-service-public.pem, defaulting to ../user-service/keys/public.pem
-relative to the Compose file. Supply that public file before starting; no private
+Service public PEM. Local Compose mounts that same file read-only at
+/run/credit/user-service-public.pem, defaulting to ../user-service/keys/public.pem
+relative to credit-service/. Supply that public file before starting; no private
 User Service key is read, mounted, or packaged.
 
 Both history RPCs, their messages/types, and client wrappers have been removed.
@@ -280,85 +291,110 @@ resolved boundary. Sequence values and the existing ordering/index stay internal
 
 ## Setup and configuration
 
-Run commands from the repository root. Supply User Service's public PEM before
-starting Credit. Host execution reads `CREDIT_JWT_PUBLIC_KEY_PATH`; Compose mounts
-`CREDIT_JWT_PUBLIC_KEY_FILE` read-only. No private User Service key is needed.
+Copy [.env.example](.env.example) to the ignored `credit-service/.env`. Both
+Docker Compose and host development read it. Supply User Service's public PEM
+before starting Credit (`npm run keys:generate` in user-service). No private User
+Service key is needed.
 
-| Configuration | Host default / requirement |
+| Configuration | Default / requirement |
 | --- | --- |
 | CREDIT_ORDER_SERVICE_TOKEN | Required; match Order Service's configured secret |
-| CREDIT_JWT_PUBLIC_KEY_PATH | `../user-service/keys/public.pem`, relative to Credit's working directory |
-| RABBITMQ_URL | `amqp://guest:guest@localhost:5672` |
-| HTTP_HOST / HTTP_PORT | `0.0.0.0` / `3004` |
-| GRPC_HOST / GRPC_PORT | `0.0.0.0` / `50054` |
-| PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE | Set for the chosen PostgreSQL database |
+| CREDIT_JWT_PUBLIC_KEY_PATH | `../user-service/keys/public.pem`, relative to credit-service/ |
+| RABBITMQ_URL | Host runs: `amqp://guest:guest@localhost:5672` |
+| DOCKER_RABBITMQ_URL | Compose: the broker as seen from the container (`host.docker.internal`) |
+| HTTP_PORT / GRPC_PORT | `3004` / `50054` |
+| PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE | Compose creates `credit-db` from PGUSER/PGPASSWORD/PGDATABASE and publishes it on PGPORT; host runs connect through PGHOST:PGPORT |
 
-For host development, populate the ignored `credit-service/.env` from
-[.env.example](.env.example), then run:
+### Docker (from credit-service/)
+
+Provide a reachable RabbitMQ broker separately; this Compose file starts the
+database, the migration job and Credit:
 
 ```sh
-npm ci
+docker compose up -d --build
+```
+
+| Service | What it is | Where (standalone dev) |
+| --- | --- | --- |
+| `credit-db` | PostgreSQL 17, data in the credit_service_pgdata volume | `127.0.0.1:${PGPORT}` (5433) |
+| `credit-migrate` | One-off job: applies new migrations, then exits | — |
+| `credit-service` | gRPC + REST | `localhost:50054`, `http://localhost:3004` |
+
+Inside Docker, Credit reaches the database at `credit-db:5432`. Ports are
+published by `compose.override.yaml`, which Compose loads only when run from this
+folder; the root compose does not load it, so nothing is exposed there.
+
+After source changes, rebuild the image; a previous image does not pick up source
+edits automatically:
+
+```sh
+docker compose up -d --build credit-service
+```
+
+To open psql, stop the stack keeping the data, or reset it:
+
+```sh
+docker compose exec credit-db psql -U credit_service -d credit_service
+docker compose down       # keep the data
+docker compose down -v    # also delete the data
+```
+
+### Host development
+
+```sh
+npm install                              # from the repository root
 npm run dev --workspace @foc/credit-grpc
 ```
 
-The predev script builds both shared packages. For Docker, provide a reachable
-RabbitMQ broker separately; this Compose file starts PostgreSQL and Credit only:
-
-```sh
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml up -d --build
-```
-
-The example uses local development credentials. For personal configuration, pass
-your selected ignored env file consistently. The Docker example connects to
-RabbitMQ through `host.docker.internal`. PostgreSQL uses database/user
-`credit_service`, host port 5433 (override CREDIT_POSTGRES_PORT), and internal
-address `postgres:5432`. Data persists in the named credit_service_pgdata volume.
-Compose waits for PostgreSQL's healthcheck. Migrations are applied explicitly below.
-
-After source changes, rebuild the running container using the same selected
-configuration; a previous image does not pick up source edits automatically:
-
-```sh
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml up -d --build --no-deps credit-service
-```
-
-To open psql or stop the stack while retaining the database volume:
-
-```sh
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec postgres psql -U credit_service -d credit_service
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml down
-```
+The predev script builds both shared packages.
 
 ## SQL migrations
 
 The current tables are credit_accounts, reservations, credit_history and
 idempotency_records.
 
-Apply each SQL file once, in order, using the transactional CLI at
-`migrations/apply-migration.cjs` (invoked by `npm run db:migrate`). It has no migration
-ledger or automatic skipping. Apply only missing files on an existing database;
-the commands below list the full sequence for a fresh database. Migration 009
-requires the updated service queries that omit account/reservation timestamps.
-The last recorded local application completed migrations 001–009; that does not
-establish which migrations a teammate's database has applied.
-Migration 010 has been tested in isolated schemas and has not been applied to the
-running local database. Apply it together with the updated Credit service build.
+In Docker, the `credit-migrate` job runs `migrations/run-migrations.cjs` on every
+`docker compose up`, before `credit-service` starts. It applies every
+`migrations/*.sql` in filename order, each in its own transaction, and records
+each file in the `credit_migrations` table (filename, applied_at, success).
+Files already recorded as successful are skipped; on a failure the file is rolled
+back, recorded as unsuccessful, and the run stops. A PostgreSQL advisory lock
+prevents two runs from applying migrations at the same time. Databases migrated
+by hand before this job existed have no records, so reset them once with
+`docker compose down -v`.
+
+To run the same runner from the host against the published database:
 
 ```sh
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/001_initial.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/002_align_credit_contract.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/003_uppercase_reservation_status.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/004_reservation_invariants.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/005_initial_grant_history_type.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/006_history_types_and_paging.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/007_credit_delta_constraints.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/008_history_links_and_uniqueness.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/009_remove_account_reservation_timestamps.sql
-docker compose --env-file credit-service/.env.docker.example -f credit-service/compose.yaml exec -T credit-service npm run db:migrate -- migrations/010_remove_idempotency_metadata.sql
+set -a; . ./.env; set +a                 # from credit-service/: export the PG* values
+node migrations/run-migrations.cjs
+# Or use the same runner through npm:
+npm run db:migrate
+
+# Apply pending files only through this filename, inclusive:
+node migrations/run-migrations.cjs --to 001_initial.sql
+npm run db:migrate -- --to 001_initial.sql
 ```
 
-The CLI uses PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE; PGDATABASE must be explicit.
-It uses one connection and transaction, following [node-postgres](https://node-postgres.com/features/transactions).
+From the repository root, the equivalent bounded command is:
+
+```sh
+npm run db:migrate --workspace @foc/credit-grpc -- --to 001_initial.sql
+```
+
+Without `--to`, the runner applies all pending files. With `--to`, it considers
+only files through the named target in sorted filename order, skipping successful
+records within that range. Use the exact filename, not a path. An unknown target
+or invalid arguments fail before connecting to the database. A stop point does
+not undo later files that were already applied. Both bounded and full runs use
+the same migration ledger, advisory lock and per-file transactions; the separate
+single-file runner has been removed.
+
+The runner uses PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE; PGDATABASE must be
+explicit. Each migration runs in one transaction, following
+[node-postgres](https://node-postgres.com/features/transactions).
+Migration 009 requires the updated service queries that omit account/reservation
+timestamps.
 Migration 004 enforces unique order_id, settled iff courier is set, and distinct
 participants. Migration 005 changes the initial label. Migration 006 converts all
 remaining legacy labels, adds sequence paging and initial-grant uniqueness, and
@@ -378,12 +414,8 @@ RESERVATION_UPDATED may occur multiple times. Invalid legacy links or duplicate
 indexed events reject the entire migration; no data is repaired or deleted.
 Migration 009 drops created_at and updated_at from credit_accounts and reservations.
 The account model and repository no longer read or write those columns.
-Migration 010 drops user_id and created_at from idempotency_records. Its remaining
-columns are operation_type, idempotency_key, request_hash and result (jsonb), with
-the same composite primary key on (operation_type, idempotency_key). Retry lookup,
-request-hash conflict checks and saved-response replay are unchanged; allocation
-tests identify records by operation_type = 'init_credits' and idempotency_key =
-userId. credit_history.created_at remains. The public REST/gRPC shapes are unchanged.
+credit_history.created_at and idempotency_records.created_at remain. The existing
+balance/reservation REST and gRPC response fields are unchanged.
 
 ## Verification
 
@@ -395,23 +427,27 @@ PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_loc
 npm test --workspace @foc/grpc
 ```
 
-The Credit build and all 103 Credit checks passed after removing idempotency
-metadata. The shared gRPC suite previously passed 51 checks; it was not rerun for
-this refactor. Detailed outputs and prior checks are in [the usage log](ai/usage-log.md).
-All seven live-listener test results also passed against a disposable RabbitMQ
-broker and the fully migrated isolated schema, including duplicate allocation,
-retry/dead-letter behavior and restart. The test broker was removed afterwards.
+The most recent messaging/Credit builds passed after the startup retry change.
+Lifecycle tests control time to check capped retries, client reuse,
+one initial consumer, shutdown cancellation and live health. Shared-client tests
+hold consumer recovery pending to verify that readiness remains down until it
+finishes. Earlier shared gRPC, Docker and listener results remain in
+[the usage log](ai/usage-log.md).
+After switching the migration command to the tracked runner with `--to`, all 110
+Credit tests passed. Migration tests cover inclusive boundaries, skipping already
+successful files, atomic failure and repair/resume, and concurrent-run locking.
+Schema tests exercise the npm command and historical checkpoints through `--to`.
+The updated live-listener suite also passed all 10 Node test results against a
+dedicated broker and private outage proxy, including startup recovery, later
+disconnect recovery and shutdown during backoff.
 Root `npm test` runs the shared gRPC suite; use the Credit workspace command above
 for Credit tests. Without PGDATABASE, the database integration checks skip.
 
 Tests cover migrations and rollback, initial-allocation duplicates, full atomic
 rollback, no overspend, version conflicts, settle/release races, opposing
 settlements, exact history links/deltas, entry-ID pagination, late writes,
-authentication, error trailers and public health. The combined 009/010 upgrade
-test verifies populated-row preservation, exact remaining idempotency columns,
-replay of successes saved before migration, and operations after column removal.
-Only the historical upgrade fixture supplies the old idempotency user column;
-current service, repository and runtime test queries do not use it.
+authentication, error trailers and public health. Migration 009's upgrade test
+verifies populated-row preservation and operations after timestamp removal.
 
 The shared [SQL ledger oracle](test/sql/ledger-violations.sql) returns violating
 rows for explicitly scoped scenario users/reservations (empty means pass).
@@ -427,8 +463,10 @@ PGHOST=127.0.0.1 PGPORT=5433 PGUSER=credit_service PGPASSWORD=credit_service_loc
 ```
 
 The separate live-listener test requires a disposable broker with no other
-consumers. It tests registration, duplicate events, retries, dead-letter handling
-and restart using a temporary database schema and actual Credit startup:
+consumers. A private TCP proxy simulates startup outages and later disconnects
+without stopping the broker. It checks health/recovery without a Credit restart,
+one restored consumer, registration delivery, duplicates, retries, dead letters,
+restart and shutdown during startup backoff using an isolated database schema:
 
 ```sh
 npm run build
@@ -450,43 +488,17 @@ The human approved this attribution method for comment-free JSON in
 
 | File | Tool, date, and scope | Author review |
 | --- | --- | --- |
-| credit-service/package.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: pg, migration/test scripts, @types/pg, jsonwebtoken and @types/jsonwebtoken; relocated the existing workspace manifest to the service root in exchange 024; updated db:migrate to the relocated migrations/apply-migration.cjs in exchange 034 (2026-10-22); added @foc/messaging dependency and predev build in exchange 037. | Pending human review. |
+| credit-service/package.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: pg, migration/test scripts, @types/pg, jsonwebtoken and @types/jsonwebtoken; relocated the existing workspace manifest to the service root in exchange 024; relocated the migration CLI in exchange 034 (2026-10-22); added @foc/messaging dependency and predev build in exchange 037; exchange 048 (2026-10-30) points db:migrate to the tracked run-migrations.cjs runner with optional --to. | Pending human review. |
 | Root package-lock.json | OpenAI Codex (GPT-6), 2026-10-20–2026-10-21: corresponding dependencies/transitive packages and relocated credit workspace/link metadata; earlier npm also normalized existing flags; exchange 037 adds messaging/amqplib workspace entries and resolves the shared Zod range to 4.6.7. | Pending human review. |
 | Root package.json | OpenAI Codex (GPT-6), 2026-10-21: changed only the credit workspace path from credit-service/grpc to credit-service, using the recorded comment-free JSON attribution method; exchange 037 adds the shared/messaging workspace and prerequisite build. | Pending human review. |
 | shared/messaging/package.json and tsconfig.json | Original files by @sunpterodactyl/shared messaging contributors, copied byte-for-byte from 0b48f5f in exchange 037; no AI-generated source/config changes. Provenance is in shared/messaging/README.md. | Upstream authorship preserved; integration review pending. |
 
 Exact prompts/key exchanges and actual checks are archived under
-[credit-service/ai/](ai/usage-log.md). 
-
+[credit-service/ai/](ai/usage-log.md). The human authors remain responsible for
+review, validation, team norms, licensing checks, and submission disclosure.
 
 ## AI Use Summary
 
-This summary covers recorded assistance on feat/credit-implementation from
-2026-10-19. 
-
-- **Tool and modes:** OpenAI Codex (GPT-6), implementation after human design
-  finalization, bounded requirements interpretation/formatting, boilerplate,
-  debugging, tests, refactoring, documentation and explanations.
-- **Scope:** Credit's PostgreSQL schema and ten migrations; domain/repository/
-  service implementation; atomic initialization, reservation, update, release and
-  settlement; gRPC contracts/client retries and service-token authentication;
-  authenticated own-balance/history REST with entry-ID bookmarks; RabbitMQ consumer
-  integration; Docker/workspace setup; health reporting; tests, local demo
-  preparation and attribution records; removal of idempotency user/timestamp
-  columns and corresponding repository/test refactoring. The [service README](credit-service/README.md)
-  documents current interfaces, behavior and setup.
-- **Human decisions:** Requirements, architecture, schema, interfaces, policies,
-  locking, pagination and security changes came from the human authors. No
-  requirements prioritization, backlog/sprint planning, design decisions or
-  decision rationales were generated.
-- **Prompts and key responses:** Exact exchanges, affected files, recorded reviews
-  and actual checks are in [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md),
-  entries 001–045. Attribution comments identify AI-influenced files. The approved
-  [JSON attribution table](credit-service/README.md#attribution-for-json-files)
-  covers formats that cannot contain comments.
-- **Provenance:** Shared messaging code belongs to @sunpterodactyl and the shared
-  messaging contributors, imported from events/data-validation commit
-  0b48f5f85be01d148176a6410c9ca22c2b8e672e. Its [provenance and original declarations](shared/messaging/README.md)
-  are retained; Credit integration assistance does not claim that authorship.
-  Official documentation consulted during implementation is cited in the usage
-  log. Human authors remain responsible for licensing and assignment validation.
+Credit implementation, tests and documentation assistance are recorded in
+[ai/usage-log.md](ai/usage-log.md), including tools/models, exact prompts, affected
+files, actual checks and human review status.

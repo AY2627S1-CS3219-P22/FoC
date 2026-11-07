@@ -1,3 +1,10 @@
+// AI Assistance Disclosure:
+// Tool: Claude Code (Claude Opus), date: 2026-09-25
+// Scope: AI generated the original entry point (start REST and gRPC servers,
+// shutdown). Messaging wiring was added later by a teammate.
+// Author review: Author reviewed the code and approved. See
+// user-service/ai/usage-log.md, entry 001.
+
 import { RabbitMQClient, CREDIT_USER_QUEUE } from '@foc/messaging';
 import { env } from './env';
 import { prisma } from './db';
