@@ -112,3 +112,36 @@ logged in each service's own log.
   AI made the edits; JadeCheah reviewed and approved.
 - **External sources:** credit-service's existing gRPC server settings
   (`credit-service/src/grpc/server.ts`), reused for consistency.
+# 006 Generic CI workflow
+- **Timestamp:** 2026-11-09 (Asia/Singapore).
+- **Tool/model:** Grok 4.7 (xAI), in Cursor.
+- **Mode/scenario:** Add continuous deployment to the credit-service workflow
+  while keeping pull-request checks. The supplied sample was an Elastic
+  Beanstalk zip deploy of an Address Book app.
+- **Prompts:** [prompts/003-cd.md](prompts/003-cd.md).
+- **Key responses:** Pull requests keep test, lint, and the image build. A
+  deploy job runs only on push to `main`, after those jobs pass, and applies
+  the credit-service Kubernetes manifests to EKS with this commit's GHCR image.
+  The Beanstalk zip was not used: credit-service is a compiled workspace image
+  with an init migration container, and the repo already deploys it to EKS.
+- **Key output:** `deploy` job in `.github/workflows/credit-service.yaml`.
+  Follow-up: the image swap is a `sed` in that job. `GITHUB_SHA` matches the
+  `sha-<commit>` tag published by `build-and-push-image`. The substitution
+  rewrites both `image:` lines in `k8s/credit-service/credit-service.yaml`
+  before one `kubectl apply`. A `:latest` substitution does not match these
+  manifests, which pin `:sha-<commit>`.
+  Follow-up: the human copied the credit deploy job into the order, user,
+  supplier and UI workflows. Then a new prompt was made to change the deployed
+  credit-service to use each services own mainfest. AI pointed each copy at its own manifests and
+deployment, matched the `-migrate` images for order and user, set
+  `needs: build-and-push-image`, and added `k8s/<service>/**` to each
+  workflow's paths.
+- **Affected locations:** `.github/workflows/credit-service.yaml`,
+  `.github/workflows/order-service.yaml`, `.github/workflows/user-service.yaml`,
+  `.github/workflows/supplier-service.yaml`, `.github/workflows/ui.yaml`,
+  `ai/usage-log.md`, `ai/prompts/003-cd.md`.
+- **Human review/edits:** Human review done actually, I was q specific.
+- **External sources:** Existing credit-service workflow and
+  `k8s/credit-service/credit-service.yaml`. User-supplied Beanstalk sample
+  (AddressBookApp, `einaregilsson/beanstalk-deploy@v22`, region
+  `ap-southeast-1`).
