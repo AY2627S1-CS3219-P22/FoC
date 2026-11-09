@@ -183,7 +183,13 @@ jobs:
       - name: Deploy to EKS
         run: |
           set -euo pipefail
-          aws eks describe-cluster --name foc || exit 0
+          if ! aws eks describe-cluster --name foc >/tmp/cluster.out 2>/tmp/cluster.err; then
+            echo "::warning title=EKS unavailable::Cluster foc is down; skipping deploy of sha-${GITHUB_SHA}"
+            echo "--- aws error ---"
+            cat /tmp/cluster.err
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           aws eks update-kubeconfig --name foc --region ap-southeast-1
           sed -i "s/newTag: latest/newTag: sha-${GITHUB_SHA}/" k8s/order-service/kustomization.yaml
           kubectl apply -k k8s/order-service
