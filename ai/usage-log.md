@@ -139,7 +139,23 @@ deployment, matched the `-migrate` images for order and user, set
 - **Affected locations:** `.github/workflows/credit-service.yaml`,
   `.github/workflows/order-service.yaml`, `.github/workflows/user-service.yaml`,
   `.github/workflows/supplier-service.yaml`, `.github/workflows/ui.yaml`,
+  `k8s/user-service/kustomization.yaml`, `k8s/order-service/kustomization.yaml`,
+  `k8s/supplier-service/kustomization.yaml`, `k8s/ui/kustomization.yaml`,
+  `k8s/credit-service/kustomization.yaml`,
   `ai/usage-log.md`, `ai/prompts/003-cd.md`.
+  Follow-up: the human asked whether Kustomize can replace the image-tag
+  regex. AI added `k8s/user-service/kustomization.yaml` (app + config only)
+  and the deploy job now sets `newTag` to `sha-${GITHUB_SHA}` then
+  `kubectl apply -k`. The previous `kubectl kustomize | set image` line
+  failed: there was no kustomization file, `user-service-image` is not a
+  container name, and `my-registry` is not GHCR.
+  Follow-up: added the same kustomization + `kubectl apply -k` deploy to
+  order, supplier and UI. User already had it. Credit was left on the
+  earlier sed apply because it was not in this request. Databases and
+  example secrets stay out of each `resources:` list.
+  Follow-up: added `k8s/credit-service/kustomization.yaml`. Credit has one
+  image name (the migrate initContainer reuses the app image), plus config
+  and HPA.
 - **Human review/edits:** Human review done actually, I was q specific.
 - **External sources:** Existing credit-service workflow and
   `k8s/credit-service/credit-service.yaml`. User-supplied Beanstalk sample
