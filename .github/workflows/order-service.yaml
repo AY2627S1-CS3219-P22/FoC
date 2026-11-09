@@ -1,3 +1,4 @@
+# ChatGPT (Codex), 2026-11-07: Trigger Order checks for its shared messaging dependency; review pending; see order-service/usage-log.md.
 # AI Assistance Disclosure: Claude Code (Claude Opus), 2026-11-05.
 # Scope: the migrate image steps.
 # Details: ai/usage-log.md, entry 001.
@@ -11,7 +12,7 @@ on:
       - 'order-service/**'
       - 'shared/grpc/**'
       - 'shared/grpc/package.json'
-      - 'shared/messaging/package.json'
+      - 'shared/messaging/**'
       - 'package.json'
       - 'package-lock.json'
       - '.npmrc'

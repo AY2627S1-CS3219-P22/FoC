@@ -13,7 +13,11 @@ current error handling to send server side error for all errors from gRPC
 Tbh this is just a fallback for my supplier zod schema i don't think its really necessary
 */
 
+import { status } from '@grpc/grpc-js';
+
+// ChatGPT (Codex), 2026-11-06: Classify invalid local Supplier IDs like other invalid Supplier requests; review pending.
 export class InvalidSupplierError extends Error {
+  readonly code = status.INVALID_ARGUMENT;
   constructor(message = 'Invalid supplier request') {
     super(message);
     this.name = 'InvalidSupplierError';

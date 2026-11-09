@@ -1,3 +1,5 @@
+// ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
+// ChatGPT (Codex), 2026-11-02: Mirror backend requester exclusion for courier actions; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import { useState } from "react"
 import type { Order } from "../App"
@@ -13,12 +15,12 @@ interface Props {
 }
 
 export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, onAccepted, onDelivered }: Props) {
-  const { order, actionError, busy, run } = useOrder(initialOrder)
+  const { order, actionError, busy, loadError, run } = useOrder(initialOrder)
   const [showAcceptModal, setShowAcceptModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
 
   const isRequester = order.requesterId === currentUserId
-  const isCourier   = order.courierId   === currentUserId
+  const isCourier   = !isRequester && order.courierId === currentUserId
   const isOpen      = order.status === "open"
   const canAccept   = !isRequester && !isCourier && isOpen
 
@@ -29,14 +31,27 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
   }
 
   const deliver = async () => {
+    if (!isCourier || order.status !== "picked-up") return
     const updated = await run("deliver")
     if (updated) onDelivered(updated)
+  }
+
+  const pickup = async () => {
+    if (!isCourier || order.status !== "accepted") return
+    await run("pickup")
   }
 
   const cancel = async () => {
     setShowCancelModal(false)
     if (await run("cancel")) onBack()
   }
+
+  if (loadError) return (
+    <div className="mx-auto max-w-lg p-6">
+      <p role="alert">{loadError}</p>
+      <button onClick={onBack}>Back to Orders</button>
+    </div>
+  )
 
   return (
     <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6 sm:py-8">
@@ -178,7 +193,7 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
         <div className="space-y-3">
           {order.status === "accepted" && (
             <button
-              onClick={() => run("pickup")}
+              onClick={pickup}
               disabled={busy}
               className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-50 transition-colors"
             >

@@ -1,3 +1,7 @@
+# AI Assistance Disclosure: Claude Code (Claude Opus), 2026-11-06.
+# Scope: migrate initContainer memory limit (OOMKilled at 128Mi).
+# Details: ai/usage-log.md, entry 003.
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,26 +16,24 @@ spec:
       labels: { app.kubernetes.io/name: order-service, app.kubernetes.io/part-of: foc }
     spec:
       # nodeSelector: { role: order }   # enable on EC2; leave off for local k3d
-      imagePullSecrets:   # pulls image from GHCR in
-        - name: ghcr-pull
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000                  # the image's "node" user
       terminationGracePeriodSeconds: 30
       initContainers:   # applies any new database migrations, only relevant for order
         - name: migrate
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/order-service-migrate:sha-aa7d9f9ecd2f1a8732571049127a1426355553ac
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/order-service-migrate:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           command: ['npm', 'run', 'prisma:deploy']
           envFrom:
             - secretRef: { name: order-secrets }
-          resources:
-            requests: { cpu: 50m, memory: 64Mi }
-            limits: { memory: 128Mi }
+          resources:   # prisma's migrate engine was OOMKilled at 128Mi
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { memory: 512Mi }
       containers:
         - name: order-service
-          image: ghcr.io/ay2627s1-cs3219-p22/foc/order-service:sha-aa7d9f9ecd2f1a8732571049127a1426355553ac # same tag as migrate above
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/ay2627s1-cs3219-p22/foc/order-service:latest
+          imagePullPolicy: Always   # latest moves on every build, so always check GHCR
           ports:
             - { name: grpc, containerPort: 50053 }
             - { name: http, containerPort: 3003 }

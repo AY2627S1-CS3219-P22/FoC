@@ -1,7 +1,9 @@
+// ChatGPT (Codex), 2026-11-02: Added human-approved deletion eligibility client; review pending; see ../../../order-service/usage-log.md.
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Added human-finalized credit wrappers and bounded application retries with one overall deadline and configurable backoff.
 // Author review: I reviewed the shared client retry implementation.
+// Claude Code (Claude Opus), 2026-11-06: round_robin for all clients. Details: ai/usage-log.md (repo root), entry 005.
 // Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 010–012, 016, 021, 026–027 and 029.
 // OpenAI Codex added the author-specified Order Service eligibility client;
 // Author review: Author reviewed the changes line by line, manually tested and confirmed the
@@ -21,6 +23,9 @@ import { UserService, OrderService, CreditService, SupplierService } from './con
 import type { GetPublicProfileRequest } from './generated/user/GetPublicProfileRequest';
 import type { PublicProfile__Output as PublicProfile } from './generated/user/PublicProfile';
 import type { GetOrderRequest } from './generated/order/GetOrderRequest';
+// ChatGPT (Codex), 2026-11-02: Team-approved User-to-Order deletion check; review pending; see ../../../order-service/usage-log.md.
+import type { CheckDeletionEligibilityRequest } from './generated/order/CheckDeletionEligibilityRequest';
+import type { CheckDeletionEligibilityResponse__Output } from './generated/order/CheckDeletionEligibilityResponse';
 import type { Order__Output as Order } from './generated/order/Order';
 import type { CheckDeletionEligibilityRequest } from './generated/order/CheckDeletionEligibilityRequest';
 import type { CheckDeletionEligibilityResponse__Output as CheckDeletionEligibilityResponse } from './generated/order/CheckDeletionEligibilityResponse';
@@ -158,9 +163,16 @@ async function creditUnary<Response>(
   }
 }
 
+// Behind a headless Kubernetes Service, DNS returns every pod's IP. round_robin
+// spreads calls across all of them; the default (pick_first) sends everything
+// to one pod. The servers cap connection age so clients re-resolve and find new pods.
+const channelOptions = {
+  'grpc.service_config': JSON.stringify({ loadBalancingConfig: [{ round_robin: {} }] }),
+};
+
 export function createUserClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 3000);
-  const client = new UserService(target, config.credentials ?? credentials.createInsecure());
+  const client = new UserService(target, config.credentials ?? credentials.createInsecure(), channelOptions);
   return {
     getPublicProfile(
       request: GetPublicProfileRequest,
@@ -183,8 +195,13 @@ export function createUserClient(target: string, config: ClientConfig = {}) {
 
 export function createOrderClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 3000);
-  const client = new OrderService(target, config.credentials ?? credentials.createInsecure());
+  const client = new OrderService(target, config.credentials ?? credentials.createInsecure(), channelOptions);
   return {
+    checkDeletionEligibility(request: CheckDeletionEligibilityRequest, options: RpcOptions = {}): Promise<CheckDeletionEligibilityResponse__Output> {
+      return unary((callback) => client.checkDeletionEligibility(
+        request, options.metadata ?? new Metadata(), callOptions(timeoutMs, options), callback,
+      ));
+    },
     getOrder(request: GetOrderRequest, options: RpcOptions = {}): Promise<Order> {
       return unary((callback) =>
         client.getOrder(
@@ -214,7 +231,7 @@ export function createOrderClient(target: string, config: ClientConfig = {}) {
 export function createCreditClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 1300);
   const retries = creditRetryOptions(creditRetryDefaults, config);
-  const client = new CreditService(target, config.credentials ?? credentials.createInsecure(), { 'grpc.service_config': JSON.stringify({ loadBalancingConfig: [{ round_robin: {} }] }) },);
+  const client = new CreditService(target, config.credentials ?? credentials.createInsecure(), channelOptions);
   return {
     getBalance(request: GetBalanceRequest, options: RpcOptions = {}): Promise<Balance> {
       return creditUnary(timeoutMs, retries, options, (attemptOptions, callback) =>
@@ -284,7 +301,7 @@ export function createCreditClient(target: string, config: ClientConfig = {}) {
 
 export function createSupplierClient(target: string, config: ClientConfig = {}) {
   const timeoutMs = positiveTimeout(config.timeoutMs ?? 3000);
-  const client = new SupplierService(target, config.credentials ?? credentials.createInsecure());
+  const client = new SupplierService(target, config.credentials ?? credentials.createInsecure(), channelOptions);
   return {
     getSupplier(request: GetSupplierRequest, options: RpcOptions = {}): Promise<Supplier> {
       return unary((callback) =>

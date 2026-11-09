@@ -1,3 +1,6 @@
+// ChatGPT (Codex), 2026-11-06: Complete lifecycle snapshots and UI contract handling; review pending; see order-service/usage-log.md.
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02.
+// Scope: Pass authenticated viewer identity to courier page; review pending; see ../order-service/usage-log.md.
 import { useEffect, useState } from "react"
 import Navbar from "./components/Navbar"
 import LoginPage from "./pages/LoginPage"
@@ -11,6 +14,7 @@ import ProfilePage from "./pages/ProfilePage"
 import AdminPage from "./pages/AdminPage"
 import SuppliersPage from "./pages/SuppliersPage"
 import { getMe, logout, type ApiUser } from "./api/users"
+import { deliveryFeedback } from "./api/orders"
 import { getBalance } from "./api/credits"
 import { refreshToken } from "./api/client"
 
@@ -40,6 +44,7 @@ export interface Order {
   requesterId: string
   requesterName: string
   courierId?: string
+  creditState?: "RESERVED" | "SETTLEMENT_PENDING" | "SETTLED" | "REFUND_PENDING" | "REFUNDED"
   courierName?: string
   createdAt: string
 }
@@ -126,7 +131,7 @@ export default function App() {
   const [checkingSession, setCheckingSession] = useState(true)
   const [user, setUser]           = useState<User>(CURRENT_USER)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  const [earnedCredits, setEarnedCredits] = useState(0)
+  const [completedOrder, setCompletedOrder] = useState<Order | null>(null)
   const [createPending, setCreatePending] = useState(false)
   const [loginNotice, setLoginNotice] = useState("")
 
@@ -181,7 +186,7 @@ export default function App() {
   }
 
   const handleDelivered = (order: Order) => {
-    setEarnedCredits(order.credits)
+    setCompletedOrder(order)
     navigate("errand-complete")
   }
 
@@ -258,6 +263,7 @@ export default function App() {
           <AcceptedOrderPage
             key={selectedOrder.id}
             initialOrder={selectedOrder}
+            currentUserId={user.id}
             onDelivered={handleDelivered}
             onBack={() => navigate("orders")}
           />
@@ -266,8 +272,8 @@ export default function App() {
         {page === "errand-complete" && (
           <SuccessScreen
             title="Errand completed"
-            accent={`+${earnedCredits} Credits`}
-            subtitle="Credits have been added to your balance."
+            accent={deliveryFeedback(completedOrder).accent}
+            subtitle={deliveryFeedback(completedOrder).subtitle}
             primaryLabel="Back to Orders"
             onPrimary={() => navigate("orders")}
           />

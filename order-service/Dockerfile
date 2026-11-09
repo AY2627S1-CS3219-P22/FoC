@@ -1,3 +1,4 @@
+# ChatGPT (Codex), 2026-11-07: Preserve main Docker layout and Order messaging build/runtime wiring; review pending; see usage-log.md.
 # AI Assistance Disclosure: ChatGPT (Codex), 2026-10-21.
 # Scope: Generated Order Docker build; team review pending; see usage-log.md.
 # Must be built from the project root so shared/ is available.
@@ -21,9 +22,10 @@ COPY user-service/package.json ./user-service/
 
 # --- Build stage ---
 FROM base AS build
-RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci -w @foc/order-grpc -w @foc/grpc
+RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci -w @foc/order-grpc -w @foc/grpc -w @foc/messaging
 
 COPY shared/grpc ./shared/grpc
+COPY shared/messaging ./shared/messaging
 COPY order-service/grpc ./order-service/grpc
 COPY order-service/prisma ./order-service/prisma
 
@@ -41,10 +43,11 @@ CMD ["npm", "run", "prisma:deploy"]
 # --- Runtime stage ---
 FROM base AS runtime
 ENV NODE_ENV=production
-RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci --omit=dev -w @foc/order-grpc -w @foc/grpc
+RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci --omit=dev -w @foc/order-grpc -w @foc/grpc -w @foc/messaging
 
 # Compiled code (including the generated Prisma client) from the build stage.
 COPY --from=build /repo/shared/grpc/dist ./shared/grpc/dist
+COPY --from=build /repo/shared/messaging/dist ./shared/messaging/dist
 COPY --from=build /repo/order-service/grpc/dist ./order-service/grpc/dist
 
 # shared/grpc and order's credit client load these proto files at runtime by relative path.
@@ -52,6 +55,7 @@ COPY shared/grpc/proto ./shared/grpc/proto
 COPY user-service/proto ./user-service/proto
 
 WORKDIR /repo/order-service/grpc
+RUN mkdir -p logs/rabbitmq && chown -R node:node logs
 
 EXPOSE 3003 50053
 USER node

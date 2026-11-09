@@ -1,10 +1,5 @@
-// AI Assistance Disclosure:
-// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
-// Scope: Added the author-specified Order Service deletion-eligibility RPC.
-// Author reviewed the changes line by line, manually tested and confirmed the
-// behaviour, approved the implementation. See user-service/ai/usage-log.md,
-// entry 031.
-
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02.
+// Scope: Team-approved deletion eligibility RPC; review pending; see ../../../order-service/usage-log.md.
 syntax = "proto3";
 
 package order;

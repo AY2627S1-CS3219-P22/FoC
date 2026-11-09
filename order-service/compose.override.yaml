@@ -1,3 +1,4 @@
+# ChatGPT (Codex), 2026-11-07: Preserve Order broker access for standalone Compose; review pending; see usage-log.md.
 # Dev-only: loaded automatically when running order-service standalone from this
 # folder (the root compose does not load it).
 # - Publishes ports to localhost.
@@ -14,4 +15,5 @@ services:
     environment:
       USER_GRPC_ADDR: host.docker.internal:50051
       CREDIT_GRPC_ADDR: host.docker.internal:50054
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@host.docker.internal:5672}
       SUPPLIER_GRPC_ADDR: host.docker.internal:50052

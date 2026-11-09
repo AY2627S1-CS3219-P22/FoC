@@ -1,3 +1,6 @@
+// ChatGPT (Codex), 2026-11-06: Complete lifecycle snapshots and UI contract handling; review pending; see order-service/usage-log.md.
+// ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
+// ChatGPT (Codex), 2026-11-02: Selected destination ID contract; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import type { Order } from "../App"
 import { api, ApiError } from "./client"
@@ -12,12 +15,14 @@ export type ApiOrder = {
   pickupLocation: string
   requesterName: string
   courierName: string | null
+  destinationLocationId: string | null
   destination: string
   requestDetails: string
   credits: number
   expiryTime: string
   status: "UNASSIGNED" | "ASSIGNED" | "PICKED_UP" | "DELIVERED" | "CANCELLED"
   cancellationReason: "REQUESTER" | "EXPIRY" | null
+  creditState: "RESERVED" | "SETTLEMENT_PENDING" | "SETTLED" | "REFUND_PENDING" | "REFUNDED"
   createdAt: string
   acceptedAt: string | null
   pickedUpAt: string | null
@@ -59,17 +64,23 @@ const toOrder = (o: ApiOrder): Order => ({
   requesterName: o.requesterName,
   courierId: o.courierId ?? undefined,
   courierName: o.courierName ?? undefined,
+  creditState: o.creditState,
   createdAt: formatTime(o.createdAt),
 })
 
 export const listOrders = (scope: OrderScope) =>
   api<{ orders: ApiOrder[] }>(`/orders?scope=${scope}`).then((r) => r.orders.map(toOrder))
 
+export const getOrder = (id: string, signal?: AbortSignal) =>
+  api<{ order: ApiOrder }>(`/orders/${encodeURIComponent(id)}`, { signal })
+    .then((r) => toOrder(r.order))
+
 export const updateOrder = (id: string, action: OrderAction) =>
   api<{ order: ApiOrder }>(`/orders/${id}/${action}`, { method: "POST", body: "{}" })
     .then((r) => toOrder(r.order))
 
 export type NewOrder = {
+  destinationLocationId: string
   supplierId: string
   destination: string
   requestDetails: string
@@ -90,8 +101,9 @@ export const createOrder = (order: NewOrder, idempotencyKey: string) =>
 // order-service sends back short codes like "invalid-transition", so turn
 // those into something readable
 const ERRORS: Record<string, string> = {
+  "invalid-destination": "Select a building from the destination search results.",
   "dependency-unavailable": "This isn't available yet, order-service can't reach the other services.",
-  "dependency-rejected": "That supplier isn't taking orders right now.",
+  "dependency-rejected": "A service rejected this request. Check the order details and your credit balance.",
   "invalid-transition": "This order has already changed. Refresh to see the latest.",
   "expired": "This order has expired.",
   "conflict": "Someone else got to this order first.",
@@ -110,3 +122,14 @@ export function orderError(err: unknown) {
 // Admin only: no scope = every order across all statuses, newest first
 export const getAllOrders = () =>
   api<{ orders: ApiOrder[] }>("/orders").then((r) => r.orders)
+
+// Only a confirmed settlement may be presented as credits received.
+export function deliveryFeedback(order: Pick<Order, 'creditState' | 'credits'> | null) {
+  return order?.creditState === "SETTLED"
+    ? { accent: `+${order.credits} Credits`, subtitle: "Credits have been added to your balance." }
+    : { accent: "Credit transfer pending", subtitle: "Your delivery is recorded. Credits have not been confirmed yet; check your balance again later." }
+}
+
+export function isValidOrderDeadline(timestamp: number, now: number) {
+  return Number.isFinite(timestamp) && timestamp - now >= 60 * 60 * 1000
+}

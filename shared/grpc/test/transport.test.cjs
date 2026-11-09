@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-07: Remove stale test for the removed Supplier client method; review pending; see ../../../order-service/usage-log.md.
 // AI Assistance Disclosure:
 // Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-21 (Asia/Singapore).
 // Scope: Verified six authenticated credit RPCs, removed initialization/history calls, and corrected the stale User Service stub assertion.
@@ -85,7 +86,6 @@ test('supplier bigint IDs retain precision and floors are integers', async (t) =
         longitude: 103.7732,
       });
     },
-    IsOpen: rpc.unimplemented('IsOpen'),
   });
   const client = await listen(t, server, rpc.createSupplierClient);
   const supplier = await client.getSupplier({ supplierId: id });
@@ -93,18 +93,6 @@ test('supplier bigint IDs retain precision and floors are integers', async (t) =
   assert.equal(supplier.floor, 1);
   assert.equal(supplier.buildingName, 'Central Library');
   assert.equal(supplier.startingTime, undefined);
-});
-
-test('supplier IsOpen returns a boolean', async (t) => {
-  const server = rpc.createServer(rpc.SupplierService.service, {
-    GetSupplier: rpc.unimplemented('GetSupplier'),
-    IsOpen(call, callback) {
-      assert.equal(call.request.supplierId, '1');
-      callback(null, { isOpen: true });
-    },
-  });
-  const client = await listen(t, server, rpc.createSupplierClient);
-  assert.deepEqual(await client.isOpen({ supplierId: '1' }), { isOpen: true });
 });
 
 test('metadata and gRPC error codes/details survive the client wrapper', async (t) => {

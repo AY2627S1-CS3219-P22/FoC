@@ -1,3 +1,4 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02. Generated from the human-approved eligibility contract; review pending; see order-service/usage-log.md.
 // Original file: proto/order.proto
 
 import type * as grpc from '@grpc/grpc-js'
@@ -25,14 +26,14 @@ export interface OrderServiceClient extends grpc.Client {
   getOrder(argument: _order_GetOrderRequest, metadata: grpc.Metadata, callback: grpc.requestCallback<_order_Order__Output>): grpc.ClientUnaryCall;
   getOrder(argument: _order_GetOrderRequest, options: grpc.CallOptions, callback: grpc.requestCallback<_order_Order__Output>): grpc.ClientUnaryCall;
   getOrder(argument: _order_GetOrderRequest, callback: grpc.requestCallback<_order_Order__Output>): grpc.ClientUnaryCall;
-  
+
 }
 
 export interface OrderServiceHandlers extends grpc.UntypedServiceImplementation {
   CheckDeletionEligibility: grpc.handleUnaryCall<_order_CheckDeletionEligibilityRequest__Output, _order_CheckDeletionEligibilityResponse>;
 
   GetOrder: grpc.handleUnaryCall<_order_GetOrderRequest__Output, _order_Order>;
-  
+
 }
 
 export interface OrderServiceDefinition extends grpc.ServiceDefinition {

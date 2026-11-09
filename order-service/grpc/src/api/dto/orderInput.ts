@@ -1,3 +1,4 @@
+// ChatGPT (Codex), 2026-11-02: Optional catalogue ID for exact-name compatibility; review pending.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 // Scope: Implemented author-approved Order validation/authentication/RPC integration.
 // Author review: Pending; see ../../../../usage-log.md.
@@ -10,6 +11,7 @@ const supplierId = z.string().regex(/^[1-9][0-9]*$/).refine(
 export const createOrderSchema = z.object({
   supplierId,
   destination: nonblank,
+  destinationLocationId: nonblank.optional(),
   requestDetails: nonblank,
   credits: z.number().int().positive().max(2147483647),
   expiryTime: z.iso.datetime({ offset: true }).transform((value) => new Date(value)),

@@ -1,3 +1,5 @@
+<!-- ChatGPT (Codex), 2026-11-02: Use catalogue destinations in manual tests; review pending; see usage-log.md. -->
+<!-- ChatGPT (Codex), 2026-10-30: Updated opening-hours behavior; human review pending. -->
 <!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-22.
 Scope: Generated manual integration instructions from the existing service contracts.
 Human review pending; see usage-log.md. -->
@@ -14,7 +16,7 @@ The current checkout cannot yet complete a successful live creation by itself:
 
 - Supplier `GetSupplier` returns UNIMPLEMENTED. The Supplier checkout also has
   merge-conflict markers in its Compose/controller files. Use the Supplier
-  teammate's working implementation of GetSupplier and IsOpen.
+  teammate's working implementation of GetSupplier.
 - The current Credit workspace is a stub. Run the implemented
   `feat/credit-implementation` service, including its migrations and RabbitMQ consumer.
 - Credit initializes accounts through `user.created`. The current User register
@@ -75,7 +77,7 @@ curl -i http://localhost:3002/suppliers
 ```
 
 Expected: a supplier list. The REST response uses a `data` property. Select an
-existing supplier whose hours make it open **now**, not just at the order deadline.
+existing supplier; it does not need to be open now.
 The actual supplier ID might not be 1.
 
 For Credit, set this terminal variable to your separate working Credit checkout,
@@ -145,7 +147,7 @@ and payloads when retrying an Order request.
 
 ## 4. Check the supplier and credit account
 
-Choose a real currently open supplier from the list:
+Choose a real supplier from the list:
 
 ```sh
 export SUPPLIER_ID=1 # Replace with the selected real supplier ID.
@@ -166,14 +168,11 @@ not required because the proto is supplied):
 grpcurl -plaintext -import-path shared/grpc/proto -proto supplier.proto \
   -d "{\"supplier_id\":\"$SUPPLIER_ID\"}" localhost:50052 \
   supplier.SupplierService/GetSupplier
-grpcurl -plaintext -import-path shared/grpc/proto -proto supplier.proto \
-  -d "{\"supplier_id\":\"$SUPPLIER_ID\"}" localhost:50052 \
-  supplier.SupplierService/IsOpen
 ```
 
-Expected: supplier details and isOpen true. UNIMPLEMENTED confirms the required
-Supplier implementation is not running. A successful Supplier REST lookup alone
-does not establish that these RPCs work.
+Expected: supplier details. UNIMPLEMENTED for GetSupplier means the required
+Supplier lookup implementation is not running. Order does not call IsOpen. A successful Supplier REST lookup alone
+does not establish that GetSupplier works.
 
 ## 5. Create an order
 
@@ -181,7 +180,7 @@ Generate the key and body once, then keep both for retries:
 
 ```sh
 export CREATE_KEY="$(node -p 'require("node:crypto").randomUUID()')"
-node -e 'console.log(JSON.stringify({supplierId:process.env.SUPPLIER_ID,destination:"PGP",requestDetails:"One iced latte",credits:4,expiryTime:new Date(Date.now()+2*60*60*1000).toISOString()}))' \
+node -e 'console.log(JSON.stringify({supplierId:process.env.SUPPLIER_ID,destination:"COM1",destinationLocationId:"kr_001",requestDetails:"One iced latte",credits:4,expiryTime:new Date(Date.now()+2*60*60*1000).toISOString()}))' \
   > "$MANUAL_DIR/create.json"
 curl -sS -o "$MANUAL_DIR/create-response.json" -w 'HTTP %{http_code}\n' \
   -X POST http://localhost:3003/orders \
@@ -221,7 +220,7 @@ Edit the unassigned order using a new key:
 
 ```sh
 export EDIT_KEY="$(node -p 'require("node:crypto").randomUUID()')"
-printf '%s\n' '{"destination":"UTown", "credits":6}' > "$MANUAL_DIR/edit.json"
+printf '%s\n' '{"destination":"COM2", "destinationLocationId":"kr_002", "credits":6}' > "$MANUAL_DIR/edit.json"
 curl -i -X PATCH "http://localhost:3003/orders/$ORDER_ID" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -H "Idempotency-Key: $EDIT_KEY" --data-binary @"$MANUAL_DIR/edit.json"
@@ -232,7 +231,7 @@ Expected: HTTP 200 with updated order, or 202 while reconciliation is pending.
 After confirmation, total remains unchanged and the reservation is 6 credits
 (only 2 extra reserved). Replay the identical PATCH with its original key/body:
 no second credit adjustment. An edit must still satisfy the one-hour expiry and
-currently-open supplier rules. If too much time has passed, include a new future
+supplier-existence rules. If too much time has passed, include a new future
 expiry in a new edit attempt.
 
 ## 7. Cancel and verify the refund
@@ -315,7 +314,7 @@ that same uncertain attempt.
 | Another USER attempts to cancel your order | 403; no credit release |
 | Missing Idempotency-Key on create/edit | 400 |
 | Blank destination/requestDetails, zero/fractional credits, expiry under 1 hour | 400 |
-| Nonexistent or currently closed supplier | 409 if explicitly rejected; unavailable/stub RPC gives 503 before creation is recorded |
+| Nonexistent supplier | 409 if explicitly rejected; unavailable/stub RPC gives 503 before creation is recorded |
 | Credits above available balance | 409; no published order/reservation |
 | Same creation key with changed body | 409 |
 | Cancel malformed UUID/body or nonexistent order | 400 / 404 |
@@ -368,8 +367,7 @@ docker compose -f order-service/compose.yaml logs --tail 100 order-service
 - Pending creation: check Credit availability, matching service token, account
   initialization and retry exhaustion. Preserve the creation ID and original key.
 - Credit REST 401: log in again and check it uses User's matching public key.
-- Supplier closed: select another currently open supplier or use the Supplier
-  team's approved admin opening-hours controls.
+- Supplier closed: this does not block order creation or editing.
 
 Cancel your remaining active test orders and verify Credit releases before
 stopping the stack. Stop Order while retaining its database:

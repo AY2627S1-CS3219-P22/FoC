@@ -1,34 +1,31 @@
-// AI Assistance Disclosure:
-// Tool: OpenAI Codex, 2026-11-02 (Asia/Singapore).
-// Scope: Implemented the author-specified deletion-eligibility gRPC handler,
-// including blocked-order counting and error mapping. Author reviewed the
-// changes line by line, manually tested and confirmed the behaviour, approved
-// the implementation. See user-service/ai/usage-log.md, entry 031.
-
-import { status } from '@grpc/grpc-js';
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02.
+// Scope: Human-approved deletion eligibility contract; review pending; see ../../../usage-log.md.
 import { OrderService, createServer, unimplemented, type OrderServiceHandlers } from '@foc/grpc';
-import { prisma } from '../db';
-import { countBlockingOrders } from '../services/deletionEligibility';
+import { status } from '@grpc/grpc-js';
+import type { PrismaClient } from '../generated/prisma';
+import { findDeletionBlockingOrders } from '../services/deletionEligibility';
 
-export const handlers: OrderServiceHandlers = {
-  GetOrder: unimplemented('GetOrder'),
-  // User Service calls this before deleting an account.
-  CheckDeletionEligibility(call, callback) {
-    const userId = call.request.userId;
-    if (!userId) {
-      callback({ code: status.INVALID_ARGUMENT, details: 'user_id is required' });
-      return;
-    }
-
-    countBlockingOrders(prisma, userId).then((blockedOrderCount) => {
-      callback(null, { eligible: blockedOrderCount === 0, blockedOrderCount });
-    }).catch((err) => {
-      console.error('CheckDeletionEligibility failed:', err);
-      callback({ code: status.INTERNAL, details: 'Internal error' });
-    });
-  },
-};
-
-export function createGrpcServer() {
+export function createGrpcServer(db?: PrismaClient) {
+  const handlers: OrderServiceHandlers = {
+    GetOrder: unimplemented('GetOrder'),
+    CheckDeletionEligibility: async (call, callback) => {
+      const userId = call.request.userId;
+      if (!userId?.trim()) {
+        callback({ code: status.INVALID_ARGUMENT, details: 'user_id is required' });
+        return;
+      }
+      if (!db) {
+        callback({ code: status.UNAVAILABLE, details: 'Order database is unavailable' });
+        return;
+      }
+      try {
+        const orders = await findDeletionBlockingOrders(db, userId);
+        callback(null, { eligible: orders.length === 0, blockedOrderCount: orders.length });
+      } catch {
+        // Never return eligible=true when the lookup failed.
+        callback({ code: status.UNAVAILABLE, details: 'Unable to verify deletion eligibility' });
+      }
+    },
+  };
   return createServer(OrderService.service, handlers);
 }

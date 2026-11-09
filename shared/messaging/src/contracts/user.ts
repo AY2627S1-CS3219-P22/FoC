@@ -1,3 +1,5 @@
+// AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02.
+// Scope: Align user.deleted with the team-supplied event contract; review pending; see ../../../../order-service/usage-log.md.
 // Message producer: user service
 // Consumers: credit service, order service
 

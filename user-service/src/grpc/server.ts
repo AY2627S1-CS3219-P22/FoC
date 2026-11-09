@@ -4,6 +4,7 @@
 // handler and its error mapping.
 // Author review: Author specified the endpoint and error behaviour, reviewed
 // the code and approved. See user-service/ai/usage-log.md, entries 001, 013.
+// gRPC connection age (2026-11-06): see ai/usage-log.md (repo root), entry 005.
 
 import path from 'node:path';
 import {
@@ -68,7 +69,12 @@ const userServiceImpl: UntypedServiceImplementation = {
 };
 
 export function createGrpcServer(): Server {
-  const server = new Server();
+  // Close connections after 2 min so clients reconnect and re-resolve DNS,
+  // which is how they find new pods when the service scales.
+  const server = new Server({
+    'grpc.max_connection_age_ms': 120_000,
+    'grpc.max_connection_age_grace_ms': 30_000, // let in-flight calls finish first
+  });
   server.addService(proto.user.UserService.service, userServiceImpl);
   return server;
 }
