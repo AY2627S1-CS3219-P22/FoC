@@ -134,17 +134,11 @@ jobs:
         uses: azure/setup-kubectl@v4
 
       - name: Deploy to EKS
-        env:
-          CLUSTER: ${{ vars.EKS_CLUSTER_NAME }}
         run: |
           set -euo pipefail
-          if [ -z "$CLUSTER" ]; then
-            echo "Set the EKS_CLUSTER_NAME repository variable."
-            exit 1
-          fi
-          aws eks update-kubeconfig --name "$CLUSTER" --region ap-southeast-1
-          kubectl apply -f k8s/shared/namespace.yaml
-          tag="sha-${GITHUB_SHA}"
-          sed -E "s#(image: .*/ui:)[^[:space:]]+#\\1${tag}#g" k8s/ui/ui.yaml | kubectl apply -f -
+          aws eks describe-cluster --name foc || exit 0
+          aws eks update-kubeconfig --name foc --region ap-southeast-1
+          sed -i "s/newTag: latest/newTag: sha-${GITHUB_SHA}/" k8s/ui/kustomization.yaml
+          kubectl apply -k k8s/ui
           kubectl -n foc rollout status deployment/ui --timeout=5m
 

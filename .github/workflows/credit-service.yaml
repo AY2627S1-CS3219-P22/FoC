@@ -146,24 +146,10 @@ jobs:
               uses: azure/setup-kubectl@v4
 
             - name: Deploy to EKS
-              env:
-                CLUSTER: ${{ vars.EKS_CLUSTER_NAME }}
               run: |
                 set -euo pipefail
-                if [ -z "$CLUSTER" ]; then
-                  echo "Set the EKS_CLUSTER_NAME repository variable."
-                  exit 1
-                fi
-                aws eks update-kubeconfig --name "$CLUSTER" --region ap-southeast-1
-                kubectl apply -f k8s/shared/namespace.yaml
-                # GITHUB_SHA is the commit just merged to main. The image build
-                # pushed that same commit as ghcr.io/.../credit-service:sha-<sha>.
-                tag="sha-${GITHUB_SHA}"
-                {
-                  sed -E "s#(image: .*/credit-service:)[^[:space:]]+#\\1${tag}#g" k8s/credit-service/credit-service.yaml
-                  echo "---"
-                  cat k8s/credit-service/credit-config.yaml
-                  echo "---"
-                  cat k8s/credit-service/credit-hpa.yaml
-                } | kubectl apply -f -
+                aws eks describe-cluster --name foc || exit 0
+                aws eks update-kubeconfig --name foc --region ap-southeast-1
+                sed -i "s/newTag: latest/newTag: sha-${GITHUB_SHA}/" k8s/credit-service/kustomization.yaml
+                kubectl apply -k k8s/credit-service
                 kubectl -n foc rollout status deployment/credit-service --timeout=5m
