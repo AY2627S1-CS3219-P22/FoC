@@ -18,20 +18,21 @@ const userEventBaseSchema = z.object({
   });
   
   /**
-   * User row deleted. Order receives the old ID and deletion timestamps;
-   * User owns the four-year archive and sends no later purge event.
+   * User row deleted. Order resolves active orders and scrubs personal details;
+   * credit keeps the balance under the old id in case the user returns.
    */
   export const userDeletedSchema = userEventBaseSchema.extend({
     type: z.literal('user.deleted'),
-    eventId: z.string().trim().min(1),
-    userId: z.string().trim().min(1),
-    occurredAt: z.iso.datetime({ offset: true }),
-    deletedAt: z.iso.datetime({ offset: true }),
+    deletedAt: z.string(),
   });
-  
-  /** User logged back in within the retention window. Consumers restore archived data. */
+
+  /**
+   * Deleted user re-registered within the retention window, with a new id.
+   * Sent instead of user.created. Credit moves the old balance to `userId`.
+   */
   export const userRestoredSchema = userEventBaseSchema.extend({
     type: z.literal('user.restored'),
+    previousUserId: z.string(),
   });
   
   export const userEventSchema = z.discriminatedUnion('type', [

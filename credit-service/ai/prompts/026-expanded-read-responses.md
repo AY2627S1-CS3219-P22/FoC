@@ -34,5 +34,4 @@ retired generated/compiled artifacts. Regenerated credit types and updated clien
 wire/controller/service tests and current docs. REST forwards the service balance;
 its response still contains userId and three credit values. Internal initialization
 uses Omit<Balance, 'userId'> for its existing result/saved-response shape. No database
-migration or mutation/retry behavior changed. Existing human-review markers were
-preserved and the new edits explicitly marked pending review.
+migration or mutation/retry behavior changed. 

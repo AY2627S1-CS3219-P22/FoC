@@ -1,9 +1,9 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
-// Scope: Implemented human-specified core credit business rules, reads, and transaction ownership. Resolved history-entry bookmarks to private sequence boundaries within the authenticated user's scope. Removed idempotency user metadata from saved results
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-11-04 (Asia/Singapore).
+// Scope: Implemented human-specified core credit business rules, reads, and transaction ownership. Resolved history-entry bookmarks to private sequence boundaries within the authenticated user's scope. Removed idempotency user metadata from saved results. Implemented human-specified deletion/restoration, placeholder grants and status gates.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: I reviewed and edited the initial allocation to use a constant and removed the hard-coded 10 across four usages.
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–026, 028, 043, 045.
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–026, 028, 043, 045, 049.
 
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
@@ -40,6 +40,13 @@ export class InitialAllocationError extends CreditOperationError {
   }
 }
 
+export class RestoreError extends CreditOperationError {
+  constructor(message: string) {
+    super('FAILED_PRECONDITION', message);
+    this.name = 'RestoreError';
+  }
+}
+
 export class CreditService {
   constructor(private readonly pool: Pool) {}
 
@@ -51,6 +58,10 @@ export class CreditService {
     if (pageSize > 100) throw new ValidationError('pageSize must be at most 100');
     const entryId = pageToken === undefined ? undefined : decodeHistoryBookmark(pageToken);
     return this.read(async (repository) => {
+      const account = await repository.findAccount(userId);
+      if (!account || account.status !== 'ACTIVE') {
+        throw new CreditOperationError('NOT_FOUND', 'Credit account not found', 'ACCOUNT_NOT_FOUND');
+      }
       const boundary = entryId === undefined ? undefined : await repository.findHistorySequenceId(entryId, userId);
       if (entryId !== undefined && boundary === undefined) throw new ValidationError('Invalid history page token');
       const rows = await repository.findHistoryByUser(userId, boundary, pageSize + 1);
@@ -67,7 +78,7 @@ export class CreditService {
     assertUserId(userId);
     return this.read(async (repository) => {
       const account = await repository.findAccount(userId);
-      if (!account) throw new CreditOperationError('NOT_FOUND', 'Credit account not found', 'ACCOUNT_NOT_FOUND');
+      if (!account || account.status !== 'ACTIVE') throw new CreditOperationError('NOT_FOUND', 'Credit account not found', 'ACCOUNT_NOT_FOUND');
       return {
         userId: account.userId,
         totalCredits: account.totalCredits,
@@ -102,7 +113,7 @@ export class CreditService {
       }
       await repository.lockAccounts([requesterId]);
       const account = await repository.findAccount(requesterId);
-      if (!account) throw new CreditOperationError('NOT_FOUND', 'Requester credit account not found', 'ACCOUNT_NOT_FOUND');
+      if (!account || account.status !== 'ACTIVE') throw new CreditOperationError('NOT_FOUND', 'Requester credit account not found', 'ACCOUNT_NOT_FOUND');
       if (account.totalCredits - account.reservedCredits < amount) {
         throw new CreditOperationError('FAILED_PRECONDITION', 'Insufficient available credits', 'INSUFFICIENT_CREDITS');
       }
@@ -127,7 +138,7 @@ export class CreditService {
       }
       await repository.lockAccounts([reservation.requesterId]);
       const account = await repository.findAccount(reservation.requesterId);
-      if (!account) throw new CreditOperationError('NOT_FOUND', 'Requester credit account not found', 'ACCOUNT_NOT_FOUND');
+      if (!account || !['ACTIVE', 'DELETED'].includes(account.status)) throw new CreditOperationError('NOT_FOUND', 'Requester credit account not found', 'ACCOUNT_NOT_FOUND');
       await repository.saveAccount({ ...account, reservedCredits: account.reservedCredits - reservation.amount });
       const released: Reservation = { ...reservation, status: 'RELEASED', version: reservation.version + 1 };
       await repository.saveReservation(released);
@@ -160,8 +171,8 @@ export class CreditService {
       await repository.lockAccounts([reservation.requesterId, courierId]);
       const requester = await repository.findAccount(reservation.requesterId);
       const courier = await repository.findAccount(courierId);
-      if (!requester) throw new CreditOperationError('NOT_FOUND', 'Requester credit account not found', 'ACCOUNT_NOT_FOUND');
-      if (!courier) throw new CreditOperationError('NOT_FOUND', `Courier credit account not found: ${courierId}`, 'ACCOUNT_NOT_FOUND');
+      if (!requester || !['ACTIVE', 'DELETED'].includes(requester.status)) throw new CreditOperationError('NOT_FOUND', 'Requester credit account not found', 'ACCOUNT_NOT_FOUND');
+      if (!courier || !['ACTIVE', 'DELETED'].includes(courier.status)) throw new CreditOperationError('NOT_FOUND', 'Courier credit account not found', 'ACCOUNT_NOT_FOUND');
       await repository.saveAccount({
         ...requester, totalCredits: requester.totalCredits - reservation.amount,
         reservedCredits: requester.reservedCredits - reservation.amount,
@@ -206,7 +217,7 @@ export class CreditService {
         }
         await repository.lockAccounts([reservation.requesterId]);
         const account = await repository.findAccount(reservation.requesterId);
-        if (!account) throw new CreditOperationError('NOT_FOUND', 'Requester credit account not found', 'ACCOUNT_NOT_FOUND');
+        if (!account || account.status !== 'ACTIVE') throw new CreditOperationError('NOT_FOUND', 'Requester credit account not found', 'ACCOUNT_NOT_FOUND');
         const difference = amount - reservation.amount;
         if (difference > 0 && account.totalCredits - account.reservedCredits < difference) {
           throw new CreditOperationError('FAILED_PRECONDITION', 'Insufficient available credits', 'INSUFFICIENT_CREDITS');
@@ -251,8 +262,10 @@ export class CreditService {
         await repository.lockKey('account', userId);
         await repository.lockAccounts([userId]);
         const account = await repository.findAccount(userId);
-        if (account) {
-          const grant = await repository.findCreditHistoryEntry(userId, 'INITIAL_GRANT');
+        const grant = account && await repository.findCreditHistoryEntry(userId, 'INITIAL_GRANT');
+        const restored = account && await repository.findCreditHistoryEntry(userId, 'BALANCE_RESTORED');
+        const placeholder = account?.status === 'DELETED' && !grant && !restored;
+        if (account && !placeholder) {
           if (!grant || grant.totalAmountChange !== initAlloc || grant.totalReservedChange !== 0) {
             throw new InitialAllocationError('ALREADY_EXISTS', 'Credit account exists without a confirmed initial grant');
           }
@@ -263,8 +276,14 @@ export class CreditService {
           };
           confirmedExistingGrant = true;
         } else {
-          result = { totalCredits: initAlloc, reservedCredits: 0, availableCredits: initAlloc };
-          await repository.createAccount({ userId, totalCredits: initAlloc, reservedCredits: 0 });
+          const totalCredits = (account?.totalCredits ?? 0) + initAlloc;
+          const reservedCredits = account?.reservedCredits ?? 0;
+          result = { totalCredits, reservedCredits, availableCredits: totalCredits - reservedCredits };
+          if (placeholder) {
+            await repository.saveAccount({ ...account, totalCredits });
+          } else {
+            await repository.createAccount({ userId, totalCredits: initAlloc, reservedCredits: 0 });
+          }
           await repository.appendHistory({
             userId, orderId: null, reservationId: null, type: 'INITIAL_GRANT',
             totalAmountChange: initAlloc, totalReservedChange: 0,
@@ -293,6 +312,50 @@ export class CreditService {
     } finally {
       client.release(discardConnection);
     }
+  }
+
+  async markDeleted({ userId }: { userId: string }): Promise<void> {
+    assertUserId(userId);
+    await this.transaction(async (repository) => {
+      await repository.lockKey('account', userId);
+      await repository.lockAccounts([userId]);
+      if (await repository.markDeleted(userId)) return;
+      if (!await repository.findAccount(userId)) {
+        await repository.createAccount({ userId, totalCredits: 0, reservedCredits: 0, status: 'DELETED' });
+      }
+    });
+  }
+
+  async restoreCredits({ previousUserId, userId }: { previousUserId: string; userId: string }): Promise<void> {
+    assertUserId(previousUserId);
+    assertUserId(userId);
+    if (previousUserId === userId) throw new RestoreError('Restoration requires distinct accounts');
+    await this.transaction(async (repository) => {
+      const ids = [previousUserId, userId].sort();
+      for (const id of ids) await repository.lockKey('account', id);
+      await repository.lockAccounts(ids);
+      const previous = await repository.findAccount(previousUserId);
+      const current = await repository.findAccount(userId);
+      if (current) {
+        if (previous?.status === 'CLOSED') return;
+        throw new RestoreError('Restoration destination already exists');
+      }
+      if (!previous) throw new Error('Restoration source is not initialized yet');
+      if (previous.status === 'CLOSED') throw new RestoreError('Restoration source is already closed');
+      const grant = await repository.findCreditHistoryEntry(previousUserId, 'INITIAL_GRANT');
+      const restored = await repository.findCreditHistoryEntry(previousUserId, 'BALANCE_RESTORED');
+      if (!grant && !restored) {
+        if (previous.status === 'ACTIVE') throw new RestoreError('Restoration source has no confirmed initial allocation');
+        throw new Error('Restoration source has no initial allocation yet');
+      }
+      if (previous.reservedCredits !== 0) throw new Error('Restoration source has unresolved reservations');
+      await repository.createAccount({ userId, totalCredits: previous.totalCredits, reservedCredits: 0 });
+      await repository.closeAccount(previousUserId);
+      await repository.appendHistory({
+        userId, orderId: null, reservationId: null, type: 'BALANCE_RESTORED',
+        totalAmountChange: previous.totalCredits, totalReservedChange: 0,
+      });
+    });
   }
 
   private async read<Result>(work: (repository: CreditRepository) => Promise<Result>): Promise<Result> {

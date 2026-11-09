@@ -5,6 +5,10 @@
 // Author review: I reviewed the shared client retry implementation.
 // Claude Code (Claude Opus), 2026-11-06: round_robin for all clients. Details: ai/usage-log.md (repo root), entry 005.
 // Prompts and key responses: ../../../credit-service/ai/usage-log.md, entries 010–012, 016, 021, 026–027 and 029.
+// OpenAI Codex added the author-specified Order Service eligibility client;
+// Author review: Author reviewed the changes line by line, manually tested and confirmed the
+// behaviour, approved the implementation. See user-service/ai/usage-log.md,
+// entry 031.
 
 import {
   credentials,
@@ -23,6 +27,8 @@ import type { GetOrderRequest } from './generated/order/GetOrderRequest';
 import type { CheckDeletionEligibilityRequest } from './generated/order/CheckDeletionEligibilityRequest';
 import type { CheckDeletionEligibilityResponse__Output } from './generated/order/CheckDeletionEligibilityResponse';
 import type { Order__Output as Order } from './generated/order/Order';
+import type { CheckDeletionEligibilityRequest } from './generated/order/CheckDeletionEligibilityRequest';
+import type { CheckDeletionEligibilityResponse__Output as CheckDeletionEligibilityResponse } from './generated/order/CheckDeletionEligibilityResponse';
 import type { GetBalanceRequest } from './generated/credit/GetBalanceRequest';
 import type { Balance__Output as Balance } from './generated/credit/Balance';
 import type { ReserveCreditsRequest } from './generated/credit/ReserveCreditsRequest';
@@ -199,6 +205,16 @@ export function createOrderClient(target: string, config: ClientConfig = {}) {
     getOrder(request: GetOrderRequest, options: RpcOptions = {}): Promise<Order> {
       return unary((callback) =>
         client.getOrder(
+          request,
+          options.metadata ?? new Metadata(),
+          callOptions(timeoutMs, options),
+          callback,
+        ),
+      );
+    },
+    checkDeletionEligibility(request: CheckDeletionEligibilityRequest, options: RpcOptions = {}): Promise<CheckDeletionEligibilityResponse> {
+      return unary((callback) =>
+        client.checkDeletionEligibility(
           request,
           options.metadata ?? new Metadata(),
           callOptions(timeoutMs, options),

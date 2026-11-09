@@ -1,9 +1,11 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
-// Scope: Implemented human-specified SQL account/reservation/history/idempotency operations and transaction-level bigint advisory/row locks. Removed account timestamp reads and account/reservation timestamp writes. Looked up bookmark sequence boundaries by history entry ID and authenticated user ID. Removed idempotency user-column reads/writes.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-11-04 (Asia/Singapore).
+// Scope: Implemented human-specified SQL account/reservation/history/idempotency operations and transaction-level bigint advisory/row locks. 
+// Removed account timestamp reads and account/reservation timestamp writes. Looked up bookmark sequence boundaries by history entry ID and authenticated user ID. Removed idempotency user-column reads/writes. 
+// Implemented human-specified account status reads, deletion and atomic closure.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: I reviewed the pure SQL operations, and ultimately changed the design to remove accounts, reservation, idempotency records timestamp fields as well as user id field in idempotency records..
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–024, 040, 043, 045 (prior scopes retained).
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–024, 040, 043, 045, 049.
 
 import type { PoolClient } from 'pg';
 import type {
@@ -44,17 +46,33 @@ export class SqlCreditRepository implements CreditRepository {
 
   async findAccount(userId: string): Promise<CreditAccount | undefined> {
     const { rows } = await this.client.query<CreditAccount>(
-      'SELECT user_id AS "userId", total_credits AS "totalCredits", reserved_credits AS "reservedCredits" FROM credit_accounts WHERE user_id = $1',
+      'SELECT user_id AS "userId", total_credits AS "totalCredits", reserved_credits AS "reservedCredits", status FROM credit_accounts WHERE user_id = $1',
       [userId],
     );
     return rows[0];
   }
 
-  async createAccount(account: Pick<CreditAccount, 'userId' | 'totalCredits' | 'reservedCredits'>): Promise<void> {
+  async createAccount(account: Pick<CreditAccount, 'userId' | 'totalCredits' | 'reservedCredits'> & Partial<Pick<CreditAccount, 'status'>>): Promise<void> {
     await this.client.query(
-      'INSERT INTO credit_accounts (user_id, total_credits, reserved_credits) VALUES ($1, $2, $3)',
-      [account.userId, account.totalCredits, account.reservedCredits],
+      'INSERT INTO credit_accounts (user_id, total_credits, reserved_credits, status) VALUES ($1, $2, $3, $4)',
+      [account.userId, account.totalCredits, account.reservedCredits, account.status ?? 'ACTIVE'],
     );
+  }
+
+  async markDeleted(userId: string): Promise<boolean> {
+    const result = await this.client.query(
+      "UPDATE credit_accounts SET status = 'DELETED' WHERE user_id = $1 AND status = 'ACTIVE'",
+      [userId],
+    );
+    return result.rowCount === 1;
+  }
+
+  async closeAccount(userId: string): Promise<void> {
+    const result = await this.client.query(
+      "UPDATE credit_accounts SET total_credits = 0, reserved_credits = 0, status = 'CLOSED' WHERE user_id = $1 AND status IN ('ACTIVE', 'DELETED') AND reserved_credits = 0",
+      [userId],
+    );
+    if (result.rowCount !== 1) throw new Error('Credit account could not be closed');
   }
 
   async saveAccount(account: CreditAccount): Promise<void> {

@@ -1,10 +1,11 @@
 // AI Assistance Disclosure:
-// Tool: Claude Code (Claude Opus), dates: 2026-09-27 – 2026-10-19
+// Tool: Claude Code (Claude Opus), 2026-09-27 – 2026-10-19; OpenAI Codex,
+// 2026-11-02 (Asia/Singapore).
 // Scope: AI generated the register, login, /me, admin list, admin get-by-id,
-// refresh, PATCH /me and admin grant/revoke routes.
+// refresh, PATCH /me and admin grant/revoke routes, then added DELETE /users/me.
 // Author review: Author specified the endpoints and access rules, reviewed the
-// code and approved. See user-service/ai/usage-log.md, entries 004, 008, 009,
-// 010, 015, 020.
+// code, manually tested the deletion route, and approved. See
+// user-service/ai/usage-log.md, entries 004, 008, 009, 010, 015, 020, and 025.
 
 import { Router } from 'express';
 import { validate } from '../middleware/validate';
@@ -34,6 +35,9 @@ userRouter.get('/me', authenticate, userController.getMe);
 
 // PATCH /users/me
 userRouter.patch('/me', authenticate, validate(updateProfileSchema), userController.updateMe);
+
+// DELETE /users/me
+userRouter.delete('/me', authenticate, userController.deleteMe);
 
 // GET /users
 userRouter.get('/', authenticate, requireRole('ADMINISTRATOR'), userController.listUsers);

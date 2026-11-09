@@ -1,9 +1,12 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
-// Scope: Tested the human-finalized history migration, sequence ordering, and account-lock pagination concurrency. Verified REST pagination against database ordering without exposing sequence IDs. Added/tested/documented startup-only listener health with database-based HTTP status as the human specified. Implemented/documented the human-defined history constraints and scoped SQL/seeded concurrency checks. Tested entry-ID bookmarks, scoped sequence lookup and uniform REST rejection while preserving sequence pagination. Ran paging/repository scenarios against the metadata-free idempotency schema.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-11-04 (Asia/Singapore).
+// Scope: Tested the human-finalized history migration, sequence ordering, and account-lock pagination concurrency. 
+// Verified REST pagination against database ordering without exposing sequence IDs. Added/tested/documented startup-only listener health with database-based HTTP status as the human specified. 
+// Implemented/documented the human-defined history constraints and scoped SQL/seeded concurrency checks. Tested entry-ID bookmarks, scoped sequence lookup and uniform REST rejection while preserving sequence pagination. Ran paging/repository scenarios against the metadata-free idempotency schema. 
+// Applied lifecycle migration before current-service checks; missing history account now returns ACCOUNT_NOT_FOUND.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: I reviewed that the test specification is correct.
-// Prompts and key responses: ../ai/usage-log.md, entries 005–025, 031, 038, 039, 043, 045.
+// Prompts and key responses: ../ai/usage-log.md, entries 005–025, 031, 038, 039, 043, 045, 049.
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -88,6 +91,7 @@ test('history migration and sequence paging use the human-defined labels and acc
     await apply('008_history_links_and_uniqueness.sql');
     await apply('009_remove_account_reservation_timestamps.sql');
     await apply('010_remove_idempotency_metadata.sql');
+    await apply('011_account_lifecycle.sql');
 
     await t.test('sequence boundary excludes writes during paging and preserves bigint precision', async () => {
       const service = new CreditService(pool);
@@ -143,7 +147,7 @@ test('history migration and sequence paging use the human-defined labels and acc
       const ids = [...first.entries, ...second.entries, ...last.entries].map((row) => row.sequenceId);
       assert.equal(new Set(ids).size, 103);
       assert.deepEqual(ids, [...ids].sort((a, b) => BigInt(a) > BigInt(b) ? -1 : 1));
-      assert.deepEqual(await service.getUserCreditHistory({ userId: 'unknown' }), { entries: [], nextPageToken: null });
+      await assert.rejects(service.getUserCreditHistory({ userId: 'unknown' }), error => error.reason === 'ACCOUNT_NOT_FOUND');
       for (const input of [
         { userId: 'other', pageToken: first.nextPageToken },
         { userId, pageToken: encodeHistoryBookmark(randomUUID()) },

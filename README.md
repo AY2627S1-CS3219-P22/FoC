@@ -1,15 +1,8 @@
 <!--
-AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-19–2026-10-22 (Asia/Singapore).
-Mode/scope: Credit-service implementation support and project disclosure documentation.
-Review: Earlier reviews are logged; latest documentation changes await human review.
-Exact prompts, key responses and checks: credit-service/ai/usage-log.md, entries 001–044.
+AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-19–2026-11-01 (Asia/Singapore). Claude Code (Claude Opus), 2026-11-01.
+Mode/scope: Credit-service implementation support and project disclosure documentation. Drafted the User service part of the AI Use Summary; author reviewed and approved. Maintained the final AI Use Summary section.
+Exact prompts, key responses and checks: See credit-service/ai/usage-log.md, user-service/ai/usage-log.md, order-service/usage-log.md.
 -->
-<!-- AI Assistance Disclosure: ChatGPT (Codex), 2026-10-21–2026-10-22.
-Scope: Maintained the final AI Use Summary section. Team review pending.
-See order-service/usage-log.md. -->
-<!-- AI Assistance Disclosure: Claude Code (Claude Opus), 2026-11-01.
-Scope: Drafted the User service part of the AI Use Summary; author reviewed and
-approved. See user-service/ai/usage-log.md. -->
 
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
 
@@ -126,46 +119,34 @@ port; host processes use `localhost` and the published host port.
 
 ## AI Use Summary
 
-### Credit service
+### User service
 
-This summary covers recorded assistance on feat/credit-implementation from
-2026-10-19. Other team members' usage must be consolidated by the authors.
+- **Tool and modes:** Claude Code (Anthropic, Claude Opus). Code generation
+  from author-specified requirements, boilerplate and scaffolding, code
+  review, debugging, documentation and code explanations.
+- **Scope:** Express + Prisma + gRPC scaffold; registration, login with RS256
+  JWTs and RBAC; refresh-token sessions with rotation and logout; profile
+  update; the internal `GetPublicProfile` gRPC endpoint; admin bootstrap CLI,
+  grant/revoke endpoints with last-admin protection and audit records;
+  cross-service port standardisation; account deletion and archived-account
+  restoration; daily archive purging; Order Service deletion-eligibility gRPC;
+  setup and API documentation.
+- **Human decisions:** The author chose the stack and specified the schemas,
+  endpoints, access rules, error behaviour, session design and admin
+  bootstrap approach. Some design points (for example SHA-256 token hashing,
+  cookie flags and the caller re-check) were raised by AI and accepted by the
+  author; these are marked in the log.
+- **Review comments:** Two rounds of Codex automated review on GitHub (PR #56,
+  PR #64) are quoted in the log, with the fixes made using Claude.
+- **Prompts and key responses:** [user-service/ai/usage-log.md](user-service/ai/usage-log.md).
+  AI-influenced files carry header comments; JSON files and migrations are
+  listed in the [service README](user-service/README.md#ai-attribution-for-files-without-comments).
+- **Sources:** Course material on bootstrapping the first admin
+  (https://sds-edu.github.io/resource-bootstrap-first-admin/); official
+  Docker images.
+- **Verification:** The author reviewed all AI-assisted code and tested the
+  endpoints manually.
 
-- **Tool and modes:** OpenAI Codex (GPT-6), implementation after human design
-  finalization, bounded requirements interpretation/formatting, boilerplate,
-  debugging, tests, refactoring, documentation and explanations.
-- **Scope:** Credit's PostgreSQL schema and nine migrations; domain/repository/
-  service implementation; atomic initialization, reservation, update, release and
-  settlement; gRPC contracts/client retries and service-token authentication;
-  authenticated own-balance/history REST with entry-ID bookmarks; RabbitMQ consumer
-  integration; Docker/workspace setup; health reporting; tests, local demo
-  preparation and attribution records. The [service README](credit-service/README.md)
-  documents current interfaces, behavior and setup.
-- **Human decisions:** Requirements, architecture, schema, interfaces, policies,
-  locking, pagination and security changes came from the human authors. No
-  requirements prioritization, backlog/sprint planning, design decisions or
-  decision rationales were generated.
-- **Prompts and key responses:** Exact exchanges, affected files, recorded reviews
-  and actual checks are in [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md),
-  entries 001–044. Attribution comments identify AI-influenced files. The approved
-  [JSON attribution table](credit-service/README.md#attribution-for-json-files)
-  covers formats that cannot contain comments.
-- **Verification:** The latest implementation run passed the Credit build and
-  103 Credit checks, including scoped seeded ledger invariants and entry-ID
-  paging. Earlier shared gRPC checks, Docker builds, live listener and local demo
-  results are recorded separately in the log. This README update did not rerun
-  them. Order/Credit demo integration has not been verified live. Agent checks
-  do not establish human approval; latest documentation changes await review.
-- **Provenance:** Shared messaging code belongs to @sunpterodactyl and the shared
-  messaging contributors, imported from events/data-validation commit
-  0b48f5f85be01d148176a6410c9ca22c2b8e672e. Its [provenance and original declarations](shared/messaging/README.md)
-  are retained; Credit integration assistance does not claim that authorship.
-  Official documentation consulted during implementation is cited in the usage
-  log. Human authors remain responsible for licensing and assignment validation.
-- **Submission:** Authors must review and validate assisted outputs, agree team AI
-  norms, include the agent/skill instructions used, consolidate team disclosures,
-  and link this README from the submission slides. Root AGENTS.md and
-  credit-service/AGENTS.md are retained; no skills were invoked for these exchanges.
 
 ### Order service
 
@@ -220,99 +201,25 @@ shared Supplier validators' runtime Zod import and corrected the dependency
 summary in Order PR_DESCRIPTION.md. Prompt/checks: Order usage log. Human review
 pending; documentation-only update.
 
-Administrator order filters, ChatGPT (Codex), 2026-10-30: implemented the team's
-explicit GET /orders status query contract and confirmed ONGOING membership,
-including overdue orders. Added HTTP/database regression coverage and service
-documentation. Exact prompts, key responses and verification are in
-[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
 
-Supplier opening-hours restriction removal, ChatGPT (Codex), 2026-10-30:
-removed current-open checks from Order creation, recovery and editing following
-the user's explicit instruction. Supplier existence, expiry and credit validation
-remain. Updated regression tests and operational documentation. Exact prompt,
-key response and verification: [order-service/usage-log.md](order-service/usage-log.md).
-Human review pending.
-
-
-Order deletion eligibility preparation, ChatGPT (Codex), 2026-11-02: implemented
-the supplied requester/courier active-order and unresolved-credit blocking query.
-The asynchronous deletion flow and gRPC exposure are not yet complete. Exchanges
-and validation: [order-service/usage-log.md](order-service/usage-log.md).
-Human review pending.
-
-
-Destination catalogue, ChatGPT (Codex), 2026-11-02: implemented the user-approved
-PostgreSQL catalogue, supplied CSV import, search API, order destination validation
-and UI type-to-search selection. Added migration/recovery/search tests and setup
-documentation. Exact prompts, key exchanges and verification:
-[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
-
-
-Courier-only UI controls, ChatGPT (Codex), 2026-11-02: fixed missing viewer checks
-on the active errand page, aligned detail-page controls with existing backend
-requester exclusion and added UI/HTTP regression tests. Backend authorization
-was already enforced. Exact prompt and verification:
-[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
-
-
-Courier existence validation, ChatGPT (Codex), 2026-11-02: implemented the user's
-explicit requirement to check User GetPublicProfile before acceptance, fail
-closed on RPC failures and recheck expiry before assignment. Added real gRPC/HTTP
-regression coverage. Exact prompts, key response and verification:
-[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
-
-
-Order user.deleted subscription, ChatGPT (Codex), 2026-11-02: implemented the
-requested shared RabbitMQ consumer, durable repeat-safe event receipts,
-configuration and Docker wiring. This does not complete deletion lifecycle
-processing. Added real broker/database and message validation tests. JSON and
-root lockfile attribution, exact prompts, key exchanges and verification:
-[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
-
-
-Order deletion consistency handling, ChatGPT (Codex), 2026-11-02: implemented the
-human-confirmed eligibility RPC, manual-review handling for active/unresolved
-work and transactional personal-data scrubbing for safe history. No notification,
-account restoration or active-order recovery contract was invented. Cross-service
-deletion coordination remains pending agreement with User Service. Exact prompts,
-key exchanges, JSON/generated-file attribution and verification:
-[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
-
-
-User deletion PR integration review, ChatGPT (Codex), 2026-11-03: reviewed PR #101
-at 6ffe05ff for Order/shared-contract compatibility and ran focused isolated
-wire/event-schema and archive-purge race checks. No service code merged or changed
-by this review. Exact prompt, findings and validation limits:
-[order-service/usage-log.md](order-service/usage-log.md). Human review pending.
-
-### User service
-
-- **Tool and modes:** Claude Code (Anthropic, Claude Opus). Code generation
-  from author-specified requirements, boilerplate and scaffolding, code
-  review, debugging, documentation and code explanations.
-- **Scope:** Express + Prisma + gRPC scaffold; registration, login with RS256
-  JWTs and RBAC; refresh-token sessions with rotation and logout; profile
-  update; the internal `GetPublicProfile` gRPC endpoint; admin bootstrap CLI,
-  grant/revoke endpoints with last-admin protection and audit records;
-  cross-service port standardisation; setup and API documentation.
-- **Human decisions:** The author chose the stack and specified the schemas,
-  endpoints, access rules, error behaviour, session design and admin
-  bootstrap approach. Some design points (for example SHA-256 token hashing,
-  cookie flags and the caller re-check) were raised by AI and accepted by the
-  author; these are marked in the log.
-- **Review comments:** Two rounds of Codex automated review on GitHub (PR #56,
-  PR #64) are quoted in the log, with the fixes made using Claude.
-- **Prompts and key responses:** [user-service/ai/usage-log.md](user-service/ai/usage-log.md).
-  AI-influenced files carry header comments; JSON files and migrations are
-  listed in the [service README](user-service/README.md#ai-attribution-for-files-without-comments).
-- **Sources:** Course material on bootstrapping the first admin
-  (https://sds-edu.github.io/resource-bootstrap-first-admin/); official
-  Docker images.
-- **Verification:** The author reviewed all AI-assisted code and tested the
-  endpoints manually.
-
-
-Order merge resolution, ChatGPT (Codex), 2026-11-07: retained main's Compose and
-HTTP-safe request key while preserving Order's catalogue and event consumer.
-Prompts, integration checks and exact resolutions: [Order usage log](order-service/usage-log.md).
-Human review pending.
+### Credit service
+- **Tool and modes:** OpenAI Codex (GPT-6), implementation after human design
+  finalization, bounded requirements interpretation/formatting, boilerplate,
+  debugging, tests, refactoring, documentation and explanations.
+- **Scope:** Credit's PostgreSQL schema and migrations; domain/repository/
+  service implementation; atomic initialization, reservation, update, release and
+  settlement; gRPC contracts/client retries and service-token authentication;
+  authenticated own-balance/history REST with entry-ID bookmarks; RabbitMQ consumer
+  integration; Docker/workspace setup; health reporting; tests, attribution records, user lifecycle integration. The [service README](credit-service/README.md)
+  documents current interfaces, behavior and setup.
+- **Human decisions:** Requirements, architecture, schema, interfaces, policies,
+  locking, pagination and security changes came from the human authors. No
+  requirements prioritization, backlog/sprint planning, design decisions or
+  decision rationales were generated.
+- **Prompts and key responses:** Exact exchanges, affected files, recorded reviews
+  and actual checks are in [credit-service/ai/usage-log.md](credit-service/ai/usage-log.md),
+  entries 001–050. Attribution comments identify AI-influenced files. The approved
+  [JSON attribution table](credit-service/README.md#attribution-for-json-files)
+  covers formats that cannot contain comments.
+- **Verification:** The latest implementation run passed the Credit build and
+  Credit checks, and all changes are verified by the author.

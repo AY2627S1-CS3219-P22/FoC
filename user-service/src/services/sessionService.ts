@@ -59,11 +59,11 @@ export async function rotateSession(token: string) {
       id: true, 
       userId: true, 
       user: { 
-        select: { roles: true, isDeleted: true } 
+        select: { roles: true }
       } },
   });
 
-  if (row && !row.user.isDeleted) {
+  if (row) {
     const next = newToken();
     // Atomic check-and-swap. Concurrent refreshes/logouts on this session wait
     // on the row lock, then re-check this WHERE — only one of them wins.

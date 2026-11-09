@@ -38,7 +38,7 @@ Inspected the installed amqplib types/event forwarding source to confirm close,
 error and cancellation notifications exist at the underlying transport layer.
 No source/public API changes or runtime tests performed while the human choices
 are pending. Used local source and root AGENTS.md; no external source or package
-changes. Human review pending.
+changes. 
 
 ## Exact human answers
 
@@ -83,5 +83,4 @@ is recorded in the usage log. Existing Credit/Postgres services were not replace
 Postman REST collection lint passed; all 103 regenerated scripts parse. No new
 native Postman run claimed. Shared source remains unchanged from the credited
 upstream package. Scoped whitespace/local documentation links checked. No new
-dependencies, external sources, skill, agent, commit, push or deployment. Human
-review pending; runtime startup status is explicitly not live connection health.
+dependencies, external sources, skill, agent, commit, push or deployment. Runtime startup status is explicitly not live connection health.

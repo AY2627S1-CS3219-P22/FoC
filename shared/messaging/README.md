@@ -1,30 +1,9 @@
 <!--
 AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-30 (Asia/Singapore).
 Scope: Documented the human-requested shared-client readiness getter; original broker authorship retained.
-Review: New documentation awaits human review; see ../../credit-service/ai/usage-log.md, entry 047.
+Author review: I edited for conciseness and structure.
+Prompts/key responses: ../../credit-service/ai/usage-log.md, entry 047.
 -->
-
-## Upstream attribution for the Credit PR
-
-This package was copied from `origin/events/data-validation` at commit
-`0b48f5f85be01d148176a6410c9ca22c2b8e672e`, authored by **@sunpterodactyl and the
-shared messaging contributors**. The broker implementation and contracts belong
-to those authors; this Credit PR does not claim their authorship. Their source
-and existing AI declarations are preserved. The initial import preserved source/
-configuration unchanged. Subsequent shared recovery work remains with the broker
-authors. Credit-specific work includes consumer integration, workspace/build
-wiring, listener tests, and the human-requested `isConnected` getter in exchange
-047. The existing broker recovery logic was not generated or replaced in that
-exchange.
-
-`RabbitMQClient.isConnected` is a read-only boolean getter. It is false before
-connection, while recovering, after connection/channel closure and during explicit
-shutdown. It becomes true when the connection/channel are available and any
-registered consumers have finished restoring. Credit uses it for informational
-listener health. The getter does not actively probe the broker or detect consumer
-cancellation on an otherwise open channel.
-
-The upstream README follows.
 
 ## RabbitMQ Broker
 
@@ -270,3 +249,16 @@ Management UI: [http://localhost:15672](http://localhost:15672) — user `guest`
 If ping fails or `curl` is not `200`, the container is not healthy yet — wait and retry. `ECONNREFUSED` on `5672` means the AMQP port is not published.
 
 **AI Declaration** — Helped with formatting, and expansion on unclear definitions written by @sunpterodactyl. All thoughts/explanations are my own.
+
+## Credit Service Additions
+Credit-specific work includes consumer integration, workspace/build
+wiring, listener tests, and the human-requested `isConnected` getter in exchange
+047. The existing broker recovery logic was not generated or replaced in that
+exchange.
+
+`RabbitMQClient.isConnected` is a read-only boolean getter. It is false before
+connection, while recovering, after connection/channel closure and during explicit
+shutdown. It becomes true when the connection/channel are available and any
+registered consumers have finished restoring. Credit uses it for informational
+listener health. The getter does not actively probe the broker or detect consumer
+cancellation on an otherwise open channel.

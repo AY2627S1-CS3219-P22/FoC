@@ -1,14 +1,15 @@
 // AI Assistance Disclosure:
-// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-10-26 (Asia/Singapore).
-// Scope: Moved the existing account/reservation/history/idempotency entity types into the human-specified domains folder. Removed account timestamps at the human's request; history timestamps remain. Removed the human-deleted idempotency user field; changes await human review.
+// Tool: OpenAI Codex (model: GPT-6), dates: 2026-10-20–2026-11-04 (Asia/Singapore).
+// Scope: Moved the existing account/reservation/history/idempotency entity types into the human-specified domains folder. Removed account timestamps at the human's request; history timestamps remain. Removed the human-deleted idempotency user field. Added human-specified account lifecycle status.
 // Refactor: Moved/imports updated for the human-specified src layout (entry 024).
 // Author review: I have reviewed that the types created for each table are correct and align with the repository design.
-// Prompts and key responses: ../../ai/usage-log.md, entries 005–024, 040, 045.
+// Prompts and key responses: ../../ai/usage-log.md, entries 005–024, 040, 045, 049.
 
 import type { Balance__Output as Balance } from '@foc/grpc/dist/generated/credit/Balance';
 
 export interface CreditAccount {
   userId: string;
+  status: 'ACTIVE' | 'DELETED' | 'CLOSED';
   totalCredits: number;
   reservedCredits: number;
 }
