@@ -1,3 +1,8 @@
+# AI Assistance Disclosure: Claude Opus (Cursor), 2026-11-05.
+# Prompt: improve index.ts to ensure supplier/order pub-sub works for the supplier cache.
+# Scope: optional RABBITMQ_URL for supplier event publishing.
+# Author review: Done added in RabbitMQ to local compose for testing @sunpterodactyl.
+#
 # Run from inside supplier-service/:  docker compose up --build
 #
 # Ports are not published here because this file is included by the root Compose,
@@ -55,6 +60,8 @@ services:
       USER_GRPC_ADDR: user-service:50051
       ORDER_GRPC_ADDR: order-service:50053
       CREDIT_GRPC_ADDR: credit-service:50054
+      # Broker by service name on the internal network (full stack).
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
       USER_SERVICE_PUBLIC_KEY_PATH: /app/keys/public.pem
     volumes:
       # Fails at start if user-service's public key is missing

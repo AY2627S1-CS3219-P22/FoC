@@ -7,7 +7,9 @@ services:
   order-db:
     ports:
       - '5434:5432' # 5433 is credit-db's standalone port
-
+  redis:
+    ports:
+      - '127.0.0.1:${ORDER_REDIS_PORT:-6380}:6379'
   order-service:
     ports:
       - '3003:3003'

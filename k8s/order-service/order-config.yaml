@@ -13,4 +13,7 @@ data: # ports here need to match containerPort and probes in *-service.yaml file
   USER_GRPC_ADDR: user-service:50051
   SUPPLIER_GRPC_ADDR: supplier-service:50052
   CREDIT_GRPC_ADDR: dns:///credit-service:50054
+  # Supplier lookup cache. Unset would disable it; order-service then uses Supplier gRPC only.
+  REDIS_URL: redis://order-redis:6379
+  SUPPLIER_CACHE_TTL_SECONDS: "600"
 
