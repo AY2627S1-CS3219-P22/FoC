@@ -108,15 +108,38 @@ export async function initiateRegister(input: RegisterInput) {
     return { ok: false as const, reason: 'restore_confirmation_required' as const };
   }
 
-  const pending = await buildNewUser(input); //standardize
-  const otpResult = await sendOTPRequest({
-    email: input.email,
-    challengeId: REGISTER_CHALLENGE,
-  });
-  // Leave any existing pending signup in place when the code is not sent.
-  if (!otpResult.ok) return otpResult;
+  const key = pendingKey(input.email);
+  const value = JSON.stringify(await buildNewUser(input)); //standardize
+  const ttl = { type: 'EX', value: PENDING_TTL_SECONDS } as const;
 
-  await redis.set(pendingKey(input.email), JSON.stringify(pending), { EX: PENDING_TTL_SECONDS });
+  // Store the pending signup before sending, so a delivered code always has one.
+  // NX: only the first request for this email claims the slot.
+  const claimed = await redis.set(key, value, { condition: 'NX', expiration: ttl });
+  if (!claimed) {
+    // A signup for this email is already waiting. Only the same person (same
+    // password) may resend or edit it. 
+    const stored = await redis.get(key);
+    const samePerson =
+      !!stored &&
+      (await bcrypt.compare(input.password, (JSON.parse(stored) as PendingRegistration).passwordHash));
+    if (!samePerson) return { ok: false as const, reason: 'signup_in_progress' as const };
+    await redis.set(key, value, { expiration: ttl });
+  }
+
+  try {
+    const otpResult = await sendOTPRequest({
+      email: input.email,
+      challengeId: REGISTER_CHALLENGE,
+    });
+    if (!otpResult.ok) {
+      // A resend keeps the existing pending signup; a first request cleans up.
+      if (claimed) await redis.del(key);
+      return otpResult;
+    }
+  } catch (err) {
+    if (claimed) await redis.del(key).catch(() => undefined);
+    throw err;
+  }
   return { ok: true as const };
 }
 

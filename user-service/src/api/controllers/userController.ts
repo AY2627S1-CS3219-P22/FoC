@@ -79,6 +79,13 @@ export const register: RequestHandler = async (req, res) => {
         });
         return;
       }
+      if ('reason' in result && result.reason === 'signup_in_progress') {
+        res.status(409).json({
+          error: 'Sign-up In Progress',
+          message: 'A sign-up for this email is already waiting for its code. Use that code, or try again in 2 minutes.',
+        });
+        return;
+      }
       if ('field' in result) {
         sendRegisterConflict(res, result.field);
         return;

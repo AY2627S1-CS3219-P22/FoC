@@ -1,5 +1,17 @@
 # AI usage log: User Service
 
+## 035: Block pending signup overwrite (OTP review)
+
+- **Timestamp:** 2026-11-11 (Asia/Singapore).
+- **Tool/model:** Claude Code (Anthropic), Claude Opus 5.5.
+- **Mode/scenario:** Review of `initiateRegister` (PR #112), then a security fix.
+- **Prompts:** [prompts/035-pending-signup-overwrite.md](prompts/035-pending-signup-overwrite.md).
+- **Key response:** Found that the OTP was sent before the pending signup was stored, and that another request for the same email could overwrite the pending signup with a different password (account takeover). Recommended claiming it with `SET NX` and letting only the same password resend; explained why the password is the check.
+- **Affected locations:** `user-service/src/services/userService.ts`, `user-service/src/api/controllers/userController.ts`.
+- **Checks:** `tsc --noEmit` passed. Manual test pending.
+- **Human review/edits:** Author confirmed the attack scenario, chose the same-password check over a per-signup challenge ID, reviewed the change and approved.
+- **External sources:** node-redis `SetOptions` type definitions (`@redis/client`, `lib/commands/SET.d.ts`) for the `NX` syntax.
+
 ## 033: README update for recent workflows
 
 - **Timestamp:** 2026-11-02 (Asia/Singapore).
