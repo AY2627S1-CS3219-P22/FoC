@@ -1,13 +1,13 @@
 /**
  * Services related to reset and forgot password
  *
- * 1: Forgot Password (Unauthenticated)
- * 2: Reset Password (Only when authenticated)
  *
- * Forgot Password --> OTP --> Verify OTP --> Update password (no JWT)
+ * 1: Reset Password (Only when authenticated)
+ *
+ * 
  * Logged-in reset uses the same reset:{email} OTP and completeForgotPassword.
  *
- * 3: Reinstantiate Deleted Account (Get OTP, register again)
+ * 2: Reinstantiate Deleted Account (Get OTP, register again)
  */
 import bcrypt from 'bcryptjs';
 import type { Prisma } from '@prisma/client';
@@ -46,6 +46,7 @@ async function retainedDeletion(email: string): Promise<boolean> {
   return !!archived && archived.purgeAfter > new Date();
 }
 
+//DEPRECATED FOR UNATHENTICATED USER
 export async function requestForgotPassword(input: ForgotPasswordInput,): Promise<ForgotPasswordResult> {
   if (await retainedDeletion(input.email)) return { ok: false, reason: 'deleted' };
 
@@ -61,6 +62,7 @@ export async function requestForgotPassword(input: ForgotPasswordInput,): Promis
     challengeId: RESET_CHALLENGE,
   });
 }
+
 
 export async function completeForgotPassword( input: CompleteForgotPasswordInput,): Promise<ForgotPasswordResult> {
   if (await retainedDeletion(input.email)) return { ok: false, reason: 'deleted' };
@@ -96,6 +98,7 @@ export async function completeForgotPassword( input: CompleteForgotPasswordInput
   });
 }
 
+//Deployed 
 export async function requestResetPassword(userId: string): Promise<ForgotPasswordResult> {
   const user = await prisma.user.findFirst({
     where: { id: userId },
