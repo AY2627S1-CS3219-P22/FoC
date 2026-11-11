@@ -171,8 +171,6 @@ not allowed). Roles: `USER` (default) and `ADMINISTRATOR`.
 | POST   | `/users/login`                   | public            | Verify credentials → access token + refresh cookie   |
 | POST   | `/users/refresh`                 | refresh cookie    | Rotate refresh cookie → new access token             |
 | POST   | `/users/logout`                  | refresh cookie    | End this browser's session (F2.2) → `204`            |
-| POST   | `/users/forgot-password/request` | public            | Email a reset OTP (`{ email }`)                      |
-| POST   | `/users/forgot-password`         | public            | Set a new password (`{ email, password, otp }`)      |
 | POST   | `/users/reset-password/request`  | any authenticated | Email a reset OTP to the caller's address            |
 | POST   | `/users/reset-password/verify`   | any authenticated | Set a new password (`{ otp, newPassword }`)          |
 | GET    | `/users/me`                      | any authenticated | Own profile (F2.3)                                   |

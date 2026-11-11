@@ -12,7 +12,7 @@ export default function OtpSentPage({ email, message, onContinue, onBack }: Prop
         <h2 className="text-xl font-semibold text-[#162A46] mb-1">OTP sent</h2>
         <p className="text-sm text-[#3F6B5A] mb-4">{message || "OTP sent"}</p>
         <p className="text-sm text-[#1B2522] mb-6">
-          Check the inbox for <span className="font-medium">{email || "your account email"}</span>. The code is 6 digits and expires in 2 minutes. Mailpit shows local mail at port 8025.
+          Check the inbox for <span className="font-medium">{email || "your account email"}</span>. The code is 6 digits and expires in 2 minutes.
         </p>
         <button
           onClick={onContinue}

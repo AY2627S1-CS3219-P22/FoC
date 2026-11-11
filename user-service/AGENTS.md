@@ -59,11 +59,7 @@ management, role-based access control, and OTP email verification (FR F1–F4).
   HTTP register is OTP-gated and public: `initiateRegister` / `completeRegister`
   (pending signup in Redis, challenge `'register'`). Admin bootstrap is
   `bootstrapAdmin` (`buildNewUser` + outbox), not an immediate HTTP register.
-  Forgot-password is
-  public (`/forgot-password/request` then `/forgot-password`). Logged-in password
-  change uses the session only to resolve email (`/reset-password/request` then
-  `/reset-password/verify` → `completeForgotPassword`). The OTP code itself is
-  never taken from the JWT. Forgot/reset use `RESET_CHALLENGE` (`'reset'`).
+   Forgot/reset use `RESET_CHALLENGE` (`'reset'`).
   Requesting a forgotten-password OTP must not reveal whether the email exists
   (always `200`). Completing forgot-password may `404` if no active account
   matches.

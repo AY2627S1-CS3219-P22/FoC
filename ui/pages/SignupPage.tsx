@@ -14,6 +14,7 @@ const NUS_EMAIL = /@(u\.nus\.edu|nus\.edu\.sg)$/i
 export default function SignupPage({ onOtpSent, onNavigate }: Props) {
   const [form, setForm] = useState({ firstName: "", lastName: "", username: "", email: "", password: "", confirm: "" })
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }))
+  const [restorePrompt, setRestorePrompt] = useState(false)
   const [confirmRestore, setConfirmRestore] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -43,7 +44,7 @@ export default function SignupPage({ onOtpSent, onNavigate }: Props) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Sign up failed."
       if (err instanceof ApiError && err.status === 409 && message.toLowerCase().includes("deleted account")) {
-        setConfirmRestore(true)
+        setRestorePrompt(true)
       }
       setError(message)
     } finally {
@@ -101,7 +102,7 @@ export default function SignupPage({ onOtpSent, onNavigate }: Props) {
                 />
               </div>
             ))}
-            {confirmRestore && (
+            {restorePrompt && (
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
                   type="checkbox"

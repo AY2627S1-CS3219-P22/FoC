@@ -101,32 +101,22 @@ export async function initiateRegister(input: RegisterInput) {
   const field = await findDuplicate(input.email, input.username); //extra check to make sure user doesn't exist
   if (field) return { ok: false as const, field };
 
-  const pending = await buildNewUser(input); //standardize
-  const key = pendingKey(input.email); //lock into redis so we dont create the user just yet
-  await redis.set(key, JSON.stringify(pending), { EX: PENDING_TTL_SECONDS });
-
   const archived = await prisma.archivedUser.findUnique({ where: { email: input.email } });
-  const now = new Date();
-  // Past its 4 years, the row is ignored and deleted below: a normal signup.
-  const restoreFrom = archived && archived.purgeAfter > now ? archived : null;
+  // Past its 4 years, the row is ignored and deleted at verify: a normal signup.
+  const restoreFrom = archived && archived.purgeAfter > new Date() ? archived : null;
   if (restoreFrom && !input.confirmRestore) {
     return { ok: false as const, reason: 'restore_confirmation_required' as const };
   }
 
-  try {
-    const otpResult = await sendOTPRequest({
-      email: input.email,
-      challengeId: REGISTER_CHALLENGE,
-    });
-    if (!otpResult.ok) {
-      await redis.del(key);
-      return otpResult;
-    }
-  } catch (err) {
-    await redis.del(key).catch(() => undefined);
-    throw err;
-  }
+  const pending = await buildNewUser(input); //standardize
+  const otpResult = await sendOTPRequest({
+    email: input.email,
+    challengeId: REGISTER_CHALLENGE,
+  });
+  // Leave any existing pending signup in place when the code is not sent.
+  if (!otpResult.ok) return otpResult;
 
+  await redis.set(pendingKey(input.email), JSON.stringify(pending), { EX: PENDING_TTL_SECONDS });
   return { ok: true as const };
 }
 
