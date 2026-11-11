@@ -79,7 +79,9 @@ export default function Navbar({ user, currentPage, onNavigate }: NavbarProps) {
       ? "create-request"
       : ["order-details", "accepted-order", "errand-complete"].includes(currentPage)
         ? "orders"
-        : currentPage
+        : ["delete-account", "otp-sent", "otp-verify"].includes(currentPage)
+          ? "profile"
+          : currentPage
 
   return (
     <header className="sticky top-0 z-40 border-b border-[#E4E8E6] bg-white pt-[env(safe-area-inset-top,0px)]">

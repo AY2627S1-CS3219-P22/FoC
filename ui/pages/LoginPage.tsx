@@ -100,12 +100,7 @@ export default function LoginPage({ notice, onLogin, onNavigate }: Props) {
                 />
               </div>
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-medium text-[#1B2522]">Password</label>
-                  <button type="button" className="text-xs text-[#3F6B5A] hover:text-[#1A4A36] transition-colors">
-                    Forgot password?
-                  </button>
-                </div>
+                <label className="block text-xs font-medium text-[#1B2522] mb-1.5">Password</label>
                 <input
                   type="password"
                   value={password}

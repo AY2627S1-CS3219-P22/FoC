@@ -11,9 +11,12 @@ import CreateRequestPage from "./pages/CreateRequestPage"
 import OrderDetailsPage from "./pages/OrderDetailsPage"
 import AcceptedOrderPage from "./pages/AcceptedOrderPage"
 import ProfilePage from "./pages/ProfilePage"
+import OtpSentPage from "./pages/OtpSentPage"
+import OtpVerifyPage, { type OtpKind } from "./pages/OtpVerifyPage"
+import DeleteAccountPage from "./pages/DeleteAccountPage"
 import AdminPage from "./pages/AdminPage"
 import SuppliersPage from "./pages/SuppliersPage"
-import { getMe, logout, type ApiUser } from "./api/users"
+import { getMe, logout, requestResetPassword, type ApiUser } from "./api/users"
 import { deliveryFeedback } from "./api/orders"
 import { getBalance } from "./api/credits"
 import { refreshToken } from "./api/client"
@@ -31,6 +34,9 @@ export type Page =
   | "profile"
   | "admin"
   | "suppliers"
+  | "otp-sent"
+  | "otp-verify"
+  | "delete-account"
 
 export interface Order {
   id: string
@@ -134,6 +140,7 @@ export default function App() {
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null)
   const [createPending, setCreatePending] = useState(false)
   const [loginNotice, setLoginNotice] = useState("")
+  const [otp, setOtp] = useState<{ kind: OtpKind; email: string; message: string } | null>(null)
 
   const [orderReturnPage, setOrderReturnPage] = useState<"orders" | "my-orders">("orders")
 
@@ -197,9 +204,32 @@ export default function App() {
     if (page === "signup") {
       return (
         <SignupPage
-          onLogin={handleLogin}
-          onRegistered={() => { setLoginNotice("Account created! Log in to continue."); navigate("login") }}
+          onOtpSent={(email, message) => { setOtp({ kind: "register", email, message }); navigate("otp-sent") }}
           onNavigate={navigate}
+        />
+      )
+    }
+    if ((page === "otp-sent" || page === "otp-verify") && otp?.kind === "register") {
+      if (page === "otp-sent") {
+        return (
+          <OtpSentPage
+            email={otp.email}
+            message={otp.message}
+            onContinue={() => navigate("otp-verify")}
+            onBack={() => navigate("signup")}
+          />
+        )
+      }
+      return (
+        <OtpVerifyPage
+          kind="register"
+          email={otp.email}
+          onVerified={() => {
+            setLoginNotice("Account created. Log in to continue.")
+            setOtp(null)
+            navigate("login")
+          }}
+          onBack={() => navigate("otp-sent")}
         />
       )
     }
@@ -286,6 +316,49 @@ export default function App() {
             user={user}
             onNavigate={navigate}
             onLogout={handleLogout}
+            onResetPassword={async () => {
+              const sent = await requestResetPassword()
+              setOtp({ kind: "reset", email: user.email, message: sent.message })
+              navigate("otp-sent")
+            }}
+          />
+        )}
+
+        {(page === "otp-sent" || page === "otp-verify") && otp?.kind === "reset" && (
+          page === "otp-sent" ? (
+            <OtpSentPage
+              email={otp.email}
+              message={otp.message}
+              onContinue={() => navigate("otp-verify")}
+              onBack={() => navigate("profile")}
+            />
+          ) : (
+            <OtpVerifyPage
+              kind="reset"
+              email={otp.email}
+              onVerified={() => {
+                localStorage.removeItem("token")
+                setUser(CURRENT_USER)
+                setIsLoggedIn(false)
+                setOtp(null)
+                setLoginNotice("Password updated. Log in with the new password.")
+                navigate("login")
+              }}
+              onBack={() => navigate("otp-sent")}
+            />
+          )
+        )}
+
+        {page === "delete-account" && (
+          <DeleteAccountPage
+            email={user.email}
+            onBack={() => navigate("profile")}
+            onDeleted={(message) => {
+              setUser(CURRENT_USER)
+              setIsLoggedIn(false)
+              setLoginNotice(message)
+              navigate("login")
+            }}
           />
         )}
       </main>

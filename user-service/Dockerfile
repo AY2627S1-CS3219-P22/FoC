@@ -62,6 +62,9 @@ COPY --from=build /repo/node_modules/.prisma ./node_modules/.prisma
 COPY user-service/prisma ./user-service/prisma
 COPY user-service/proto ./user-service/proto
 
+# OTP Redis script. Path matches REDIS_OTP_LUA in compose.yaml.
+COPY user-service/src/scripts/atomic.lua /app/scripts/atomic.lua
+
 WORKDIR /repo/user-service
 
 # The messaging logger writes to ./logs at startup. Give the non-root user

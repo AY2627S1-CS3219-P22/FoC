@@ -1,19 +1,21 @@
 import React, { useState } from "react"
 import type { Page } from "../App"
-import { login, register } from "../api/users"
+import { ApiError } from "../api/client"
+import { register } from "../api/users"
 
 interface Props {
-  onLogin: () => void
-  onRegistered: () => void
+  onOtpSent: (email: string, message: string) => void
   onNavigate: (page: Page) => void
 }
 
 // same rule as user-service's registerDto
 const NUS_EMAIL = /@(u\.nus\.edu|nus\.edu\.sg)$/i
 
-export default function SignupPage({ onLogin, onRegistered, onNavigate }: Props) {
+export default function SignupPage({ onOtpSent, onNavigate }: Props) {
   const [form, setForm] = useState({ firstName: "", lastName: "", username: "", email: "", password: "", confirm: "" })
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }))
+  const [restorePrompt, setRestorePrompt] = useState(false)
+  const [confirmRestore, setConfirmRestore] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
@@ -37,20 +39,14 @@ export default function SignupPage({ onLogin, onRegistered, onNavigate }: Props)
     setLoading(true)
     const { confirm: _confirm, ...data } = form
     try {
-      await register(data)
+      const sent = await register({ ...data, confirmRestore })
+      onOtpSent(data.email, sent.message)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign up failed.")
-      setLoading(false)
-      return
-    }
-    // log straight in with the new account instead of making them type it again.
-    // If that fails the account still exists, so send them to log in normally
-    try {
-      const { token } = await login(data.email, data.password)
-      localStorage.setItem("token", token)
-      onLogin()
-    } catch {
-      onRegistered()
+      const message = err instanceof Error ? err.message : "Sign up failed."
+      if (err instanceof ApiError && err.status === 409 && message.toLowerCase().includes("deleted account")) {
+        setRestorePrompt(true)
+      }
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -106,6 +102,19 @@ export default function SignupPage({ onLogin, onRegistered, onNavigate }: Props)
                 />
               </div>
             ))}
+            {restorePrompt && (
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={confirmRestore}
+                  onChange={(e) => setConfirmRestore(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-[#E4E8E6] accent-[#1A4A36]"
+                />
+                <span className="text-xs text-[#1B2522] leading-relaxed">
+                  A deleted account exists for this email. Re-register to restore only the previous credit balance.
+                </span>
+              </label>
+            )}
             {error && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
             )}
@@ -114,7 +123,7 @@ export default function SignupPage({ onLogin, onRegistered, onNavigate }: Props)
               disabled={loading}
               className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] active:scale-[.99] transition-all disabled:opacity-60"
             >
-              {loading ? "Creating account…" : "Create account"}
+              {loading ? "Sending code…" : "Send verification code"}
             </button>
           </form>
 

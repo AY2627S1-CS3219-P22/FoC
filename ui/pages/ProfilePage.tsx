@@ -7,9 +7,12 @@ interface Props {
   user: User
   onNavigate: (page: Page) => void
   onLogout: () => void
+  onResetPassword: () => Promise<void>
 }
 
-export default function ProfilePage({ user, onNavigate, onLogout }: Props) {
+export default function ProfilePage({ user, onNavigate, onLogout, onResetPassword }: Props) {
+  const [resetError, setResetError] = useState("")
+  const [resetting, setResetting] = useState(false)
   const [myRequests, setMyRequests]     = useState<Order[]>([])
   const [myDeliveries, setMyDeliveries] = useState<Order[]>([])
   const [history, setHistory]           = useState<CreditEntry[] | null>(null)
@@ -166,9 +169,27 @@ export default function ProfilePage({ user, onNavigate, onLogout }: Props) {
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3">
-        <button className="flex-1 py-2.5 border border-[#E4E8E6] bg-white text-[#1B2522] text-sm font-medium rounded-lg hover:bg-[#F7F9F8] transition-colors">
-          Edit Profile
+      {resetError && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{resetError}</p>}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <button
+          disabled={resetting}
+          onClick={() => {
+            setResetError("")
+            setResetting(true)
+            onResetPassword().catch((err) => {
+              setResetError(err instanceof Error ? err.message : "Could not send a code.")
+              setResetting(false)
+            })
+          }}
+          className="flex-1 py-2.5 border border-[#E4E8E6] bg-white text-[#1B2522] text-sm font-medium rounded-lg hover:bg-[#F7F9F8] disabled:opacity-60"
+        >
+          {resetting ? "Sending code…" : "Reset password"}
+        </button>
+        <button
+          onClick={() => onNavigate("delete-account")}
+          className="flex-1 py-2.5 border border-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50"
+        >
+          Delete account
         </button>
         <button
           onClick={onLogout}

@@ -46,6 +46,14 @@ There are two ways to run this service. Choose based on what you're doing.
 > secret) and `keys/public.pem` (other services verify tokens with it — safe to
 > share). The service refuses to boot if the keys are missing. See
 > [Integrating with this service](#integrating-with-this-service-other-services).
+>
+> **OTP key** (same idea — a git-ignored file, required to boot):
+>
+> ```bash
+> npm run keys:otp
+> ```
+>
+> This writes `keys/otp.key`, a 32-byte key the service uses to HMAC OTP values.
 
 ### Path A — Quick run ("just start it") 🚀
 
@@ -96,11 +104,12 @@ npm install
 # 2. Create your local env file (edit values if needed)
 cp .env.example .env
 
-# 3. Generate the JWT signing keys (first time only; required to boot)
+# 3. Generate the JWT signing keys and the OTP key (first time only; required to boot)
 npm run keys:generate
+npm run keys:otp
 
-# 4. Start ONLY the database
-docker compose up -d user-db
+# 4. Start the database and Redis
+docker compose up -d user-db redis-cache
 
 # 5. Create + apply the database schema
 #    (first time, Prisma asks for a migration name — use "init")
@@ -155,19 +164,83 @@ Protected routes run two middlewares: `authenticate` (verifies the access token 
 `401` if missing/invalid) then `requireRole(...)` (checks role claims → `403` if
 not allowed). Roles: `USER` (default) and `ADMINISTRATOR`.
 
-| Method | Route              | Access                | Purpose                                         |
-| ------ | ------------------ | --------------------- | ----------------------------------------------- |
-| POST   | `/users/register`  | public                | Create an account (F1)                          |
-| POST   | `/users/login`     | public                | Verify credentials → access token + refresh cookie |
-| POST   | `/users/refresh`   | refresh cookie        | Rotate refresh cookie → new access token        |
-| POST   | `/users/logout`    | refresh cookie        | End this browser's session (F2.2) → `204`       |
-| GET    | `/users/me`        | any authenticated     | Own profile (F2.3)                              |
-| PATCH  | `/users/me`        | any authenticated     | Update own first/last name, username (F2.4)     |
-| DELETE | `/users/me`        | any authenticated     | Delete own account after eligibility checks      |
-| GET    | `/users`           | `ADMINISTRATOR`       | List all users                                  |
-| GET    | `/users/:id`       | `ADMINISTRATOR`       | View a specific user                            |
-| POST   | `/users/:id/admin` | `ADMINISTRATOR`       | Grant the Administrator role (F3.3)             |
-| DELETE | `/users/:id/admin` | `ADMINISTRATOR`       | Revoke the Administrator role (F3.3, F3.2)      |
+| Method | Route                            | Access            | Purpose                                              |
+| ------ | -------------------------------- | ----------------- | ---------------------------------------------------- |
+| POST   | `/users/register`                | public            | Stash signup + email OTP (no User row yet)           |
+| POST   | `/users/register/verify`         | public            | Consume OTP and create the account (`{ email, otp }`) |
+| POST   | `/users/login`                   | public            | Verify credentials → access token + refresh cookie   |
+| POST   | `/users/refresh`                 | refresh cookie    | Rotate refresh cookie → new access token             |
+| POST   | `/users/logout`                  | refresh cookie    | End this browser's session (F2.2) → `204`            |
+| POST   | `/users/reset-password/request`  | any authenticated | Email a reset OTP to the caller's address            |
+| POST   | `/users/reset-password/verify`   | any authenticated | Set a new password (`{ otp, newPassword }`)          |
+| GET    | `/users/me`                      | any authenticated | Own profile (F2.3)                                   |
+| PATCH  | `/users/me`                      | any authenticated | Update own first/last name, username (F2.4)          |
+| DELETE | `/users/me`                      | any authenticated | Delete own account after eligibility checks          |
+| GET    | `/users`                         | `ADMINISTRATOR`   | List all users                                       |
+| GET    | `/users/:id`                     | `ADMINISTRATOR`   | View a specific user                                 |
+| POST   | `/users/:id/admin`               | `ADMINISTRATOR`   | Grant the Administrator role (F3.3)                  |
+| DELETE | `/users/:id/admin`               | `ADMINISTRATOR`   | Revoke the Administrator role (F3.3, F3.2)           |
+
+**OTP / password (as implemented).** Codes live in Redis for 2 minutes, are
+single-use, and are HMAC'd before storage. Redis keys are
+`register:{sha256(email)}` / `reset:{sha256(email)}` (`:record`, `:requests`,
+`:attempts`; register also stores `:pending`). Skipping a UI step does not bypass
+this: complete endpoints refuse the change unless a matching unused OTP is in
+Redis.
+
+- **Register:** `POST /users/register` hashes the password, stores pending
+  signup in Redis (TTL 2 minutes), and emails an OTP with challenge `register`.
+  While a signup for that email is pending, a new request is accepted only with
+  the same password (a resend); a different password gets
+  `409 Sign-up In Progress`, so nobody can swap in their own password before the
+  owner enters the code. `POST /users/register/verify` consumes that OTP and pending signup in one
+  Redis script (missing pending does not burn the code), rejects duplicate
+  email/username with `409`, then in one transaction creates the user and
+  enqueues `user.created` (`P2002` → `409`). A still-retained deleted account
+  returns `409` until `confirmRestore` is set; verify then enqueues `user.restored`.
+- **Reset password (logged in only):** send and verify use challenge `reset`.
+  `POST /users/reset-password/request` uses the session only to look up the
+  caller's email, then sends the OTP. `POST /users/reset-password/verify` loads
+  that email via `getProfile`, verifies the OTP, hashes the new password, then in
+  one transaction updates `passwordHash` and revokes every session, and clears
+  the refresh cookie (the user logs in again). There is no logged-out
+  forgot-password route and no generic `/users/otp` route. OTP failures: `429`
+  when throttled or locked (`Retry-After` set), otherwise `400`.
+
+**Email.** Locally, OTP emails go to Mailpit (`EMAIL_TRANSPORT=smtp`). On EKS
+they go through Amazon SES (`EMAIL_TRANSPORT=ses`), using the pod's IAM role, so
+there is no SMTP password. To try real SES locally: set `EMAIL_TRANSPORT=ses`,
+`AWS_PROFILE=foc` and a verified `SMTP_FROM` in `.env`, run `aws sso login`,
+then `docker compose up` (standalone). While SES is in sandbox mode, the
+recipient address must also be verified in SES.
+
+**OTP QA — two E2E paths.** Mailpit UI: `http://localhost:8025`. Use an NUS
+address. Password must meet F1.1.2. These are the happy paths only.
+
+**1. Register OTP**
+
+| Step | Call | Expect |
+| ---- | ---- | ------ |
+| 1 | `POST /users/register` full signup body | `200` `{ message: "OTP sent" }`. No `User` row yet. Mailpit has a 6-digit code. |
+| 2 | `POST /users/register/verify` `{ email, otp }` | `201` `{ user }`. Pending and OTP keys gone. `user.created` in the outbox. |
+| 3 | `POST /users/login` with the same password | `200` token + refresh cookie. |
+
+**2. Reset-password OTP (logged in)**
+
+| Step | Call | Expect |
+| ---- | ---- | ------ |
+| 1 | `POST /users/login` then `POST /users/reset-password/request` with Bearer | `200`. Mail goes to the **session** email, not a body email. |
+| 2 | `POST /users/reset-password/verify` `{ otp, newPassword }` | `200`. Refresh cookie cleared. |
+| 3 | Login with the new password; old password rejected | `200` / `401`. |
+
+**Remarks (known races — do not script these as extra tests).** Verify consumes
+OTP and pending in one Lua script: if `:pending` expired first, the OTP is not
+burned. If Postgres `create` / password `update` fails **after** that script
+succeeds, the code is already gone and the client must start the flow again.
+The 3-fail lock lives on `:attempts` and is **not** reset
+by a resend (hardcoded `register` / `reset` challenge). Two signups that pass
+`findDuplicate` together still collide on `@unique` (`P2002` → `409`). A retained
+deleted account is restored only when register is sent with `confirmRestore`.
 
 Quick demo (service running on `:3001`):
 
@@ -467,6 +540,7 @@ npm run prisma:migrate
 | ------------------------- | --------------------------------------------- |
 | `npm run dev`             | Start REST + gRPC with hot reload (`tsx`)     |
 | `npm run keys:generate`   | Generate the RS256 JWT keypair into `keys/`   |
+| `npm run keys:otp`        | Generate the OTP HMAC key into `keys/otp.key` |
 | `npm run build`           | `prisma generate` + compile TypeScript        |
 | `npm start`               | Run the compiled build (`dist/`)              |
 | `npm run prisma:migrate`  | Create & apply a migration (`migrate dev`)    |
@@ -494,6 +568,15 @@ Copy `.env.example` → `.env`. `.env` is gitignored — never commit real secre
 | `OUTBOX_POLL_INTERVAL_MS` | How often the outbox dispatcher checks for unsent events | `1000` |
 | `OUTBOX_BATCH_SIZE`    | Max events the dispatcher sends per poll | `50` |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Read by `compose.yaml` to create the database (not by the app) | see `.env.example` |
+| `REDIS_URL`            | Redis connection (OTP cache)         | `redis://localhost:6379` |
+| `OTP_HMAC_KEY_PATH`    | OTP HMAC key (`npm run keys:otp`)    | `./keys/otp.key`     |
+| `EMAIL_TRANSPORT`      | How OTP email is sent: `smtp` (Mailpit or any SMTP server) or `ses` (Amazon SES API) | `smtp` |
+| `SMTP_FROM`            | Sender shown on OTP emails. With SES it must be a verified identity | `CampusDash <no-reply@campusdash.local>` |
+| `AWS_REGION`           | SES region (`EMAIL_TRANSPORT=ses`)   | `ap-southeast-1`     |
+| `AWS_PROFILE`          | Local SES only: AWS profile the SDK uses (`compose.override.yaml` mounts `~/.aws`) | unset |
+| `SMTP_HOST` / `SMTP_PORT` | SMTP server (`EMAIL_TRANSPORT=smtp`) | `localhost` / `1025` (compose: `mailpit`) |
+| `SMTP_SECURE`          | `true` = TLS from the start (port 465) | `false`            |
+| `SMTP_USER` / `SMTP_PASS` | SMTP login; when set, STARTTLS is required | unset (Mailpit needs none) |
 
 ## Architecture
 

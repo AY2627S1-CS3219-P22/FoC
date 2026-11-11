@@ -27,8 +27,6 @@ import type { GetOrderRequest } from './generated/order/GetOrderRequest';
 import type { CheckDeletionEligibilityRequest } from './generated/order/CheckDeletionEligibilityRequest';
 import type { CheckDeletionEligibilityResponse__Output } from './generated/order/CheckDeletionEligibilityResponse';
 import type { Order__Output as Order } from './generated/order/Order';
-import type { CheckDeletionEligibilityRequest } from './generated/order/CheckDeletionEligibilityRequest';
-import type { CheckDeletionEligibilityResponse__Output as CheckDeletionEligibilityResponse } from './generated/order/CheckDeletionEligibilityResponse';
 import type { GetBalanceRequest } from './generated/credit/GetBalanceRequest';
 import type { Balance__Output as Balance } from './generated/credit/Balance';
 import type { ReserveCreditsRequest } from './generated/credit/ReserveCreditsRequest';
@@ -205,16 +203,6 @@ export function createOrderClient(target: string, config: ClientConfig = {}) {
     getOrder(request: GetOrderRequest, options: RpcOptions = {}): Promise<Order> {
       return unary((callback) =>
         client.getOrder(
-          request,
-          options.metadata ?? new Metadata(),
-          callOptions(timeoutMs, options),
-          callback,
-        ),
-      );
-    },
-    checkDeletionEligibility(request: CheckDeletionEligibilityRequest, options: RpcOptions = {}): Promise<CheckDeletionEligibilityResponse> {
-      return unary((callback) =>
-        client.checkDeletionEligibility(
           request,
           options.metadata ?? new Metadata(),
           callOptions(timeoutMs, options),

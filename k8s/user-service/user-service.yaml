@@ -17,6 +17,8 @@ spec:
       labels: { app.kubernetes.io/name: user-service, app.kubernetes.io/part-of: foc }
     spec:
       # nodeSelector: { role: user }   # enable on EC2; leave off for local k3d
+      # Created by eksctl (k8s/eks/cluster.yaml); its IAM role lets the app send via SES.
+      serviceAccountName: user-service
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000                  # the image's "node" user
@@ -50,6 +52,10 @@ spec:
               mountPath: /app/keys/private.pem
               subPath: private.pem
               readOnly: true
+            - name: otp-key
+              mountPath: /app/keys/otp.key
+              subPath: otp.key
+              readOnly: true
             - name: logs
               mountPath: /repo/user-service/logs
           readinessProbe:  # calls /health every 10s and stops sending traffic to the pod if it keeps failing, for eg if database is down
@@ -75,6 +81,8 @@ spec:
           configMap: { name: user-public-key }
         - name: jwt-private-key
           secret: { secretName: user-jwt-private-key }
+        - name: otp-key
+          secret: { secretName: user-otp-key }
         - name: logs
           emptyDir: {}
 ---  # how other pods reach the app
