@@ -16,9 +16,7 @@ import { registerSchema } from '../dto/registerDto';
 import { loginSchema } from '../dto/loginDto';
 import { updateProfileSchema } from '../dto/updateProfileDto';
 import {
-  completeForgotPasswordSchema,
   completeResetPasswordSchema,
-  forgotPasswordSchema,
   registerVerifySchema,
 } from '../dto/otpDto';
 import * as userController from '../controllers/userController';
@@ -48,12 +46,6 @@ userRouter.patch('/me', authenticate, validate(updateProfileSchema), userControl
 
 // DELETE /users/me
 userRouter.delete('/me', authenticate, userController.deleteMe);
-
-// POST /users/forgot-password/request — public send; challenge is fixed as 'reset'
-userRouter.post('/forgot-password/request',validate(forgotPasswordSchema),userController.requestForgotPassword,);
-
-// POST /users/forgot-password — public complete (OTP + new password)
-userRouter.post('/forgot-password',validate(completeForgotPasswordSchema),userController.completeForgotPassword,);
 
 // POST /users/reset-password/request — logged-in send; email comes from the session, not the OTP layer
 userRouter.post('/reset-password/request', authenticate, userController.requestResetPassword);

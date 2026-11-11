@@ -27,9 +27,7 @@ import * as sessionService from '../../services/sessionService';
 import * as adminService from '../../services/adminService';
 import * as passwordService from '../../services/passwordService';
 import type {
-  CompleteForgotPasswordInput,
   CompleteResetPasswordInput,
-  ForgotPasswordInput,
   RegisterVerifyInput,
 } from '../dto/otpDto';
 
@@ -284,35 +282,6 @@ function sendOtpFailure(
   }
   res.status(400).json({ error: 'Bad Request', message: 'Invalid OTP.' });
 }
-
-// POST /users/forgot-password/request
-//user inputs an email to trigger an otp request
-export const requestForgotPassword: RequestHandler = async (req, res) => {
-  try {
-    const result = await passwordService.requestForgotPassword(req.body as ForgotPasswordInput);
-    if (!result.ok) {
-      sendOtpFailure(res, result);
-      return;
-    }
-    res.status(200).json({ message: 'If an account exists for this email, an OTP has been sent.' });
-  } catch {
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to send OTP.' });
-  }
-};
-
-// POST /users/forgot-password
-export const completeForgotPassword: RequestHandler = async (req, res) => {
-  try {
-    const result = await passwordService.completeForgotPassword(req.body as CompleteForgotPasswordInput);
-    if (!result.ok) {
-      sendOtpFailure(res, result);
-      return;
-    }
-    res.status(200).json({ message: 'Password updated.' });
-  } catch {
-    res.status(500).json({ error: 'Internal Server Error', message: 'Failed to reset password.' });
-  }
-};
 
 // POST /users/reset-password/request
 export const requestResetPassword: RequestHandler = async (req, res) => {

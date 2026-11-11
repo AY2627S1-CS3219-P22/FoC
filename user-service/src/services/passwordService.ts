@@ -26,6 +26,7 @@ type ForgotPasswordResult =
       ok: false;
       reason:
         | 'not_found'
+        | 'deleted'
         | 'throttled'
         | 'locked'
         | 'missing'
@@ -35,12 +36,24 @@ type ForgotPasswordResult =
       retryAfterSeconds?: number;
     };
 
+// A deleted account is removed from User and kept on ArchivedUser until purgeAfter.
+// Reset mail is only for a live account. Re-registration is the register flow.
+async function retainedDeletion(email: string): Promise<boolean> {
+  const archived = await prisma.archivedUser.findUnique({
+    where: { email },
+    select: { purgeAfter: true },
+  });
+  return !!archived && archived.purgeAfter > new Date();
+}
+
 export async function requestForgotPassword(input: ForgotPasswordInput,): Promise<ForgotPasswordResult> {
+  if (await retainedDeletion(input.email)) return { ok: false, reason: 'deleted' };
+
   const user = await prisma.user.findFirst({
-    where: { email: input.email, isDeleted: false },
+    where: { email: input.email },
     select: { id: true, email: true },
   });
-  // Same 200 whether the email exists, so this is not an account oracle.
+  // Same 200 when the email is unknown, so this is not an account oracle.
   if (!user) return { ok: true };
 
   return sendOTPRequest({
@@ -50,8 +63,10 @@ export async function requestForgotPassword(input: ForgotPasswordInput,): Promis
 }
 
 export async function completeForgotPassword( input: CompleteForgotPasswordInput,): Promise<ForgotPasswordResult> {
+  if (await retainedDeletion(input.email)) return { ok: false, reason: 'deleted' };
+
   const user = await prisma.user.findFirst({
-    where: { email: input.email, isDeleted: false },
+    where: { email: input.email },
     select: { id: true },
   });
   if (!user) return { ok: false, reason: 'not_found' };
@@ -67,7 +82,7 @@ export async function completeForgotPassword( input: CompleteForgotPasswordInput
 
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const { count } = await tx.user.updateMany({
-      where: { email: input.email, isDeleted: false },
+      where: { email: input.email },
       data: { passwordHash },
     });
     // updateMany does not throw P2025; count 0 is the same "no row" outcome.
@@ -83,7 +98,7 @@ export async function completeForgotPassword( input: CompleteForgotPasswordInput
 
 export async function requestResetPassword(userId: string): Promise<ForgotPasswordResult> {
   const user = await prisma.user.findFirst({
-    where: { id: userId, isDeleted: false },
+    where: { id: userId },
     select: { id: true, email: true },
   });
   if (!user) return { ok: false, reason: 'not_found' };
