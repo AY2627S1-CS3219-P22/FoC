@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
+// Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 // ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import { useEffect, useState } from "react"
@@ -40,5 +43,5 @@ export function useOrder(initial: Order) {
     }
   }
 
-  return { order, actionError, busy: busy || loading, loadError, run }
+  return { order, setOrder, actionError, busy: busy || loading, loadError, run }
 }

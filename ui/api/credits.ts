@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
+// Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import { api } from "./client"
 
@@ -28,7 +31,7 @@ export const getCreditHistory = (pageSize = 10, pageToken?: string) => {
 
 const LABELS: Record<CreditEntry["type"], string> = {
   INITIAL_GRANT:       "Welcome credits",
-  RESERVED:            "Held for a request",
+  RESERVED:            "Reserved for transaction",
   RESERVATION_UPDATED: "Request credits changed",
   RELEASED:            "Returned from a cancelled request",
   TRANSFER_OUT:        "Paid for a delivered request",
@@ -41,3 +44,12 @@ export const creditLabel = (entry: CreditEntry) => LABELS[entry.type] ?? entry.t
 // part, so show that change for those
 export const creditChange = (entry: CreditEntry) =>
   entry.totalAmountChange !== 0 ? entry.totalAmountChange : -entry.totalReservedChange
+
+export function creditDescription(entry: CreditEntry, orders: { id: string; description: string; pickupStore: string }[]) {
+  if (!entry.orderId) return creditLabel(entry)
+  const order = orders.find(order => order.id === entry.orderId)
+  const detail = order
+    ? [order.pickupStore, order.description].filter(Boolean).join(" — ")
+    : `Order ${entry.orderId}`
+  return `${detail} (${creditLabel(entry)})`
+}

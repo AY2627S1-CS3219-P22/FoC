@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
+// Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 // ChatGPT (Codex), 2026-11-07: Preserve main HTTP-safe request key and destination/deadline UI; review pending; see ../../order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-06: Complete lifecycle snapshots and UI contract handling; review pending; see order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Catalogue-backed destination selector; review pending; see ../../order-service/usage-log.md.
@@ -7,17 +10,8 @@ import { useEffect, useState } from "react"
 import { DestinationSearch } from "../components/DestinationSearch"
 import type { User, Page } from "../App"
 import { CATEGORIES, categoryLabel, supplierLocation, type Category } from "../api/suppliers"
-import { createOrder, isValidOrderDeadline, orderError, type NewOrder } from "../api/orders"
+import { createOrder, newRequestKey, isValidOrderDeadline, orderError, type NewOrder } from "../api/orders"
 import { useSuppliers } from "../hooks/useSuppliers"
-
-// crypto.randomUUID only exists on secure pages (HTTPS or localhost), and the
-// deployed link is plain http, so fall back to a v4 UUID from getRandomValues
-function newRequestKey() {
-  if (typeof crypto.randomUUID === "function") return crypto.randomUUID()
-  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
-    (Number(c) ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(c) / 4)))).toString(16),
-  )
-}
 
 function localDateValue(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
@@ -348,7 +342,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
               ].map(({ label, value }) => (
                 <div key={label} className="flex gap-4">
                   <span className="text-xs text-[#3F6B5A] w-20 flex-shrink-0 pt-0.5">{label}</span>
-                  <span className="text-xs text-[#1B2522] flex-1 font-medium">{value}</span>
+                  <span className="text-xs text-[#1B2522] min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere] font-medium">{value}</span>
                 </div>
               ))}
             </div>

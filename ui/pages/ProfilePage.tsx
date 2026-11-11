@@ -1,7 +1,10 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
+// Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 import { useEffect, useState } from "react"
 import type { User, Order, Page } from "../App"
 import { formatTime, listOrders } from "../api/orders"
-import { creditChange, creditLabel, getCreditHistory, type CreditEntry } from "../api/credits"
+import { creditChange, creditDescription, getCreditHistory, type CreditEntry } from "../api/credits"
 
 interface Props {
   user: User
@@ -155,7 +158,7 @@ export default function ProfilePage({ user, onNavigate, onLogout, onResetPasswor
                     </span>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm text-[#1B2522] truncate">{creditLabel(entry)}</p>
+                    <p className="text-sm text-[#1B2522] break-words">{creditDescription(entry, [...myRequests, ...myDeliveries])}</p>
                     <p className="text-xs text-[#9CA3AF]">{formatTime(entry.createdAt)}</p>
                   </div>
                 </div>

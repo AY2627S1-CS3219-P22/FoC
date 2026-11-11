@@ -1,3 +1,4 @@
+<!-- AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12. Scope: UI work disclosure; human review pending; see ui/ai-usage/ui-order-fix.md. -->
 <!--
 AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-19–2026-11-01 (Asia/Singapore). Claude Code (Claude Opus), 2026-11-01.
 Mode/scope: Credit-service implementation support and project disclosure documentation. Drafted the User service part of the AI Use Summary; author reviewed and approved. Maintained the final AI Use Summary section.
@@ -223,3 +224,26 @@ pending; documentation-only update.
   covers formats that cannot contain comments.
 - **Verification:** The latest implementation run passed the Credit build and
   Credit checks, and all changes are verified by the author.
+
+
+### UI order integration and confirmation layout
+
+- **Tool and modes:** ChatGPT (Codex, GPT-6), implementation, debugging,
+  regression tests, and documentation on 2026-11-12.
+- **Scope:** UI editing through the existing Order PATCH endpoint, credit-history
+  order descriptions, HTTP-compatible retry keys, and wrapping confirmation text.
+  Backend source, service interfaces, and dependency manifests were unchanged.
+- **Prompts and key responses:** [Exact prompts and usage record](ui/ai-usage/ui-order-fix.md).
+- **Review:** Automated checks are recorded in the usage log. Human author review
+  and live backend verification remain pending.
+
+Open Requests follow-up, 2026-11-12: traced the existing Order visibility query,
+added UI refresh and clarified that the list contains other students' unassigned,
+unexpired requests. Regression coverage checks the authenticated endpoint, empty
+results and failures. Exact prompt and verification are in the same UI usage record.
+Human review and live backend verification remain pending.
+
+Signup validation follow-up, 2026-11-12: UI collects all missing password
+requirements and displays separate error lines on submit. Existing User service
+rules are preserved. Exact prompt, affected files and checks are in
+[the UI usage record](ui/ai-usage/ui-order-fix.md). Human review pending.

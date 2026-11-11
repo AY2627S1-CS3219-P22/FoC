@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
+// Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 // ChatGPT (Codex), 2026-11-06: Complete lifecycle snapshots and UI contract handling; review pending; see order-service/usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02.
 // Scope: Pass authenticated viewer identity to courier page; review pending; see ../order-service/usage-log.md.
@@ -45,6 +48,7 @@ export interface Order {
   deliveryLocation: string
   description: string
   credits: number
+  expiryTime?: string
   deadline: string
   status: "open" | "accepted" | "picked-up" | "delivered" | "cancelled" | "expired"
   requesterId: string
