@@ -190,24 +190,24 @@ Redis.
 
 - **Register:** `POST /users/register` hashes the password, stores pending
   signup in Redis (TTL 2 minutes), and emails an OTP with challenge `register`.
-  `POST /users/register/verify` consumes that OTP and pending signup in one
+  While a signup for that email is pending, a new request is accepted only with
+  the same password (a resend); a different password gets
+  `409 Sign-up In Progress`, so nobody can swap in their own password before the
+  owner enters the code. `POST /users/register/verify` consumes that OTP and pending signup in one
   Redis script (missing pending does not burn the code), rejects duplicate
   email/username with `409`, then in one transaction creates the user and
   enqueues `user.created` (`P2002` → `409`). A still-retained deleted account
   returns `409` until `confirmRestore` is set; verify then enqueues `user.restored`.
-- **Forgot / reset:** both send and verify with challenge `reset`.
-  `POST /users/forgot-password/request` always returns `200` so unknown emails
-  are not distinguishable. `POST /users/forgot-password` verifies the OTP,
-  hashes the new password, then in one transaction updates `passwordHash`
-  where `email` matches and `isDeleted` is false and revokes every session
-  (`404` if no active account). `POST /users/reset-password/request` uses the
-  session only to look up the caller's email, then sends the same reset OTP.
-  `POST /users/reset-password/verify` loads that email via `getProfile`, calls
-  `completeForgotPassword` with `{ email, otp, password: newPassword }`, and
-  clears the refresh cookie. There is no generic `/users/otp` route. OTP
-  failures: `429` when throttled or locked (`Retry-After` set), otherwise `400`.
+- **Reset password (logged in only):** send and verify use challenge `reset`.
+  `POST /users/reset-password/request` uses the session only to look up the
+  caller's email, then sends the OTP. `POST /users/reset-password/verify` loads
+  that email via `getProfile`, verifies the OTP, hashes the new password, then in
+  one transaction updates `passwordHash` and revokes every session, and clears
+  the refresh cookie (the user logs in again). There is no logged-out
+  forgot-password route and no generic `/users/otp` route. OTP failures: `429`
+  when throttled or locked (`Retry-After` set), otherwise `400`.
 
-**OTP QA — three E2E paths.** Mailpit UI: `http://localhost:8025`. Use an NUS
+**OTP QA — two E2E paths.** Mailpit UI: `http://localhost:8025`. Use an NUS
 address. Password must meet F1.1.2. These are the happy paths only.
 
 **1. Register OTP**
@@ -218,15 +218,7 @@ address. Password must meet F1.1.2. These are the happy paths only.
 | 2 | `POST /users/register/verify` `{ email, otp }` | `201` `{ user }`. Pending and OTP keys gone. `user.created` in the outbox. |
 | 3 | `POST /users/login` with the same password | `200` token + refresh cookie. |
 
-**2. Forgot-password OTP**
-
-| Step | Call | Expect |
-| ---- | ---- | ------ |
-| 1 | `POST /users/forgot-password/request` `{ email }` | `200` (“If an account exists…”). Mailpit has a code if the account is active. |
-| 2 | `POST /users/forgot-password` `{ email, password, otp }` | `200`. Other sessions revoked. |
-| 3 | `POST /users/login` with the new password | `200`. Old password fails. |
-
-**3. Reset-password OTP (logged in)**
+**2. Reset-password OTP (logged in)**
 
 | Step | Call | Expect |
 | ---- | ---- | ------ |
@@ -238,8 +230,7 @@ address. Password must meet F1.1.2. These are the happy paths only.
 OTP and pending in one Lua script: if `:pending` expired first, the OTP is not
 burned. If Postgres `create` / password `update` fails **after** that script
 succeeds, the code is already gone and the client must start the flow again.
-Forgot and logged-in reset share `reset:{email}`, so a new send on either route
-overwrites the other. The 3-fail lock lives on `:attempts` and is **not** reset
+The 3-fail lock lives on `:attempts` and is **not** reset
 by a resend (hardcoded `register` / `reset` challenge). Two signups that pass
 `findDuplicate` together still collide on `@unique` (`P2002` → `409`). A retained
 deleted account is restored only when register is sent with `confirmRestore`.

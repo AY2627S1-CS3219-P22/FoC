@@ -59,10 +59,15 @@ management, role-based access control, and OTP email verification (FR F1–F4).
   HTTP register is OTP-gated and public: `initiateRegister` / `completeRegister`
   (pending signup in Redis, challenge `'register'`). Admin bootstrap is
   `bootstrapAdmin` (`buildNewUser` + outbox), not an immediate HTTP register.
-   Forgot/reset use `RESET_CHALLENGE` (`'reset'`).
-  Requesting a forgotten-password OTP must not reveal whether the email exists
-  (always `200`). Completing forgot-password may `404` if no active account
-  matches.
+  Password reset is logged-in only (`/reset-password/request` then
+  `/reset-password/verify`), uses `RESET_CHALLENGE` (`'reset'`), and takes the
+  email from the session, never the body. There is no logged-out
+  forgot-password route; `requestForgotPassword` is kept but deprecated.
+- **A pending signup is only replaced by the same password.** `initiateRegister`
+  claims `:pending` with `SET NX`; a later request for that email must pass a
+  bcrypt check against the stored hash, otherwise `409`. Without this, anyone
+  could overwrite the pending signup with their own password and the owner
+  would create the account for them by entering the code.
 - **The OTP key is a local file, same pattern as the JWT keys.** `npm run keys:otp`
   writes `keys/otp.key` (git-ignored). Boot reads `OTP_HMAC_KEY_PATH`, decodes the
   32-byte key, and refuses to start if it is missing. OTPs are HMAC-SHA256 hashed
