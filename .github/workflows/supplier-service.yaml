@@ -167,6 +167,7 @@ jobs:
           fi
           aws eks update-kubeconfig --name foc --region ap-southeast-1
           sed -i "s/newTag: latest/newTag: sha-${GITHUB_SHA}/" k8s/supplier-service/kustomization.yaml
-          kubectl apply -k k8s/supplier-service
+          # Init SQL and the campus seed live outside this kustomization directory.
+          kubectl kustomize --load-restrictor LoadRestrictionsNone k8s/supplier-service | kubectl apply -f -
           kubectl -n foc rollout status deployment/supplier-service --timeout=5m
 

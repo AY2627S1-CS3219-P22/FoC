@@ -9,3 +9,17 @@ resources:
 images:
   - name: ghcr.io/ay2627s1-cs3219-p22/foc/supplier-service
     newTag: latest
+# Stable names: a new pod can mount the scripts, and a content change does not
+# roll the existing supplier-db pod. Postgres runs these only on an empty volume.
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: supplier-db-init
+    files:
+      - ../../supplier-service/db/init/01_schema.sql
+      - ../../supplier-service/db/init/02_opening_hours.sql
+      - ../../supplier-service/db/init/03_seed.sql
+      - ../../supplier-service/db/init/04_import_campus.sh
+  - name: supplier-db-seed
+    files:
+      - ../../supplier-service/data/campus_suppliers.json
