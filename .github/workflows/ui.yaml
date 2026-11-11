@@ -15,6 +15,8 @@ on:
   pull_request:
     paths: *ui_ci_paths
 
+  workflow_dispatch:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -50,7 +52,7 @@ jobs:
 
   build-and-push-image:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -114,7 +116,7 @@ jobs:
   # CD only: runs after the image for this commit is pushed on main.
   deploy:
     needs: build-and-push-image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: dev
     permissions:
