@@ -645,3 +645,4 @@ recorded here; details are in [ai/usage-log.md](ai/usage-log.md).
 | `prisma/migrations/20261019105105_f3_admin_roles/` | Same, for SystemBootstrap and AdminRoleChange | 018 |
 
 The `user_outbox` migration was written by a teammate and is not covered here.
+
