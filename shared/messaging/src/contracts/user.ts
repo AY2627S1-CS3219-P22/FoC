@@ -23,7 +23,10 @@ const userEventBaseSchema = z.object({
    */
   export const userDeletedSchema = userEventBaseSchema.extend({
     type: z.literal('user.deleted'),
-    deletedAt: z.string(),
+    eventId: z.string().trim().min(1),
+    userId: z.string().trim().min(1),
+    occurredAt: z.iso.datetime({ offset: true }),
+    deletedAt: z.iso.datetime({ offset: true }),
   });
 
   /**
