@@ -14,3 +14,7 @@ data: # ports here need to match containerPort and probes in *-service.yaml file
   # the public link is plain http (no domain for an HTTPS certificate), and browsers
   # drop Secure cookies over http; set back to "true" once the site has HTTPS
   COOKIE_SECURE: "false"
+  # OTP store. The Lua script is copied into the image at this path.
+  REDIS_URL: redis://user-redis:6379
+  REDIS_OTP_LUA: /app/scripts/atomic.lua
+  OTP_HMAC_KEY_PATH: /app/keys/otp.key
