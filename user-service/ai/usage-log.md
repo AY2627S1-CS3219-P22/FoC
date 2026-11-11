@@ -1,5 +1,17 @@
 # AI usage log: User Service
 
+## 036: OTP email through Amazon SES with IRSA (EKS)
+
+- **Timestamp:** 2026-11-11 (Asia/Singapore).
+- **Tool/model:** Claude Code (Anthropic), Claude Opus 5.5.
+- **Mode/scenario:** Making OTP email work on EKS, with a pivot from SES SMTP credentials to the SES API with IRSA.
+- **Prompts:** [prompts/036-ses-email-irsa.md](prompts/036-ses-email-irsa.md).
+- **Key response:** Explained that `emailServer.ts` only worked with local Mailpit, and planned configurable SMTP settings. Checked SES account status and DMARC policies (`u.nus.edu` rejects spoofed senders, so the sender is a verified Gmail address). When the sandbox blocked IAM user creation, switched to the SES API through the AWS SDK, with credentials from an eksctl-created service-account role (IRSA) restricted to sending as the verified address.
+- **Affected locations:** `user-service/src/env.ts`, `user-service/src/api/middleware/emailServer.ts`, `user-service/package.json`, `package-lock.json`, `user-service/compose.yaml`, `user-service/compose.override.yaml`, `k8s/eks/cluster.yaml`, `k8s/user-service/user-service.yaml`, `k8s/user-service/user-config.yaml`.
+- **Checks:** `tsc --noEmit` passed; `kubectl kustomize` rendered; local end-to-end test (register → SES email received at NUS address → verify → login) passed. EKS test pending.
+- **Human review/edits:** Author chose SES over Gmail SMTP, verified the SES identities, asked why the IRSA setup works, reviewed the change, ran the local end-to-end test and approved.
+- **External sources:** Nodemailer SES transport type definitions (`node_modules/nodemailer/dist/esm/ses-transport/index.d.ts`, v10.5) for the `{ sesClient, SendEmailCommand }` option; DMARC DNS records for `u.nus.edu`, `nus.edu.sg` and `gmail.com` (`dig TXT _dmarc.<domain>`).
+
 ## 035: Block pending signup overwrite (OTP review)
 
 - **Timestamp:** 2026-11-11 (Asia/Singapore).

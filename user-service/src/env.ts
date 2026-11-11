@@ -32,6 +32,20 @@ const schema = z.object({
   REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
   OTP_HMAC_KEY_PATH: z.string().min(1),
   REDIS_OTP_LUA: z.string().min(1),
+
+  // How OTP emails are sent: 'smtp' (local Mailpit) or 'ses' (Amazon SES API).
+  // SES credentials come from the AWS SDK: IRSA on EKS, AWS_PROFILE locally.
+  EMAIL_TRANSPORT: z.enum(['smtp', 'ses']).default('smtp'),
+  AWS_REGION: z.string().min(1).default('ap-southeast-1'),
+
+  // SMTP settings (EMAIL_TRANSPORT=smtp). Defaults are local Mailpit (no login).
+  SMTP_HOST: z.string().min(1).default('localhost'),
+  SMTP_PORT: z.coerce.number().int().positive().default(1025),
+  SMTP_SECURE: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  // Empty string counts as unset, so compose can pass an empty default.
+  SMTP_USER: z.string().optional().transform((v) => v || undefined),
+  SMTP_PASS: z.string().optional().transform((v) => v || undefined),
+  SMTP_FROM: z.string().min(1).default('"CampusDash" <no-reply@campusdash.local>'),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -42,6 +56,11 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+if (env.SMTP_USER && !env.SMTP_PASS) {
+  console.error('SMTP_USER is set but SMTP_PASS is missing.');
+  process.exit(1);
+}
 
 function readKey(filePath: string, label: string): string {
   try {

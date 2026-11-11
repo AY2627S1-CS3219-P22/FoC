@@ -22,10 +22,11 @@
     "test": "tsx --test test/**/*.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.1166.0",
+    "@foc/grpc": "0.1.0",
     "@foc/messaging": "file:../shared/messaging",
     "@grpc/grpc-js": "^1.14.5",
     "@grpc/proto-loader": "^0.8.1",
-    "@foc/grpc": "0.1.0",
     "@prisma/client": "^6.19.3",
     "@types/nodemailer": "^8.0.2",
     "@types/redis": "^4.0.10",

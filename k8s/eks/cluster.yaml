@@ -7,6 +7,21 @@ metadata:
 
 iam:
   withOIDC: true  # pods get AWS roles via OIDC (NUS SCP blocks Pod Identity)
+  # eksctl creates these IAM roles + Kubernetes service accounts with the cluster.
+  # A role is tied to this cluster's OIDC ID, so it must be recreated with it.
+  serviceAccounts:
+    - metadata: { name: user-service, namespace: foc }
+      # OTP emails through the SES API (sandbox blocks IAM users, so no SMTP password).
+      # Can only send, and only as the verified sender.
+      attachPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: ["ses:SendEmail", "ses:SendRawEmail"]
+            Resource: "*"
+            Condition:
+              StringEquals:
+                ses:FromAddress: campusdash.otp@gmail.com
 
 accessConfig:
   accessEntries:

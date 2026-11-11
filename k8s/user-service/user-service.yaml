@@ -17,6 +17,8 @@ spec:
       labels: { app.kubernetes.io/name: user-service, app.kubernetes.io/part-of: foc }
     spec:
       # nodeSelector: { role: user }   # enable on EC2; leave off for local k3d
+      # Created by eksctl (k8s/eks/cluster.yaml); its IAM role lets the app send via SES.
+      serviceAccountName: user-service
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000                  # the image's "node" user

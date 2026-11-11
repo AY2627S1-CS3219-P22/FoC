@@ -15,3 +15,8 @@ services:
       RABBITMQ_URL: amqp://guest:guest@host.docker.internal:5672
       # Standalone: order-service runs separately and publishes 50053 on the host.
       ORDER_GRPC_ADDR: host.docker.internal:50053
+      # For EMAIL_TRANSPORT=ses: the AWS SDK uses this profile from the mounted
+      # ~/.aws (run `aws sso login --profile foc` on the host first).
+      AWS_PROFILE: ${AWS_PROFILE:-}
+    volumes:
+      - ${HOME}/.aws:/home/node/.aws:ro
