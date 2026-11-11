@@ -86,7 +86,6 @@ services:
     volumes:
       # Run `npm run keys:generate` first, else service exits at boot.
       - ./keys:/app/keys:ro
-      - ./src/scripts/atomic.lua:/app/scripts/atomic.lua:ro
     networks: [internal]
 
   mailpit:
