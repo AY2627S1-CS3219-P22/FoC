@@ -14,7 +14,7 @@
 // registration handling (entries 025 and 027); both were reviewed, manually
 // tested, and approved.
 //
-import type { Request, RequestHandler, Response } from 'express';
+import type { RequestHandler, Response } from 'express';
 import type { Roles } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
@@ -65,6 +65,32 @@ function sendRegisterConflict(res: Response, field: 'email' | 'username') {
     error: 'Conflict',
     message: `An account with this ${field} already exists.`,
   });
+}
+
+function sendOtpFailure(
+  res: Response,
+  result: { reason: string; retryAfterSeconds?: number },
+) {
+  if (result.retryAfterSeconds) {
+    res.setHeader('Retry-After', String(result.retryAfterSeconds));
+  }
+  if (result.reason === 'throttled' || result.reason === 'locked') {
+    res.status(429).json({ error: 'Too Many Requests', message: 'Try again after some time.' });
+    return;
+  }
+  if (result.reason === 'not_found') {
+    res.status(404).json({ error: 'Not Found', message: 'User not found.' });
+    return;
+  }
+  if (result.reason === 'challenge') {
+    res.status(400).json({ error: 'Bad Request', message: 'This OTP is no longer valid.' });
+    return;
+  }
+  if (result.reason === 'missing') {
+    res.status(400).json({ error: 'Bad Request', message: 'OTP expired or not found.' });
+    return;
+  }
+  res.status(400).json({ error: 'Bad Request', message: 'Invalid OTP.' });
 }
 
 // POST /users/register — stash pending signup and email an OTP. No User row yet.
@@ -263,32 +289,6 @@ export const revokeAdmin: RequestHandler = async (req, res) => {
   }
   res.status(200).json({ user: result.user });
 };
-
-function sendOtpFailure(
-  res: Response,
-  result: { reason: string; retryAfterSeconds?: number },
-) {
-  if (result.retryAfterSeconds) {
-    res.setHeader('Retry-After', String(result.retryAfterSeconds));
-  }
-  if (result.reason === 'throttled' || result.reason === 'locked') {
-    res.status(429).json({ error: 'Too Many Requests', message: 'Try again after some time.' });
-    return;
-  }
-  if (result.reason === 'not_found') {
-    res.status(404).json({ error: 'Not Found', message: 'User not found.' });
-    return;
-  }
-  if (result.reason === 'challenge') {
-    res.status(400).json({ error: 'Bad Request', message: 'This OTP is no longer valid.' });
-    return;
-  }
-  if (result.reason === 'missing') {
-    res.status(400).json({ error: 'Bad Request', message: 'OTP expired or not found.' });
-    return;
-  }
-  res.status(400).json({ error: 'Bad Request', message: 'Invalid OTP.' });
-}
 
 // POST /users/reset-password/request
 export const requestResetPassword: RequestHandler = async (req, res) => {

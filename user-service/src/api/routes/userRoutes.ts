@@ -51,7 +51,7 @@ userRouter.delete('/me', authenticate, userController.deleteMe);
 userRouter.post('/reset-password/request', authenticate, userController.requestResetPassword);
 
 // POST /users/reset-password/verify — logged-in complete; reuses completeForgotPassword
-userRouter.post('/reset-password/verify',authenticate,validate(completeResetPasswordSchema),userController.completeResetPassword,);
+userRouter.post('/reset-password/verify', authenticate, validate(completeResetPasswordSchema), userController.completeResetPassword);
 
 // GET /users
 userRouter.get('/', authenticate, requireRole('ADMINISTRATOR'), userController.listUsers);
