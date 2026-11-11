@@ -67,7 +67,7 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run build --workspace @foc/grpc
+      - run: npm run build --workspace @foc/grpc --workspace @foc/messaging
       - run: npm test -w supplier-service
 
   build-and-push-image:
