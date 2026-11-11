@@ -42,7 +42,10 @@ Creating or deleting the cluster needs access to the team's AWS sandbox
 
 Reference steps for a fresh cluster (run from the repo root, logged in with `aws sso login`):
 
-1. `eksctl create cluster -f k8s/eks/cluster.yaml` (about 20 min)
+1. `eksctl create cluster -f k8s/eks/cluster.yaml` (about 20 min). This also creates
+   the `foc/user-service` service account and its IAM role (IRSA), which lets
+   user-service send OTP email through SES. On a cluster that already exists, run
+   `eksctl create iamserviceaccount --config-file k8s/eks/cluster.yaml --approve`.
 2. `kubectl apply -f k8s/shared/namespace.yaml`
 3. Create the secrets listed in each `*-secrets.yaml.example`, plus `rabbitmq-secrets`
    (`RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`). Order and credit must share the
@@ -51,6 +54,7 @@ Reference steps for a fresh cluster (run from the repo root, logged in with `aws
    ```bash
    kubectl -n foc create configmap user-public-key --from-file=public.pem=user-service/keys/public.pem
    kubectl -n foc create secret generic user-jwt-private-key --from-file=private.pem=user-service/keys/private.pem
+   kubectl -n foc create secret generic user-otp-key --from-file=otp.key=<fresh key from `openssl rand -base64 32`>
    kubectl -n foc create configmap supplier-db-init --from-file=supplier-service/db/init/
    kubectl -n foc create configmap supplier-db-seed --from-file=supplier-service/data/campus_suppliers.json
    ```
@@ -114,6 +118,9 @@ kubectl -n foc delete pod -l role=load          # stop; scales back down after ~
 - **http only:** HTTPS needs a domain and certificate. Because of that, `user-config.yaml`
   sets `COOKIE_SECURE: "false"` so the login cookie works over http.
 - **Single replica databases** on one disk each. Fine for the demo, not highly available.
+- **SES sandbox:** OTP email is sent from `campusdash.otp@gmail.com` (verified in SES,
+  ap-southeast-1). Until SES production access is granted, every recipient address must
+  also be verified (`aws sesv2 create-email-identity`), so verify demo accounts first.
 
 ## Troubleshooting
 
@@ -124,3 +131,5 @@ kubectl -n foc delete pod -l role=load          # stop; scales back down after ~
 | `OOMKilled` | Container hit its memory limit; raise `limits.memory` |
 | Pod stuck `ContainerCreating` | A secret or ConfigMap it mounts is missing: `kubectl -n foc describe pod <pod>` |
 | HPA shows `<unknown>` | Normal for the first minute after deploy |
+| user-service pods not created, `serviceaccount "user-service" not found` | Run the `eksctl create iamserviceaccount` command in step 1 |
+| Sign-up returns 500 "Failed to send OTP" | `kubectl -n foc logs deploy/user-service \| grep -A3 "Error sending"`. `MessageRejected`: recipient not verified (SES sandbox). `AccessDenied`: check the role in `cluster.yaml` |

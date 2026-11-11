@@ -207,6 +207,13 @@ Redis.
   forgot-password route and no generic `/users/otp` route. OTP failures: `429`
   when throttled or locked (`Retry-After` set), otherwise `400`.
 
+**Email.** Locally, OTP emails go to Mailpit (`EMAIL_TRANSPORT=smtp`). On EKS
+they go through Amazon SES (`EMAIL_TRANSPORT=ses`), using the pod's IAM role, so
+there is no SMTP password. To try real SES locally: set `EMAIL_TRANSPORT=ses`,
+`AWS_PROFILE=foc` and a verified `SMTP_FROM` in `.env`, run `aws sso login`,
+then `docker compose up` (standalone). While SES is in sandbox mode, the
+recipient address must also be verified in SES.
+
 **OTP QA — two E2E paths.** Mailpit UI: `http://localhost:8025`. Use an NUS
 address. Password must meet F1.1.2. These are the happy paths only.
 
@@ -563,6 +570,13 @@ Copy `.env.example` → `.env`. `.env` is gitignored — never commit real secre
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Read by `compose.yaml` to create the database (not by the app) | see `.env.example` |
 | `REDIS_URL`            | Redis connection (OTP cache)         | `redis://localhost:6379` |
 | `OTP_HMAC_KEY_PATH`    | OTP HMAC key (`npm run keys:otp`)    | `./keys/otp.key`     |
+| `EMAIL_TRANSPORT`      | How OTP email is sent: `smtp` (Mailpit or any SMTP server) or `ses` (Amazon SES API) | `smtp` |
+| `SMTP_FROM`            | Sender shown on OTP emails. With SES it must be a verified identity | `CampusDash <no-reply@campusdash.local>` |
+| `AWS_REGION`           | SES region (`EMAIL_TRANSPORT=ses`)   | `ap-southeast-1`     |
+| `AWS_PROFILE`          | Local SES only: AWS profile the SDK uses (`compose.override.yaml` mounts `~/.aws`) | unset |
+| `SMTP_HOST` / `SMTP_PORT` | SMTP server (`EMAIL_TRANSPORT=smtp`) | `localhost` / `1025` (compose: `mailpit`) |
+| `SMTP_SECURE`          | `true` = TLS from the start (port 465) | `false`            |
+| `SMTP_USER` / `SMTP_PASS` | SMTP login; when set, STARTTLS is required | unset (Mailpit needs none) |
 
 ## Architecture
 
