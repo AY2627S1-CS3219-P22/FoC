@@ -2,6 +2,7 @@
 # Review pending. See ai/usage-log.md, entry 003.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+namespace: foc
 resources:
   - supplier-db.yaml
   - supplier-service.yaml
