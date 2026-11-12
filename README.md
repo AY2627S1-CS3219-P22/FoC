@@ -1,8 +1,7 @@
-<!-- AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12. Scope: UI work disclosure; human review pending; see ui/ai-usage/ui-order-fix.md. -->
 <!--
-AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-19–2026-11-01 (Asia/Singapore). Claude Code (Claude Opus), 2026-11-01.
-Mode/scope: Credit-service implementation support and project disclosure documentation. Drafted the User service part of the AI Use Summary; author reviewed and approved. Maintained the final AI Use Summary section.
-Exact prompts, key responses and checks: See credit-service/ai/usage-log.md, user-service/ai/usage-log.md, order-service/usage-log.md.
+AI Assistance Disclosure: OpenAI Codex (GPT-6), 2026-10-19–2026-11-01 (Asia/Singapore). Claude Code (Claude Opus), 2026-11-01-2026-11-12.
+Mode/scope: Credit-service implementation support and project disclosure documentation. Drafted the User service part of the AI Use Summary; author reviewed and approved. Maintained the final AI Use Summary section. UI work disclosure;
+Exact prompts, key responses and checks: See credit-service/ai/usage-log.md, user-service/ai/usage-log.md, order-service/usage-log.md, ui/ai-usage/ui-order-fix.md.
 -->
 
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
@@ -22,10 +21,10 @@ withdrawn, or exchanged for money, and only circulate within the platform.
 | Name | Role |
 | ----- | ----- |
 | Eunice | Order Service |
-| Jade | User Service |
-| Karthika | Credit Service |
-| Maliha | UI |
-|Sanya | Supplier Service |
+| Jade | User Service, Containerisation, Cloud Deployment |
+| Karthika | Credit Service, K8s |
+| Maliha | UI, Chat Service, Admin Dashboard |
+|Sanya | Supplier Service, CI/CD |
 
 ---
 
@@ -42,9 +41,12 @@ microservice (`user-service/`, `supplier-service/`, `order-service/`,
 ├── supplier-service/
 ├── order-service/
 ├── credit-service/
+├── chat-service/         # N2H: errand chat + content filter
 ├── shared/               # gRPC contracts/clients, RabbitMQ messaging
-├── ui/
-├── chat-service/       # N2H: errand chat + content filter
+├── ui/                   # React app + nginx (the only public entry point)
+├── k8s/                  # Kubernetes manifests for AWS EKS (see k8s/README.md)
+├── .github/workflows/    # CI/CD: one workflow per service
+├── ai/                   # AI usage log for repo-level work (CI, k8s)
 └── README.md
 ```
 
@@ -63,6 +65,7 @@ Requires Docker Desktop. One-time setup:
 
 ```sh
 npm run keys:generate --prefix user-service     # JWT keys (other services mount the public key)
+npm run keys:otp --prefix user-service          # key for hashing sign-up OTP codes
 cp user-service/.env.example user-service/.env
 cp supplier-service/.env.example supplier-service/.env
 cp credit-service/.env.example credit-service/.env
@@ -80,11 +83,17 @@ docker compose ps -a          # *-migrate jobs Exited (0); everything else healt
 Open <http://localhost:8080>. The root `compose.yaml` includes each service's own
 compose file (plus `shared/messaging` for RabbitMQ and `ui/`):
 
-- **One entry point:** only the UI (nginx) publishes a port, `8080`. It serves the
-  app and proxies `/backend/*` to the services. Databases, gRPC and RabbitMQ are
+- **One entry point:** the UI (nginx) publishes `8080`. It serves the app and
+  proxies `/backend/*` to the services. Databases, gRPC, Redis and RabbitMQ are
   reachable only on the shared `internal` network, by service name.
-- **Migrations:** each service has a one-off `*-migrate` job; the service starts
-  only after its job succeeds. Applied migrations are skipped on later runs.
+- **Sign-up emails:** locally, OTP codes are caught by Mailpit instead of being
+  sent. Read them at <http://localhost:8025> (the only other published port).
+- **Migrations:** user, order and credit each have a one-off `*-migrate` job, and
+  the service starts only after it succeeds; applied migrations are skipped on
+  later runs. Supplier's database runs its init scripts on first start, and chat
+  creates its tables itself on startup.
+- **Redis:** user-service keeps pending OTP codes in Redis, and order-service
+  caches supplier details in Redis.
 - **Data:** each database uses a named volume, so data survives `down`/`up`.
   `docker compose down -v` deletes it.
 
@@ -112,11 +121,34 @@ configuration predictable.
 | Chat service (N2H) | 3005 | — | 5436 |
 | UI (nginx) | 8080 | — | — |
 | RabbitMQ | — | — | 5672 (AMQP), 15672 (management UI) |
+| Mailpit (local OTP emails) | 8025 (web) | — | 1025 (SMTP) |
 
 PostgreSQL containers listen on `5432` internally. In the full stack only the UI's
-8080 is published; service and database ports are published only when a service
-runs standalone. Container-to-container calls use service names and the internal
-port; host processes use `localhost` and the published host port.
+8080 and Mailpit's 8025/1025 are published; service and database ports are
+published only when a service runs standalone. Container-to-container calls use
+service names and the internal port; host processes use `localhost` and the
+published host port.
+
+## Deployment (Kubernetes on AWS EKS)
+
+The app runs on an EKS cluster in the `foc` namespace. Full setup, secrets and
+troubleshooting are in [k8s/README.md](k8s/README.md).
+
+- **Per service:** a Deployment and Service for the app, a Postgres StatefulSet
+  with its own disk, a ConfigMap for settings, a Secret created with `kubectl`
+  (never committed), Redis where needed, and a `kustomization.yaml`.
+- **Only the UI is public**, through an AWS LoadBalancer. Everything else is
+  reachable only inside the cluster.
+- **Zero-downtime deploys:** migrations run in an init container, readiness and
+  liveness probes gate traffic, and `preStop` lets old pods drain.
+- **Autoscaling:** order and credit run 2–6 pods at a 70% CPU target. Headless
+  Services and round-robin gRPC clients spread calls across every pod. Chat is
+  ready to scale (Redis adapter, WebSocket-only clients) but runs one pod until
+  its HPA is enabled.
+- **CI/CD:** each service has a GitHub Actions workflow. Pull requests are built
+  and checked; merges to `main` push the image to GHCR tagged with the commit
+  SHA and deploy it with `kubectl apply -k`. GitHub signs in to AWS with OIDC,
+  so no AWS keys are stored. Rolling back means deploying an earlier SHA.
 
 ---
 
@@ -182,14 +214,14 @@ Order-only integration port, ChatGPT (Codex), 2026-10-24: transferred shared-cli
 usage, missing-account recovery, Supplier compatibility and courier pickup from
 d3-demo into Order. Teammate implementations/root workspace metadata were not
 merged. Dependencies and validation limits: Order INTEGRATION_NOTES.md and usage
-log. Human review pending; normal build awaits shared contract PRs.
+log. Normal build awaits shared contract PRs.
 
 Main merge / PR preparation, ChatGPT (Codex), 2026-10-25: merged main at 2c8a068,
 resolved root package-lock.json from main plus seven Order manifest entries,
 and included main's .npmrc in the Order Docker context. Root JSON attribution
 uses this summary and Order usage log. PR_DESCRIPTION.md documents implemented
 APIs, reproducible reviewer tests and missing teammate contract prerequisites.
-Human review pending; ordinary build is blocked until those contracts merge.
+Ordinary build is blocked until those contracts merge.
 
 Shared prerequisites completed, ChatGPT (Codex), 2026-10-25: agreed Credit shared
 contracts/client/types and Supplier validators are now tracked, with explicit
@@ -197,7 +229,7 @@ Zod dependency and approved JSON attribution in shared README/Order usage log.
 Normal repository build and 128 shared/Order tests pass without overrides; Order
 Docker builds normally. Full Credit business runtime remains the teammate PR;
 this branch only keeps its scaffold type-compatible. Earlier build-blocker
-notes are superseded by this update. Human review pending.
+notes are superseded by this update.
 
 PR documentation refresh, ChatGPT (Codex), 2026-10-25: documented the existing
 shared Supplier validators' runtime Zod import and corrected the dependency
@@ -248,15 +280,15 @@ Human review and live backend verification remain pending.
 Signup validation follow-up, 2026-11-12: UI collects all missing password
 requirements and displays separate error lines on submit. Existing User service
 rules are preserved. Exact prompt, affected files and checks are in
-[the UI usage record](ui/ai-usage/ui-order-fix.md). Human review pending.
+[the UI usage record](ui/ai-usage/ui-order-fix.md).
 
 Minimum-credit wording follow-up, 2026-11-12: creation UI displays the requested
 minimum-one-credit message and blocks zero-credit submissions. Exact prompt and
-checks are recorded in the UI usage record. Human review pending.
+checks are recorded in the UI usage record.
 
 Credit-picker follow-up, 2026-11-12: zero balance initializes to zero with both
 adjustment buttons disabled. Existing offers clamp when balance changes.
-Boundary tests and exact prompt are in the UI usage record. Human review pending.
+Boundary tests and exact prompt are in the UI usage record.
 
 ### UI bug fixes and chat-service (Maliha)
 
@@ -277,4 +309,4 @@ Chat fixes, ChatGPT (Codex, GPT-6), 2026-11-12: stable merging and chronological
 message display across history/live/ack responses, stale-response cleanup, and
 courier completion-screen return-to-chat navigation using existing one-hour
 backend access. Exact prompt, files and checks:
-[UI chat usage record](ui/ai-usage/chat-bug-fixes.md). Human review pending.
+[UI chat usage record](ui/ai-usage/chat-bug-fixes.md).
