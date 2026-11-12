@@ -161,3 +161,119 @@ deployment, matched the `-migrate` images for order and user, set
   `k8s/credit-service/credit-service.yaml`. User-supplied Beanstalk sample
   (AddressBookApp, `einaregilsson/beanstalk-deploy@v22`, region
   `ap-southeast-1`).
+
+## 007: chat-service CI/CD and Kubernetes manifests
+
+- **Timestamp:** 2026-11-12 (Asia/Singapore).
+- **Tool/model:** Claude Code (Anthropic), Claude Opus 5.5.
+- **Mode/scenario:** New CI/CD workflow and Kubernetes manifests so the chat
+  service (N2H, on `ui/final-n2h`) deploys to EKS like the other services.
+- **Prompts:** [prompts/007-chat-service-k8s-ci-cd.md](prompts/007-chat-service-k8s-ci-cd.md) (2 prompts).
+- **Key responses:**
+  1. "Chat runs exactly one pod with no HPA: Socket.IO keeps chat rooms in the
+     pod's memory, so users on a second pod would not get each other's
+     messages. Scaling it needs the Socket.IO Redis adapter plus sticky
+     sessions. There is no migrate initContainer, because chat-service applies
+     `schema.sql` on startup."
+  2. "No, the first version did not fully follow your spec: it was based on
+     credit's database and the UI workflow instead of supplier's, used a 2Gi
+     volume, built `DATABASE_URL` from separate env entries instead of
+     `envFrom` chat-secrets, had a TCP liveness probe, larger requests, a
+     non-headless Service and an extra test step, and the deploy only waited
+     for the Deployment." All files were then rewritten from the supplier
+     templates to match the spec.
+- **Key output:** `k8s/chat-service/` (ConfigMap, secrets template with
+  `DATABASE_URL`/`PGUSER`/`PGPASSWORD`, Postgres 16 StatefulSet with 1Gi,
+  one-replica Deployment + headless Service on 3005, kustomization);
+  `Chat Service CI` workflow (`npm ci` + `npm run build` in `chat-service/`,
+  image with `context: chat-service`, deploy waiting for `statefulset/chat-db`
+  and `deployment/chat-service`); `CHAT_SERVICE_URL` for nginx; README updates.
+- **Affected locations:** `k8s/chat-service/chat-config.yaml`,
+  `k8s/chat-service/chat-secrets.yaml.example`, `k8s/chat-service/chat-db.yaml`,
+  `k8s/chat-service/chat-service.yaml`, `k8s/chat-service/kustomization.yaml`,
+  `.github/workflows/chat-service.yaml`, `k8s/ui/ui.yaml`, `k8s/README.md`,
+  `ai/prompts/007-chat-service-k8s-ci-cd.md`, `ai/usage-log.md`.
+- **Checks:** `kubectl kustomize k8s/chat-service` renders 5 objects; all new
+  YAML parses; the deploy `sed` pins the image to `sha-<commit>`. Using
+  chat-service from `ui/final-n2h`: `npm ci` and `npm run build` pass, and the
+  `runtime` image builds and starts as uid 1000 with a read-only filesystem.
+  Not yet run on the EKS cluster.
+- **Human review/edits:** Karthika specified the file-by-file spec (templates,
+  values, volume size, probes, deploy waits) and asked AI to confirm it was
+  followed; AI wrote the files, found and fixed where the first version
+  differed, and ran the checks above; Karthika reviewed the workflow.
+- **External sources:** `k8s/supplier-service/` manifests and
+  `.github/workflows/supplier-service.yaml` (templates); `chat-service/`
+  Dockerfile, compose files, `src/env.ts`, `src/index.ts` and `ui/api/chat.ts`
+  on `ui/final-n2h`.
+
+## 008: chat-service autoscaling (Kubernetes side)
+
+- **Timestamp:** 2026-11-12 (Asia/Singapore).
+- **Tool/model:** Claude Code (Anthropic), Claude Opus 5.5.
+- **Mode/scenario:** Preparing chat-service to run more than one pod on EKS.
+- **Prompts:** [prompts/008-chat-service-scaling.md](prompts/008-chat-service-scaling.md) (1 prompt, 1 choice).
+- **Key responses:**
+  1. "Scaling chat isn't a YAML-only change. Socket.IO keeps chat rooms in each
+     pod's memory and the UI starts with HTTP polling, so chat-service needs
+     the Socket.IO Redis adapter and the UI should connect with WebSocket only."
+  2. "Turning on more pods before that code lands would split users across
+     pods and messages would silently stop arriving, so Redis is deployed now
+     and the HPA is ready but switched off."
+- **Key output:** `chat-redis.yaml` and `REDIS_URL` (active); `chat-hpa.yaml`
+  (2–6 pods at 70% CPU, commented out in `kustomization.yaml`); `replicas: 1`
+  kept with instructions; "Enabling chat autoscaling" section in
+  `k8s/README.md` with the chat-service and UI code changes and the two-line
+  switch.
+- **Affected locations:** `k8s/chat-service/chat-redis.yaml`,
+  `k8s/chat-service/chat-hpa.yaml`, `k8s/chat-service/chat-config.yaml`,
+  `k8s/chat-service/kustomization.yaml`, `k8s/chat-service/chat-service.yaml`,
+  `k8s/README.md`, `ai/prompts/008-chat-service-scaling.md`, `ai/usage-log.md`.
+- **Checks:** The README code snippet compiles against chat-service from
+  `ui/final-n2h` (`npm run build`). `kubectl kustomize` renders Redis and one
+  chat pod now, and an HPA with 2–6 pods once the switch is made. Not tested
+  with two live pods or on the EKS cluster.
+- **Human review/edits:** Karthika asked for chat scaling and chose to add the
+  Kubernetes files only, leaving the code change to the chat-service owner;
+  AI wrote the files and the instructions; Karthika has reviewed the code changes as well.
+- **External sources:** `k8s/user-service/user-redis.yaml` and
+  `k8s/credit-service/credit-hpa.yaml` (templates); `chat-service/src/index.ts`,
+  `src/env.ts` and `ui/api/chat.ts` on `ui/final-n2h`; Socket.IO Redis adapter
+  documentation (`@socket.io/redis-adapter`).
+
+## 009: chat-service code for running several pods
+
+- **Timestamp:** 2026-11-12 (Asia/Singapore).
+- **Tool/model:** Claude Code (Anthropic), Claude Opus 5.5.
+- **Mode/scenario:** Code changes on `ui/final-n2h` so chat-service can run
+  more than one pod (Kubernetes side: entry 008).
+- **Prompts:** [prompts/009-chat-scaling-code.md](prompts/009-chat-scaling-code.md) (1 prompt).
+- **Key responses:**
+  1. "With `REDIS_URL` set, chat-service attaches the Socket.IO Redis adapter,
+     so a message sent through one pod reaches users on the other pods.
+     Without it, rooms stay in memory, so local dev is unchanged."
+  2. "Two pods starting together can both run `CREATE TABLE IF NOT EXISTS` and
+     fail with a duplicate-key error, so `migrate()` now takes a Postgres
+     advisory lock and the pods take turns."
+  3. "The UI connects with WebSocket only, so each connection stays on one pod
+     and no sticky sessions are needed."
+- **Key output:** Redis adapter, Redis error logging and shutdown in
+  chat-service; locked `migrate()`; WebSocket-only UI chat client; README and
+  `.env.example` notes.
+- **Affected locations (branch `ui/final-n2h`):** `chat-service/package.json`,
+  `chat-service/package-lock.json`, `chat-service/src/env.ts`,
+  `chat-service/src/index.ts`, `chat-service/src/db.ts`,
+  `chat-service/.env.example`, `chat-service/README.md`, `ui/api/chat.ts`.
+  **(branch `k8s-ui-chat`):** `k8s/README.md`,
+  `ai/prompts/009-chat-scaling-code.md`, `ai/usage-log.md`.
+- **Checks:** chat-service `npm run build`, test type-check and `npm test`
+  (6/6); UI `npm run build`. Two chat instances sharing one Postgres and one
+  Redis, started together on a fresh database, with a stand-in order service
+  and test-signed tokens: requester on instance A and courier on instance B
+  received each other's messages; without Redis, neither did. Not yet run on
+  EKS.
+- **Human review/edits:** Karthika asked for the code changes on
+  `ui/final-n2h`; AI made and tested them; human review pending, and Maliha
+  (chat-service owner) should review before merge.
+- **External sources:** `@socket.io/redis-adapter` and `redis` (node-redis)
+  package documentation; existing chat-service and UI code on `ui/final-n2h`.
