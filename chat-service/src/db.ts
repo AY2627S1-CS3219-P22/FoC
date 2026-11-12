@@ -1,4 +1,5 @@
 // AI-assisted (Claude), reviewed and tested by Maliha
+// Additional use: (Claude Code, Claude Opus 5.5), 2026-11-12: migrate() takes a lock so several pods can start together. See ai/usage-log.md, entry 009.
 import fs from 'node:fs';
 import path from 'node:path';
 import { Pool } from 'pg';
@@ -8,10 +9,27 @@ import { endedAt } from './rules';
 
 export const pool = new Pool({ connectionString: env.DATABASE_URL });
 
-// schema.sql sits next to src/ and dist/, so this works for both
+// Any number for the lock, as long as nothing else in this database uses it
+const MIGRATE_LOCK = 3005;
+
+// schema.sql sits next to src/ and dist/, so this works for both.
+// When several chat pods start at once, running CREATE TABLE IF NOT EXISTS at
+// the same moment can still fail with a duplicate-key error, so the pods take
+// turns: the lock is held until COMMIT, and the next pod finds the tables made.
 export async function migrate() {
   const sql = fs.readFileSync(path.join(__dirname, '..', 'schema.sql'), 'utf8');
-  await pool.query(sql);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock($1)', [MIGRATE_LOCK]);
+    await client.query(sql);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export type Message = {
