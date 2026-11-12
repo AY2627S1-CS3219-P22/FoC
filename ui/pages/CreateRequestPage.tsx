@@ -89,7 +89,8 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
     deliveryLocation: "",
     destinationLocationId: "",
     description: "",
-    credits: clampCreditOffer(4, user.credits),
+    // A zero balance is shown as 0. Anyone who can spend starts at 1.
+    credits: clampCreditOffer(1, user.credits),
   })
 
   useEffect(() => {
@@ -100,6 +101,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
   }, [user.credits])
 
   const set = (k: keyof typeof form, v: string | number) => setForm((f) => ({ ...f, [k]: v }))
+
   // if the balance didn't load, let order-service decide whether there are enough credits
   const creditsAfter = user.credits === null ? null : user.credits - form.credits
   const minimumCreditError = form.credits < 1 ? "A minimum of 1 Credit is required to create an order." : ""
@@ -313,6 +315,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
             <label className="block text-xs font-medium text-[#1B2522] mb-3">Credits offered</label>
             <div className="flex items-center gap-4">
               <button
+                type="button"
                 aria-label="Decrease credits"
                 disabled={form.credits <= 1 || submitting}
                 onClick={() => setForm(previous => ({ ...previous, credits: clampCreditOffer(previous.credits - 1, user.credits) }))}
@@ -325,6 +328,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
                 <span className="text-sm text-[#3F6B5A] ml-1.5">credits</span>
               </div>
               <button
+                type="button"
                 aria-label="Increase credits"
                 disabled={form.credits >= (user.credits ?? 2147483647) || submitting}
                 onClick={() => setForm(previous => ({ ...previous, credits: clampCreditOffer(previous.credits + 1, user.credits) }))}

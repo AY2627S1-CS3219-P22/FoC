@@ -45,6 +45,37 @@ export const creditLabel = (entry: CreditEntry) => LABELS[entry.type] ?? entry.t
 export const creditChange = (entry: CreditEntry) =>
   entry.totalAmountChange !== 0 ? entry.totalAmountChange : -entry.totalReservedChange
 
+// Credit-service appends RESERVATION_UPDATED rows for amount edits. Fold those
+// into the original RESERVED row so the profile list shows one edited hold.
+export function collapseCreditHistory(entries: CreditEntry[]): CreditEntry[] {
+  const reservedByOrder = new Map<string, CreditEntry>()
+  const chronological: CreditEntry[] = []
+
+  for (const entry of [...entries].reverse()) {
+    if (entry.type === "RESERVED" && entry.orderId) {
+      const merged = { ...entry }
+      reservedByOrder.set(entry.orderId, merged)
+      chronological.push(merged)
+      continue
+    }
+    if (entry.type === "RESERVATION_UPDATED" && entry.orderId) {
+      const base = reservedByOrder.get(entry.orderId)
+      if (base) {
+        base.totalReservedChange += entry.totalReservedChange
+        continue
+      }
+      // Base reserve may sit on an earlier page — still show one hold row.
+      const merged = { ...entry, type: "RESERVED" as const }
+      reservedByOrder.set(entry.orderId, merged)
+      chronological.push(merged)
+      continue
+    }
+    chronological.push(entry)
+  }
+
+  return chronological.reverse()
+}
+
 export function creditDescription(entry: CreditEntry, orders: { id: string; description: string; pickupStore: string }[]) {
   if (!entry.orderId) return creditLabel(entry)
   const order = orders.find(order => order.id === entry.orderId)

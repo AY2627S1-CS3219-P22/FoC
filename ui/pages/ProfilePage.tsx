@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react"
 import type { User, Order, Page } from "../App"
 import { formatTime, listOrders } from "../api/orders"
-import { creditChange, creditDescription, getCreditHistory, type CreditEntry } from "../api/credits"
+import { collapseCreditHistory, creditChange, creditDescription, getCreditHistory, type CreditEntry } from "../api/credits"
 
 interface Props {
   user: User
@@ -24,7 +24,7 @@ export default function ProfilePage({ user, onNavigate, onLogout, onResetPasswor
   useEffect(() => {
     listOrders("requested").then(setMyRequests).catch(() => {})
     listOrders("assigned").then(setMyDeliveries).catch(() => {})
-    getCreditHistory(10).then((r) => setHistory(r.entries)).catch(() => setHistory(null))
+    getCreditHistory(10).then((r) => setHistory(collapseCreditHistory(r.entries))).catch(() => setHistory(null))
   }, [])
 
   const delivered = myDeliveries.filter((o) => o.status === "delivered")
