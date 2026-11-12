@@ -4,7 +4,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { editOrder } = require('../api/orders.ts');
-const { creditDescription } = require('../api/credits.ts');
+const { creditDescription, visibleCreditHistory } = require('../api/credits.ts');
 
 test('editing sends PATCH and a stable retry key and distinguishes pending confirmation', async t => {
   const fetchBefore = global.fetch;
@@ -27,11 +27,25 @@ test('editing sends PATCH and a stable retry key and distinguishes pending confi
 });
 
 test('credit history identifies related orders and keeps a fallback when order data is unavailable', () => {
-  const entry = { type: 'RESERVED', orderId: 'order-id' };
-  assert.equal(creditDescription(entry, [{ id: 'order-id', description: 'Tea', pickupStore: 'Cafe' }]),
-    'Cafe — Tea (Reserved for transaction)');
-  assert.equal(creditDescription(entry, []), 'Order order-id (Reserved for transaction)');
+  const orders = [{ id: 'order-id', description: 'Tea', pickupStore: 'Cafe' }];
+  assert.equal(creditDescription({ type: 'TRANSFER_OUT', orderId: 'order-id' }, orders),
+    'Paid a courier — Cafe — Tea');
+  assert.equal(creditDescription({ type: 'TRANSFER_IN', orderId: 'order-id' }, orders),
+    'Paid for a completed request — Cafe — Tea');
+  assert.equal(creditDescription({ type: 'TRANSFER_OUT', orderId: 'order-id' }, []), 'Paid a courier');
   assert.equal(creditDescription({ type: 'INITIAL_GRANT', orderId: null }, []), 'Welcome credits');
+});
+
+test('credit history hides reservations and order credit edits', () => {
+  const visible = visibleCreditHistory([
+    { id: 'reserve', type: 'RESERVED', orderId: 'order-id' },
+    { id: 'edit', type: 'RESERVATION_UPDATED', orderId: 'order-id' },
+    { id: 'release', type: 'RELEASED', orderId: 'order-id' },
+    { id: 'pay', type: 'TRANSFER_OUT', orderId: 'order-id' },
+    { id: 'earn', type: 'TRANSFER_IN', orderId: 'order-id' },
+    { id: 'grant', type: 'INITIAL_GRANT', orderId: null },
+  ]);
+  assert.deepEqual(visible.map(entry => entry.id), ['pay', 'earn', 'grant']);
 });
 
 test('request keys work on HTTP pages without randomUUID', t => {

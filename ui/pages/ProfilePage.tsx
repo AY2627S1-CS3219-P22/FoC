@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react"
 import type { User, Order, Page } from "../App"
 import { formatTime, listOrders } from "../api/orders"
-import { collapseCreditHistory, creditChange, creditDescription, getCreditHistory, type CreditEntry } from "../api/credits"
+import { creditChange, creditDescription, loadVisibleCreditHistory, type CreditEntry } from "../api/credits"
 
 interface Props {
   user: User
@@ -24,7 +24,7 @@ export default function ProfilePage({ user, onNavigate, onLogout, onResetPasswor
   useEffect(() => {
     listOrders("requested").then(setMyRequests).catch(() => {})
     listOrders("assigned").then(setMyDeliveries).catch(() => {})
-    getCreditHistory(10).then((r) => setHistory(collapseCreditHistory(r.entries))).catch(() => setHistory(null))
+    loadVisibleCreditHistory(10).then(setHistory).catch(() => setHistory(null))
   }, [])
 
   const delivered = myDeliveries.filter((o) => o.status === "delivered")
@@ -48,6 +48,9 @@ export default function ProfilePage({ user, onNavigate, onLogout, onResetPasswor
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-1.5 bg-[#E8F1ED] text-[#1A4A36] text-xs font-semibold px-3 py-1.5 rounded-full">
                 {user.credits ?? "–"} Credits
+              </div>
+              <div className="flex items-center gap-1.5 bg-[#F7F9F8] border border-[#E4E8E6] text-[#3F6B5A] text-xs font-semibold px-3 py-1.5 rounded-full">
+                {user.reservedCredits ?? "–"} Reserved
               </div>
               <span className="text-xs text-[#9CA3AF]">Member since {user.memberSince}</span>
             </div>

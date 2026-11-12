@@ -34,8 +34,8 @@ const LABELS: Record<CreditEntry["type"], string> = {
   RESERVED:            "Reserved for transaction",
   RESERVATION_UPDATED: "Request credits changed",
   RELEASED:            "Returned from a cancelled request",
-  TRANSFER_OUT:        "Paid for a delivered request",
-  TRANSFER_IN:         "Earned from a delivery",
+  TRANSFER_OUT:        "Paid a courier",
+  TRANSFER_IN:         "Paid for a completed request",
 }
 
 export const creditLabel = (entry: CreditEntry) => LABELS[entry.type] ?? entry.type
@@ -45,42 +45,34 @@ export const creditLabel = (entry: CreditEntry) => LABELS[entry.type] ?? entry.t
 export const creditChange = (entry: CreditEntry) =>
   entry.totalAmountChange !== 0 ? entry.totalAmountChange : -entry.totalReservedChange
 
-// Credit-service appends RESERVATION_UPDATED rows for amount edits. Fold those
-// into the original RESERVED row so the profile list shows one edited hold.
-export function collapseCreditHistory(entries: CreditEntry[]): CreditEntry[] {
-  const reservedByOrder = new Map<string, CreditEntry>()
-  const chronological: CreditEntry[] = []
+// Reservations and order edits stay on the order. History only records money
+// that actually moved: paying a courier, or being paid for a completed request.
+const VISIBLE_CREDIT_TYPES = new Set<CreditEntry["type"]>(["INITIAL_GRANT", "TRANSFER_OUT", "TRANSFER_IN"])
 
-  for (const entry of [...entries].reverse()) {
-    if (entry.type === "RESERVED" && entry.orderId) {
-      const merged = { ...entry }
-      reservedByOrder.set(entry.orderId, merged)
-      chronological.push(merged)
-      continue
-    }
-    if (entry.type === "RESERVATION_UPDATED" && entry.orderId) {
-      const base = reservedByOrder.get(entry.orderId)
-      if (base) {
-        base.totalReservedChange += entry.totalReservedChange
-        continue
-      }
-      // Base reserve may sit on an earlier page — still show one hold row.
-      const merged = { ...entry, type: "RESERVED" as const }
-      reservedByOrder.set(entry.orderId, merged)
-      chronological.push(merged)
-      continue
-    }
-    chronological.push(entry)
+export function visibleCreditHistory(entries: CreditEntry[]): CreditEntry[] {
+  return entries.filter(entry => VISIBLE_CREDIT_TYPES.has(entry.type))
+}
+
+// Reservation rows can fill a raw page, so keep reading until the visible
+// payments fill the list or the ledger ends.
+export async function loadVisibleCreditHistory(limit = 10): Promise<CreditEntry[]> {
+  const visible: CreditEntry[] = []
+  let pageToken: string | undefined
+  for (let page = 0; page < 20 && visible.length < limit; page++) {
+    const result = await getCreditHistory(50, pageToken)
+    visible.push(...visibleCreditHistory(result.entries))
+    if (!result.nextPageToken) break
+    pageToken = result.nextPageToken
   }
-
-  return chronological.reverse()
+  return visible.slice(0, limit)
 }
 
 export function creditDescription(entry: CreditEntry, orders: { id: string; description: string; pickupStore: string }[]) {
-  if (!entry.orderId) return creditLabel(entry)
+  const label = creditLabel(entry)
+  if (!entry.orderId) return label
   const order = orders.find(order => order.id === entry.orderId)
   const detail = order
     ? [order.pickupStore, order.description].filter(Boolean).join(" — ")
-    : `Order ${entry.orderId}`
-  return `${detail} (${creditLabel(entry)})`
+    : ""
+  return detail ? `${label} — ${detail}` : label
 }
