@@ -1173,45 +1173,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1228,45 +1228,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1283,45 +1283,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1338,45 +1338,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1393,45 +1393,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1448,45 +1448,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1503,45 +1503,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1558,45 +1558,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1613,45 +1613,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1668,45 +1668,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1723,45 +1723,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1778,45 +1778,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1833,45 +1833,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1888,45 +1888,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1943,45 +1943,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -1998,45 +1998,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -2053,45 +2053,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -2108,45 +2108,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -2163,45 +2163,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -2218,45 +2218,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -2273,45 +2273,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -2328,45 +2328,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -2383,45 +2383,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
@@ -2438,45 +2438,45 @@
       "openingHours": [
         {
           "dayOfWeek": 0,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 1,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 2,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 3,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 4,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 5,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         },
         {
           "dayOfWeek": 6,
-          "opensAt": null,
-          "closesAt": null,
-          "isClosed": true
+          "opensAt": "09:00:00",
+          "closesAt": "17:00:00",
+          "isClosed": false
         }
       ],
       "sourceUrl": "https://www.capitaland.com/sg/en/lease/engagement/Geneo-stores.html",
