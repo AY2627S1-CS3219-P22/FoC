@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
+// Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 // ChatGPT (Codex), 2026-11-07: Preserve main HTTP-safe request key and destination/deadline UI; review pending; see ../../order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-06: Complete lifecycle snapshots and UI contract handling; review pending; see order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Catalogue-backed destination selector; review pending; see ../../order-service/usage-log.md.
@@ -7,16 +10,13 @@ import { useEffect, useState } from "react"
 import { DestinationSearch } from "../components/DestinationSearch"
 import type { User, Page } from "../App"
 import { CATEGORIES, categoryLabel, supplierLocation, type Category } from "../api/suppliers"
-import { createOrder, isValidOrderDeadline, orderError, type NewOrder } from "../api/orders"
+import { createOrder, newRequestKey, isValidOrderDeadline, orderError, type NewOrder } from "../api/orders"
 import { useSuppliers } from "../hooks/useSuppliers"
 
-// crypto.randomUUID only exists on secure pages (HTTPS or localhost), and the
-// deployed link is plain http, so fall back to a v4 UUID from getRandomValues
-function newRequestKey() {
-  if (typeof crypto.randomUUID === "function") return crypto.randomUUID()
-  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
-    (Number(c) ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(c) / 4)))).toString(16),
-  )
+export function clampCreditOffer(amount: number, balance: number | null) {
+  const maximum = balance === null ? 2147483647 : Math.max(0, Math.min(balance, 2147483647))
+  const minimum = maximum === 0 ? 0 : 1
+  return Math.min(maximum, Math.max(minimum, amount))
 }
 
 function localDateValue(date: Date) {
@@ -40,6 +40,9 @@ interface Props {
 
 const inputCls =
   "w-full px-3.5 py-2.5 border border-[#E4E8E6] rounded-lg text-sm text-[#1B2522] bg-white focus:outline-none focus:border-[#1A4A36] focus:ring-1 focus:ring-[#1A4A36] transition-colors placeholder-[#9CA3AF]"
+
+export const zeroCreditRequestMessage =
+  "You currently have 0 credits. A request requires a minimum of 1."
 
 export default function CreateRequestPage({ user, onNavigate, onCreated }: Props) {
   const [step, setStep] = useState(1)
@@ -89,12 +92,26 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
     deliveryLocation: "",
     destinationLocationId: "",
     description: "",
-    credits: 4,
+    // A zero balance is shown as 0. Anyone who can spend starts at 1.
+    credits: clampCreditOffer(1, user.credits),
   })
 
+  useEffect(() => {
+    setForm(previous => {
+      const credits = clampCreditOffer(previous.credits, user.credits)
+      return credits === previous.credits ? previous : { ...previous, credits }
+    })
+  }, [user.credits])
+
   const set = (k: keyof typeof form, v: string | number) => setForm((f) => ({ ...f, [k]: v }))
+
   // if the balance didn't load, let order-service decide whether there are enough credits
   const creditsAfter = user.credits === null ? null : user.credits - form.credits
+  const minimumCreditError = user.credits === 0
+    ? zeroCreditRequestMessage
+    : form.credits < 1
+      ? "A minimum of 1 Credit is required to create an order."
+      : ""
   const notEnough = creditsAfter !== null && creditsAfter < 0
 
   const [submitting, setSubmitting] = useState(false)
@@ -103,6 +120,9 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
   const [lastAttempt, setLastAttempt] = useState<{ body: string; key: string } | null>(null)
 
   const handleSubmit = async () => {
+    if (user.credits === 0) { setSubmitError(zeroCreditRequestMessage); return }
+    if (notEnough) { setSubmitError("Insufficient credits."); return }
+    if (minimumCreditError) { setSubmitError(minimumCreditError); return }
     if (!form.destinationLocationId) { setStep(2); return }
     if (!validateDeadline()) { setStep(2); return }
     const order: NewOrder = {
@@ -131,6 +151,21 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
 
   const step1Valid = !!form.pickupLocation && !!form.supplier
   const step2Valid = !!form.destinationLocationId && form.description.trim().length > 0 && deadlineValid
+
+  if (user.credits === 0) {
+    return (
+      <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6 sm:py-8">
+        <button
+          onClick={() => onNavigate("orders")}
+          className="mb-6 flex items-center gap-1.5 text-sm text-[#3F6B5A] transition-colors hover:text-[#1A4A36]"
+        >
+          Back to Orders
+        </button>
+        <h1 className="mb-2 text-xl font-semibold text-[#162A46]">Create a Request</h1>
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{zeroCreditRequestMessage}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6 sm:py-8">
@@ -303,8 +338,11 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
             <label className="block text-xs font-medium text-[#1B2522] mb-3">Credits offered</label>
             <div className="flex items-center gap-4">
               <button
-                onClick={() => set("credits", Math.max(1, form.credits - 1))}
-                className="w-10 h-10 border border-[#E4E8E6] rounded-lg flex items-center justify-center hover:bg-[#F7F9F8] text-xl text-[#1B2522] transition-colors"
+                type="button"
+                aria-label="Decrease credits"
+                disabled={form.credits <= 1 || submitting}
+                onClick={() => setForm(previous => ({ ...previous, credits: clampCreditOffer(previous.credits - 1, user.credits) }))}
+                className="w-10 h-10 border border-[#E4E8E6] rounded-lg flex items-center justify-center hover:bg-[#F7F9F8] text-xl text-[#1B2522] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 −
               </button>
@@ -313,8 +351,11 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
                 <span className="text-sm text-[#3F6B5A] ml-1.5">credits</span>
               </div>
               <button
-                onClick={() => set("credits", user.credits === null ? form.credits + 1 : Math.min(user.credits, form.credits + 1))}
-                className="w-10 h-10 border border-[#E4E8E6] rounded-lg flex items-center justify-center hover:bg-[#F7F9F8] text-xl text-[#1B2522] transition-colors"
+                type="button"
+                aria-label="Increase credits"
+                disabled={form.credits >= (user.credits ?? 2147483647) || submitting}
+                onClick={() => setForm(previous => ({ ...previous, credits: clampCreditOffer(previous.credits + 1, user.credits) }))}
+                className="w-10 h-10 border border-[#E4E8E6] rounded-lg flex items-center justify-center hover:bg-[#F7F9F8] text-xl text-[#1B2522] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 +
               </button>
@@ -348,7 +389,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
               ].map(({ label, value }) => (
                 <div key={label} className="flex gap-4">
                   <span className="text-xs text-[#3F6B5A] w-20 flex-shrink-0 pt-0.5">{label}</span>
-                  <span className="text-xs text-[#1B2522] flex-1 font-medium">{value}</span>
+                  <span className="text-xs text-[#1B2522] min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere] font-medium">{value}</span>
                 </div>
               ))}
             </div>
@@ -362,10 +403,10 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
           </p>
 
           {!deadlineValid && <p role="alert" className="text-xs text-red-600">Go back and choose a delivery time at least one hour from now.</p>}
-          {submitError && <p role="alert" className="text-xs text-red-600">{submitError}</p>}
+          {(minimumCreditError || submitError) && <p role="alert" className="text-xs text-red-600">{minimumCreditError || submitError}</p>}
           <button
             onClick={handleSubmit}
-            disabled={notEnough || !deadlineValid || submitting}
+            disabled={!!minimumCreditError || notEnough || !deadlineValid || submitting}
             className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {submitting ? "Placing request…" : "Place Request"}

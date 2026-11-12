@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: Show all missing signup password requirements together.
+// Human review pending; see ui/ai-usage/ui-order-fix.md.
 import React, { useState } from "react"
 import type { Page } from "../App"
 import { ApiError } from "../api/client"
@@ -11,31 +14,37 @@ interface Props {
 // same rule as user-service's registerDto
 const NUS_EMAIL = /@(u\.nus\.edu|nus\.edu\.sg)$/i
 
+export function passwordRequirements(password: string): string[] {
+  const issues: string[] = []
+  if (password.length < 8) issues.push("Password must be at least 8 characters.")
+  if (!/[A-Z]/.test(password)) issues.push("Password requires at least one uppercase letter.")
+  if (!/[0-9]/.test(password)) issues.push("Password requires at least one number.")
+  if (!/[^A-Za-z0-9]/.test(password)) issues.push("Password requires at least one special character.")
+  return issues
+}
+
 export default function SignupPage({ onOtpSent, onNavigate }: Props) {
   const [form, setForm] = useState({ firstName: "", lastName: "", username: "", email: "", password: "", confirm: "" })
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }))
   const [restorePrompt, setRestorePrompt] = useState(false)
   const [confirmRestore, setConfirmRestore] = useState(false)
-  const [error, setError] = useState("")
+  const [errors, setErrors] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
 
   // Same rules as user-service, so users see problems before submitting
   const validate = () => {
-    if (!form.firstName || !form.lastName || !form.username) return "Please fill in your name and username."
-    if (!NUS_EMAIL.test(form.email)) return "Use your NUS email (@u.nus.edu or @nus.edu.sg)."
-    if (form.password.length < 8) return "Password must be at least 8 characters."
-    if (!/[A-Z]/.test(form.password)) return "Password needs an uppercase letter."
-    if (!/[0-9]/.test(form.password)) return "Password needs a number."
-    if (!/[^A-Za-z0-9]/.test(form.password)) return "Password needs a special character."
-    if (form.password !== form.confirm) return "Passwords don't match."
-    return ""
+    const problems = passwordRequirements(form.password)
+    if (!form.firstName || !form.lastName || !form.username) problems.unshift("Please fill in your name and username.")
+    if (!NUS_EMAIL.test(form.email)) problems.unshift("Use your NUS email (@u.nus.edu or @nus.edu.sg).")
+    if (form.password !== form.confirm) problems.push("Passwords don't match.")
+    return problems
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const problem = validate()
-    if (problem) { setError(problem); return }
-    setError("")
+    if (problem.length) { setErrors(problem); return }
+    setErrors([])
     setLoading(true)
     const { confirm: _confirm, ...data } = form
     try {
@@ -46,7 +55,7 @@ export default function SignupPage({ onOtpSent, onNavigate }: Props) {
       if (err instanceof ApiError && err.status === 409 && message.toLowerCase().includes("deleted account")) {
         setRestorePrompt(true)
       }
-      setError(message)
+      setErrors([message])
     } finally {
       setLoading(false)
     }
@@ -115,8 +124,10 @@ export default function SignupPage({ onOtpSent, onNavigate }: Props) {
                 </span>
               </label>
             )}
-            {error && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
+            {errors.length > 0 && (
+              <ul role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 space-y-1">
+                {errors.map(message => <li key={message}>{message}</li>)}
+              </ul>
             )}
             <button
               type="submit"

@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
+// Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import { api } from "./client"
 
@@ -28,11 +31,11 @@ export const getCreditHistory = (pageSize = 10, pageToken?: string) => {
 
 const LABELS: Record<CreditEntry["type"], string> = {
   INITIAL_GRANT:       "Welcome credits",
-  RESERVED:            "Held for a request",
+  RESERVED:            "Reserved for transaction",
   RESERVATION_UPDATED: "Request credits changed",
   RELEASED:            "Returned from a cancelled request",
-  TRANSFER_OUT:        "Paid for a delivered request",
-  TRANSFER_IN:         "Earned from a delivery",
+  TRANSFER_OUT:        "Paid a courier",
+  TRANSFER_IN:         "Paid for a completed request",
 }
 
 export const creditLabel = (entry: CreditEntry) => LABELS[entry.type] ?? entry.type
@@ -41,3 +44,35 @@ export const creditLabel = (entry: CreditEntry) => LABELS[entry.type] ?? entry.t
 // part, so show that change for those
 export const creditChange = (entry: CreditEntry) =>
   entry.totalAmountChange !== 0 ? entry.totalAmountChange : -entry.totalReservedChange
+
+// Reservations and order edits stay on the order. History only records money
+// that actually moved: paying a courier, or being paid for a completed request.
+const VISIBLE_CREDIT_TYPES = new Set<CreditEntry["type"]>(["INITIAL_GRANT", "TRANSFER_OUT", "TRANSFER_IN"])
+
+export function visibleCreditHistory(entries: CreditEntry[]): CreditEntry[] {
+  return entries.filter(entry => VISIBLE_CREDIT_TYPES.has(entry.type))
+}
+
+// Reservation rows can fill a raw page, so keep reading until the visible
+// payments fill the list or the ledger ends.
+export async function loadVisibleCreditHistory(limit = 10): Promise<CreditEntry[]> {
+  const visible: CreditEntry[] = []
+  let pageToken: string | undefined
+  for (let page = 0; page < 20 && visible.length < limit; page++) {
+    const result = await getCreditHistory(50, pageToken)
+    visible.push(...visibleCreditHistory(result.entries))
+    if (!result.nextPageToken) break
+    pageToken = result.nextPageToken
+  }
+  return visible.slice(0, limit)
+}
+
+export function creditDescription(entry: CreditEntry, orders: { id: string; description: string; pickupStore: string }[]) {
+  const label = creditLabel(entry)
+  if (!entry.orderId) return label
+  const order = orders.find(order => order.id === entry.orderId)
+  const detail = order
+    ? [order.pickupStore, order.description].filter(Boolean).join(" — ")
+    : ""
+  return detail ? `${label} — ${detail}` : label
+}

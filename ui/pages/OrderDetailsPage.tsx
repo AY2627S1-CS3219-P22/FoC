@@ -1,8 +1,12 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
+// Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 // ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Mirror backend requester exclusion for courier actions; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
-import { useState } from "react"
+import { useRef, useState } from "react"
 import type { Order } from "../App"
+import { editOrder, getOrder, newRequestKey, isValidOrderDeadline, orderError, type OrderPatch } from "../api/orders"
 import StatusBadge from "../components/StatusBadge"
 import { useOrder } from "../hooks/useOrder"
 
@@ -15,9 +19,54 @@ interface Props {
 }
 
 export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, onAccepted, onDelivered }: Props) {
-  const { order, actionError, busy, loadError, run } = useOrder(initialOrder)
+  const { order, setOrder, actionError, busy, loadError, run } = useOrder(initialOrder)
   const [showAcceptModal, setShowAcceptModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
+
+
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editMessage, setEditMessage] = useState("")
+  const [draft, setDraft] = useState({ requestDetails: "", credits: 1, expiryTime: "" })
+  const retry = useRef<{ payload: string; key: string } | null>(null)
+  const startEdit = () => {
+    const date = new Date(order.expiryTime ?? "")
+    const local = Number.isFinite(+date)
+      ? new Date(+date - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""
+    setDraft({ requestDetails: order.description, credits: order.credits, expiryTime: local })
+    setEditMessage("")
+    setEditing(true)
+  }
+  const saveEdit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (saving || busy) return
+    const timestamp = new Date(draft.expiryTime).getTime()
+    if (!draft.requestDetails.trim() || !Number.isInteger(draft.credits) || draft.credits < 1
+      || !isValidOrderDeadline(timestamp, Date.now())) {
+      setEditMessage("Enter instructions, a positive whole credit amount, and a deadline at least one hour from now.")
+      return
+    }
+    const patch: OrderPatch = { ...draft, expiryTime: new Date(timestamp).toISOString() }
+    const payload = JSON.stringify(patch)
+    if (retry.current?.payload !== payload) retry.current = { payload, key: newRequestKey() }
+    setSaving(true)
+    setEditMessage("")
+    try {
+      const result = await editOrder(order.id, patch, retry.current.key)
+      if (result.pending) {
+        setEditMessage("Your edit is pending credit confirmation. Retry these same details to check it, or reopen the order later.")
+      } else {
+        setOrder(await getOrder(order.id))
+        setEditing(false)
+        setEditMessage("Order updated.")
+        retry.current = null
+      }
+    } catch (error) {
+      setEditMessage(orderError(error))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const isRequester = order.requesterId === currentUserId
   const isCourier   = !isRequester && order.courierId === currentUserId
@@ -127,6 +176,33 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
         </div>
       </div>
 
+      {editMessage && <p role="status" className="mb-4 text-sm text-[#3F6B5A]">{editMessage}</p>}
+      {isRequester && isOpen && (
+        editing ? <form onSubmit={saveEdit} className="bg-white border border-[#E4E8E6] rounded-xl p-5 mb-4 space-y-3">
+          <h2 className="font-semibold text-[#162A46]">Edit order</h2>
+          <label className="block text-sm">Instructions
+            <textarea required value={draft.requestDetails} disabled={saving}
+              onChange={e => setDraft({ ...draft, requestDetails: e.target.value })}
+              className="block w-full border rounded p-2 mt-1" />
+          </label>
+          <label className="block text-sm">Credits offered
+            <input type="number" required min="1" max="2147483647" step="1" value={draft.credits} disabled={saving}
+              onChange={e => setDraft({ ...draft, credits: Number(e.target.value) })}
+              className="block w-full border rounded p-2 mt-1" />
+          </label>
+          <label className="block text-sm">Deadline
+            <input type="datetime-local" required value={draft.expiryTime} disabled={saving}
+              onChange={e => setDraft({ ...draft, expiryTime: e.target.value })}
+              className="block w-full border rounded p-2 mt-1" />
+          </label>
+          <p className="text-xs text-[#3F6B5A]">The deadline must be at least one hour from now. Credit changes update your reservation.</p>
+          <div className="flex gap-3">
+            <button type="submit" disabled={saving || busy} className="rounded-lg bg-[#1A4A36] text-white px-4 py-2 disabled:opacity-50">{saving ? "Saving…" : "Save changes"}</button>
+            <button type="button" disabled={saving} onClick={() => setEditing(false)} className="px-4 py-2">Close editor</button>
+          </div>
+        </form> : <button onClick={startEdit} disabled={busy || saving} className="w-full mb-4 py-2.5 border border-[#E4E8E6] rounded-lg text-sm font-medium">Edit order</button>
+      )}
+
       {/* Requester */}
       <div className="bg-white border border-[#E4E8E6] rounded-xl p-4 mb-5">
         <p className="text-xs text-[#3F6B5A] mb-3 font-medium">Requested by</p>
@@ -180,7 +256,7 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
           </button>
           <button
             onClick={() => setShowAcceptModal(true)}
-            disabled={busy}
+            disabled={busy || saving || editing}
             className="flex-1 py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-50 transition-colors"
           >
             Accept Request
@@ -194,7 +270,7 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
           {order.status === "accepted" && (
             <button
               onClick={pickup}
-              disabled={busy}
+              disabled={busy || saving || editing}
               className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-50 transition-colors"
             >
               Mark as Picked Up
@@ -203,7 +279,7 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
           {order.status === "picked-up" && (
             <button
               onClick={deliver}
-              disabled={busy}
+              disabled={busy || saving || editing}
               className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-50 transition-colors"
             >
               Mark as Delivered
@@ -232,7 +308,7 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
             {isOpen && (
               <button
                 onClick={() => setShowCancelModal(true)}
-                disabled={busy}
+                disabled={busy || saving || editing}
                 className="flex-1 py-2.5 border border-red-100 text-red-500 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
               >
                 Cancel Request

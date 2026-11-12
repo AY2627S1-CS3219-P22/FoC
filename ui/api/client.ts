@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
+// Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 // Error with the HTTP status so pages can tell "wrong password" (4xx)
 // apart from "service not running" (5xx / network).
 export class ApiError extends Error {
@@ -54,7 +57,7 @@ function send(path: string, options: RequestInit) {
 
 // Shared fetch helper: adds JSON headers + login token, throws on errors.
 // On a 401 it refreshes the token once and retries.
-export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiResponse<T>(path: string, options: RequestInit = {}): Promise<{ data: T; status: number }> {
   let res: Response
   try {
     res = await send(path, options)
@@ -66,5 +69,8 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   }
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new ApiError(errorMessage(body, res.status), res.status)
-  return body as T
+  return { data: body as T, status: res.status }
+}
+export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return (await apiResponse<T>(path, options)).data
 }

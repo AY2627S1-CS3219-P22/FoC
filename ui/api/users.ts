@@ -51,4 +51,10 @@ export const deleteMe = () => api<{ message: string }>("/users/me", { method: "D
 
 export const getMe = () => api<{ user: ApiUser }>("/users/me").then((r) => r.user)
 
+export const updateMe = (profile: { firstName: string; lastName: string; username: string }) =>
+  api<{ user: ApiUser }>("/users/me", {
+    method: "PATCH",
+    body: JSON.stringify(profile),
+  }).then((r) => r.user)
+
 export const logout = () => api<void>("/users/logout", { method: "POST" })

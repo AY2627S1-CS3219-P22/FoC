@@ -1,9 +1,12 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
+// Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 // ChatGPT (Codex), 2026-11-06: Complete lifecycle snapshots and UI contract handling; review pending; see order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Selected destination ID contract; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import type { Order } from "../App"
-import { api, ApiError } from "./client"
+import { api, apiResponse, ApiError } from "./client"
 
 // Order as returned by order-service
 export type ApiOrder = {
@@ -59,6 +62,7 @@ const toOrder = (o: ApiOrder): Order => ({
   description: o.requestDetails,
   credits: o.credits,
   deadline: formatTime(o.expiryTime),
+  expiryTime: o.expiryTime,
   status: orderStatus(o),
   requesterId: o.requesterId,
   requesterName: o.requesterName,
@@ -68,8 +72,8 @@ const toOrder = (o: ApiOrder): Order => ({
   createdAt: formatTime(o.createdAt),
 })
 
-export const listOrders = (scope: OrderScope) =>
-  api<{ orders: ApiOrder[] }>(`/orders?scope=${scope}`).then((r) => r.orders.map(toOrder))
+export const listOrders = (scope: OrderScope, signal?: AbortSignal) =>
+  api<{ orders: ApiOrder[] }>(`/orders?scope=${scope}`, { signal }).then((r) => r.orders.map(toOrder))
 
 export const getOrder = (id: string, signal?: AbortSignal) =>
   api<{ order: ApiOrder }>(`/orders/${encodeURIComponent(id)}`, { signal })
@@ -132,4 +136,24 @@ export function deliveryFeedback(order: Pick<Order, 'creditState' | 'credits'> |
 
 export function isValidOrderDeadline(timestamp: number, now: number) {
   return Number.isFinite(timestamp) && timestamp - now >= 60 * 60 * 1000
+}
+
+export type OrderPatch = Pick<NewOrder, "requestDetails" | "credits" | "expiryTime">
+
+export async function editOrder(id: string, patch: OrderPatch, key: string) {
+  const response = await apiResponse<{ order: ApiOrder }>(`/orders/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Idempotency-Key": key },
+    body: JSON.stringify(patch),
+  })
+  return { pending: response.status === 202 }
+}
+
+// crypto.randomUUID only exists on secure pages (HTTPS or localhost), and the
+// deployed link is plain http, so fall back to a v4 UUID from getRandomValues
+export function newRequestKey() {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID()
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
+    (Number(c) ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(c) / 4)))).toString(16),
+  )
 }

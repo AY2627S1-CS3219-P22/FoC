@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
+// Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 // ChatGPT (Codex), 2026-11-06: Complete lifecycle snapshots and UI contract handling; review pending; see order-service/usage-log.md.
 // AI Assistance Disclosure: ChatGPT (Codex), 2026-11-02.
 // Scope: Pass authenticated viewer identity to courier page; review pending; see ../order-service/usage-log.md.
@@ -45,6 +48,7 @@ export interface Order {
   deliveryLocation: string
   description: string
   credits: number
+  expiryTime?: string
   deadline: string
   status: "open" | "accepted" | "picked-up" | "delivered" | "cancelled" | "expired"
   requesterId: string
@@ -58,8 +62,13 @@ export interface Order {
 export interface User {
   id: string
   name: string
+  firstName: string
+  lastName: string
+  username: string
   email: string
-  credits: number | null  // null until credit-service answers
+  credits: number | null  // available credits; null until credit-service answers
+  totalCredits: number | null
+  reservedCredits: number | null
   memberSince: string
   isAdmin: boolean
 }
@@ -67,8 +76,13 @@ export interface User {
 const CURRENT_USER: User = {
   id: "u1",
   name: "Jordan Tan",
+  firstName: "Jordan",
+  lastName: "Tan",
+  username: "jordantan",
   email: "jordan.tan@u.nus.edu",
   credits: null,
+  totalCredits: null,
+  reservedCredits: null,
   memberSince: "September 2026",
   isAdmin: false,
 }
@@ -77,6 +91,9 @@ const fromApiUser = (u: ApiUser): User => ({
   ...CURRENT_USER,
   id: u.id,
   name: `${u.firstName} ${u.lastName}`,
+  firstName: u.firstName,
+  lastName: u.lastName,
+  username: u.username,
   email: u.email,
   memberSince: new Date(u.createdAt).toLocaleDateString("en-SG", { month: "long", year: "numeric" }),
   isAdmin: u.roles.includes("ADMINISTRATOR"),
@@ -153,13 +170,23 @@ export default function App() {
 
   // keeps the mock user if user-service isn't running
   const loadUser = () => getMe()
-    .then((u) => setUser((prev) => ({ ...fromApiUser(u), credits: prev.credits })))
+    .then((u) => setUser((prev) => ({
+      ...fromApiUser(u),
+      credits: prev.credits,
+      totalCredits: prev.totalCredits,
+      reservedCredits: prev.reservedCredits,
+    })))
     .catch(() => {})
 
   // balance shows as "–" if credit-service is down or has no account for this user yet
   const loadCredits = () => getBalance()
-    .then((b) => setUser((prev) => ({ ...prev, credits: b.availableCredits })))
-    .catch(() => setUser((prev) => ({ ...prev, credits: null })))
+    .then((b) => setUser((prev) => ({
+      ...prev,
+      credits: b.availableCredits,
+      totalCredits: b.totalCredits,
+      reservedCredits: b.reservedCredits,
+    })))
+    .catch(() => setUser((prev) => ({ ...prev, credits: null, totalCredits: null, reservedCredits: null })))
 
   // creating, delivering and cancelling all move credits, so refresh on every page change
   useEffect(() => {
@@ -316,6 +343,12 @@ export default function App() {
             user={user}
             onNavigate={navigate}
             onLogout={handleLogout}
+            onUpdated={(updated) => setUser((prev) => ({
+              ...fromApiUser(updated),
+              credits: prev.credits,
+              totalCredits: prev.totalCredits,
+              reservedCredits: prev.reservedCredits,
+            }))}
             onResetPassword={async () => {
               const sent = await requestResetPassword()
               setOtp({ kind: "reset", email: user.email, message: sent.message })
