@@ -63,7 +63,8 @@ export interface User {
   id: string
   name: string
   email: string
-  credits: number | null  // null until credit-service answers
+  credits: number | null  // available credits; null until credit-service answers
+  totalCredits: number | null
   reservedCredits: number | null
   memberSince: string
   isAdmin: boolean
@@ -74,6 +75,7 @@ const CURRENT_USER: User = {
   name: "Jordan Tan",
   email: "jordan.tan@u.nus.edu",
   credits: null,
+  totalCredits: null,
   reservedCredits: null,
   memberSince: "September 2026",
   isAdmin: false,
@@ -159,13 +161,23 @@ export default function App() {
 
   // keeps the mock user if user-service isn't running
   const loadUser = () => getMe()
-    .then((u) => setUser((prev) => ({ ...fromApiUser(u), credits: prev.credits, reservedCredits: prev.reservedCredits })))
+    .then((u) => setUser((prev) => ({
+      ...fromApiUser(u),
+      credits: prev.credits,
+      totalCredits: prev.totalCredits,
+      reservedCredits: prev.reservedCredits,
+    })))
     .catch(() => {})
 
   // balance shows as "–" if credit-service is down or has no account for this user yet
   const loadCredits = () => getBalance()
-    .then((b) => setUser((prev) => ({ ...prev, credits: b.availableCredits, reservedCredits: b.reservedCredits })))
-    .catch(() => setUser((prev) => ({ ...prev, credits: null, reservedCredits: null })))
+    .then((b) => setUser((prev) => ({
+      ...prev,
+      credits: b.availableCredits,
+      totalCredits: b.totalCredits,
+      reservedCredits: b.reservedCredits,
+    })))
+    .catch(() => setUser((prev) => ({ ...prev, credits: null, totalCredits: null, reservedCredits: null })))
 
   // creating, delivering and cancelling all move credits, so refresh on every page change
   useEffect(() => {

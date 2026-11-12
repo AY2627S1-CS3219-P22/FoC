@@ -46,8 +46,11 @@ export default function ProfilePage({ user, onNavigate, onLogout, onResetPasswor
             <h2 className="text-base font-semibold text-[#162A46] mb-0.5">{user.name}</h2>
             <p className="text-sm text-[#3F6B5A] mb-3 truncate">{user.email}</p>
             <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 bg-[#162A46]/75 text-white text-xs font-semibold px-3 py-1.5 rounded-full">
+                {user.totalCredits ?? "–"} Total
+              </div>
               <div className="flex items-center gap-1.5 bg-[#E8F1ED] text-[#1A4A36] text-xs font-semibold px-3 py-1.5 rounded-full">
-                {user.credits ?? "–"} Credits
+                {user.credits ?? "–"} Available
               </div>
               <div className="flex items-center gap-1.5 bg-[#F7F9F8] border border-[#E4E8E6] text-[#3F6B5A] text-xs font-semibold px-3 py-1.5 rounded-full">
                 {user.reservedCredits ?? "–"} Reserved
