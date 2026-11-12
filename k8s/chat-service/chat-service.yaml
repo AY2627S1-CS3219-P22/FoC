@@ -9,13 +9,9 @@ metadata:
   namespace: foc
   labels: { app.kubernetes.io/name: chat-service, app.kubernetes.io/part-of: foc }
 spec:
-  # One pod for now: Socket.IO keeps each errand's chat room in the pod's
-  # memory, so users on a second pod would not get each other's messages.
-  # chat-redis.yaml and chat-hpa.yaml are ready for scaling. Once chat-service
-  # uses the Redis adapter and the UI connects with WebSocket only, delete this
-  # line and enable chat-hpa.yaml in kustomization.yaml (the HPA then owns the
-  # pod count; leaving this line in would reset it to 1 on every deploy).
-  replicas: 1
+  # No `replicas` here: chat-hpa.yaml owns the pod count (2-6). Setting it here
+  # would reset chat to that number on every deploy.
+  # Pods share chat rooms through the Socket.IO Redis adapter (chat-redis.yaml).
   selector:
     matchLabels: { app.kubernetes.io/name: chat-service }
   template:

@@ -14,5 +14,5 @@ data: # ports here need to match containerPort and probes in *-service.yaml file
   ORDER_SERVICE_URL: http://order-service.foc.svc.cluster.local:3003
   USER_SERVICE_PUBLIC_KEY_PATH: /app/keys/public.pem
   # Socket.IO Redis adapter (chat-redis.yaml); lets chat pods share chat rooms.
-  # Unused until chat-service reads it (see k8s/README.md, "Enabling chat autoscaling").
+  # Shares chat rooms between chat pods (see k8s/README.md, "Chat autoscaling").
   REDIS_URL: redis://chat-redis:6379
