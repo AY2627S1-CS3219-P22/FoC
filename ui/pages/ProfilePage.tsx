@@ -5,17 +5,23 @@ import { useEffect, useState } from "react"
 import type { User, Order, Page } from "../App"
 import { formatTime, listOrders } from "../api/orders"
 import { creditChange, creditDescription, loadVisibleCreditHistory, type CreditEntry } from "../api/credits"
+import { updateMe, type ApiUser } from "../api/users"
 
 interface Props {
   user: User
   onNavigate: (page: Page) => void
   onLogout: () => void
+  onUpdated: (user: ApiUser) => void
   onResetPassword: () => Promise<void>
 }
 
-export default function ProfilePage({ user, onNavigate, onLogout, onResetPassword }: Props) {
+export default function ProfilePage({ user, onNavigate, onLogout, onUpdated, onResetPassword }: Props) {
   const [resetError, setResetError] = useState("")
   const [resetting, setResetting] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editMessage, setEditMessage] = useState("")
+  const [draft, setDraft] = useState({ firstName: "", lastName: "", username: "" })
   const [myRequests, setMyRequests]     = useState<Order[]>([])
   const [myDeliveries, setMyDeliveries] = useState<Order[]>([])
   const [history, setHistory]           = useState<CreditEntry[] | null>(null)
@@ -29,6 +35,38 @@ export default function ProfilePage({ user, onNavigate, onLogout, onResetPasswor
 
   const delivered = myDeliveries.filter((o) => o.status === "delivered")
   const initials = user.name.split(" ").map((n) => n[0]).join("").slice(0, 2)
+  const inputCls = "block w-full border border-[#E4E8E6] rounded-lg px-3 py-2 mt-1 text-sm text-[#1B2522] focus:outline-none focus:border-[#1A4A36]"
+
+  const startEdit = () => {
+    setDraft({ firstName: user.firstName, lastName: user.lastName, username: user.username })
+    setEditMessage("")
+    setEditing(true)
+  }
+
+  const saveProfile = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (saving) return
+    const profile = {
+      firstName: draft.firstName.trim(),
+      lastName: draft.lastName.trim(),
+      username: draft.username.trim(),
+    }
+    if (!profile.firstName || !profile.lastName || !profile.username) {
+      setEditMessage("Enter a first name, last name, and username.")
+      return
+    }
+    setSaving(true)
+    setEditMessage("")
+    try {
+      onUpdated(await updateMe(profile))
+      setEditing(false)
+      setEditMessage("Profile updated.")
+    } catch (error) {
+      setEditMessage(error instanceof Error ? error.message : "Could not update your profile.")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-2xl px-3 py-5 sm:px-6 sm:py-8">
@@ -37,13 +75,27 @@ export default function ProfilePage({ user, onNavigate, onLogout, onResetPasswor
       </div>
 
       {/* Profile card */}
-      <div className="bg-white border border-[#E4E8E6] rounded-xl p-6 mb-4">
-        <div className="flex items-start gap-4">
+      <div className="relative bg-white border border-[#E4E8E6] rounded-xl p-6 mb-4">
+        {!editing && (
+          <button
+            type="button"
+            onClick={startEdit}
+            aria-label="Edit profile"
+            className="absolute top-4 right-4 w-8 h-8 rounded-lg border border-[#E4E8E6] text-[#3F6B5A] hover:bg-[#F7F9F8] hover:text-[#1A4A36] flex items-center justify-center"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 7.125L16.862 4.487" />
+            </svg>
+          </button>
+        )}
+        <div className="flex items-start gap-4 pr-10">
           <div className="w-14 h-14 rounded-full bg-[#162A46] text-white text-lg font-semibold flex items-center justify-center flex-shrink-0">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-[#162A46] mb-0.5">{user.name}</h2>
+            <p className="text-sm text-[#3F6B5A] truncate">@{user.username}</p>
             <p className="text-sm text-[#3F6B5A] mb-3 truncate">{user.email}</p>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-1.5 bg-[#162A46]/75 text-white text-xs font-semibold px-3 py-1.5 rounded-full">
@@ -59,6 +111,25 @@ export default function ProfilePage({ user, onNavigate, onLogout, onResetPasswor
             </div>
           </div>
         </div>
+        {editMessage && <p role="status" className={`mt-4 text-sm ${editing ? "text-red-600" : "text-[#3F6B5A]"}`}>{editMessage}</p>}
+        {editing ? (
+          <form onSubmit={saveProfile} className="mt-4 space-y-3 border-t border-[#E4E8E6] pt-4">
+            <label className="block text-sm text-[#1B2522]">First name
+              <input required value={draft.firstName} disabled={saving} onChange={e => setDraft({ ...draft, firstName: e.target.value })} className={inputCls} />
+            </label>
+            <label className="block text-sm text-[#1B2522]">Last name
+              <input required value={draft.lastName} disabled={saving} onChange={e => setDraft({ ...draft, lastName: e.target.value })} className={inputCls} />
+            </label>
+            <label className="block text-sm text-[#1B2522]">Username
+              <input required value={draft.username} disabled={saving} onChange={e => setDraft({ ...draft, username: e.target.value })} className={inputCls} />
+            </label>
+            <p className="text-xs text-[#3F6B5A]">Email stays {user.email}.</p>
+            <div className="flex gap-3">
+              <button type="submit" disabled={saving} className="rounded-lg bg-[#1A4A36] text-white px-4 py-2 text-sm disabled:opacity-50">{saving ? "Saving…" : "Save profile"}</button>
+              <button type="button" disabled={saving} onClick={() => { setEditing(false); setEditMessage("") }} className="px-4 py-2 text-sm text-[#3F6B5A]">Cancel</button>
+            </div>
+          </form>
+        ) : null}
       </div>
 
       {/* Stats */}

@@ -62,6 +62,9 @@ export interface Order {
 export interface User {
   id: string
   name: string
+  firstName: string
+  lastName: string
+  username: string
   email: string
   credits: number | null  // available credits; null until credit-service answers
   totalCredits: number | null
@@ -73,6 +76,9 @@ export interface User {
 const CURRENT_USER: User = {
   id: "u1",
   name: "Jordan Tan",
+  firstName: "Jordan",
+  lastName: "Tan",
+  username: "jordantan",
   email: "jordan.tan@u.nus.edu",
   credits: null,
   totalCredits: null,
@@ -85,6 +91,9 @@ const fromApiUser = (u: ApiUser): User => ({
   ...CURRENT_USER,
   id: u.id,
   name: `${u.firstName} ${u.lastName}`,
+  firstName: u.firstName,
+  lastName: u.lastName,
+  username: u.username,
   email: u.email,
   memberSince: new Date(u.createdAt).toLocaleDateString("en-SG", { month: "long", year: "numeric" }),
   isAdmin: u.roles.includes("ADMINISTRATOR"),
@@ -334,6 +343,12 @@ export default function App() {
             user={user}
             onNavigate={navigate}
             onLogout={handleLogout}
+            onUpdated={(updated) => setUser((prev) => ({
+              ...fromApiUser(updated),
+              credits: prev.credits,
+              totalCredits: prev.totalCredits,
+              reservedCredits: prev.reservedCredits,
+            }))}
             onResetPassword={async () => {
               const sent = await requestResetPassword()
               setOtp({ kind: "reset", email: user.email, message: sent.message })
