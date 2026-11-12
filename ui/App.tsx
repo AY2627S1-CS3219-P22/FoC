@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: Stable chat ordering and post-completion courier access.
+// Human review pending; see ui/ai-usage/chat-bug-fixes.md.
 // AI-assisted (Claude Opus 5.5), 2026-11-12: supplierId on orders; see ui/ai-usage/usage-log.md, entry 002
 // AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
 // Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
@@ -334,6 +337,8 @@ export default function App() {
         {page === "errand-complete" && (
           <SuccessScreen
             title="Errand completed"
+            secondaryLabel={completedOrder ? "Return to chat" : undefined}
+            onSecondary={() => { if (completedOrder) navigate("order-details", completedOrder) }}
             accent={deliveryFeedback(completedOrder).accent}
             subtitle={deliveryFeedback(completedOrder).subtitle}
             primaryLabel="Back to Orders"

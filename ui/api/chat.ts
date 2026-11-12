@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: Stable chat ordering and post-completion courier access.
+// Human review pending; see ui/ai-usage/chat-bug-fixes.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 // AI-assisted (Claude Opus 5.5), 2026-11-12: closesAt in the join reply; see ui/ai-usage/usage-log.md, entry 003
 import { io, type Socket } from "socket.io-client"
@@ -80,3 +83,22 @@ export const getFlags = (includeReviewed = false) =>
 
 export const reviewFlag = (id: string) =>
   api<unknown>(`/chat/flags/${id}/review`, { method: "POST" })
+
+// Combine history, socket events and acknowledgements without losing read receipts.
+// sentAt is server-generated; numeric message IDs break timestamp ties.
+export function mergeChatMessages(current: ChatMessage[], incoming: ChatMessage[]) {
+  const messages = new Map(current.map(message => [message.id, message]))
+  for (const message of incoming) {
+    const previous = messages.get(message.id)
+    messages.set(message.id, { ...message, readAt: message.readAt ?? previous?.readAt ?? null })
+  }
+  return [...messages.values()].sort((a, b) => {
+    const time = Date.parse(a.sentAt) - Date.parse(b.sentAt)
+    if (time) return time
+    if (/^\d+$/.test(a.id) && /^\d+$/.test(b.id)) {
+      const left = BigInt(a.id), right = BigInt(b.id)
+      return left < right ? -1 : left > right ? 1 : 0
+    }
+    return a.id.localeCompare(b.id)
+  })
+}

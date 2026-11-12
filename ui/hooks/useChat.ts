@@ -1,8 +1,11 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: Stable chat ordering and post-completion courier access.
+// Human review pending; see ui/ai-usage/chat-bug-fixes.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 // AI-assisted (Claude Opus 5.5), 2026-11-12: re-join on status change, close at closesAt; see ui/ai-usage/usage-log.md, entry 003
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
-  ask, getChatSocket,
+  ask, getChatSocket, mergeChatMessages,
   type ChatErrorCode, type ChatMessage, type JoinReply, type SendReply,
 } from "../api/chat"
 
@@ -19,15 +22,34 @@ export function useChat(orderId: string, status?: string) {
   const [error, setError]       = useState<ChatErrorCode | null>(null)
   const [loading, setLoading]   = useState(true)
 
+  const session = useRef({ active: false })
+  const lastOrder = useRef(orderId)
+
   useEffect(() => {
+    const current = { active: true }
+    session.current = current
+    let joinVersion = 0
+    setLoading(true)
+    setCanSend(false)
+    setError(null)
+    if (lastOrder.current !== orderId) {
+      setMessages([])
+      setMe("")
+      setOther(null)
+      setClosesAt(null)
+      lastOrder.current = orderId
+    }
     const socket = getChatSocket()
     let myId = ""
 
     const join = async () => {
+      const version = ++joinVersion
       const reply = await ask<JoinReply>("chat:join", { orderId })
+      if (!current.active || version !== joinVersion) return
       setLoading(false)
       if ("error" in reply) {
         setError(reply.error)
+        setCanSend(false)
         return
       }
       myId = reply.me
@@ -36,27 +58,27 @@ export function useChat(orderId: string, status?: string) {
       setOther(reply.other)
       setCanSend(reply.canSend)
       setClosesAt(reply.closesAt)
-      setMessages(reply.messages)
+      setMessages(previous => mergeChatMessages(previous, reply.messages))
     }
 
     const onMessage = (m: ChatMessage) => {
-      if (m.orderId !== orderId) return
+      if (!current.active || m.orderId !== orderId) return
       // my own message also arrives here, after the send reply added it
-      setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]))
+      setMessages(prev => mergeChatMessages(prev, [m]))
       // it's on screen, so it's read
       if (m.senderId !== myId) ask("chat:read", { orderId })
     }
 
     // the other person has seen everything I sent so far
     const onRead = (r: { orderId: string; readerId: string }) => {
-      if (r.orderId !== orderId || r.readerId === myId) return
+      if (!current.active || r.orderId !== orderId || r.readerId === myId) return
       const now = new Date().toISOString()
       setMessages((prev) => prev.map((m) => (m.senderId === myId && !m.readAt ? { ...m, readAt: now } : m)))
     }
 
     // chat-service down: say so. Socket.IO keeps retrying and "connect" re-joins
     const onConnectError = (err: Error) => {
-      if (err.message === "unauthorized") return
+      if (!current.active || err.message === "unauthorized") return
       setLoading(false)
       setError("unavailable")
     }
@@ -69,6 +91,7 @@ export function useChat(orderId: string, status?: string) {
     if (socket.connected) join()
 
     return () => {
+      current.active = false
       socket.off("chat:message", onMessage)
       socket.off("chat:read", onRead)
       socket.off("connect", join)
@@ -81,7 +104,7 @@ export function useChat(orderId: string, status?: string) {
   useEffect(() => {
     if (!closesAt) return
     // messages are deleted at this point too, so drop them and show the closed note
-    const close = () => { setCanSend(false); setMessages([]); setError("closed") }
+    const close = () => { session.current.active = false; setCanSend(false); setMessages([]); setError("closed") }
     const left = new Date(closesAt).getTime() - Date.now()
     if (left <= 0) { close(); return }
     const timer = window.setTimeout(close, left)
@@ -90,12 +113,14 @@ export function useChat(orderId: string, status?: string) {
 
   // resolves to an error code, or null once it's sent
   const send = async (text: string): Promise<{ error: ChatErrorCode | null; masked: boolean }> => {
+    const current = session.current
     const reply = await ask<SendReply>("chat:send", { orderId, text })
+    if (!current.active) return { error: "closed", masked: false }
     if ("error" in reply) {
       if (reply.error === "closed") setCanSend(false)
       return { error: reply.error, masked: false }
     }
-    setMessages((prev) => (prev.some((x) => x.id === reply.message.id) ? prev : [...prev, reply.message]))
+    setMessages(prev => mergeChatMessages(prev, [reply.message]))
     return { error: null, masked: reply.masked }
   }
 

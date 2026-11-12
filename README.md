@@ -272,3 +272,9 @@ Boundary tests and exact prompt are in the UI usage record. Human review pending
   with exact prompts in [ui/ai-usage/prompts/](ui/ai-usage/prompts/).
 - **Review:** Automated checks are recorded in the log. Author review and live
   backend testing pending.
+
+Chat fixes, ChatGPT (Codex, GPT-6), 2026-11-12: stable merging and chronological
+message display across history/live/ack responses, stale-response cleanup, and
+courier completion-screen return-to-chat navigation using existing one-hour
+backend access. Exact prompt, files and checks:
+[UI chat usage record](ui/ai-usage/chat-bug-fixes.md). Human review pending.

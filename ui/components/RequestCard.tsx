@@ -1,3 +1,6 @@
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: Stable chat ordering and post-completion courier access.
+// Human review pending; see ui/ai-usage/chat-bug-fixes.md.
 import type { Order } from "../App"
 import StatusBadge from "../components/StatusBadge"
 
@@ -69,7 +72,7 @@ export default function RequestCard({ order, onClick, actions = {}, busy = false
           {/* Default: view details when no primary action */}
           {!hasDeliveryAction && (
             <span className="text-xs font-medium text-[#1A4A36] border border-[#E4E8E6] px-2.5 py-1 rounded-md hover:bg-[#E8F1ED] transition-colors">
-              View Details
+              {order.courierId ? "View Details & Chat" : "View Details"}
             </span>
           )}
 
