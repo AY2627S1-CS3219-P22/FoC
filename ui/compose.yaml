@@ -20,6 +20,7 @@ services:
       SUPPLIER_SERVICE_URL: http://supplier-service:3002
       ORDER_SERVICE_URL: http://order-service:3003
       CREDIT_SERVICE_URL: http://credit-service:3004
+      CHAT_SERVICE_URL: http://chat-service:3005
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/health']
       interval: 10s

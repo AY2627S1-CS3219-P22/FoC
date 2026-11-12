@@ -3,6 +3,13 @@
 # Serves the built UI and forwards /backend/* to each service, same as the
 # Vite dev proxy. Only this container is exposed to the browser.
 
+# Socket.IO (chat) upgrades its connection to a WebSocket, which needs these
+# headers passed through. Plain requests keep Connection: close as before.
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  ''      close;
+}
+
 server {
   listen 80;
   root /usr/share/nginx/html;
@@ -46,6 +53,17 @@ server {
     set $credits ${CREDIT_SERVICE_URL};
     rewrite ^/backend(/.*)$ $1 break;
     proxy_pass $credits;
+  }
+
+  # REST for admin flags plus the Socket.IO connection at /backend/chat/socket.io
+  location /backend/chat {
+    set $chat ${CHAT_SERVICE_URL};
+    rewrite ^/backend(/.*)$ $1 break;
+    proxy_pass $chat;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    # a chat can sit idle for a while, keep the socket open
+    proxy_read_timeout 1h;
   }
 
   # build output has hashed names, so it can be cached for good

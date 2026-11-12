@@ -1,5 +1,8 @@
+// AI-assisted (Claude Opus 5.5), 2026-11-12: all password problems in one warning, show/hide toggle; see ui/ai-usage/usage-log.md, entry 002
 import React, { useState } from "react"
 import { completeResetPassword, verifyRegister } from "../api/users"
+import PasswordInput from "../components/PasswordInput"
+import { passwordRequirements } from "./SignupPage"
 
 export type OtpKind = "register" | "reset"
 
@@ -10,41 +13,34 @@ interface Props {
   onBack: () => void
 }
 
-const passwordProblem = (password: string, confirm: string) => {
-  if (password.length < 8) return "Password must be at least 8 characters."
-  if (!/[A-Z]/.test(password)) return "Password needs an uppercase letter."
-  if (!/[0-9]/.test(password)) return "Password needs a number."
-  if (!/[^A-Za-z0-9]/.test(password)) return "Password needs a special character."
-  if (password !== confirm) return "Passwords don't match."
-  return ""
+// list every problem at once, same as sign up
+const passwordProblems = (password: string, confirm: string) => {
+  const problems = passwordRequirements(password)
+  if (password !== confirm) problems.push("Passwords don't match.")
+  return problems
 }
 
 export default function OtpVerifyPage({ kind, email, onVerified, onBack }: Props) {
   const [otp, setOtp] = useState("")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
-  const [error, setError] = useState("")
+  const [errors, setErrors] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const needsPassword = kind !== "register"
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!/^\d{6}$/.test(otp)) {
-      setError("Enter the 6-digit code.")
-      return
-    }
-    if (needsPassword) {
-      const problem = passwordProblem(password, confirm)
-      if (problem) { setError(problem); return }
-    }
-    setError("")
+    const problems = needsPassword ? passwordProblems(password, confirm) : []
+    if (!/^\d{6}$/.test(otp)) problems.unshift("Enter the 6-digit code.")
+    if (problems.length) { setErrors(problems); return }
+    setErrors([])
     setLoading(true)
     try {
       if (kind === "register") await verifyRegister(email, otp)
       else await completeResetPassword(otp, password)
       onVerified()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification failed.")
+      setErrors([err instanceof Error ? err.message : "Verification failed."])
     } finally {
       setLoading(false)
     }
@@ -70,15 +66,19 @@ export default function OtpVerifyPage({ kind, email, onVerified, onBack }: Props
             <>
               <div>
                 <label className="block text-xs font-medium text-[#1B2522] mb-1.5">New password</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} />
+                <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-[#1B2522] mb-1.5">Confirm password</label>
-                <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={inputCls} />
+                <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} className={inputCls} />
               </div>
             </>
           )}
-          {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+          {errors.length > 0 && (
+            <ul role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 space-y-1">
+              {errors.map((message) => <li key={message}>{message}</li>)}
+            </ul>
+          )}
           <button type="submit" disabled={loading} className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-60">
             {loading ? "Checking…" : kind === "register" ? "Create account" : "Update password"}
           </button>

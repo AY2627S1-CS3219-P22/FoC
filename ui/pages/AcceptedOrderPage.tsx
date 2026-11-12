@@ -1,9 +1,13 @@
+// AI-assisted (Claude Opus 5.5), 2026-11-12: pass order status to the chat; see ui/ai-usage/usage-log.md, entry 003
+// AI-assisted (Claude Opus 5.5), 2026-11-12: finished progress tracker, pickup place name; see ui/ai-usage/usage-log.md, entry 002
 // ChatGPT (Codex), 2026-11-03: Single-order retrieval with approved visibility rules; review pending; see order-service/usage-log.md.
 // ChatGPT (Codex), 2026-11-02: Enforce courier-only action visibility/handlers; review pending; see ../../order-service/usage-log.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 import type { Order } from "../App"
+import ChatPanel from "../components/ChatPanel"
 import StatusBadge from "../components/StatusBadge"
 import { useOrder } from "../hooks/useOrder"
+import { mapsLink, usePickupPlace } from "../hooks/usePickupPlace"
 
 interface Props {
   initialOrder: Order
@@ -17,7 +21,8 @@ const STEPS = ["Accepted", "Picked Up", "Delivered"] as const
 
 function stepIndex(status: Order["status"]): number {
   if (status === "picked-up") return 1
-  if (status === "delivered") return 2
+  // past the last step, so "Delivered" gets a tick instead of staying "current"
+  if (status === "delivered") return STEPS.length
   return 0
 }
 
@@ -25,6 +30,8 @@ export default function AcceptedOrderPage({ initialOrder, currentUserId, onDeliv
   const { order, actionError, busy, loadError, run } = useOrder(initialOrder)
 
   const current = stepIndex(order.status)
+  const pickupPlace = usePickupPlace(order)
+  const pickupMap = mapsLink(order.pickupLocation)
   const isCourier = order.courierId === currentUserId && order.requesterId !== currentUserId
 
   const pickup = async () => {
@@ -111,7 +118,7 @@ export default function AcceptedOrderPage({ initialOrder, currentUserId, onDeliv
         <div className="space-y-2.5">
           {[
             { label: "Requester",      value: order.requesterName },
-            { label: "Pickup",         value: `${order.pickupStore} · ${order.pickupLocation}` },
+            { label: "Pickup",         value: [order.pickupStore, pickupPlace].filter(Boolean).join(" · ") },
             { label: "Deliver to",     value: order.deliveryLocation },
             { label: "Instructions",   value: order.description },
             { label: "Credits to earn",value: `${order.credits} credits` },
@@ -119,11 +126,16 @@ export default function AcceptedOrderPage({ initialOrder, currentUserId, onDeliv
           ].map(({ label, value }) => (
             <div key={label} className="flex gap-4">
               <span className="text-xs text-[#3F6B5A] w-28 flex-shrink-0 pt-0.5">{label}</span>
-              <span className="text-xs text-[#1B2522] flex-1 font-medium leading-relaxed">{value}</span>
+              <span className="text-xs text-[#1B2522] min-w-0 flex-1 font-medium leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{value}</span>
             </div>
           ))}
+          {pickupMap && (
+            <a href={pickupMap} target="_blank" rel="noreferrer" className="inline-block text-xs text-[#1A4A36] underline">Open pickup in Maps</a>
+          )}
         </div>
       </div>
+
+      <ChatPanel orderId={order.id} status={order.status} />
 
       {actionError && (
         <p role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-center text-xs text-red-600">{actionError}</p>

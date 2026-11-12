@@ -1,9 +1,11 @@
+// AI-assisted (Claude Opus 5.5), 2026-11-12: show/hide password toggle; see ui/ai-usage/usage-log.md, entry 002
 // AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
 // Scope: Show all missing signup password requirements together.
 // Human review pending; see ui/ai-usage/ui-order-fix.md.
 import React, { useState } from "react"
 import type { Page } from "../App"
 import { ApiError } from "../api/client"
+import PasswordInput from "../components/PasswordInput"
 import { register } from "../api/users"
 
 interface Props {
@@ -34,8 +36,9 @@ export default function SignupPage({ onOtpSent, onNavigate }: Props) {
   // Same rules as user-service, so users see problems before submitting
   const validate = () => {
     const problems = passwordRequirements(form.password)
-    if (!form.firstName || !form.lastName || !form.username) problems.unshift("Please fill in your name and username.")
+    // same order as the form: name, email, then password
     if (!NUS_EMAIL.test(form.email)) problems.unshift("Use your NUS email (@u.nus.edu or @nus.edu.sg).")
+    if (!form.firstName || !form.lastName || !form.username) problems.unshift("Please fill in your name and username.")
     if (form.password !== form.confirm) problems.push("Passwords don't match.")
     return problems
   }
@@ -102,13 +105,22 @@ export default function SignupPage({ onOtpSent, onNavigate }: Props) {
             {fields.map(({ key, label, type, placeholder }) => (
               <div key={key}>
                 <label className="block text-xs font-medium text-[#1B2522] mb-1.5">{label}</label>
-                <input
-                  type={type}
-                  value={form[key]}
-                  onChange={(e) => set(key, e.target.value)}
-                  placeholder={placeholder}
-                  className={inputCls}
-                />
+                {type === "password" ? (
+                  <PasswordInput
+                    value={form[key]}
+                    onChange={(e) => set(key, e.target.value)}
+                    placeholder={placeholder}
+                    className={inputCls}
+                  />
+                ) : (
+                  <input
+                    type={type}
+                    value={form[key]}
+                    onChange={(e) => set(key, e.target.value)}
+                    placeholder={placeholder}
+                    className={inputCls}
+                  />
+                )}
               </div>
             ))}
             {restorePrompt && (

@@ -44,7 +44,7 @@ microservice (`user-service/`, `supplier-service/`, `order-service/`,
 ├── credit-service/
 ├── shared/               # gRPC contracts/clients, RabbitMQ messaging
 ├── ui/
-├── <n2h-service>/
+├── chat-service/       # N2H: errand chat + content filter
 └── README.md
 ```
 
@@ -67,6 +67,7 @@ cp user-service/.env.example user-service/.env
 cp supplier-service/.env.example supplier-service/.env
 cp credit-service/.env.example credit-service/.env
 cp order-service/.env.example order-service/.env
+cp chat-service/.env.example chat-service/.env
 ```
 
 Then, from the repository root:
@@ -108,6 +109,7 @@ configuration predictable.
 | Supplier service | 3002 | 50052 | 54332 |
 | Order service | 3003 | 50053 | 5434 |
 | Credit service | 3004 | 50054 | 5433 |
+| Chat service (N2H) | 3005 | — | 5436 |
 | UI (nginx) | 8080 | — | — |
 | RabbitMQ | — | — | 5672 (AMQP), 15672 (management UI) |
 
@@ -255,3 +257,24 @@ checks are recorded in the UI usage record. Human review pending.
 Credit-picker follow-up, 2026-11-12: zero balance initializes to zero with both
 adjustment buttons disabled. Existing offers clamp when balance changes.
 Boundary tests and exact prompt are in the UI usage record. Human review pending.
+
+### UI bug fixes and chat-service (Maliha)
+
+- **Tool and modes:** Claude (Anthropic, claude.ai), Claude Opus 5.5. Code
+  review, debugging, implementation, regression tests and documentation on
+  2026-11-12.
+- **Scope:** Review of PR #118; UI fixes from the author's bug list (pickup
+  place names, order progress, full order details, profile role, password
+  warnings, "Deliver by" wording, show/hide password); chat closing 1 h after
+  the errand ends with a notice to both people; combining the N2H branch
+  with main in one PR.
+- **Prompts and key responses:** [ui/ai-usage/usage-log.md](ui/ai-usage/usage-log.md),
+  with exact prompts in [ui/ai-usage/prompts/](ui/ai-usage/prompts/).
+- **Review:** Automated checks are recorded in the log. Author review and live
+  backend testing pending.
+
+Chat fixes, ChatGPT (Codex, GPT-6), 2026-11-12: stable merging and chronological
+message display across history/live/ack responses, stale-response cleanup, and
+courier completion-screen return-to-chat navigation using existing one-hour
+backend access. Exact prompt, files and checks:
+[UI chat usage record](ui/ai-usage/chat-bug-fixes.md). Human review pending.

@@ -1,3 +1,4 @@
+// AI-assisted (Claude Opus 5.5), 2026-11-12: merge with main, keep restored-balance label and show it in history; see ui/ai-usage/usage-log.md, entry 004
 // AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
 // Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
 // Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
@@ -14,7 +15,7 @@ export type Balance = {
 export type CreditEntry = {
   id: string
   orderId: string | null
-  type: "INITIAL_GRANT" | "RESERVED" | "RESERVATION_UPDATED" | "RELEASED" | "TRANSFER_OUT" | "TRANSFER_IN"
+  type: "INITIAL_GRANT" | "BALANCE_RESTORED" | "RESERVED" | "RESERVATION_UPDATED" | "RELEASED" | "TRANSFER_OUT" | "TRANSFER_IN"
   totalAmountChange: number
   totalReservedChange: number
   createdAt: string
@@ -31,6 +32,8 @@ export const getCreditHistory = (pageSize = 10, pageToken?: string) => {
 
 const LABELS: Record<CreditEntry["type"], string> = {
   INITIAL_GRANT:       "Welcome credits",
+  // re-registered after deleting the account, old balance comes back
+  BALANCE_RESTORED:    "Balance restored from your old account",
   RESERVED:            "Reserved for transaction",
   RESERVATION_UPDATED: "Request credits changed",
   RELEASED:            "Returned from a cancelled request",
@@ -47,7 +50,7 @@ export const creditChange = (entry: CreditEntry) =>
 
 // Reservations and order edits stay on the order. History only records money
 // that actually moved: paying a courier, or being paid for a completed request.
-const VISIBLE_CREDIT_TYPES = new Set<CreditEntry["type"]>(["INITIAL_GRANT", "TRANSFER_OUT", "TRANSFER_IN"])
+const VISIBLE_CREDIT_TYPES = new Set<CreditEntry["type"]>(["INITIAL_GRANT", "BALANCE_RESTORED", "TRANSFER_OUT", "TRANSFER_IN"])
 
 export function visibleCreditHistory(entries: CreditEntry[]): CreditEntry[] {
   return entries.filter(entry => VISIBLE_CREDIT_TYPES.has(entry.type))

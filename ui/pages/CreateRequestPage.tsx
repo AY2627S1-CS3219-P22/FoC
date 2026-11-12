@@ -1,3 +1,4 @@
+// AI-assisted (Claude Opus 5.5), 2026-11-12: clearer "deliver by" wording, one deadline error at a time; see ui/ai-usage/usage-log.md, entry 002
 // AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
 // Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
 // Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
@@ -76,7 +77,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
     const currentTime = Date.now()
     setNow(currentTime)
     if (!isValidOrderDeadline(deadlineTimestamp, currentTime)) {
-      setDeadlineError("Choose a delivery date and time at least one hour from now.")
+      setDeadlineError("Pick a time at least 1 hour from now.")
       return false
     }
     setDeadlineError("")
@@ -297,7 +298,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
             />
           </div>
           <fieldset className="min-w-0">
-            <legend className="mb-3 text-xs font-medium text-[#1B2522]">Preferred delivery / deadline</legend>
+            <legend className="mb-3 text-xs font-medium text-[#1B2522]">Deliver by</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="min-w-0">
                 <label htmlFor="delivery-date" className="mb-1.5 block text-xs text-[#3F6B5A]">Date</label>
@@ -314,9 +315,9 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
                 </select>
               </div>
             </div>
-            <p id="deadline-help" className="mt-2 text-xs text-[#3F6B5A]">At least one hour ahead, within the next 30 days, in 15-minute intervals. Times use your local time zone.</p>
+            <p id="deadline-help" className="mt-2 text-xs text-[#3F6B5A]">The latest time you need it. Pick something at least 1 hour from now so a courier has time to accept. If no one delivers by then, the request expires and your credits come back.</p>
             {!DELIVERY_TIMES.some((time) => isValidOrderDeadline(new Date(`${deliveryDate}T${time.value}:00`).getTime(), now)) && <p className="mt-2 text-xs text-amber-700">No times remain for this date. Choose a later date.</p>}
-            {(deadlineError || (deliveryTime && !deadlineValid)) && <p role="alert" className="mt-2 text-xs text-red-600">{deadlineError || "Choose a delivery time at least one hour from now."}</p>}
+            {(deadlineError || (deliveryTime && !deadlineValid)) && <p role="alert" className="mt-2 text-xs text-red-600">{deadlineError || "That time is now less than 1 hour away. Pick a later one."}</p>}
           </fieldset>
           <button
             onClick={() => { if (validateDeadline()) setStep(3) }}
@@ -384,7 +385,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
                 { label: "Pickup",       value: form.supplier },
                 { label: "Deliver to",   value: form.deliveryLocation },
                 { label: "Instructions", value: form.description },
-                { label: "Deadline",     value: deadlineLabel },
+                { label: "Deliver by",   value: deadlineLabel },
                 { label: "Credits",      value: `${form.credits} credits reserved` },
               ].map(({ label, value }) => (
                 <div key={label} className="flex gap-4">
@@ -402,7 +403,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
             Credits will be reserved when this request is created.
           </p>
 
-          {!deadlineValid && <p role="alert" className="text-xs text-red-600">Go back and choose a delivery time at least one hour from now.</p>}
+          {!deadlineValid && <p role="alert" className="text-xs text-red-600">That time is now less than 1 hour away. Go back and pick a later one.</p>}
           {(minimumCreditError || submitError) && <p role="alert" className="text-xs text-red-600">{minimumCreditError || submitError}</p>}
           <button
             onClick={handleSubmit}

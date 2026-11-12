@@ -1,4 +1,8 @@
 // AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
+// Scope: Stable chat ordering and post-completion courier access.
+// Human review pending; see ui/ai-usage/chat-bug-fixes.md.
+// AI-assisted (Claude Opus 5.5), 2026-11-12: supplierId on orders; see ui/ai-usage/usage-log.md, entry 002
+// AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
 // Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
 // Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 // ChatGPT (Codex), 2026-11-06: Complete lifecycle snapshots and UI contract handling; review pending; see order-service/usage-log.md.
@@ -19,10 +23,12 @@ import OtpVerifyPage, { type OtpKind } from "./pages/OtpVerifyPage"
 import DeleteAccountPage from "./pages/DeleteAccountPage"
 import AdminPage from "./pages/AdminPage"
 import SuppliersPage from "./pages/SuppliersPage"
+import ChatPanel from "./components/ChatPanel"
 import { getMe, logout, requestResetPassword, type ApiUser } from "./api/users"
 import { deliveryFeedback } from "./api/orders"
 import { getBalance } from "./api/credits"
 import { refreshToken } from "./api/client"
+import { closeChatSocket } from "./api/chat"
 
 export type Page =
   | "login"
@@ -43,8 +49,9 @@ export type Page =
 
 export interface Order {
   id: string
-  pickupLocation: string
+  pickupLocation: string  // order-service stores the supplier's "lat, lng" here
   pickupStore: string
+  supplierId?: string
   deliveryLocation: string
   description: string
   credits: number
@@ -107,6 +114,7 @@ function SuccessScreen({
   secondaryLabel,
   onPrimary,
   onSecondary,
+  compact,
 }: {
   title: string
   subtitle: string
@@ -115,9 +123,10 @@ function SuccessScreen({
   secondaryLabel?: string
   onPrimary: () => void
   onSecondary?: () => void
+  compact?: boolean
 }) {
   return (
-    <div className="flex items-center justify-center min-h-[80vh] px-4">
+    <div className={`flex items-center justify-center px-4 ${compact ? "py-8" : "min-h-[80vh]"}`}>
       <div className="text-center max-w-xs mx-auto">
         <div className="w-14 h-14 rounded-full bg-[#E8F1ED] flex items-center justify-center mx-auto mb-5">
           <svg className="w-7 h-7 text-[#1A4A36]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -214,6 +223,8 @@ export default function App() {
   const handleLogout = () => {
     logout().catch(() => {})
     localStorage.removeItem("token")
+    // so the next person to log in doesn't reuse this chat connection
+    closeChatSocket()
     setUser(CURRENT_USER)
     setIsLoggedIn(false)
     navigate("login")
@@ -327,13 +338,21 @@ export default function App() {
         )}
 
         {page === "errand-complete" && (
-          <SuccessScreen
-            title="Errand completed"
-            accent={deliveryFeedback(completedOrder).accent}
-            subtitle={deliveryFeedback(completedOrder).subtitle}
-            primaryLabel="Back to Orders"
-            onPrimary={() => navigate("orders")}
-          />
+          <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6">
+            <SuccessScreen
+              compact
+              title="Errand completed"
+              secondaryLabel={completedOrder ? "Return to chat" : undefined}
+              onSecondary={() => { if (completedOrder) navigate("order-details", completedOrder) }}
+              accent={deliveryFeedback(completedOrder).accent}
+              subtitle={deliveryFeedback(completedOrder).subtitle}
+              primaryLabel="Back to Orders"
+              onPrimary={() => navigate("orders")}
+            />
+            {completedOrder?.courierId && (
+              <ChatPanel orderId={completedOrder.id} status={completedOrder.status} />
+            )}
+          </div>
         )}
 
         {page === "suppliers" && <SuppliersPage />}

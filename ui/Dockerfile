@@ -20,6 +20,7 @@ ENV USER_SERVICE_URL=http://host.docker.internal:3001 \
     SUPPLIER_SERVICE_URL=http://host.docker.internal:3002 \
     ORDER_SERVICE_URL=http://host.docker.internal:3003 \
     CREDIT_SERVICE_URL=http://host.docker.internal:3004 \
+    CHAT_SERVICE_URL=http://host.docker.internal:3005 \
     DNS_RESOLVER=127.0.0.11
 
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
