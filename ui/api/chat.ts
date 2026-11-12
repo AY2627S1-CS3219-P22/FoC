@@ -3,6 +3,7 @@
 // Human review pending; see ui/ai-usage/chat-bug-fixes.md.
 // AI-assisted (Claude), reviewed and tested by Maliha
 // AI-assisted (Claude Opus 5.5), 2026-11-12: closesAt in the join reply; see ui/ai-usage/usage-log.md, entry 003
+// Additional use: (Claude Code, Claude Opus 5.5), 2026-11-12: WebSocket-only transport for multi-pod chat. See ai/usage-log.md, entry 009.
 import { io, type Socket } from "socket.io-client"
 import { api, refreshToken } from "./client"
 
@@ -42,6 +43,9 @@ export function getChatSocket() {
   if (socket) return socket
   socket = io({
     path: "/backend/chat/socket.io",
+    // WebSocket only, no HTTP polling first: the whole connection then stays
+    // on one chat pod, so several pods work without sticky sessions
+    transports: ["websocket"],
     auth: (cb) => cb({ token: localStorage.getItem("token") }),
   })
   // access token expired: get a new one and try again

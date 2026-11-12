@@ -8,6 +8,7 @@ content filtering (F10.5). Owner: Maliha.
 ## Stack
 
 - Express 5 + Socket.IO 4, Node 22, TypeScript
+- Optional Redis (`@socket.io/redis-adapter`) to share chat rooms between instances
 - PostgreSQL 16 through `pg`. Tables are created on startup from `schema.sql`
   (`IF NOT EXISTS`), so there is no separate migrate job
 - Verifies user-service's RS256 access tokens with its public key
@@ -66,6 +67,14 @@ npm run dev
 
 **Tests:** `npm test` (content filter and chat open/close rules).
 
+**Running several instances** (EKS, see `k8s/README.md`): set `REDIS_URL`. The
+Socket.IO Redis adapter then passes room events between instances, so a requester
+and courier connected to different pods still get each other's messages. The UI
+connects with WebSocket only, so each connection stays on one pod and no sticky
+sessions are needed. Instances that start together take turns creating the
+tables (a Postgres advisory lock in `migrate()`). Without `REDIS_URL`, rooms stay
+in memory, which is fine for one instance.
+
 ## Ports
 
 | | Host (standalone only) | Container |
@@ -80,7 +89,7 @@ Everything is under `/chat`, so the UI forwards `/backend/chat` → `chat-servic
 ### Socket.IO
 
 ```ts
-io({ path: '/backend/chat/socket.io', auth: { token } })   // through the UI
+io({ path: '/backend/chat/socket.io', transports: ['websocket'], auth: { token } })   // through the UI
 ```
 
 A missing or bad token fails with connect error `unauthorized`.
