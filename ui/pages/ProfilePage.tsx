@@ -1,8 +1,12 @@
+// AI-assisted (Claude), reviewed and tested by Maliha
+// AI-assisted (Claude Opus 5.5), 2026-11-12: show account role next to the name; see ui/ai-usage/usage-log.md, entry 002
+// AI-assisted (Claude Opus 5.5), 2026-11-12: merge with main, one delete-account button; see ui/ai-usage/usage-log.md, entry 004
 // AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
 // Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
 // Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
 import { useEffect, useState } from "react"
 import type { User, Order, Page } from "../App"
+import { deleteError, deleteMe } from "../api/users"
 import { formatTime, listOrders } from "../api/orders"
 import { creditChange, creditDescription, loadVisibleCreditHistory, type CreditEntry } from "../api/credits"
 import { updateMe, type ApiUser } from "../api/users"
@@ -25,6 +29,30 @@ export default function ProfilePage({ user, onNavigate, onLogout, onUpdated, onR
   const [myRequests, setMyRequests]     = useState<Order[]>([])
   const [myDeliveries, setMyDeliveries] = useState<Order[]>([])
   const [history, setHistory]           = useState<CreditEntry[] | null>(null)
+
+  // delete account: confirm -> (error | done message) -> logged out
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting]           = useState(false)
+  const [deleteMsg, setDeleteMsg]         = useState("")
+  const [deletedMsg, setDeletedMsg]       = useState("")
+
+  const closeDelete = () => {
+    setConfirmDelete(false)
+    setDeleteMsg("")
+  }
+
+  const deleteAccount = async () => {
+    setDeleting(true)
+    setDeleteMsg("")
+    try {
+      setDeletedMsg(await deleteMe())
+      setConfirmDelete(false)
+    } catch (err) {
+      setDeleteMsg(deleteError(err))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   // stats just stay at 0 if order-service isn't up
   useEffect(() => {
@@ -94,7 +122,14 @@ export default function ProfilePage({ user, onNavigate, onLogout, onUpdated, onR
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-[#162A46] mb-0.5">{user.name}</h2>
+            <div className="flex flex-wrap items-center gap-2 mb-0.5">
+              <h2 className="text-base font-semibold text-[#162A46]">{user.name}</h2>
+              <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                user.isAdmin ? "bg-[#162A46] text-white" : "bg-[#E8F1ED] text-[#1A4A36]"
+              }`}>
+                {user.isAdmin ? "Administrator" : "User"}
+              </span>
+            </div>
             <p className="text-sm text-[#3F6B5A] truncate">@{user.username}</p>
             <p className="text-sm text-[#3F6B5A] mb-3 truncate">{user.email}</p>
             <div className="flex flex-wrap items-center gap-3">
@@ -266,18 +301,66 @@ export default function ProfilePage({ user, onNavigate, onLogout, onUpdated, onR
           {resetting ? "Sending code…" : "Reset password"}
         </button>
         <button
-          onClick={() => onNavigate("delete-account")}
-          className="flex-1 py-2.5 border border-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50"
-        >
-          Delete account
-        </button>
-        <button
           onClick={onLogout}
           className="flex-1 py-2.5 border border-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors"
         >
           Log out
         </button>
       </div>
+
+      <button
+        onClick={() => setConfirmDelete(true)}
+        className="w-full mt-6 py-2 text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+      >
+        Delete account
+      </button>
+
+      {/* Confirm */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/30 flex items-end sm:items-center justify-center z-50 p-4" onClick={closeDelete}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-[#162A46] mb-2">Delete your account?</h3>
+            <p className="text-sm text-[#3F6B5A] mb-5 leading-relaxed">
+              You'll be logged out and your account will be closed. You can't do this while you still have
+              requests or errands in progress.
+            </p>
+            {deleteMsg && (
+              <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2.5 text-xs text-red-600">{deleteMsg}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={closeDelete}
+                className="flex-1 py-2.5 border border-[#E4E8E6] text-[#1B2522] text-sm font-medium rounded-lg hover:bg-[#F7F9F8] transition-colors"
+              >
+                Keep account
+              </button>
+              <button
+                onClick={deleteAccount}
+                disabled={deleting}
+                className="flex-1 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-60 transition-colors"
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Done. user-service already ended the session, so OK just logs out here */}
+      {deletedMsg && (
+        <div className="fixed inset-0 bg-black/30 flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
+            <h3 className="text-base font-semibold text-[#162A46] mb-2">Account deleted</h3>
+            <p className="text-sm text-[#3F6B5A] mb-5 leading-relaxed">{deletedMsg}</p>
+            <button
+              onClick={onLogout}
+              className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] transition-colors"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

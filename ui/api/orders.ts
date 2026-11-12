@@ -1,3 +1,4 @@
+// AI-assisted (Claude Opus 5.5), 2026-11-12: keep supplierId for the pickup place lookup; see ui/ai-usage/usage-log.md, entry 002
 // AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
 // Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
 // Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
@@ -58,6 +59,7 @@ const toOrder = (o: ApiOrder): Order => ({
   id: o.id,
   pickupLocation: o.pickupLocation,
   pickupStore: o.pickupStore,
+  supplierId: o.supplierId,
   deliveryLocation: o.destination,
   description: o.requestDetails,
   credits: o.credits,

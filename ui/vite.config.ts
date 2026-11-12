@@ -16,6 +16,8 @@ export default defineConfig({
       '/backend/orders/locations': { target: 'http://localhost:3003', rewrite: (p) => p.replace(/^\/backend/, '') },
       '/backend/orders':    { target: 'http://localhost:3003', rewrite: (p) => p.replace(/^\/backend/, '') },
       '/backend/credits':   { target: 'http://localhost:3004', rewrite: (p) => p.replace(/^\/backend/, '') },
+      // ws: true so Socket.IO can upgrade to a WebSocket
+      '/backend/chat':      { target: 'http://localhost:3005', rewrite: (p) => p.replace(/^\/backend/, ''), ws: true },
     },
   },
 })

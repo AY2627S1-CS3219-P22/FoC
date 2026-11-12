@@ -1,3 +1,4 @@
+// AI-assisted (Claude Opus 5.5), 2026-11-12: supplierId on orders; see ui/ai-usage/usage-log.md, entry 002
 // AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
 // Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
 // Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
@@ -23,6 +24,7 @@ import { getMe, logout, requestResetPassword, type ApiUser } from "./api/users"
 import { deliveryFeedback } from "./api/orders"
 import { getBalance } from "./api/credits"
 import { refreshToken } from "./api/client"
+import { closeChatSocket } from "./api/chat"
 
 export type Page =
   | "login"
@@ -43,8 +45,9 @@ export type Page =
 
 export interface Order {
   id: string
-  pickupLocation: string
+  pickupLocation: string  // order-service stores the supplier's "lat, lng" here
   pickupStore: string
+  supplierId?: string
   deliveryLocation: string
   description: string
   credits: number
@@ -214,6 +217,8 @@ export default function App() {
   const handleLogout = () => {
     logout().catch(() => {})
     localStorage.removeItem("token")
+    // so the next person to log in doesn't reuse this chat connection
+    closeChatSocket()
     setUser(CURRENT_USER)
     setIsLoggedIn(false)
     navigate("login")

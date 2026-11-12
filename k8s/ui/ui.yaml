@@ -28,6 +28,7 @@ spec:
             - { name: SUPPLIER_SERVICE_URL, value: "http://supplier-service.foc.svc.cluster.local:3002" }
             - { name: ORDER_SERVICE_URL, value: "http://order-service.foc.svc.cluster.local:3003" }
             - { name: CREDIT_SERVICE_URL, value: "http://credit-service.foc.svc.cluster.local:3004" }
+            - { name: CHAT_SERVICE_URL, value: "http://chat-service.foc.svc.cluster.local:3005" }
           readinessProbe:
             httpGet: { path: /health, port: http }
             periodSeconds: 10

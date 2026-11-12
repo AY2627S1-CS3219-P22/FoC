@@ -1,6 +1,8 @@
+// AI-assisted (Claude Opus 5.5), 2026-11-12: show/hide password toggle; see ui/ai-usage/usage-log.md, entry 002
 import React, { useState } from "react"
 import type { Page } from "../App"
 import { login } from "../api/users"
+import PasswordInput from "../components/PasswordInput"
 
 interface Props {
   notice?: string  // e.g. after signing up
@@ -101,8 +103,7 @@ export default function LoginPage({ notice, onLogin, onNavigate }: Props) {
               </div>
               <div>
                 <label className="block text-xs font-medium text-[#1B2522] mb-1.5">Password</label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"

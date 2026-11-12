@@ -1,3 +1,4 @@
+// AI-assisted (Claude Opus 5.5), 2026-11-12: deleteMe now returns the message; see ui/ai-usage/usage-log.md, entry 004
 import { useState } from "react"
 import { deleteMe } from "../api/users"
 
@@ -15,9 +16,9 @@ export default function DeleteAccountPage({ email, onDeleted, onBack }: Props) {
     setError("")
     setLoading(true)
     try {
-      const result = await deleteMe()
+      const message = await deleteMe()
       localStorage.removeItem("token")
-      onDeleted(result.message)
+      onDeleted(message)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete the account.")
       setLoading(false)

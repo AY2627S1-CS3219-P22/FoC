@@ -1,3 +1,5 @@
+// AI-assisted (Claude Opus 5.5), 2026-11-12: progress row follows status, full details, pickup place name; see ui/ai-usage/usage-log.md, entry 002
+// AI-assisted (Claude Opus 5.5), 2026-11-12: pass order status to the chat; see ui/ai-usage/usage-log.md, entry 003
 // AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
 // Scope: UI order editing, credit-history details, confirmation wrapping, and regression checks.
 // Human review pending. Exact prompts and verification: ui/ai-usage/ui-order-fix.md.
@@ -6,9 +8,19 @@
 // AI-assisted (Claude), reviewed and tested by Maliha
 import { useRef, useState } from "react"
 import type { Order } from "../App"
+import ChatPanel from "../components/ChatPanel"
 import { editOrder, getOrder, newRequestKey, isValidOrderDeadline, orderError, type OrderPatch } from "../api/orders"
 import StatusBadge from "../components/StatusBadge"
 import { useOrder } from "../hooks/useOrder"
+import { mapsLink, usePickupPlace } from "../hooks/usePickupPlace"
+
+// how far along the errand is, for the Pickup → Deliver → Complete row
+const JOURNEY = ["Pickup", "Deliver", "Complete"] as const
+function journeyStep(status: Order["status"]) {
+  if (status === "picked-up") return 1
+  if (status === "delivered") return 2
+  return 0
+}
 
 interface Props {
   initialOrder: Order
@@ -67,6 +79,11 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
       setSaving(false)
     }
   }
+
+  const pickupPlace = usePickupPlace(order)
+  const pickupMap = mapsLink(order.pickupLocation)
+  const step = journeyStep(order.status)
+  const ended = order.status === "cancelled" || order.status === "expired"
 
   const isRequester = order.requesterId === currentUserId
   const isCourier   = !isRequester && order.courierId === currentUserId
@@ -129,8 +146,11 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
               </svg>
             </div>
             <p className="text-[10px] font-semibold text-[#3F6B5A] uppercase tracking-wider mb-0.5">Pickup</p>
-            <p className="text-sm font-semibold text-[#162A46] truncate">{order.pickupLocation}</p>
-            <p className="text-xs text-[#3F6B5A] truncate">{order.pickupStore}</p>
+            <p className="text-sm font-semibold text-[#162A46] break-words">{order.pickupStore}</p>
+            {pickupPlace && <p className="text-xs text-[#3F6B5A] break-words">{pickupPlace}</p>}
+            {pickupMap && (
+              <a href={pickupMap} target="_blank" rel="noreferrer" className="text-[11px] text-[#1A4A36] underline">Open in Maps</a>
+            )}
           </div>
 
           <div className="flex items-center gap-1 px-1 flex-shrink-0 pb-4">
@@ -148,16 +168,19 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
               </svg>
             </div>
             <p className="text-[10px] font-semibold text-[#3F6B5A] uppercase tracking-wider mb-0.5">Deliver</p>
-            <p className="text-sm font-semibold text-[#162A46] truncate">{order.deliveryLocation}</p>
-            <p className="text-xs text-[#3F6B5A]">&nbsp;</p>
+            <p className="text-sm font-semibold text-[#162A46] break-words">{order.deliveryLocation}</p>
           </div>
         </div>
 
         <div className="flex items-center justify-center gap-2 text-xs text-[#9CA3AF] border-t border-[#E4E8E6] pt-4 mb-4">
-          {["Pickup", "Deliver", "Complete"].map((s, i) => (
+          {ended ? (
+            <span>This errand was {order.status}.</span>
+          ) : JOURNEY.map((s, i) => (
             <span key={s} className="flex items-center gap-2">
-              <span className={i === 0 ? "text-[#1A4A36] font-medium" : ""}>{s}</span>
-              {i < 2 && <span className="text-[#E4E8E6]">→</span>}
+              <span className={i <= step ? "text-[#1A4A36] font-medium" : ""}>
+                {i < step || order.status === "delivered" ? "✓ " : ""}{s}
+              </span>
+              {i < JOURNEY.length - 1 && <span className="text-[#E4E8E6]">→</span>}
             </span>
           ))}
         </div>
@@ -165,12 +188,14 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
         <div className="space-y-2.5">
           {[
             { label: "Instructions",   value: order.description },
-            { label: "Deadline",       value: order.deadline },
+            { label: "Deliver by",     value: order.deadline },
             { label: "Credits",        value: `${order.credits} credits` },
+            { label: "Posted",         value: order.createdAt },
+            { label: "Courier",        value: order.courierName ?? "Not accepted yet" },
           ].map(({ label, value }) => (
             <div key={label} className="flex gap-4">
               <span className="text-xs text-[#3F6B5A] w-24 flex-shrink-0 pt-0.5">{label}</span>
-              <span className="text-xs text-[#1B2522] flex-1 font-medium">{value}</span>
+              <span className="text-xs text-[#1B2522] min-w-0 flex-1 font-medium whitespace-pre-wrap [overflow-wrap:anywhere]">{value}</span>
             </div>
           ))}
         </div>
@@ -230,7 +255,7 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
       )}
       {isCourier && order.status === "accepted" && (
         <div className="bg-[#E8F1ED] border border-[#1A4A36]/10 rounded-lg px-4 py-3 mb-4 text-center">
-          <p className="text-xs text-[#1A4A36] font-medium">You are the courier — head to {order.pickupLocation} to pick up.</p>
+          <p className="text-xs text-[#1A4A36] font-medium">You are the courier — head to {order.pickupStore}{pickupPlace ? ` (${pickupPlace})` : ""} to pick up.</p>
         </div>
       )}
       {isCourier && order.status === "picked-up" && (
@@ -242,6 +267,9 @@ export default function OrderDetailsPage({ initialOrder, currentUserId, onBack, 
       {actionError && (
         <p role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-center text-xs text-red-600">{actionError}</p>
       )}
+
+      {/* Chat between the two people on the errand, once a courier has it */}
+      {(isRequester || isCourier) && order.courierId && <ChatPanel orderId={order.id} status={order.status} />}
 
       {/* ── ACTION AREA ── */}
 

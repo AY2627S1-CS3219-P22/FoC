@@ -1,3 +1,4 @@
+// AI-assisted (Claude Opus 5.5), 2026-11-12: background refresh of open requests; see ui/ai-usage/usage-log.md, entry 002
 // AI Assistance Disclosure: ChatGPT (Codex, GPT-6), 2026-11-12.
 // Scope: Open-request refresh, visibility explanation, and request cleanup.
 // Human review pending; see ui/ai-usage/ui-order-fix.md.
@@ -28,6 +29,14 @@ export default function OrdersPage({ onNavigate, onSelectOrder }: Props) {
       .catch(err => { if (!controller.signal.aborted) setError(orderError(err)) })
     return () => controller.abort()
   }, [attempt])
+
+  // quietly pick up new requests from other students without the loading flash
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (!document.hidden) listOrders("open").then(setOrders).catch(() => {})
+    }, 20_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   return (
     <div className="mx-auto w-full max-w-6xl px-3 py-5 sm:px-6 sm:py-8 lg:px-8">
