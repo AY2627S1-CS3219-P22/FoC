@@ -9,10 +9,7 @@ resources:
   - chat-config.yaml
   - chat-service.yaml
   - chat-redis.yaml
-  # Enable autoscaling only after the code change in k8s/README.md
-  # ("Enabling chat autoscaling"): uncomment this line and remove
-  # `replicas: 1` from chat-service.yaml in the same commit.
-  # - chat-hpa.yaml
+  - chat-hpa.yaml
 images:
   - name: ghcr.io/ay2627s1-cs3219-p22/foc/chat-service
     newTag: latest

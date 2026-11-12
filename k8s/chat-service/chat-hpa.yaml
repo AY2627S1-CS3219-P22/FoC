@@ -1,9 +1,8 @@
 # AI Assistance Disclosure: Claude Code (Claude Opus 5.5), 2026-11-12.
 # Scope: chat-service autoscaling, copied from credit-hpa.yaml.
 # Details: ai/usage-log.md, entry 008.
-# NOT in kustomization.yaml yet. Only enable it after chat-service uses the
-# Socket.IO Redis adapter and the UI connects with WebSocket only (see
-# k8s/README.md, "Enabling chat autoscaling"). Before that, a second pod would
+# Works because chat-service shares rooms through the Socket.IO Redis adapter
+# and the UI connects with WebSocket only. Without those, a second pod would
 # split users between pods and their messages would not reach each other.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

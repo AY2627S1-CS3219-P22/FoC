@@ -126,20 +126,17 @@ kubectl -n foc delete pod -l role=load          # stop; scales back down after ~
   ap-southeast-1). Until SES production access is granted, every recipient address must
   also be verified (`aws sesv2 create-email-identity`), so verify demo accounts first.
 
-## Enabling chat autoscaling
+## Chat autoscaling
 
-`chat-redis.yaml` (deployed) and `chat-hpa.yaml` (not yet deployed: 2–6 pods at 70% CPU) are
-ready. Enable them only after the code changes below are on `main`:
+`chat-hpa.yaml` scales chat-service between 2 and 6 pods at 70% CPU. It works because of:
 
-1. **chat-service** (done on `ui/final-n2h`, ai/usage-log.md entry 009): with `REDIS_URL`
-   set, the Socket.IO Redis adapter shares chat rooms between pods, and `migrate()` takes a
+1. **chat-service** (ai/usage-log.md entry 009): with `REDIS_URL` set, the Socket.IO Redis
+   adapter (`chat-redis.yaml`) shares chat rooms between pods, and `migrate()` takes a
    Postgres advisory lock so pods starting together don't race creating the tables. See
    "Running several instances" in `chat-service/README.md`.
-2. **UI** (done on the same branch): `ui/api/chat.ts` connects with `transports: ["websocket"]`,
-   so each chat stays on one pod for its whole connection and no sticky sessions are needed.
-3. **Kubernetes**, in one commit after 1 and 2 are on `main`: uncomment `- chat-hpa.yaml` in
-   `k8s/chat-service/kustomization.yaml` and delete `replicas: 1` from
-   `k8s/chat-service/chat-service.yaml`. CD then deploys it.
+2. **UI**: `ui/api/chat.ts` connects with `transports: ["websocket"]`, so each chat stays on
+   one pod for its whole connection and no sticky sessions are needed.
+3. **Kubernetes**: `chat-service.yaml` has no `replicas` field, so the HPA owns the pod count.
 
 Check with `kubectl -n foc get hpa chat-service` (2 pods), then open the same errand's chat as
 requester and courier in two browsers: messages must arrive both ways. The 5-minute cleanup
