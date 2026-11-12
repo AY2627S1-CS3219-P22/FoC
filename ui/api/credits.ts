@@ -45,26 +45,57 @@ export const creditLabel = (entry: CreditEntry) => LABELS[entry.type] ?? entry.t
 export const creditChange = (entry: CreditEntry) =>
   entry.totalAmountChange !== 0 ? entry.totalAmountChange : -entry.totalReservedChange
 
-// Reservations and order edits stay on the order. History only records money
-// that actually moved: paying a courier, or being paid for a completed request.
+// Reservations and order edits stay on the order. History shows the welcome
+// grant plus settled payments: paying a courier, or being paid as the courier.
 const VISIBLE_CREDIT_TYPES = new Set<CreditEntry["type"]>(["INITIAL_GRANT", "TRANSFER_OUT", "TRANSFER_IN"])
 
 export function visibleCreditHistory(entries: CreditEntry[]): CreditEntry[] {
   return entries.filter(entry => VISIBLE_CREDIT_TYPES.has(entry.type))
 }
 
-// Reservation rows can fill a raw page, so keep reading until the visible
-// payments fill the list or the ledger ends.
-export async function loadVisibleCreditHistory(limit = 10): Promise<CreditEntry[]> {
+// Same bookmark the credit service accepts: the history entry id, base64url-encoded.
+function encodeHistoryBookmark(entryId: string) {
+  return btoa(entryId).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
+export type CreditHistoryPage = { entries: CreditEntry[]; nextPageToken: string | null }
+
+// One page of payments. Reservation rows are skipped, and the next token points
+// at the last payment shown so the following page does not skip or repeat one.
+export async function loadVisibleCreditHistory(limit = 5, pageToken?: string): Promise<CreditHistoryPage> {
   const visible: CreditEntry[] = []
-  let pageToken: string | undefined
-  for (let page = 0; page < 20 && visible.length < limit; page++) {
-    const result = await getCreditHistory(50, pageToken)
-    visible.push(...visibleCreditHistory(result.entries))
-    if (!result.nextPageToken) break
-    pageToken = result.nextPageToken
+  let token = pageToken
+  let buffer: CreditEntry[] = []
+  let index = 0
+  let moreRaw = true
+  let fetches = 0
+
+  const nextRaw = async (): Promise<CreditEntry | null> => {
+    if (index < buffer.length) return buffer[index++]
+    if (!moreRaw || fetches >= 20) return null
+    fetches += 1
+    const result = await getCreditHistory(50, token)
+    buffer = result.entries
+    index = 0
+    moreRaw = result.nextPageToken !== null
+    token = result.nextPageToken ?? undefined
+    if (buffer.length === 0) return null
+    return buffer[index++]
   }
-  return visible.slice(0, limit)
+
+  while (visible.length < limit) {
+    const entry = await nextRaw()
+    if (!entry) return { entries: visible, nextPageToken: null }
+    if (VISIBLE_CREDIT_TYPES.has(entry.type)) visible.push(entry)
+  }
+
+  while (true) {
+    const entry = await nextRaw()
+    if (!entry) return { entries: visible, nextPageToken: null }
+    if (VISIBLE_CREDIT_TYPES.has(entry.type)) {
+      return { entries: visible, nextPageToken: encodeHistoryBookmark(visible[visible.length - 1].id) }
+    }
+  }
 }
 
 export function creditDescription(entry: CreditEntry, orders: { id: string; description: string; pickupStore: string }[]) {

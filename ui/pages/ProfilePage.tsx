@@ -5,6 +5,8 @@ import { useEffect, useState } from "react"
 import type { User, Order, Page } from "../App"
 import { formatTime, listOrders } from "../api/orders"
 import { creditChange, creditDescription, loadVisibleCreditHistory, type CreditEntry } from "../api/credits"
+
+const HISTORY_PAGE_SIZE = 6
 import { updateMe, type ApiUser } from "../api/users"
 
 interface Props {
@@ -25,13 +27,31 @@ export default function ProfilePage({ user, onNavigate, onLogout, onUpdated, onR
   const [myRequests, setMyRequests]     = useState<Order[]>([])
   const [myDeliveries, setMyDeliveries] = useState<Order[]>([])
   const [history, setHistory]           = useState<CreditEntry[] | null>(null)
+  const [historyToken, setHistoryToken] = useState<string | undefined>(undefined)
+  const [historyTokens, setHistoryTokens] = useState<Array<string | undefined>>([undefined])
+  const [historyIndex, setHistoryIndex] = useState(0)
+  const [nextHistoryToken, setNextHistoryToken] = useState<string | null>(null)
+  const [loadingHistory, setLoadingHistory] = useState(true)
 
   // stats just stay at 0 if order-service isn't up
   useEffect(() => {
     listOrders("requested").then(setMyRequests).catch(() => {})
     listOrders("assigned").then(setMyDeliveries).catch(() => {})
-    loadVisibleCreditHistory(10).then(setHistory).catch(() => setHistory(null))
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setLoadingHistory(true)
+    loadVisibleCreditHistory(HISTORY_PAGE_SIZE, historyToken)
+      .then((page) => {
+        if (cancelled) return
+        setHistory(page.entries)
+        setNextHistoryToken(page.nextPageToken)
+      })
+      .catch(() => { if (!cancelled) setHistory(null) })
+      .finally(() => { if (!cancelled) setLoadingHistory(false) })
+    return () => { cancelled = true }
+  }, [historyToken])
 
   const delivered = myDeliveries.filter((o) => o.status === "delivered")
   const initials = user.name.split(" ").map((n) => n[0]).join("").slice(0, 2)
@@ -213,7 +233,9 @@ export default function ProfilePage({ user, onNavigate, onLogout, onUpdated, onR
         <div className="px-5 py-3.5 border-b border-[#E4E8E6]">
           <h3 className="text-sm font-semibold text-[#162A46]">Credit History</h3>
         </div>
-        {!history || history.length === 0 ? (
+        {loadingHistory && !history ? (
+          <p className="text-xs text-[#3F6B5A] text-center py-6">Loading credit history…</p>
+        ) : !history || history.length === 0 ? (
           <p className="text-xs text-[#3F6B5A] text-center py-6">
             {history ? "No credit activity yet" : "Couldn't load credit history"}
           </p>
@@ -245,6 +267,36 @@ export default function ProfilePage({ user, onNavigate, onLogout, onUpdated, onR
               </div>
             )
           })
+        )}
+        {history && (historyIndex > 0 || nextHistoryToken) && (
+          <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-[#E4E8E6]">
+            <button
+              type="button"
+              disabled={historyIndex === 0 || loadingHistory}
+              onClick={() => {
+                const previous = historyTokens[historyIndex - 1]
+                setHistoryIndex((index) => index - 1)
+                setHistoryToken(previous)
+              }}
+              className="text-xs font-medium text-[#1B2522] px-3 py-1.5 border border-[#E4E8E6] rounded-lg hover:bg-[#F7F9F8] disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <span className="text-xs text-[#9CA3AF]">Page {historyIndex + 1}</span>
+            <button
+              type="button"
+              disabled={!nextHistoryToken || loadingHistory}
+              onClick={() => {
+                if (!nextHistoryToken) return
+                setHistoryTokens((tokens) => [...tokens.slice(0, historyIndex + 1), nextHistoryToken])
+                setHistoryIndex((index) => index + 1)
+                setHistoryToken(nextHistoryToken)
+              }}
+              className="text-xs font-medium text-[#1B2522] px-3 py-1.5 border border-[#E4E8E6] rounded-lg hover:bg-[#F7F9F8] disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
         )}
       </div>
 
