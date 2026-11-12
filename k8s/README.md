@@ -1,4 +1,4 @@
-<!-- AI Assistance Disclosure: Claude Code (Claude Opus), 2026-11-06. Details: ai/usage-log.md, entry 004. -->
+<!-- AI Assistance Disclosure: Claude Code (Claude Opus 5.5), 2026-11-06-2026-11-12. Details: ai/usage-log.md, entry 004, 007, 008, 009. -->
 
 # Kubernetes (EKS) deployment
 
@@ -7,7 +7,7 @@ in the `foc` namespace. Only the UI is public; the services talk to each other
 inside the cluster.
 
 ```
-browser ──http──► AWS load balancer ──► ui (nginx) ──/backend/*──► user · supplier · order · credit
+browser ──http──► AWS load balancer ──► ui (nginx) ──/backend/*──► user · supplier · order · credit · chat
                                                                      │        each has its own Postgres
                                                                      └─────── events via RabbitMQ
 ```
@@ -23,7 +23,7 @@ browser ──http──► AWS load balancer ──► ui (nginx) ──/backen
 
 Key ideas:
 - **Config vs secrets:** non-secret settings are in the `*-config.yaml` files. Passwords and tokens are created with `kubectl create secret` and are never committed.
-- **Migrations:** user, order and credit run their migrations in an `initContainer` before the app starts. Supplier's database sets itself up from `supplier-service/db/init/` on first start.
+- **Migrations:** user, order and credit run their migrations in an `initContainer` before the app starts. Supplier's database sets itself up from `supplier-service/db/init/` on first start. Chat creates its tables itself on startup (`chat-service/schema.sql`).
 - **Autoscaling:** order and credit run 2–6 pods, adding pods when average CPU is above 70% of their request.
 
 ## Images
@@ -59,7 +59,8 @@ Reference steps for a fresh cluster (run from the repo root, logged in with `aws
    kubectl -n foc create configmap supplier-db-seed --from-file=supplier-service/data/campus_suppliers.json
    ```
 5. Apply in order, waiting for each to be ready: `shared/rabbitmq.yaml` → `user-service/` →
-   `credit-service/` → `supplier-service/` → `order-service/` → `ui/`
+   `credit-service/` → `supplier-service/` → `order-service/` → `chat-service/` → `ui/`
+   (use `kubectl apply -k k8s/<service>/` for folders with a `kustomization.yaml`)
 6. The link: `kubectl -n foc get svc ui` → open `http://<EXTERNAL-IP hostname>`
 
 **Teardown:** delete the namespace first (`kubectl delete namespace foc`), so the load
@@ -118,9 +119,31 @@ kubectl -n foc delete pod -l role=load          # stop; scales back down after ~
 - **http only:** HTTPS needs a domain and certificate. Because of that, `user-config.yaml`
   sets `COOKIE_SECURE: "false"` so the login cookie works over http.
 - **Single replica databases** on one disk each. Fine for the demo, not highly available.
+- **Chat runs one pod until its autoscaling is enabled** (next section). Socket.IO keeps chat
+  rooms in the pod's memory, so a second pod would not see the first pod's users. Open chats
+  reconnect automatically after a restart or deploy.
 - **SES sandbox:** OTP email is sent from `campusdash.otp@gmail.com` (verified in SES,
   ap-southeast-1). Until SES production access is granted, every recipient address must
   also be verified (`aws sesv2 create-email-identity`), so verify demo accounts first.
+
+## Enabling chat autoscaling
+
+`chat-redis.yaml` (deployed) and `chat-hpa.yaml` (not yet deployed: 2–6 pods at 70% CPU) are
+ready. Enable them only after the code changes below are on `main`:
+
+1. **chat-service** (done on `ui/final-n2h`, ai/usage-log.md entry 009): with `REDIS_URL`
+   set, the Socket.IO Redis adapter shares chat rooms between pods, and `migrate()` takes a
+   Postgres advisory lock so pods starting together don't race creating the tables. See
+   "Running several instances" in `chat-service/README.md`.
+2. **UI** (done on the same branch): `ui/api/chat.ts` connects with `transports: ["websocket"]`,
+   so each chat stays on one pod for its whole connection and no sticky sessions are needed.
+3. **Kubernetes**, in one commit after 1 and 2 are on `main`: uncomment `- chat-hpa.yaml` in
+   `k8s/chat-service/kustomization.yaml` and delete `replicas: 1` from
+   `k8s/chat-service/chat-service.yaml`. CD then deploys it.
+
+Check with `kubectl -n foc get hpa chat-service` (2 pods), then open the same errand's chat as
+requester and courier in two browsers: messages must arrive both ways. The 5-minute cleanup
+of ended chats runs on every pod; that is safe, since deleting the same rows twice does nothing.
 
 ## Troubleshooting
 
