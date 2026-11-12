@@ -41,6 +41,9 @@ interface Props {
 const inputCls =
   "w-full px-3.5 py-2.5 border border-[#E4E8E6] rounded-lg text-sm text-[#1B2522] bg-white focus:outline-none focus:border-[#1A4A36] focus:ring-1 focus:ring-[#1A4A36] transition-colors placeholder-[#9CA3AF]"
 
+export const zeroCreditRequestMessage =
+  "You currently have 0 credits. A request requires a minimum of 1."
+
 export default function CreateRequestPage({ user, onNavigate, onCreated }: Props) {
   const [step, setStep] = useState(1)
   const [now, setNow] = useState(() => Date.now())
@@ -104,7 +107,11 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
 
   // if the balance didn't load, let order-service decide whether there are enough credits
   const creditsAfter = user.credits === null ? null : user.credits - form.credits
-  const minimumCreditError = form.credits < 1 ? "A minimum of 1 Credit is required to create an order." : ""
+  const minimumCreditError = user.credits === 0
+    ? zeroCreditRequestMessage
+    : form.credits < 1
+      ? "A minimum of 1 Credit is required to create an order."
+      : ""
   const notEnough = creditsAfter !== null && creditsAfter < 0
 
   const [submitting, setSubmitting] = useState(false)
@@ -113,6 +120,7 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
   const [lastAttempt, setLastAttempt] = useState<{ body: string; key: string } | null>(null)
 
   const handleSubmit = async () => {
+    if (user.credits === 0) { setSubmitError(zeroCreditRequestMessage); return }
     if (notEnough) { setSubmitError("Insufficient credits."); return }
     if (minimumCreditError) { setSubmitError(minimumCreditError); return }
     if (!form.destinationLocationId) { setStep(2); return }
@@ -143,6 +151,21 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
 
   const step1Valid = !!form.pickupLocation && !!form.supplier
   const step2Valid = !!form.destinationLocationId && form.description.trim().length > 0 && deadlineValid
+
+  if (user.credits === 0) {
+    return (
+      <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6 sm:py-8">
+        <button
+          onClick={() => onNavigate("orders")}
+          className="mb-6 flex items-center gap-1.5 text-sm text-[#3F6B5A] transition-colors hover:text-[#1A4A36]"
+        >
+          Back to Orders
+        </button>
+        <h1 className="mb-2 text-xl font-semibold text-[#162A46]">Create a Request</h1>
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{zeroCreditRequestMessage}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto w-full max-w-lg px-3 py-5 sm:px-6 sm:py-8">
