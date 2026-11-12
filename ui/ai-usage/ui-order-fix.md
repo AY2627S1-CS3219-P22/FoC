@@ -131,3 +131,33 @@ No backend validation or password policy was changed. README disclosure updated.
 Human review pending.
 Signup follow-up verification: all 14 UI tests, TypeScript, production build and
 whitespace checks passed using Node 22.22.0.
+
+## Follow-up: minimum credit message
+
+Exact user prompt (attachment showed a zero-credit request validation error):
+
+> Change the text to "A minimum of 1 Credit is required to create an order."
+
+Key response: CreateRequestPage displays that exact message for credit amounts
+below one, disables submission, and guards the submit handler before making an API
+request. Other backend errors retain their original meaning.
+Affected file: ui/pages/CreateRequestPage.tsx. Human review pending.
+Minimum-credit follow-up verification: UI TypeScript and git diff --check passed.
+
+## Follow-up: credit picker boundaries
+
+Exact user prompt (attachment showed zero balance and an offered credit):
+
+> when this user has 0 credits and tries to create an order, it goes from 4 to 3 to 2 to 1, and then only goes to 0 if i press on the + sign. once it reaches 0 and i press on the minus sign credit offered goes from 0 to 1 credit for some reason
+
+Key response: Both buttons now use the same limits. A zero balance initializes
+the offer to zero and disables both buttons. Positive balances initialize to
+the smaller of four and the balance, with a one-credit minimum. Balance updates
+clamp the existing offer. Submission remains blocked below one credit or above
+a known balance. Unknown balances retain the existing backend-check behavior.
+
+Affected files: ui/pages/CreateRequestPage.tsx and ui/tests/creditOffer.test.cjs.
+No backend or dependencies changed. Human review pending.
+Credit-picker verification: all 16 UI tests, TypeScript, production build and
+whitespace checks passed with Node 22.22.0. Tests were run from ui after an initial
+root-directory invocation matched no test files.

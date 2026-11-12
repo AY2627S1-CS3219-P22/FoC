@@ -13,6 +13,12 @@ import { CATEGORIES, categoryLabel, supplierLocation, type Category } from "../a
 import { createOrder, newRequestKey, isValidOrderDeadline, orderError, type NewOrder } from "../api/orders"
 import { useSuppliers } from "../hooks/useSuppliers"
 
+export function clampCreditOffer(amount: number, balance: number | null) {
+  const maximum = balance === null ? 2147483647 : Math.max(0, Math.min(balance, 2147483647))
+  const minimum = maximum === 0 ? 0 : 1
+  return Math.min(maximum, Math.max(minimum, amount))
+}
+
 function localDateValue(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
 }
@@ -83,12 +89,20 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
     deliveryLocation: "",
     destinationLocationId: "",
     description: "",
-    credits: 4,
+    credits: clampCreditOffer(4, user.credits),
   })
+
+  useEffect(() => {
+    setForm(previous => {
+      const credits = clampCreditOffer(previous.credits, user.credits)
+      return credits === previous.credits ? previous : { ...previous, credits }
+    })
+  }, [user.credits])
 
   const set = (k: keyof typeof form, v: string | number) => setForm((f) => ({ ...f, [k]: v }))
   // if the balance didn't load, let order-service decide whether there are enough credits
   const creditsAfter = user.credits === null ? null : user.credits - form.credits
+  const minimumCreditError = form.credits < 1 ? "A minimum of 1 Credit is required to create an order." : ""
   const notEnough = creditsAfter !== null && creditsAfter < 0
 
   const [submitting, setSubmitting] = useState(false)
@@ -97,6 +111,8 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
   const [lastAttempt, setLastAttempt] = useState<{ body: string; key: string } | null>(null)
 
   const handleSubmit = async () => {
+    if (notEnough) { setSubmitError("Insufficient credits."); return }
+    if (minimumCreditError) { setSubmitError(minimumCreditError); return }
     if (!form.destinationLocationId) { setStep(2); return }
     if (!validateDeadline()) { setStep(2); return }
     const order: NewOrder = {
@@ -297,8 +313,10 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
             <label className="block text-xs font-medium text-[#1B2522] mb-3">Credits offered</label>
             <div className="flex items-center gap-4">
               <button
-                onClick={() => set("credits", Math.max(1, form.credits - 1))}
-                className="w-10 h-10 border border-[#E4E8E6] rounded-lg flex items-center justify-center hover:bg-[#F7F9F8] text-xl text-[#1B2522] transition-colors"
+                aria-label="Decrease credits"
+                disabled={form.credits <= 1 || submitting}
+                onClick={() => setForm(previous => ({ ...previous, credits: clampCreditOffer(previous.credits - 1, user.credits) }))}
+                className="w-10 h-10 border border-[#E4E8E6] rounded-lg flex items-center justify-center hover:bg-[#F7F9F8] text-xl text-[#1B2522] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 −
               </button>
@@ -307,8 +325,10 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
                 <span className="text-sm text-[#3F6B5A] ml-1.5">credits</span>
               </div>
               <button
-                onClick={() => set("credits", user.credits === null ? form.credits + 1 : Math.min(user.credits, form.credits + 1))}
-                className="w-10 h-10 border border-[#E4E8E6] rounded-lg flex items-center justify-center hover:bg-[#F7F9F8] text-xl text-[#1B2522] transition-colors"
+                aria-label="Increase credits"
+                disabled={form.credits >= (user.credits ?? 2147483647) || submitting}
+                onClick={() => setForm(previous => ({ ...previous, credits: clampCreditOffer(previous.credits + 1, user.credits) }))}
+                className="w-10 h-10 border border-[#E4E8E6] rounded-lg flex items-center justify-center hover:bg-[#F7F9F8] text-xl text-[#1B2522] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 +
               </button>
@@ -356,10 +376,10 @@ export default function CreateRequestPage({ user, onNavigate, onCreated }: Props
           </p>
 
           {!deadlineValid && <p role="alert" className="text-xs text-red-600">Go back and choose a delivery time at least one hour from now.</p>}
-          {submitError && <p role="alert" className="text-xs text-red-600">{submitError}</p>}
+          {(minimumCreditError || submitError) && <p role="alert" className="text-xs text-red-600">{minimumCreditError || submitError}</p>}
           <button
             onClick={handleSubmit}
-            disabled={notEnough || !deadlineValid || submitting}
+            disabled={!!minimumCreditError || notEnough || !deadlineValid || submitting}
             className="w-full py-2.5 bg-[#1A4A36] text-white text-sm font-medium rounded-lg hover:bg-[#163D2C] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {submitting ? "Placing request…" : "Place Request"}

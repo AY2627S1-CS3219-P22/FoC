@@ -247,3 +247,11 @@ Signup validation follow-up, 2026-11-12: UI collects all missing password
 requirements and displays separate error lines on submit. Existing User service
 rules are preserved. Exact prompt, affected files and checks are in
 [the UI usage record](ui/ai-usage/ui-order-fix.md). Human review pending.
+
+Minimum-credit wording follow-up, 2026-11-12: creation UI displays the requested
+minimum-one-credit message and blocks zero-credit submissions. Exact prompt and
+checks are recorded in the UI usage record. Human review pending.
+
+Credit-picker follow-up, 2026-11-12: zero balance initializes to zero with both
+adjustment buttons disabled. Existing offers clamp when balance changes.
+Boundary tests and exact prompt are in the UI usage record. Human review pending.
